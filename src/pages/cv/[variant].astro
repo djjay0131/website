@@ -1,0 +1,218 @@
+---
+import Base from "../../layouts/Base.astro";
+import { loadCV, listVariants } from "../../lib/cv-data";
+import { mdToHtml } from "../../lib/md";
+import path from "node:path";
+
+export function getStaticPaths() {
+  const variants = listVariants(path.resolve("data/variants"));
+  return variants.map((v) => ({ params: { variant: v } }));
+}
+
+const { variant } = Astro.params;
+const cv = loadCV(path.resolve("data"), variant!);
+const base = import.meta.env.BASE_URL;
+---
+
+<Base title={`${cv.meta.name} — CV (${variant})`} description={cv.summary?.text}>
+  <div class="print-banner">
+    For the formal PDF version, <a href={`${base}pdfs/${variant}.pdf`}>download it here</a>.
+  </div>
+
+  <article class="cv">
+    <header class="cv-header">
+      <h1>{cv.meta.name}</h1>
+      <div class="cv-contact">
+        <span>{cv.meta.contact.email}</span>
+        {cv.meta.contact.github && <span>GitHub: {cv.meta.contact.github}</span>}
+        {cv.meta.contact.linkedin && <span>LinkedIn: {cv.meta.contact.linkedin}</span>}
+      </div>
+      <a href={`${base}pdfs/${variant}.pdf`} class="pdf-link">Download PDF</a>
+    </header>
+
+    {cv.summary && (
+      <section>
+        <h2>Professional Summary</h2>
+        <p set:html={mdToHtml(cv.summary.text)} />
+      </section>
+    )}
+
+    {cv.employment.length > 0 && (
+      <section>
+        <h2>Professional Experience</h2>
+        {cv.employment.map((role) => (
+          <div class="entry">
+            <div class="entry-header">
+              <span class="entry-dates">{role.dates}</span>
+              <div class="entry-title">
+                <strong>{role.company}</strong> — {role.location}
+                <br />
+                <em>{role.title}</em>
+              </div>
+            </div>
+            {role.bullets.length > 0 && (
+              <ul>
+                {role.bullets.map((b) => (
+                  <li set:html={mdToHtml(b.text)} />
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </section>
+    )}
+
+    {cv.education.length > 0 && (
+      <section>
+        <h2>Education</h2>
+        {cv.education.map((e) => (
+          <div class="entry">
+            <div class="entry-header">
+              <span class="entry-dates">{e.dates ?? ""}</span>
+              <div class="entry-title">
+                <strong>{e.degree}</strong>, {e.institution}, {e.location}
+              </div>
+            </div>
+          </div>
+        ))}
+      </section>
+    )}
+
+    {cv.projects.length > 0 && (
+      <section>
+        <h2>Selected Projects &amp; Research</h2>
+        {cv.projects.map((p) => (
+          <div class="entry">
+            <div class="entry-title">
+              <strong>{p.name}</strong> — <span set:html={mdToHtml(p.summary)} />
+            </div>
+          </div>
+        ))}
+      </section>
+    )}
+
+    {cv.skills.length > 0 && (
+      <section>
+        <h2>Technical Skills</h2>
+        {cv.skills.map((g) => (
+          <div class="skill-group">
+            <h3>{g.group}</h3>
+            <p>{g.items.join("; ")}</p>
+          </div>
+        ))}
+      </section>
+    )}
+
+    {(cv.misc.awards.length > 0 || cv.misc.certifications.length > 0) && (
+      <section>
+        <h2>Miscellaneous Experience</h2>
+        {cv.misc.awards.length > 0 && (
+          <>
+            <h3>Awards and Achievements</h3>
+            {cv.misc.awards.map((a) => (
+              <div class="entry">
+                <div class="entry-header">
+                  <span class="entry-dates">{a.dates ?? ""}</span>
+                  <div class="entry-title" set:html={mdToHtml(a.text)} />
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+        {cv.misc.certifications.length > 0 && (
+          <>
+            <h3>Certification</h3>
+            <ul>
+              {cv.misc.certifications.map((c) => (
+                <li set:html={mdToHtml(c.text)} />
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+    )}
+
+    {cv.referee && (
+      <section>
+        <h2>References</h2>
+        <p>{cv.referee.text}</p>
+      </section>
+    )}
+  </article>
+</Base>
+
+<style>
+  .cv-header {
+    margin-bottom: 2rem;
+  }
+
+  .cv-contact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 0.5rem 0 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    color: var(--color-muted);
+  }
+
+  .pdf-link {
+    display: inline-block;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    padding: 0.35rem 0.75rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+  }
+
+  .entry {
+    margin-bottom: 1.25rem;
+  }
+
+  .entry-header {
+    display: flex;
+    gap: 1rem;
+    align-items: baseline;
+  }
+
+  .entry-dates {
+    flex-shrink: 0;
+    min-width: 90px;
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    color: var(--color-muted);
+  }
+
+  .entry-title {
+    flex: 1;
+  }
+
+  .skill-group {
+    margin-bottom: 0.75rem;
+  }
+
+  .skill-group p {
+    color: var(--color-muted);
+  }
+
+  ul {
+    margin: 0.5rem 0 0 1rem;
+    padding-left: 1rem;
+  }
+
+  li {
+    margin-bottom: 0.4rem;
+  }
+
+  @media (max-width: 600px) {
+    .entry-header {
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .entry-dates {
+      min-width: auto;
+    }
+  }
+</style>

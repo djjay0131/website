@@ -1,0 +1,118 @@
+---
+import Base from "../../layouts/Base.astro";
+import { parseBib } from "../../lib/bib";
+import path from "node:path";
+
+const groups = parseBib(path.resolve("data/own-bib.bib"));
+
+const sections = [
+  { title: "Journal Articles", entries: groups.articles },
+  { title: "Conference Proceedings", entries: groups.proceedings },
+  { title: "Books and Chapters", entries: groups.books },
+  { title: "Other", entries: groups.other },
+].filter((s) => s.entries.length > 0);
+---
+
+<Base title="Jason Cusati — Papers" description="Research publications by Jason Cusati.">
+  <h1>Research Publications</h1>
+
+  {sections.map((section) => (
+    <>
+      <h2>{section.title}</h2>
+      {section.entries.map((paper) => (
+        <div class="paper-card">
+          <div class="paper-title">{paper.title}</div>
+          <div class="paper-authors">{paper.authors.join(", ")}</div>
+          <div class="paper-meta">
+            {paper.journal && <span>{paper.journal}</span>}
+            {paper.year > 0 && <span>{paper.year}</span>}
+          </div>
+          <div class="paper-links">
+            {paper.url && (
+              <a href={paper.url} target="_blank" rel="noopener noreferrer">
+                Link
+              </a>
+            )}
+            {paper.doi && (
+              <a href={`https://doi.org/${paper.doi}`} target="_blank" rel="noopener noreferrer">
+                DOI
+              </a>
+            )}
+            {paper.github && (
+              <a href={paper.github} target="_blank" rel="noopener noreferrer" class="github-link">
+                GitHub
+              </a>
+            )}
+          </div>
+          {paper.abstract && (
+            <details class="paper-abstract">
+              <summary>Abstract</summary>
+              <p>{paper.abstract}</p>
+            </details>
+          )}
+        </div>
+      ))}
+    </>
+  ))}
+</Base>
+
+<style>
+  .paper-card {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .paper-card:last-child {
+    border-bottom: none;
+  }
+
+  .paper-title {
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .paper-authors {
+    color: var(--color-muted);
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .paper-meta {
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    color: var(--color-muted);
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .paper-links {
+    display: flex;
+    gap: 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+  }
+
+  .github-link {
+    font-weight: 600;
+  }
+
+  .paper-abstract {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .paper-abstract summary {
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 0.85rem;
+    color: var(--color-primary);
+  }
+
+  .paper-abstract p {
+    margin-top: 0.5rem;
+    color: var(--color-muted);
+  }
+</style>

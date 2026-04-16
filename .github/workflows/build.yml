@@ -1,0 +1,69 @@
+name: build-and-deploy
+
+on:
+  push:
+    branches: [main]
+  repository_dispatch:
+    types: [cv-updated]
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Fetch CV data and PDF
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/content data/variants public/pdfs
+          gh release download latest --repo djjay0131/cv --pattern "cv-data.zip" --dir /tmp/cv-fetch --clobber
+          gh release download latest --repo djjay0131/cv --pattern "academic.pdf" --dir public/pdfs --clobber
+          unzip -o /tmp/cv-fetch/cv-data.zip -d /tmp/cv-fetch/extracted
+          cp -r /tmp/cv-fetch/extracted/data/* data/ 2>/dev/null || true
+          cp /tmp/cv-fetch/extracted/own-bib.bib data/ 2>/dev/null || true
+          cp /tmp/cv-fetch/extracted/photo_jason_1.jpeg public/ 2>/dev/null || true
+          rm -rf /tmp/cv-fetch
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Astro
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
