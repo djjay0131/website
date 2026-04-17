@@ -12,9 +12,31 @@ export function getStaticPaths() {
 const { variant } = Astro.params;
 const cv = loadCV(path.resolve("data"), variant!);
 const base = import.meta.env.BASE_URL;
+
+const personJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: cv.meta.name,
+  email: cv.meta.contact.email,
+  url: `https://djjay0131.github.io/website/cv/${variant}`,
+  image: `https://djjay0131.github.io/website/photo_jason_1.jpeg`,
+  alumniOf: cv.education.map((e) => ({
+    "@type": "CollegeOrUniversity",
+    name: e.institution,
+  })),
+  worksFor: cv.employment.length > 0 ? {
+    "@type": "Organization",
+    name: cv.employment[0].company,
+  } : undefined,
+  hasCredential: cv.misc.certifications.map((c) => ({
+    "@type": "EducationalOccupationalCredential",
+    name: c.text,
+  })),
+  jobTitle: cv.employment.length > 0 ? cv.employment[0].title : undefined,
+};
 ---
 
-<Base title={`${cv.meta.name} — CV (${variant})`} description={cv.summary?.text}>
+<Base title={`${cv.meta.name} — CV (${variant})`} description={cv.summary?.text} jsonLd={personJsonLd}>
   <div class="print-banner">
     For the formal PDF version, <a href={`${base}pdfs/${variant}.pdf`}>download it here</a>.
   </div>

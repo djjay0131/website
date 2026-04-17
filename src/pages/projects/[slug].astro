@@ -1,0 +1,47 @@
+---
+import Base from "../../layouts/Base.astro";
+import { loadContentPool } from "../../lib/cv-data";
+import { mdToHtml } from "../../lib/md";
+import path from "node:path";
+
+export function getStaticPaths() {
+  const pool = loadContentPool(path.resolve("data/content"));
+  return Object.values(pool.projects).map((p) => ({
+    params: { slug: p.id },
+    props: { project: p },
+  }));
+}
+
+const { project } = Astro.props;
+---
+
+<Base title={`${project.name} — Jason Cusati`} description={project.summary}>
+  <article>
+    <h1>{project.name}</h1>
+    <p set:html={mdToHtml(project.summary)} />
+
+    {project.github && (
+      <p class="project-link">
+        <a href={project.github} target="_blank" rel="noopener noreferrer">
+          View on GitHub
+        </a>
+      </p>
+    )}
+  </article>
+</Base>
+
+<style>
+  .project-link {
+    margin-top: 1.5rem;
+    font-family: var(--font-sans);
+  }
+
+  .project-link a {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-weight: 500;
+  }
+</style>

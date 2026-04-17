@@ -67,3 +67,71 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  smoke-test:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Wait for Pages propagation
+        run: sleep 30
+
+      - name: Smoke test live routes
+        run: |
+          SITE="https://djjay0131.github.io/website"
+          FAILED=0
+          for ROUTE in "/" "/cv/academic" "/papers/" "/pdfs/academic.pdf" "/projects/"; do
+            STATUS=$(curl -sL -o /dev/null -w "%{http_code}" "${SITE}${ROUTE}")
+            if [ "$STATUS" = "200" ]; then
+              echo "OK: ${ROUTE} → ${STATUS}"
+            else
+              echo "FAIL: ${ROUTE} → ${STATUS}"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::One or more smoke tests failed."
+            exit 1
+          fi
+
+      - name: Verify non-empty body on key routes
+        run: |
+          SITE="https://djjay0131.github.io/website"
+          for ROUTE in "/cv/academic" "/papers/"; do
+            BODY_SIZE=$(curl -sL "${SITE}${ROUTE}" | wc -c)
+            if [ "$BODY_SIZE" -lt 500 ]; then
+              echo "::error::${ROUTE} returned suspiciously small body (${BODY_SIZE} bytes)"
+              exit 1
+            fi
+            echo "OK: ${ROUTE} body is ${BODY_SIZE} bytes"
+          done
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          WEBHOOK_URL: ${{ secrets.NOTIFICATION_WEBHOOK }}
+        run: |
+          if [ -n "${WEBHOOK_URL}" ]; then
+            curl -sSf -X POST "${WEBHOOK_URL}" \
+              -H "Content-Type: application/json" \
+              -d "{\"text\":\"Website smoke test failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          else
+            echo "No NOTIFICATION_WEBHOOK configured; skipping notification."
+          fi
+
+  notify-failure:
+    needs: [build, deploy]
+    runs-on: ubuntu-24.04
+    if: failure()
+    steps:
+      - name: Send failure notification
+        env:
+          WEBHOOK_URL: ${{ secrets.NOTIFICATION_WEBHOOK }}
+        run: |
+          if [ -n "${WEBHOOK_URL}" ]; then
+            curl -sSf -X POST "${WEBHOOK_URL}" \
+              -H "Content-Type: application/json" \
+              -d "{\"text\":\"Website build/deploy failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          else
+            echo "No NOTIFICATION_WEBHOOK configured; skipping notification."
+          fi
