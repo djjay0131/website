@@ -1,6 +1,7 @@
 /**
  * Load and resolve CV data from the content pool + variant selector.
- * Mirrors the logic of cv/tools/resolver.py.
+ * Mirrors the logic of cv/tools/resolver.py, including the extended DSL:
+ * bullet filtering, role collapse, and skills item subsetting.
  */
 
 import fs from "node:fs";
@@ -36,7 +37,7 @@ export interface Bullet {
 
 export interface EmploymentRole {
   id: string;
-  dates: string;
+  dates?: string;
   company: string;
   location: string;
   title: string;
@@ -90,9 +91,22 @@ export interface Referee {
   text: string;
 }
 
+// --- Extended DSL types ---
+
+export interface EmploymentSelector {
+  id: string;
+  bullets?: string[];
+  collapse?: boolean;
+}
+
+export interface SkillSelector {
+  id: string;
+  items?: string[];
+}
+
 export interface VariantSection {
   type: string;
-  include?: string[];
+  include?: (string | Record<string, unknown>)[];
   content_id?: string;
 }
 
@@ -112,10 +126,15 @@ export interface ContentPool {
   referees: Record<string, Referee>;
 }
 
+export interface ResolvedEmploymentEntry {
+  role: EmploymentRole;
+  collapse: boolean;
+}
+
 export interface ResolvedCV {
   meta: Meta;
   summary?: Summary;
-  employment: EmploymentRole[];
+  employment: ResolvedEmploymentEntry[];
   education: EducationEntry[];
   projects: Project[];
   skills: SkillGroup[];
@@ -165,18 +184,54 @@ export function loadVariant(variantPath: string): VariantConfig {
   return readYaml<VariantConfig>(variantPath);
 }
 
-function lookup<T>(pool: Record<string, T>, ids: string[], sectionType: string): T[] {
-  return ids.map((id) => {
-    const item = pool[id];
-    if (!item) throw new Error(`section '${sectionType}': unknown content id '${id}'`);
-    return item;
-  });
-}
-
 function lookupOne<T>(pool: Record<string, T>, id: string, sectionType: string): T {
   const item = pool[id];
   if (!item) throw new Error(`section '${sectionType}': unknown content id '${id}'`);
   return item;
+}
+
+function lookup<T>(pool: Record<string, T>, ids: string[], sectionType: string): T[] {
+  return ids.map((id) => lookupOne(pool, id, sectionType));
+}
+
+function resolveEmployment(
+  pool: ContentPool,
+  include: (string | Record<string, unknown>)[],
+): ResolvedEmploymentEntry[] {
+  return include.map((item) => {
+    if (typeof item === "string") {
+      return { role: lookupOne(pool.employment, item, "employment"), collapse: false };
+    }
+    const sel = item as EmploymentSelector;
+    let role = lookupOne(pool.employment, sel.id, "employment");
+    if (sel.bullets !== undefined) {
+      const bulletMap = new Map(role.bullets.map((b) => [b.id, b]));
+      const filtered = sel.bullets.map((bid) => {
+        const b = bulletMap.get(bid);
+        if (!b) throw new Error(`employment role '${sel.id}': unknown bullet '${bid}'`);
+        return b;
+      });
+      role = { ...role, bullets: filtered };
+    }
+    return { role, collapse: sel.collapse ?? false };
+  });
+}
+
+function resolveSkills(
+  pool: ContentPool,
+  include: (string | Record<string, unknown>)[],
+): SkillGroup[] {
+  return include.map((item) => {
+    if (typeof item === "string") {
+      return lookupOne(pool.skills, item, "skills");
+    }
+    const sel = item as SkillSelector;
+    const group = lookupOne(pool.skills, sel.id, "skills");
+    if (sel.items !== undefined) {
+      return { ...group, items: sel.items };
+    }
+    return group;
+  });
 }
 
 export function resolveVariant(pool: ContentPool, variant: VariantConfig): ResolvedCV {
@@ -198,19 +253,19 @@ export function resolveVariant(pool: ContentPool, variant: VariantConfig): Resol
         break;
       case "employment":
         if (!section.include) throw new Error("employment section requires include list");
-        result.employment = lookup(pool.employment, section.include, "employment");
+        result.employment = resolveEmployment(pool, section.include);
         break;
       case "education":
         if (!section.include) throw new Error("education section requires include list");
-        result.education = lookup(pool.education, section.include, "education");
+        result.education = lookup(pool.education, section.include as string[], "education");
         break;
       case "projects":
         if (!section.include) throw new Error("projects section requires include list");
-        result.projects = lookup(pool.projects, section.include, "projects");
+        result.projects = lookup(pool.projects, section.include as string[], "projects");
         break;
       case "skills":
         if (!section.include) throw new Error("skills section requires include list");
-        result.skills = lookup(pool.skills, section.include, "skills");
+        result.skills = resolveSkills(pool, section.include);
         break;
       case "misc":
         result.misc = pool.misc;
@@ -229,7 +284,7 @@ export function resolveVariant(pool: ContentPool, variant: VariantConfig): Resol
   return result;
 }
 
-// --- Convenience: list all variants ---
+// --- Convenience ---
 
 export function listVariants(variantsDir: string): string[] {
   return fs
@@ -237,8 +292,6 @@ export function listVariants(variantsDir: string): string[] {
     .filter((f) => f.endsWith(".yaml"))
     .map((f) => f.replace(/\.yaml$/, ""));
 }
-
-// --- Load + resolve in one call ---
 
 export function loadCV(dataDir: string, variantName: string): ResolvedCV {
   const pool = loadContentPool(path.join(dataDir, "content"));

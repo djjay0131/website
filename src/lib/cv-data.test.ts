@@ -31,7 +31,8 @@ describe("resolveVariant", () => {
     expect(resolved.meta.name).toBe("Jason Cusati");
     expect(resolved.summary?.text).toContain("Results-oriented");
     expect(resolved.employment.length).toBe(5);
-    expect(resolved.employment[0].id).toBe("yoh-adf-architect");
+    expect(resolved.employment[0].role.id).toBe("yoh-adf-architect");
+    expect(resolved.employment[0].collapse).toBe(false);
     expect(resolved.education.length).toBe(3);
     expect(resolved.projects.length).toBe(4);
     expect(resolved.skills.length).toBe(4);

@@ -26,13 +26,13 @@ const personJsonLd = {
   })),
   worksFor: cv.employment.length > 0 ? {
     "@type": "Organization",
-    name: cv.employment[0].company,
+    name: cv.employment[0].role.company,
   } : undefined,
   hasCredential: cv.misc.certifications.map((c) => ({
     "@type": "EducationalOccupationalCredential",
     name: c.text,
   })),
-  jobTitle: cv.employment.length > 0 ? cv.employment[0].title : undefined,
+  jobTitle: cv.employment.length > 0 ? cv.employment[0].role.title : undefined,
 };
 ---
 
@@ -62,25 +62,37 @@ const personJsonLd = {
     {cv.employment.length > 0 && (
       <section>
         <h2>Professional Experience</h2>
-        {cv.employment.map((role) => (
+        {cv.employment.filter((e) => !e.collapse).map((entry) => (
           <div class="entry">
             <div class="entry-header">
-              <span class="entry-dates">{role.dates}</span>
+              <span class="entry-dates">{entry.role.dates ?? ""}</span>
               <div class="entry-title">
-                <strong>{role.company}</strong> — {role.location}
+                <strong>{entry.role.company}</strong> — {entry.role.location}
                 <br />
-                <em>{role.title}</em>
+                <em>{entry.role.title}</em>
               </div>
             </div>
-            {role.bullets.length > 0 && (
+            {entry.role.bullets.length > 0 && (
               <ul>
-                {role.bullets.map((b) => (
+                {entry.role.bullets.map((b) => (
                   <li set:html={mdToHtml(b.text)} />
                 ))}
               </ul>
             )}
           </div>
         ))}
+        {cv.employment.some((e) => e.collapse) && (
+          <div class="entry">
+            <div class="entry-title">
+              <em>Earlier employment history includes tenure as {
+                cv.employment
+                  .filter((e) => e.collapse)
+                  .map((e) => `${e.role.title}, ${e.role.company}`)
+                  .join("; ")
+              }.</em>
+            </div>
+          </div>
+        )}
       </section>
     )}
 
