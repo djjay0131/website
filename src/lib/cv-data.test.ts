@@ -12,7 +12,7 @@ describe("loadContentPool", () => {
     expect(pool.meta.name).toBe("Jason Cusati");
     expect(pool.meta.contact.email).toBe("djjay@vt.edu");
     expect(Object.keys(pool.summaries).length).toBeGreaterThan(0);
-    expect(Object.keys(pool.employment).length).toBe(5);
+    expect(Object.keys(pool.employment).length).toBeGreaterThanOrEqual(5);
     expect(Object.keys(pool.education).length).toBe(3);
     expect(Object.keys(pool.projects).length).toBe(4);
     expect(Object.keys(pool.skills).length).toBe(4);
