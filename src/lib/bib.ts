@@ -94,7 +94,7 @@ export function parseBib(bibPath: string): PapersByGroup {
 
   // Sort each group year-descending.
   for (const group of Object.values(result)) {
-    group.sort((a, b) => b.year - a.year);
+    group.sort((a: PaperEntry, b: PaperEntry) => b.year - a.year);
   }
 
   return result;
