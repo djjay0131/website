@@ -7,9 +7,11 @@
   },
   "scripts": {
     "dev": "astro dev",
+    "dev:local": "npm run data:link && astro dev",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
+    "data:link": "./scripts/sync-local-data.sh",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -30,8 +30,8 @@ describe("resolveVariant", () => {
 
     expect(resolved.meta.name).toBe("Jason Cusati");
     expect(resolved.summary?.text).toContain("Results-oriented");
-    expect(resolved.employment.length).toBe(5);
-    expect(resolved.employment[0].role.id).toBe("yoh-adf-architect");
+    expect(resolved.employment.length).toBe(6);
+    expect(resolved.employment[0].role.id).toBe("vt-gra-mrs");
     expect(resolved.employment[0].collapse).toBe(false);
     expect(resolved.education.length).toBe(3);
     expect(resolved.projects.length).toBe(4);
@@ -61,7 +61,7 @@ describe("loadCV", () => {
   it("loads and resolves in one call", () => {
     const cv = loadCV(DATA_DIR, "academic");
     expect(cv.meta.name).toBe("Jason Cusati");
-    expect(cv.employment.length).toBe(5);
+    expect(cv.employment.length).toBe(6);
   });
 });
 
