@@ -1,6 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { loadCV, listVariants } from "../../lib/cv-data";
+import { parseBib } from "../../lib/bib";
 import { mdToHtml } from "../../lib/md";
 import path from "node:path";
 
@@ -11,6 +12,13 @@ export function getStaticPaths() {
 
 const { variant } = Astro.params;
 const cv = loadCV(path.resolve("data"), variant!);
+const papers = parseBib(path.resolve("data/own-bib.bib"));
+const pubSections = [
+  { title: "Journal Articles", entries: papers.articles },
+  { title: "Conference Proceedings", entries: papers.proceedings },
+  { title: "Books and Chapters", entries: papers.books },
+  { title: "Other", entries: papers.other },
+].filter((s) => s.entries.length > 0);
 const base = import.meta.env.BASE_URL;
 
 const personJsonLd = {
@@ -125,6 +133,34 @@ const personJsonLd = {
       </section>
     )}
 
+    {pubSections.length > 0 && (
+      <section>
+        <h2>Publications</h2>
+        {pubSections.map((s) => (
+          <>
+            {pubSections.length > 1 && <h3>{s.title}</h3>}
+            {s.entries.map((p) => (
+              <div class="entry">
+                <div class="entry-header">
+                  <span class="entry-dates">{p.year > 0 ? String(p.year) : ""}</span>
+                  <div class="entry-title">
+                    <strong>{p.title}</strong>
+                    {p.authors.length > 0 && <span> — {p.authors.join(", ")}</span>}
+                    {p.journal && <span>. <em>{p.journal}</em></span>}
+                    <div class="pub-links">
+                      {p.url && <a href={p.url} target="_blank" rel="noopener noreferrer">Link</a>}
+                      {p.doi && <a href={`https://doi.org/${p.doi}`} target="_blank" rel="noopener noreferrer">DOI</a>}
+                      {p.github && <a href={p.github} target="_blank" rel="noopener noreferrer">GitHub</a>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>
+        ))}
+      </section>
+    )}
+
     {cv.skills.length > 0 && (
       <section>
         <h2>Technical Skills</h2>
@@ -228,6 +264,14 @@ const personJsonLd = {
 
   .skill-group p {
     color: var(--color-muted);
+  }
+
+  .pub-links {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+    font-family: var(--font-sans);
+    font-size: 0.825rem;
   }
 
   ul {
