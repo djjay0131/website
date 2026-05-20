@@ -112,7 +112,15 @@ export interface VariantSection {
 
 export interface VariantConfig {
   variant: string;
+  label?: string;
+  description?: string;
   sections: VariantSection[];
+}
+
+export interface VariantSummary {
+  slug: string;
+  label: string;
+  description: string;
 }
 
 export interface ContentPool {
@@ -202,7 +210,7 @@ function resolveEmployment(
     if (typeof item === "string") {
       return { role: lookupOne(pool.employment, item, "employment"), collapse: false };
     }
-    const sel = item as EmploymentSelector;
+    const sel = item as unknown as EmploymentSelector;
     let role = lookupOne(pool.employment, sel.id, "employment");
     if (sel.bullets !== undefined) {
       const bulletMap = new Map(role.bullets.map((b) => [b.id, b]));
@@ -225,7 +233,7 @@ function resolveSkills(
     if (typeof item === "string") {
       return lookupOne(pool.skills, item, "skills");
     }
-    const sel = item as SkillSelector;
+    const sel = item as unknown as SkillSelector;
     const group = lookupOne(pool.skills, sel.id, "skills");
     if (sel.items !== undefined) {
       return { ...group, items: sel.items };
@@ -291,6 +299,24 @@ export function listVariants(variantsDir: string): string[] {
     .readdirSync(variantsDir)
     .filter((f) => f.endsWith(".yaml"))
     .map((f) => f.replace(/\.yaml$/, ""));
+}
+
+function titleizeSlug(slug: string): string {
+  return slug
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+export function loadVariantSummaries(variantsDir: string): VariantSummary[] {
+  return listVariants(variantsDir).map((slug) => {
+    const cfg = loadVariant(path.join(variantsDir, `${slug}.yaml`));
+    return {
+      slug,
+      label: cfg.label ?? titleizeSlug(slug),
+      description: cfg.description ?? "",
+    };
+  });
 }
 
 export function loadCV(dataDir: string, variantName: string): ResolvedCV {
