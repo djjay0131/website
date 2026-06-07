@@ -30,12 +30,20 @@ if [[ -f "$CV_ABS/photo_jason_1.jpeg" ]]; then
   ln -s "$CV_ABS/photo_jason_1.jpeg" public/photo_jason_1.jpeg
 fi
 
-if [[ -f "$CV_ABS/academic.pdf" ]]; then
-  rm -f public/pdfs/academic.pdf
-  ln -s "$CV_ABS/academic.pdf" public/pdfs/academic.pdf
-  echo "[sync] linked academic.pdf"
-else
-  echo "[sync] no local academic.pdf — PDF download link will 404 until you run latexmk in the cv repo"
+# Link every variant PDF the cv repo has produced (one per variant in data/variants/).
+shopt -s nullglob
+linked=0
+for pdf in "$CV_ABS"/*.pdf; do
+  name=$(basename "$pdf")
+  rm -f "public/pdfs/$name"
+  ln -s "$pdf" "public/pdfs/$name"
+  echo "[sync] linked $name"
+  linked=$((linked + 1))
+done
+shopt -u nullglob
+
+if [[ $linked -eq 0 ]]; then
+  echo "[sync] no local variant PDFs — Download links will 404 until you run \`make all\` in the cv repo"
 fi
 
 echo "[sync] linked data + assets from $CV_ABS"

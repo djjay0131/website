@@ -38,7 +38,8 @@ jobs:
         run: |
           mkdir -p data/content data/variants public/pdfs
           gh release download latest --repo djjay0131/cv --pattern "cv-data.zip" --dir /tmp/cv-fetch --clobber
-          gh release download latest --repo djjay0131/cv --pattern "academic.pdf" --dir public/pdfs --clobber
+          # Pull every variant PDF in the release (one per data/variants/<name>.yaml).
+          gh release download latest --repo djjay0131/cv --pattern "*.pdf" --dir public/pdfs --clobber
           unzip -o /tmp/cv-fetch/cv-data.zip -d /tmp/cv-fetch/extracted
           cp -r /tmp/cv-fetch/extracted/data/* data/ 2>/dev/null || true
           cp /tmp/cv-fetch/extracted/own-bib.bib data/ 2>/dev/null || true
@@ -80,7 +81,7 @@ jobs:
         run: |
           SITE="https://djjay0131.github.io/website"
           FAILED=0
-          for ROUTE in "/" "/cv/academic" "/papers/" "/pdfs/academic.pdf" "/projects/"; do
+          for ROUTE in "/" "/resumes/" "/cv/academic" "/cv/research-professional" "/papers/" "/pdfs/academic.pdf" "/projects/"; do
             STATUS=$(curl -sL -o /dev/null -w "%{http_code}" "${SITE}${ROUTE}")
             if [ "$STATUS" = "200" ]; then
               echo "OK: ${ROUTE} → ${STATUS}"

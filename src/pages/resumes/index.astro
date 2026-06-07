@@ -1,0 +1,77 @@
+---
+import Base from "../../layouts/Base.astro";
+import { loadVariantSummaries } from "../../lib/cv-data";
+import path from "node:path";
+
+const variants = loadVariantSummaries(path.resolve("data/variants"));
+const base = import.meta.env.BASE_URL;
+---
+
+<Base
+  title="Jason Cusati — Resumes"
+  description="Resume variants by Jason Cusati — research, academic, and software-engineering versions."
+>
+  <h1>Resumes</h1>
+  <p class="lead">
+    Multiple versions tuned for different audiences. View on the web or download
+    the formatted PDF.
+  </p>
+
+  <ul class="resume-list">
+    {variants.map((v) => (
+      <li class="resume-entry">
+        <h2>{v.label}</h2>
+        {v.description && <p class="description">{v.description}</p>}
+        <div class="links">
+          <a href={`${base}cv/${v.slug}`} class="view-link">View on web</a>
+          <a href={`${base}pdfs/${v.slug}.pdf`} class="pdf-link">Download PDF</a>
+        </div>
+      </li>
+    ))}
+  </ul>
+</Base>
+
+<style>
+  .lead {
+    color: var(--color-muted);
+    margin-bottom: 2rem;
+  }
+
+  .resume-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .resume-entry {
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .resume-entry:last-child {
+    border-bottom: none;
+  }
+
+  .resume-entry h2 {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0.4rem;
+  }
+
+  .description {
+    color: var(--color-muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .links {
+    display: flex;
+    gap: 1.25rem;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+  }
+
+  .pdf-link {
+    color: var(--color-muted);
+  }
+</style>
