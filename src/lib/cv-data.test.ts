@@ -21,7 +21,7 @@ describe("loadContentPool", () => {
     expect(Object.keys(pool.summaries).length).toBeGreaterThan(0);
     expect(Object.keys(pool.employment).length).toBeGreaterThanOrEqual(5);
     expect(Object.keys(pool.education).length).toBe(3);
-    expect(Object.keys(pool.projects).length).toBe(4);
+    expect(Object.keys(pool.projects).length).toBeGreaterThanOrEqual(7);
     expect(Object.keys(pool.skills).length).toBe(4);
     expect(pool.misc.awards.length).toBeGreaterThan(0);
     expect(pool.misc.certifications.length).toBeGreaterThan(0);
