@@ -1,0 +1,141 @@
+---
+import Base from "../../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+
+type Status = "done" | "in-progress" | "todo";
+
+interface Day {
+  day: number;
+  date: string;
+  focus: string;
+  status: Status;
+}
+
+const days: Day[] = [
+  { day: 1, date: "2026-07-18", focus: "Positioning, form parse, stream decision, reference outreach kickoff", status: "done" },
+  { day: 2, date: "2026-07-19", focus: "Resume strategy & architecture; team research priming; public notebook scaffold", status: "in-progress" },
+  { day: 3, date: "2026-07-20", focus: "Projects/research YAML rewrites; primary-stream reading", status: "todo" },
+  { day: 4, date: "2026-07-21", focus: "Professional experience rewrite; MI reading", status: "todo" },
+  { day: 5, date: "2026-07-22", focus: "Resume v1 + critique; secondary-stream reading; team-notes checkpoint", status: "todo" },
+  { day: 6, date: "2026-07-23", focus: "Draft all application answers", status: "todo" },
+  { day: 7, date: "2026-07-24", focus: "Reference briefing packages; link audit", status: "todo" },
+  { day: 8, date: "2026-07-25", focus: "Resume v2; narrative consistency pass", status: "todo" },
+  { day: 9, date: "2026-07-26", focus: "Full package review; resume v3; near-final answers", status: "todo" },
+  { day: 10, date: "2026-07-27", focus: "Proofread, verify, submit", status: "todo" },
+];
+
+const statusLabel: Record<Status, string> = {
+  done: "Done",
+  "in-progress": "In progress",
+  todo: "Todo",
+};
+---
+
+<Base
+  title="Jason Cusati — Fellowship Sprint Schedule"
+  description="10-day sprint schedule for Jason Cusati's Anthropic Fellows 2026 application."
+>
+  <p class="crumbs"><a href={`${base}fellowship-sprint/`}>← Fellowship sprint</a></p>
+
+  <h1>Sprint Schedule</h1>
+  <p class="lede">
+    Ten days, three parallel tracks: resume, team research, public notebook. This
+    page shows Track A (resume) as the day-by-day spine; the other tracks feed in
+    as the reading and notes pages fill up.
+  </p>
+
+  <table class="schedule">
+    <thead>
+      <tr>
+        <th scope="col">Day</th>
+        <th scope="col">Date</th>
+        <th scope="col">Focus</th>
+        <th scope="col">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {days.map((d) => (
+        <tr class={`row-${d.status}`}>
+          <td>{d.day}</td>
+          <td>{d.date}</td>
+          <td>{d.focus}</td>
+          <td><span class={`badge badge-${d.status}`}>{statusLabel[d.status]}</span></td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  <p class="footnote">
+    Sprint window closes 2026-07-27. Status updates land here as each day
+    completes.
+  </p>
+</Base>
+
+<style>
+  .crumbs {
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .lede {
+    color: var(--color-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  table.schedule {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+
+  .schedule th,
+  .schedule td {
+    text-align: left;
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: top;
+  }
+
+  .schedule th {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    background: var(--color-surface);
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-done {
+    background: var(--color-accent);
+    color: #fff;
+  }
+
+  .badge-in-progress {
+    background: var(--color-primary);
+    color: #fff;
+  }
+
+  .badge-todo {
+    background: var(--color-border);
+    color: var(--color-muted);
+  }
+
+  .row-done td {
+    color: var(--color-muted);
+  }
+
+  .footnote {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    margin-top: 1.5rem;
+  }
+</style>

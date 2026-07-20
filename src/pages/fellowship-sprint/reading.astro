@@ -1,0 +1,44 @@
+---
+import Base from "../../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base
+  title="Jason Cusati — Fellowship Sprint Reading List"
+  description="Reading list from Jason Cusati's Anthropic Fellows 2026 sprint."
+>
+  <p class="crumbs"><a href={`${base}fellowship-sprint/`}>← Fellowship sprint</a></p>
+
+  <h1>Reading List</h1>
+  <p class="lede">
+    Papers and posts I'm working through during the sprint. Entries land here
+    as I finish them, with a one-sentence takeaway. This is the reading trail,
+    not a curated syllabus.
+  </p>
+
+  <p class="empty-note">
+    No entries yet — the list starts filling on Day 2 (2026-07-19).
+  </p>
+</Base>
+
+<style>
+  .crumbs {
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .lede {
+    color: var(--color-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .empty-note {
+    padding: 2rem;
+    background: var(--color-surface);
+    border-radius: 4px;
+    color: var(--color-muted);
+    font-style: italic;
+    text-align: center;
+  }
+</style>
