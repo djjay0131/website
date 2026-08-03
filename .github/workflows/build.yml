@@ -15,6 +15,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  issues: write   # failure notifications fall back to opening an issue.
 
 # Real deploys (push/schedule/dispatch) stay serialized under a single "pages"
 # group so they never race each other. PR validation builds get their own
@@ -25,7 +26,54 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # This site has no CV content of its own -- it pulls it from the cv repo's
+  # "latest" release at build time. The hourly schedule exists to notice new
+  # releases, but almost every poll finds nothing new and rebuilds identical
+  # bytes. Fingerprint the release assets and compare against the fingerprint
+  # recorded in the currently deployed build; skip the pipeline when they match.
+  #
+  # Only scheduled polls are eligible to skip. Pushes, PRs, cv-updated
+  # dispatches, and manual runs always build -- they imply the inputs or the
+  # site code changed, which the fingerprint alone would not catch.
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+      fingerprint: ${{ steps.compare.outputs.fingerprint }}
+    steps:
+      - name: Compare cv release against the deployed build
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          FP=$(gh release view latest --repo djjay0131/cv --json assets \
+            --jq '[.assets[] | "\(.name):\(.updatedAt)"] | sort | join(",")')
+          echo "fingerprint=${FP}" >> "$GITHUB_OUTPUT"
+          echo "cv release fingerprint: ${FP}"
+
+          if [ "${EVENT_NAME}" != "schedule" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "${EVENT_NAME} run -- building unconditionally."
+            exit 0
+          fi
+
+          # A missing or unreadable build-info.json (first run after this
+          # lands, or a failed deploy) falls through to "changed" and builds.
+          DEPLOYED=$(curl -sfL "https://djjay0131.github.io/website/build-info.json" \
+            | jq -r '.cv_fingerprint // ""' 2>/dev/null || true)
+          echo "deployed fingerprint: ${DEPLOYED:-<none>}"
+
+          if [ -n "${DEPLOYED}" ] && [ "${DEPLOYED}" = "${FP}" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::cv release unchanged since the deployed build; skipping build and deploy."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +89,7 @@ jobs:
       - name: Fetch CV data and PDF
         env:
           GH_TOKEN: ${{ github.token }}
+          CV_FINGERPRINT: ${{ needs.check.outputs.fingerprint }}
         run: |
           mkdir -p data/content data/variants public/pdfs
           gh release download latest --repo djjay0131/cv --pattern "cv-data.zip" --dir /tmp/cv-fetch --clobber
@@ -51,6 +100,17 @@ jobs:
           cp /tmp/cv-fetch/extracted/own-bib.bib data/ 2>/dev/null || true
           cp /tmp/cv-fetch/extracted/photo_jason_1.jpeg public/ 2>/dev/null || true
           rm -rf /tmp/cv-fetch
+
+          # Astro copies public/ verbatim into dist/, so this ships to
+          # <site>/build-info.json and becomes the state the next scheduled
+          # poll compares against. jq handles the quoting.
+          jq -n \
+            --arg fp "${CV_FINGERPRINT}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg run "${GITHUB_RUN_ID}" \
+            '{cv_fingerprint: $fp, built_from_sha: $sha, run_id: $run}' \
+            > public/build-info.json
+          cat public/build-info.json
 
       - name: Run tests
         run: npm test
@@ -113,27 +173,18 @@ jobs:
             echo "OK: ${ROUTE} body is ${BODY_SIZE} bytes"
           done
 
-      - name: Notify on failure
-        if: failure()
-        env:
-          WEBHOOK_URL: ${{ secrets.NOTIFICATION_WEBHOOK }}
-        run: |
-          if [ -n "${WEBHOOK_URL}" ]; then
-            curl -sSf -X POST "${WEBHOOK_URL}" \
-              -H "Content-Type: application/json" \
-              -d "{\"text\":\"Website smoke test failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          else
-            echo "No NOTIFICATION_WEBHOOK configured; skipping notification."
-          fi
-
+  # Single place that reports failures anywhere in the pipeline. The webhook is
+  # optional; the tracking issue is not, so a broken build is visible (and
+  # emailed by GitHub) even with no secrets configured at all. Without this,
+  # nothing surfaced ~190 consecutive scheduled failures over 8 days.
   notify-failure:
-    needs: [build, deploy]
+    needs: [check, build, deploy, smoke-test]
     runs-on: ubuntu-24.04
     # A failed PR check already shows up on the PR itself; only page out for
     # failures on the real deploy path.
     if: failure() && github.event_name != 'pull_request'
     steps:
-      - name: Send failure notification
+      - name: Send webhook notification
         env:
           WEBHOOK_URL: ${{ secrets.NOTIFICATION_WEBHOOK }}
         run: |
@@ -142,5 +193,55 @@ jobs:
               -H "Content-Type: application/json" \
               -d "{\"text\":\"Website build/deploy failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
           else
-            echo "No NOTIFICATION_WEBHOOK configured; skipping notification."
+            echo "No NOTIFICATION_WEBHOOK configured; relying on the tracking issue."
           fi
+
+      - name: Open or update the failure tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create ci-failure \
+            --color B60205 \
+            --description "Automated build/deploy failure" \
+            --force >/dev/null
+
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          EXISTING=$(gh issue list --label ci-failure --state open --limit 1 \
+            --json number --jq '.[0].number // ""')
+
+          # One issue per outage, not one per hourly run -- comment on the open
+          # one instead of filing a new one every hour.
+          if [ -n "${EXISTING}" ]; then
+            gh issue comment "${EXISTING}" \
+              --body "Still failing as of ${GITHUB_EVENT_NAME} run: ${RUN_URL}"
+            echo "Commented on existing issue #${EXISTING}."
+          else
+            gh issue create \
+              --title "build-and-deploy is failing" \
+              --label ci-failure \
+              --body "$(printf '%s\n' \
+                "The \`build-and-deploy\` workflow failed." \
+                "" \
+                "- Run: ${RUN_URL}" \
+                "- Trigger: ${GITHUB_EVENT_NAME}" \
+                "- Commit: ${GITHUB_SHA}" \
+                "" \
+                "This issue is opened automatically and closes on the next fully successful run.")"
+          fi
+
+  # Closes the tracking issue once the pipeline is healthy again. Skipped
+  # automatically on no-op scheduled runs, since its needs are skipped too.
+  notify-recovery:
+    needs: [check, build, deploy, smoke-test]
+    runs-on: ubuntu-24.04
+    if: success() && github.event_name != 'pull_request'
+    steps:
+      - name: Close the failure tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          for N in $(gh issue list --label ci-failure --state open --json number --jq '.[].number'); do
+            gh issue close "${N}" --comment "Recovered: ${RUN_URL}"
+            echo "Closed #${N}."
+          done
