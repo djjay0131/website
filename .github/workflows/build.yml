@@ -3,6 +3,8 @@ name: build-and-deploy
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   repository_dispatch:
     types: [cv-updated]
   schedule:
@@ -14,9 +16,13 @@ permissions:
   pages: write
   id-token: write
 
+# Real deploys (push/schedule/dispatch) stay serialized under a single "pages"
+# group so they never race each other. PR validation builds get their own
+# per-branch group -- they never deploy, so they must not queue behind (or hold
+# up) the deploy lane, and a new push to a PR supersedes the run in flight.
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -123,7 +129,9 @@ jobs:
   notify-failure:
     needs: [build, deploy]
     runs-on: ubuntu-24.04
-    if: failure()
+    # A failed PR check already shows up on the PR itself; only page out for
+    # failures on the real deploy path.
+    if: failure() && github.event_name != 'pull_request'
     steps:
       - name: Send failure notification
         env:
