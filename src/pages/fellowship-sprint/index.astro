@@ -1,0 +1,87 @@
+---
+import Base from "../../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base
+  title="Jason Cusati — Fellowship Sprint Notebook"
+  description="Public research notebook for Jason Cusati's Anthropic Fellows 2026 application sprint."
+>
+  <h1>Fellowship Sprint Notebook</h1>
+  <p class="lede">
+    A public working notebook for my application to the <a
+      href="https://www.anthropic.com/fellows-program"
+      target="_blank"
+      rel="noopener noreferrer">Anthropic Fellows Program</a
+    > (October 2026 cohort). Started 2026-07-18.
+  </p>
+
+  <p>
+    I keep this in the open because doing research work in public sharpens
+    the work itself. What lives here: my day-by-day sprint plan and progress,
+    a running reading list of the papers and posts I'm working through, and
+    short notes on the Anthropic research teams whose work I'm most
+    interested in.
+  </p>
+
+  <p>
+    What does <em>not</em> live here: application-form drafts, reference
+    strategy, self-assessment, percentages. Those are private for the same
+    reason interview prep is: publishing them would be dishonest to the
+    people doing the reviewing.
+  </p>
+
+  <h2>Sections</h2>
+  <ul class="section-list">
+    <li>
+      <a href={`${base}fellowship-sprint/schedule`}>Sprint schedule &amp; progress</a>
+      <span class="section-meta">— 10-day plan (2026-07-18 → 2026-07-27) with progress state</span>
+    </li>
+    <li>
+      <a href={`${base}fellowship-sprint/reading`}>Reading list</a>
+      <span class="section-meta">— papers and posts I'm working through, with brief takeaways</span>
+    </li>
+    <li>
+      <a href={`${base}fellowship-sprint/team-notes`}>Team research notes</a>
+      <span class="section-meta">— what specific Anthropic research directions I'm drawn to, and why</span>
+    </li>
+  </ul>
+
+  <h2>Status</h2>
+  <p>Sprint in progress. Pages fill in as I do the work.</p>
+</Base>
+
+<style>
+  .lede {
+    font-size: 1.1rem;
+    color: var(--color-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .section-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .section-list li {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .section-list li:last-child {
+    border-bottom: none;
+  }
+
+  .section-list a {
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .section-meta {
+    display: block;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+  }
+</style>
