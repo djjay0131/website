@@ -1,0 +1,39 @@
+---
+import Base from "../../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base
+  title="Jason Cusati — Research"
+  description="Research digests and source explorers from Jason Cusati's PhD work on agentic software engineering."
+>
+  <h1>Research</h1>
+  <p class="lede">
+    Working digests from my PhD research. Each section is a synthesized
+    state-of-the-art read on one question, backed by a source dataset you can
+    filter and trace. These are living documents: they carry a date and a
+    method note, and they are regenerated from a research store in the
+    corresponding project repository.
+  </p>
+
+  <h2>Sections</h2>
+  <ul class="section-list">
+    <li>
+      <a href={`${base}research/agentic-harnesses/`}>Agentic harnesses for coding agents</a>
+      <span class="section-meta">
+        — what the scaffold around a language model contributes, academic and
+        industry, with a 268-record source explorer (September 2026)
+      </span>
+    </li>
+  </ul>
+</Base>
+
+<style>
+  .lede { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 1.5rem; }
+  .section-list { list-style: none; padding: 0; }
+  .section-list li { padding: 0.75rem 0; border-bottom: 1px solid var(--color-border); }
+  .section-list li:last-child { border-bottom: none; }
+  .section-list a { font-weight: 600; color: var(--color-primary); }
+  .section-meta { color: var(--color-muted); font-size: 0.95rem; }
+</style>
