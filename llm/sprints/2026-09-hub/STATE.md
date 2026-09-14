@@ -5,99 +5,147 @@
 **Brief:** `llm/plans/2026-09-10-research-hub-orchestration-brief.md`
 **Last updated:** 2026-09-14
 
+Machine-specific paths are never written here. `<canon checkout>` means the path
+declared in `llm/governance/governance-delta.md` §Canon Location.
+
 ---
 
 ## Current position
 
-**Phase 0 — Establish. IN PROGRESS.**
-**BLOCKED ON: Claude Code session restart** (see Blocked, below).
+**Phase 0 — Establish. IN PROGRESS.** `/governance:establish` steps 1–10 and 12
+are done; step 11 (the local `--layout` run) and step 13 (report) are next.
+ADRs 0001–0005 are drafted. The roadmap is delegated to the Chief Product
+Officer, running.
 
 ## Done
 
 - [x] §1 preconditions verified — all pass. Recorded in issue #7.
-- [x] Issue **hub-000** opened: https://github.com/djjay0131/website/issues/7
-      Mode 3 / L2 declared. Preconditions, env caveats, enforcement reality recorded.
-- [x] Branch `gov/establish-hub` cut from `main` (post-pull, includes `src/pages/research/`).
-- [x] Design doc + orchestration brief brought across from `handoff/research-hub`.
-- [x] Tarball moved OUT of the repo → `~/code/phd-milestones.tar.gz` (68565 bytes,
-      77 entries, contains a `.git/`). Confirmed absent from the working tree.
-- [x] Q1 answered: **`cusati.us`**. Q2 answered: **new project**, intended id `cusati-hub`.
+- [x] Issue **hub-000** (#7) opened; Mode 3 / L2 declared; labelled.
+- [x] Branch `gov/establish-hub` cut from `main`; design doc and brief brought
+      across; phd-milestones tarball moved out of the repo (brief §4 location),
+      confirmed absent from the tree.
+- [x] `/governance:establish`:
+  - [x] Step 1 preflight — new adoption; canon v0.8.3.
+  - [x] Step 2 layout — governance, adr, specs, sprints, plans, memory bank
+        declared. Constitution, features, artifacts not declared (see A1).
+  - [x] Step 3 governance delta written.
+  - [x] Steps 4–7 — directories, `CLAUDE.md` / `AGENTS.md` routing rule
+        (created), ADR system, execution-patterns file.
+  - [x] Step 8 — plugin registered by git URL in `.claude/settings.json`.
+  - [x] Step 9 — PR template, five issue templates, CODEOWNERS, CONTRIBUTING.
+  - [x] Step 10 — branch protection applied and verified (owner chose to mirror
+        canon: PR required, 0 approvals, enforce_admins off). 32 labels created
+        (canonical + gov-L0…L3 + seven phase milestones), 41 total, verified.
+  - [x] Step 11 wiring — `.github/workflows/ci.yml`, canon SHA-pinned (v0.8.3).
+  - [x] Step 12 — memory-bank stubs at `llm/memory_bank/`.
+- [x] ADRs 0001–0005 + index (Chief Architect).
+- [x] Contract: `contracts/chief-product-officer-phase-0.md`.
+
+## In flight
+
+- **Chief Product Officer** — `llm/master-roadmap.md` + handoff
+  `handoffs/chief-product-officer-phase-0.md`. Launched 2026-09-14.
 
 ## Blocked
 
-**`/governance:establish` is not invocable in the current session.**
-`governance@agentic-governance` v0.8.3 is installed and enabled at user scope, but was
-installed *mid-session*; plugin skills load at session start. `Skill(governance:establish)`
-returns `Unknown skill`.
+Nothing.
 
-**Resolution:** restart Claude Code, then re-read this file and resume at "Next" below.
-No other blocker. Do not re-run preconditions — they pass and are recorded in issue #7.
+## Next
 
-## Next (resume here after restart)
-
-1. Verify `Skill(governance:establish)` resolves. If it still fails, check
-   `claude plugin list` shows `governance@agentic-governance` enabled.
-2. Repository-Steward: run `/governance:establish`, canonical layout defaults.
-3. Write the governance delta:
-   - Mission: design doc §1 (paste)
-   - Design-authority document: `llm/specs/2026-09-10-research-hub-design.md`
-   - Project principles: design doc §12, **verbatim**
-   - Domain review questions: (a) "Does this change put any private-visibility item
-     on the public path?" (b) "Does this change introduce a long-lived credential?"
-     (c) "Can a satellite affect anything outside its prefix?"
-   - Governance check command: real path on this machine, with `--layout`:
-     `node /mnt/c/code/agentic-governance/plugin/scripts/governance-checks.mjs --layout`
-   - Platform enforcement reality: **`main` is NOT protected** (gh api → 404
-     "Branch not protected"). Record truthfully.
-   - Steward activation: **INACTIVE**
-   - Related repos: cv, phd-milestones, agentic-kg, construction-ai-proposal
-     (satellites); agentic-governance (canon)
-4. Chief-Architect: ADRs 1–5 per design doc §9, plus the ownership ADR candidate below.
-5. Chief-Product-Officer: `llm/master-roadmap.md`, Phases 0–6 as checkboxes with
-   per-phase acceptance criteria from design doc §11.
-6. Update this file. Open draft PR → Chief-Reviewer → mark ready → **Checkpoint 1. STOP.**
+1. Run the governance check with `--layout` locally; fix or record findings.
+2. Commit the delta, ADRs, this file and the contract correction.
+3. On the CPO report: verify the roadmap against its contract, commit it.
+4. Open the draft PR (L2; labels `gov-L2`, `governance`, `phase-0-establish`).
+5. Write the Chief Reviewer contract; launch the review.
+6. Reconcile findings through their owners; commit; mark the PR ready.
+7. **Checkpoint 1 — STOP.**
 
 ## Decisions on the record
 
-| # | Decision | Rationale |
+| # | Decision | Where |
 |---|---|---|
-| Q1 | Domain **`cusati.us`** | Parked at GoDaddy → clean bind, no teardown. Surname-based: academics search/cite by surname. Rejected `djjay.me` (live on a Google service), `djjay.org`, `djjay.info` (weak trust signal). |
-| Q2 | **New** GCP project, intended id `cusati-hub` | Clean IAM boundary; $5 budget scopes to the hub alone; no WIF collision. Billing account `011A3C-D3061E-8B0DB7` (OPEN). |
-| Q5 | **OPEN** | Chief-Architect proposes in ADR 1; Jason approves at Checkpoint 1. |
-| — | **Ownership on `djjay0131@gmail.com`** — ADR candidate | Deliberate, not an error. Preserves ownership of the research site post-graduation with no account transfer. Institutional identity (`djjay@vt.edu`) belongs in site *content* only, never the infrastructure ownership chain. |
+| Q1 | Domain `cusati.us` | ADR-0001; issue #7 |
+| Q2 | New GCP project, intended id `cusati-hub`, personal account | ADR-0001 |
+| Q5 | **Proposed:** Astro app moves under `site/`; `gate/`, `contract/`, `infra/` at root. Owner approves at Checkpoint 1 — merging the PR accepts it. | ADR-0001 |
+| — | Ownership chain on personal accounts, not institutional — survives graduation | Design doc §1; ADR-0001 |
+| — | Branch protection mirrors canon (enforce_admins off) — owner, 2026-09-14 | Delta §Platform Enforcement Reality |
+| — | Full label taxonomy + phase milestones — owner, 2026-09-14 | Delta §Milestone Labels |
+
+## Assumptions (conservative choices, not §10 questions)
+
+- **A1** — Artifacts slot (`docs/`) undeclared until its first content lands
+  (Phase 2). `--layout` fails a declared path that does not exist; the
+  checker's data-plane scan still covers `docs/` by default.
+- **A2** — Phase 0 runs its two personas (CPO, Chief Reviewer) through the Agent
+  tool. The generated ultracode workflow is reserved for the Phase 1–3 fan-out,
+  where dependency waves exist.
+- **A3** — Branch names follow the brief (`gov/…`, `feat/…`), not canon's
+  `governance/…` and `feature/…` prefixes. Flag at Checkpoint 1.
+- **A4** — Governance checks live in `ci.yml`, separate from `build.yml`. The
+  Phase 1 infra contract (`.github/workflows/**`) must carve out `ci.yml`.
+- **A5** — ADR statuses are `Accepted` per the brief; acceptance takes effect
+  on merge.
+- **A6** — `governance-checks` becomes a required status check only after a
+  green run on `main`.
+- **A7** — Constellize is not installed. The brief's delegations to its
+  system-architect (Phase 1) and QA (Phase 3) personas cannot run as written.
+  Raise at Checkpoint 1.
+
+## ADR candidates
+
+- **C1** — Satellite → hub dispatch credential. `repository_dispatch` needs a
+  GitHub-side credential; a GCP service account cannot hold it. A per-satellite
+  PAT is a long-lived credential. Decide before Phase 2. (ADR-0002)
+- **C2** — Leak-check matching rules and the derived outputs they cover
+  (sitemap, RSS, search index, OG images). Decide in Phase 3. (ADR-0005)
+- **C3** — Branch naming convention for this repo vs canon (A3).
+- **C4** — Content bucket as published-content store vs §12.5 rebuild-from-repo.
+
+## Constraints discovered (bind later contracts)
+
+- **Gate session cookie must be named `__session`** — Firebase Hosting strips
+  every other cookie on Cloud Run rewrites. Phase 3 gate contract. (ADR-0004)
+- **Gate invoker is `allUsers`** — every check must hold on direct `*.run.app`
+  requests. (ADR-0004)
+- **Leak-check script location** — brief names `scripts/…` but scopes the site
+  agent to `site/**`. Settle in the Phase 3 contract. (ADR-0005)
+- **Phase 1 site scope must include** the files the `site/` move touches outside
+  `site/**`: `.gitignore`, `.vscode/`, root `package.json`/lockfile removal,
+  `scripts/`. (ADR-0001)
 
 ## Risks carried forward
 
-1. **Base-path migration (Phase 1, `site` contract).** The current site is on
-   **GitHub Pages** — `djjay0131.github.io/website/`, `base: '/website/'` in
-   `astro.config.mjs`. Firebase Hosting on `cusati.us` drops base to `/`: every
-   internal link, asset ref and sitemap entry shifts, and inbound `/website/...`
-   links break. **The `site` agent owes a redirect map.** This is the brief's
-   "do not regress" clause.
-2. **`gh` and `terraform` are Windows `.exe`s not on the WSL `PATH`.** Any agent
-   writing a workflow or script that calls bare `gh` / `terraform` will produce
-   something that fails on this machine. State it in every contract.
-3. **`CLOUDSDK_PYTHON` points at a uv-managed interpreter** (`cpython-3.12.11`),
-   persisted in `~/.bashrc`, `~/.profile`, `~/.zshrc`. uv can prune or move it and
-   gcloud breaks again. Native Linux `google-cloud-cli` is the sturdier fix.
-4. **ADC has no quota project.** Set `gcloud auth application-default
-   set-quota-project cusati-hub` once the project exists, or expect confusing
-   "API not enabled" / quota errors.
-5. **Project id `cusati-hub` is unverified.** GCP returns `PERMISSION_DENIED`
-   for nonexistent ids, so availability cannot be pre-checked — only `gcloud
-   projects create` settles it. Keep it a Terraform **variable**; do not hard-code.
-6. **System python is 3.8.5** vs the gate service's 3.12 target. Blocks local
-   `pytest` in Phase 3. uv has 3.12.11 and 3.13.5 available.
+1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
+   `djjay0131.github.io/website/`, `base: '/website/'`. Moving to `site/` and
+   to `/` on `cusati.us` shifts every link, asset and sitemap entry; inbound
+   `/website/...` links break. Site work owes a redirect map and route parity
+   against `build.yml`'s smoke-test routes.
+2. **`build.yml`'s hourly `cv` fingerprint reads the Pages URL** — stale once the
+   site moves unless repointed in Phase 1.
+3. **`gh` and `terraform` are Windows executables not on the WSL PATH** on the
+   primary workstation. Contracts must not assume bare `gh` / `terraform`
+   locally.
+4. **gcloud depends on a uv-managed Python 3.12** via `CLOUDSDK_PYTHON`; uv can
+   prune it. A native Linux gcloud is sturdier.
+5. **ADC has no quota project** — set it once the project exists.
+6. **Project id `cusati-hub` unverified** — keep it a Terraform variable.
+7. **System Python is 3.8** vs the gate's 3.12 target — use a uv-managed 3.12
+   for Phase 3 tests.
+
+## Follow-ups
+
+- Delete the tarball from `handoff/research-hub` (design doc §2) once the
+  `phd-milestones` repo exists (Phase 3) — branch cleanup.
 
 ## Standing constraints
 
 - Sub-agents: **no git or gh mutations.** They write files and report. The Lead
-  Architect is the only actor that stages, commits, opens PRs.
-- Every agent gets a bounded contract written to
-  `llm/sprints/2026-09-hub/contracts/` **before** it launches.
-- Handoffs to `llm/sprints/2026-09-hub/handoffs/<agent>-<phase>.md`.
-- Secrets never touch the repo. WIF only. A key file means **stop and raise at the
-  next checkpoint**.
-- Ask only design doc §10 questions. Anything else: conservative choice, recorded
-  as an assumption, flagged as an ADR candidate if it is a decision.
-- **Agents do not merge.** Draft PR → ready when DoD met → stop at the checkpoint.
+  Architect alone stages, commits and opens PRs, naming files explicitly.
+- Every agent gets a bounded contract in `llm/sprints/2026-09-hub/contracts/`
+  **before** it launches; handoffs go to `handoffs/<agent>-<phase>.md`.
+- Secrets never touch the repo. WIF only. A key file means **stop and raise at
+  the next checkpoint**.
+- Ask only design doc §10 questions; everything else is a conservative choice
+  recorded above.
+- **Agents do not merge.** Draft PR → ready when DoD is met → stop at the
+  checkpoint.
