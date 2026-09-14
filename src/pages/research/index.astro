@@ -1,6 +1,5 @@
 ---
 import Base from "../../layouts/Base.astro";
-
 const base = import.meta.env.BASE_URL;
 ---
 
@@ -10,20 +9,19 @@ const base = import.meta.env.BASE_URL;
 >
   <h1>Research</h1>
   <p class="lede">
-    Working digests from my PhD research. Each section is a synthesized
-    state-of-the-art read on one question, backed by a source dataset you can
-    filter and trace. These are living documents: they carry a date and a
-    method note, and they are regenerated from a research store in the
-    corresponding project repository.
+    Working digests from my PhD research, grouped by project. Each digest is a
+    synthesized state-of-the-art read on one question, backed by a source
+    dataset you can filter and trace. They carry a date and a method note and
+    are regenerated from a research store in the project's repository.
   </p>
 
-  <h2>Sections</h2>
+  <h2>Projects</h2>
   <ul class="section-list">
     <li>
-      <a href={`${base}research/agentic-harnesses/`}>Agentic harnesses for coding agents</a>
+      <a href={`${base}research/soa-agentic-se/`}>State of the Art in Agentic Software Engineering</a>
       <span class="section-meta">
-        — what the scaffold around a language model contributes, academic and
-        industry, with a 268-record source explorer (September 2026)
+        — a paper project mapping what the field has built against what it has
+        measured. Two research tracks so far: agentic harnesses and agent memory.
       </span>
     </li>
   </ul>

@@ -1,0 +1,22 @@
+---
+import Base from "../../../../layouts/Base.astro";
+import SourceExplorer from "../../../../components/SourceExplorer.astro";
+import sources from "../../../../data/soa-agentic-se/agentic-harnesses/sources.json";
+const base = import.meta.env.BASE_URL;
+const here = `${base}research/soa-agentic-se/agentic-harnesses/`;
+---
+
+<Base
+  title="Jason Cusati — Agentic Harnesses: Sources"
+  description="Filterable explorer for the 268-record source dataset behind the agentic-harnesses state-of-the-art digest."
+>
+  <p class="crumbs"><a href={here}>← Agentic harnesses</a></p>
+  <h1>Source Explorer — Agentic Harnesses</h1>
+  <p class="lede">{sources.length} records. Filter, search, and expand a record for its summary, key claims and relevance. The <em>via</em> column says which discovery channel found it; the <em>verified</em> column reflects the separate adversarial re-check.</p>
+  <SourceExplorer records={sources} />
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .lede { color: var(--color-muted); margin-bottom: 1.25rem; }
+</style>

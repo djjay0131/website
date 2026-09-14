@@ -1,0 +1,68 @@
+---
+import Base from "../../../layouts/Base.astro";
+import harness from "../../../data/soa-agentic-se/agentic-harnesses/sources.json";
+import memory from "../../../data/soa-agentic-se/agentic-memory/sources.json";
+const base = import.meta.env.BASE_URL;
+const root = `${base}research/soa-agentic-se/`;
+---
+
+<Base
+  title="Jason Cusati — SoA Agentic SE"
+  description="Research tracks for a state-of-the-art paper on agentic software engineering: agentic harnesses and agent memory, each with a synthesis and a verified source explorer."
+>
+  <p class="crumbs"><a href={`${base}research/`}>← Research</a></p>
+  <h1>State of the Art in Agentic Software Engineering</h1>
+  <p class="lede">
+    A paper project asking what the field of agentic software engineering has
+    actually built, what has been measured about it, and what would have to be
+    true for published results to transfer. The central claim under test: the
+    field has moved to vertically integrated model–harness products, so
+    attributing outcomes to the model versus the scaffold around it is
+    structurally hard to do from outside.
+  </p>
+  <p>
+    The research tracks below are reference stores gathered alongside the
+    paper's frozen search protocol, not entries in its evidence base. Each has
+    a synthesis whose every claim links to a source record, a filterable source
+    explorer, and the Consensus search transcripts behind it. Records were
+    written only from pages actually fetched and were re-checked by a separate
+    adversarially prompted verification pass; the explorer shows the verdict
+    per record.
+  </p>
+
+  <h2>Tracks</h2>
+  <div class="cards">
+    <a class="card" href={`${root}agentic-harnesses/`}>
+      <span class="card-title">Agentic harnesses</span>
+      <span class="card-desc">What the scaffold around a language model contributes: taxonomy, design space, industry landscape, evaluation validity, and the model-vs-harness attribution evidence.</span>
+      <span class="card-meta">{harness.length} sources · 10 September 2026</span>
+    </a>
+    <a class="card" href={`${root}agentic-memory/`}>
+      <span class="card-title">Agent memory</span>
+      <span class="card-desc">Persistent memory for coding agents: who writes it, when, how it is validated and forgotten, what has been measured, and how humans stay in the loop.</span>
+      <span class="card-meta">{memory.length} sources · 14 September 2026</span>
+    </a>
+  </div>
+
+  <h2>How the tracks relate</h2>
+  <p>
+    Memory is one of the harness's design dimensions — the context and memory
+    layer, plus the externally authored configuration surface (CLAUDE.md,
+    AGENTS.md, rules, skills) that programs the runtime's behaviour. The harness
+    track covers in-context compaction; the memory track covers what persists
+    across sessions and people. Citations in the memory synthesis that point
+    into the harness store are prefixed <code>harness:</code>.
+  </p>
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .lede { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 1rem; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .card { display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem 1.1rem; border: 1px solid var(--color-border); border-left: 4px solid var(--color-accent); border-radius: 4px; background: var(--color-surface); color: var(--color-text); text-decoration: none; }
+  .card:hover { border-left-color: var(--color-primary); text-decoration: none; }
+  .card-title { font-family: var(--font-sans); font-weight: 600; color: var(--color-primary); font-size: 1.05rem; }
+  .card-desc { font-size: 0.92rem; color: var(--color-muted); }
+  .card-meta { font-family: var(--font-sans); font-size: 0.78rem; color: var(--color-muted); margin-top: 0.25rem; }
+  code { font-family: var(--font-mono); font-size: 0.9em; background: var(--color-surface); padding: 0 0.25em; }
+</style>
