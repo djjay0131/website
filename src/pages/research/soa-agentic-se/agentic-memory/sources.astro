@@ -1,0 +1,30 @@
+---
+import Base from "../../../../layouts/Base.astro";
+import SourceExplorer from "../../../../components/SourceExplorer.astro";
+import sources from "../../../../data/soa-agentic-se/agentic-memory/sources.json";
+const base = import.meta.env.BASE_URL;
+const here = `${base}research/soa-agentic-se/agentic-memory/`;
+const facets = [
+  { key: "write", label: "Write policy", get: (r: any) => r.memory_coding?.write_policy },
+  { key: "hitl", label: "Human in loop", get: (r: any) => r.hitl },
+  { key: "validation", label: "Validation", get: (r: any) => r.memory_coding?.validation },
+  { key: "scope", label: "Scope", get: (r: any) => r.memory_coding?.scope },
+  { key: "storage", label: "Storage", get: (r: any) => r.memory_coding?.storage },
+  { key: "evidence", label: "Evidence level", get: (r: any) => r.memory_coding?.evidence },
+];
+---
+
+<Base
+  title="Jason Cusati — Agent Memory: Sources"
+  description="Filterable explorer for the 283-record source dataset behind the agent-memory state-of-the-art digest, coded on scope, storage, write policy, validation, evidence and human-in-the-loop mode."
+>
+  <p class="crumbs"><a href={here}>← Agent memory</a></p>
+  <h1>Source Explorer — Agent Memory</h1>
+  <p class="lede">{sources.length} records. Beyond the usual filters, each record is coded on the paper's memory scheme — <em>write policy</em>, <em>human in loop</em>, <em>validation</em>, <em>scope</em>, <em>storage</em>, <em>evidence level</em> — so you can ask, for instance, which systems gate a memory write on human approval and what evidence they have.</p>
+  <SourceExplorer records={sources} facets={facets} />
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .lede { color: var(--color-muted); margin-bottom: 1.25rem; }
+</style>

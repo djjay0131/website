@@ -1,0 +1,23 @@
+---
+import Base from "../../../../layouts/Base.astro";
+import SynthesisArticle from "../../../../components/SynthesisArticle.astro";
+import html from "../../../../data/soa-agentic-se/agentic-memory/synthesis.html?raw";
+const base = import.meta.env.BASE_URL;
+const here = `${base}research/soa-agentic-se/agentic-memory/`;
+---
+
+<Base
+  title="Jason Cusati — Agent Memory: Synthesis"
+  description="Synthesis of the state of the art on persistent memory for coding agents: mechanisms, benchmarks, failure modes, security, industry products, and human-in-the-loop governance (September 2026)."
+>
+  <p class="crumbs"><a href={here}>← Agent memory</a></p>
+  <h1>Memory for Coding Agents: State of the Art</h1>
+  <p class="meta">Research digest, 14 September 2026. Bracketed tokens are source ids and link to the <a href={`${here}sources/`}>source explorer</a>; tokens prefixed <code>harness:</code> link into the <a href={`${base}research/soa-agentic-se/agentic-harnesses/sources/`}>harness explorer</a>.</p>
+  <SynthesisArticle html={html} />
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .meta { color: var(--color-muted); font-family: var(--font-sans); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  code { font-family: var(--font-mono); font-size: 0.85em; }
+</style>

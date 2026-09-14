@@ -1,18 +1,12 @@
 ---
-import Base from "../../../layouts/Base.astro";
-import sources from "../../../data/agentic-harnesses/sources.json";
-
+import Base from "../../../../layouts/Base.astro";
+import sources from "../../../../data/soa-agentic-se/agentic-harnesses/sources.json";
 const base = import.meta.env.BASE_URL;
-
+const here = `${base}research/soa-agentic-se/agentic-harnesses/`;
 type Rec = (typeof sources)[number];
 const count = (f: (r: Rec) => boolean) => sources.filter(f).length;
-
 const total = sources.length;
-const bySector = {
-  academic: count((r) => r.sector === "academic"),
-  industry: count((r) => r.sector === "industry"),
-  openSource: count((r) => r.sector === "open-source"),
-};
+const bySector = { academic: count((r) => r.sector === "academic"), industry: count((r) => r.sector === "industry"), openSource: count((r) => r.sector === "open-source") };
 const years = [2026, 2025, 2024, 2023];
 const byYear = years.map((y) => [y, count((r) => r.year === y)] as const);
 const consensusSurfaced = count((r) => (r.found_via ?? "").includes("consensus"));
@@ -27,8 +21,7 @@ const attribution = count((r) => r.category.includes("model-vs-harness-attributi
   title="Jason Cusati — Agentic Harnesses"
   description="State of the art on coding-agent harnesses and scaffolds: taxonomy, industry landscape, evaluation harnesses, and model-vs-harness attribution evidence, with a 268-record source explorer."
 >
-  <p class="crumbs"><a href={`${base}research/`}>← Research</a></p>
-
+  <p class="crumbs"><a href={`${base}research/soa-agentic-se/`}>← SoA Agentic SE</a></p>
   <h1>Agentic Harnesses for Coding Agents</h1>
   <p class="lede">
     What does the <em>harness</em> — the scaffold, tool surface, control loop,
@@ -39,18 +32,9 @@ const attribution = count((r) => r.category.includes("model-vs-harness-attributi
   </p>
 
   <div class="cards">
-    <a class="card" href={`${base}research/agentic-harnesses/synthesis/`}>
-      <span class="card-title">Read the synthesis</span>
-      <span class="card-desc">Eight sections: taxonomy, the design space dimension by dimension, industry landscape, evaluation harnesses and their validity, field evidence, the attribution question, gaps.</span>
-    </a>
-    <a class="card" href={`${base}research/agentic-harnesses/sources/`}>
-      <span class="card-title">Explore the {total} sources</span>
-      <span class="card-desc">Filter by sector, year, category, evidence type, discovery channel and verification status. Every claim in the synthesis links here.</span>
-    </a>
-    <a class="card" href={`${base}research/agentic-harnesses/consensus/`}>
-      <span class="card-title">Consensus deep searches</span>
-      <span class="card-desc">The eight consensus.app "Deep" queries, their generated syntheses, and the papers each surfaced.</span>
-    </a>
+    <a class="card" href={`${here}synthesis/`}><span class="card-title">Read the synthesis</span><span class="card-desc">Eight sections: taxonomy, the design space dimension by dimension, industry landscape, evaluation harnesses and their validity, field evidence, the attribution question, gaps.</span></a>
+    <a class="card" href={`${here}sources/`}><span class="card-title">Explore the {total} sources</span><span class="card-desc">Filter by sector, year, category, evidence type, discovery channel and verification status. Every claim in the synthesis links here.</span></a>
+    <a class="card" href={`${here}consensus/`}><span class="card-title">Consensus deep searches</span><span class="card-desc">The eight consensus.app "Deep" queries, their generated syntheses, and the papers each surfaced.</span></a>
   </div>
 
   <h2>The one-paragraph answer</h2>
@@ -72,16 +56,14 @@ const attribution = count((r) => r.category.includes("model-vs-harness-attributi
   </p>
 
   <h2>Dataset at a glance</h2>
-  <table class="stats">
-    <tbody>
-      <tr><th scope="row">Records</th><td>{total} — {bySector.academic} academic, {bySector.industry} industry, {bySector.openSource} open-source</td></tr>
-      <tr><th scope="row">By year</th><td>{byYear.map(([y, n], i) => <span>{y}: {n}{i < byYear.length - 1 ? " · " : ""}</span>)}</td></tr>
-      <tr><th scope="row">Empirical or benchmark evidence</th><td>{empirical} records</td></tr>
-      <tr><th scope="row">Speak to model-vs-harness attribution</th><td>{attribution} records</td></tr>
-      <tr><th scope="row">Surfaced by Consensus</th><td>{consensusSurfaced} records ({consensusOnly} found only there)</td></tr>
-      <tr><th scope="row">Independently re-verified</th><td>{verified} confirmed, {minorFix} minor metadata fixes, 0 wrong, 0 not found</td></tr>
-    </tbody>
-  </table>
+  <table class="stats"><tbody>
+    <tr><th scope="row">Records</th><td>{total} — {bySector.academic} academic, {bySector.industry} industry, {bySector.openSource} open-source</td></tr>
+    <tr><th scope="row">By year</th><td>{byYear.map(([y, n], i) => <span>{y}: {n}{i < byYear.length - 1 ? " · " : ""}</span>)}</td></tr>
+    <tr><th scope="row">Empirical or benchmark evidence</th><td>{empirical} records</td></tr>
+    <tr><th scope="row">Speak to model-vs-harness attribution</th><td>{attribution} records</td></tr>
+    <tr><th scope="row">Surfaced by Consensus</th><td>{consensusSurfaced} records ({consensusOnly} found only there)</td></tr>
+    <tr><th scope="row">Independently re-verified</th><td>{verified} confirmed, {minorFix} minor metadata fixes, 0 wrong, 0 not found</td></tr>
+  </tbody></table>
 
   <h2>Method</h2>
   <p>
@@ -94,20 +76,7 @@ const attribution = count((r) => r.category.includes("model-vs-harness-attributi
     written only from pages actually fetched. A separate, adversarially
     prompted verification pass then re-fetched 102 of the records, including
     every record whose number is quoted in the synthesis, and its corrections
-    were applied to the dataset. Discovery was limited by the research
-    environment: direct arXiv, Semantic Scholar and OpenAlex API access was
-    blocked, so discovery ran through web search plus fetching of abstract
-    pages.
-  </p>
-
-  <h2>Provenance</h2>
-  <p>
-    The research store behind this section lives in the private repository
-    for my state-of-the-art paper on agentic software engineering, under
-    <code>docs/research/agentic-harnesses/</code>. This page is generated
-    from that store's <code>sources.json</code> and <code>SYNTHESIS.md</code>.
-    It is reference material gathered outside the paper's frozen search
-    protocol: candidates for the evidence base, not entries in it.
+    were applied to the dataset.
   </p>
 </Base>
 
@@ -122,5 +91,4 @@ const attribution = count((r) => r.category.includes("model-vs-harness-attributi
   .stats { border-collapse: collapse; width: 100%; font-family: var(--font-sans); font-size: 0.95rem; }
   .stats th, .stats td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }
   .stats th { width: 40%; font-weight: 600; color: var(--color-muted); }
-  code { font-family: var(--font-mono); font-size: 0.9em; background: var(--color-surface); padding: 0 0.25em; }
 </style>
