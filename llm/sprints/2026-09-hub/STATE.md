@@ -16,8 +16,8 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 ## Current position
 
 **Phase 0 — Establish. IN PROGRESS.** Draft **PR #9** is open. `/governance:establish`
-is complete; the governance check passes locally. Waiting on the Chief Product
-Officer's roadmap, then the Chief Reviewer's independent review.
+is complete; the governance check passes locally. The roadmap has landed. Next: the
+Chief Reviewer's independent review and Phase 0 Governance Audit.
 
 ## Done
 
@@ -41,12 +41,18 @@ Officer's roadmap, then the Chief Reviewer's independent review.
       `92fcc88` (routing rule, templates, CI gate), `effd377` (delta, ADRs).
 - [x] **Draft PR #9** opened — L2, labels `gov-L2`, `governance`,
       `phase-0-establish`, `in-progress`. Closes #7.
-- [x] Contracts: `chief-product-officer-phase-0.md`, `chief-reviewer-phase-0.md`.
+- [x] Contracts: `chief-product-officer-phase-0.md`, `chief-reviewer-phase-0.md`
+      (`fcdb1eb`; amended with the brief/design-doc conflicts to verify).
+- [x] CI on PR #9 verified from the run log: `governance-checks` ran against the
+      pinned canon and reported 4 of 4 PASS — no SKIP. `build` (tests) PASS.
+- [x] **Chief Product Officer** delivered `llm/master-roadmap.md` (Phases 0–6,
+      136 checkboxes, all unchecked) and `handoffs/chief-product-officer-phase-0.md`.
+      Verified against its contract: only its two paths touched, no machine paths,
+      governance checks 4 of 4 PASS.
 
 ## In flight
 
-- **Chief Product Officer** — `llm/master-roadmap.md` + handoff
-  `handoffs/chief-product-officer-phase-0.md`. Launched 2026-09-14.
+- **Chief Reviewer** — PR #9 review + Phase 0 Governance Audit, as a final report.
 
 ## Blocked
 
@@ -54,14 +60,41 @@ Nothing.
 
 ## Next
 
-1. On the CPO report: verify the roadmap against its contract; commit and push.
-2. Launch the Chief Reviewer (contract written): PR review + Phase 0 Governance
-   Audit, as a final report.
-3. Persist the review verbatim to `handoffs/chief-reviewer-phase-0.md`; post it to
-   PR #9.
-4. Reconcile: route each finding to its document owner, apply, commit.
-5. Update the PR body (roadmap landed, review result); mark PR #9 ready.
-6. **Checkpoint 1 — STOP.**
+1. Persist the Chief Reviewer's report verbatim to
+   `handoffs/chief-reviewer-phase-0.md`; post it to PR #9.
+2. Reconcile: route each finding to its document owner, apply, commit.
+3. Update the PR body (roadmap landed, review result); mark PR #9 ready.
+4. **Checkpoint 1 — STOP.** Present K1–K8 below alongside the §10 questions.
+
+## Brief vs design-doc conflicts (owner decides at Checkpoint 1)
+
+Raised by the Chief Product Officer. The delta ranks the design doc above the
+brief, so the roadmap follows §11; each still needs the owner's word because the
+brief is the owner's own instruction.
+
+- **K1 — Buckets and Artifact Registry.** Brief: Phase 1. Design doc §11: content
+  bucket Phase 2, private bucket Phase 3; Artifact Registry unassigned (first
+  consumer is the Phase 3 gate).
+- **K2 — Gate rewrites in the Phase 1 `firebase.json`.** Brief §4 says Hosting
+  tolerates rewrites to a `hub-gate` service that does not yet exist. Public
+  reports say the deploy is rejected with HTTP 400 ("Cloud Run service … does
+  not exist"). **Unverified in this project.** If true, Checkpoint 2 fails as
+  written and Phase 1 must omit the rewrites until the gate exists.
+- **K3 — Share routes.** Brief: built in Phase 3. §11: shares are Phase 4, and
+  Q3 may cut them.
+- **K4 — Bucket IAM test.** Required on every deploy by §12.1 and ADR-0005; the
+  brief assigns it to no agent.
+- **K5 — Satellite prefix.** Brief scopes identities to `cv/`, `phd-milestones/`;
+  §4 uploads to `sources/<source>/`. IAM conditions match literal prefixes.
+- **K6 — Blaze timing.** Brief §1 requires Blaze confirmed before Phase 1; §4 has
+  it enabled at Checkpoint 2.
+- **K7 — Roadmap span.** Brief §2 asks for a Phase 0–3 roadmap; §4 asks for 0–6.
+  The roadmap covers 0–6.
+- **K8 — Design doc internals.** §6 requires share-link tests while §11 defers
+  shares to Phase 4; §11's share "list" operation is not defined in §6; §11
+  Phase 6 both redirects from Pages and retires Pages (the only host those
+  redirects could run on); the design doc header still pins governance v0.5 and
+  names the handoff branch.
 
 ## Decisions on the record
 

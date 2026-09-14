@@ -108,6 +108,11 @@ DELIVERABLES — the final report, as Markdown that can be persisted verbatim:
     pinned SHA's existence on canon's main)? Read PR #9's actual check results.
   - Whether L2 is the correct classification under the mixed-level rule.
   - Any undocumented durable decision anywhere in PR #9.
+  - The brief/design-doc conflicts K1–K8 in STATE.md, raised by the Chief
+    Product Officer: confirm each is real and correctly attributed. In
+    particular verify, against primary sources, the claim that a Firebase
+    Hosting deploy is rejected (HTTP 400) when a rewrite targets a Cloud Run
+    service that does not exist — mark VERIFIED or UNVERIFIED with URL.
 
 DEFINITION OF DONE: every finding cites an artifact, a location and a failure
   scenario; every Definition-of-Done item carries evidence; no finding says
