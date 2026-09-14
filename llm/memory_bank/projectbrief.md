@@ -1,6 +1,6 @@
 # Project Brief
 
-Status: Stub
+Status: Draft
 Last updated: 2026-09-14
 Owner: Chief Architect
 

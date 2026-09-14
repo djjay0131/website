@@ -1,9 +1,12 @@
 # Research Hub — Orchestration State
 
+Status: Active
+Last updated: 2026-09-14
+Owner: Chief Architect (Lead Architect)
+
 **Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 (all work streams)
 **Design authority:** `llm/specs/2026-09-10-research-hub-design.md`
 **Brief:** `llm/plans/2026-09-10-research-hub-orchestration-brief.md`
-**Last updated:** 2026-09-14
 
 Machine-specific paths are never written here. `<canon checkout>` means the path
 declared in `llm/governance/governance-delta.md` §Canon Location.
@@ -12,34 +15,33 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 0 — Establish. IN PROGRESS.** `/governance:establish` steps 1–10 and 12
-are done; step 11 (the local `--layout` run) and step 13 (report) are next.
-ADRs 0001–0005 are drafted. The roadmap is delegated to the Chief Product
-Officer, running.
+**Phase 0 — Establish. IN PROGRESS.** Draft **PR #9** is open. `/governance:establish`
+is complete; the governance check passes locally. Waiting on the Chief Product
+Officer's roadmap, then the Chief Reviewer's independent review.
 
 ## Done
 
 - [x] §1 preconditions verified — all pass. Recorded in issue #7.
-- [x] Issue **hub-000** (#7) opened; Mode 3 / L2 declared; labelled.
+- [x] Issue **hub-000** (#7) opened; Mode 3 / L2 declared; labelled
+      `governance`, `in-progress`, `priority-high`, `phase-0-establish`.
 - [x] Branch `gov/establish-hub` cut from `main`; design doc and brief brought
       across; phd-milestones tarball moved out of the repo (brief §4 location),
       confirmed absent from the tree.
-- [x] `/governance:establish`:
-  - [x] Step 1 preflight — new adoption; canon v0.8.3.
-  - [x] Step 2 layout — governance, adr, specs, sprints, plans, memory bank
-        declared. Constitution, features, artifacts not declared (see A1).
-  - [x] Step 3 governance delta written.
-  - [x] Steps 4–7 — directories, `CLAUDE.md` / `AGENTS.md` routing rule
-        (created), ADR system, execution-patterns file.
-  - [x] Step 8 — plugin registered by git URL in `.claude/settings.json`.
-  - [x] Step 9 — PR template, five issue templates, CODEOWNERS, CONTRIBUTING.
-  - [x] Step 10 — branch protection applied and verified (owner chose to mirror
-        canon: PR required, 0 approvals, enforce_admins off). 32 labels created
-        (canonical + gov-L0…L3 + seven phase milestones), 41 total, verified.
-  - [x] Step 11 wiring — `.github/workflows/ci.yml`, canon SHA-pinned (v0.8.3).
-  - [x] Step 12 — memory-bank stubs at `llm/memory_bank/`.
+- [x] `/governance:establish`, steps 1–12:
+  - Step 2 layout — governance, adr, specs, sprints, plans, memory bank declared;
+    constitution, features, artifacts not declared (A1).
+  - Step 10 — branch protection applied and verified (owner chose to mirror
+    canon: PR required, 0 approvals, enforce_admins off); 32 labels created, 41
+    total, verified.
+  - Step 11 — `ci.yml` (canon SHA-pinned, v0.8.3); declared check command run
+    locally: **4 of 4 PASS** (links, adr-index, adr-status, layout), both via the
+    plugin and from the canon checkout.
 - [x] ADRs 0001–0005 + index (Chief Architect).
-- [x] Contract: `contracts/chief-product-officer-phase-0.md`.
+- [x] Commits on `gov/establish-hub`: `ee59299` (design authority + scaffolding),
+      `92fcc88` (routing rule, templates, CI gate), `effd377` (delta, ADRs).
+- [x] **Draft PR #9** opened — L2, labels `gov-L2`, `governance`,
+      `phase-0-establish`, `in-progress`. Closes #7.
+- [x] Contracts: `chief-product-officer-phase-0.md`, `chief-reviewer-phase-0.md`.
 
 ## In flight
 
@@ -52,13 +54,14 @@ Nothing.
 
 ## Next
 
-1. Run the governance check with `--layout` locally; fix or record findings.
-2. Commit the delta, ADRs, this file and the contract correction.
-3. On the CPO report: verify the roadmap against its contract, commit it.
-4. Open the draft PR (L2; labels `gov-L2`, `governance`, `phase-0-establish`).
-5. Write the Chief Reviewer contract; launch the review.
-6. Reconcile findings through their owners; commit; mark the PR ready.
-7. **Checkpoint 1 — STOP.**
+1. On the CPO report: verify the roadmap against its contract; commit and push.
+2. Launch the Chief Reviewer (contract written): PR review + Phase 0 Governance
+   Audit, as a final report.
+3. Persist the review verbatim to `handoffs/chief-reviewer-phase-0.md`; post it to
+   PR #9.
+4. Reconcile: route each finding to its document owner, apply, commit.
+5. Update the PR body (roadmap landed, review result); mark PR #9 ready.
+6. **Checkpoint 1 — STOP.**
 
 ## Decisions on the record
 
@@ -66,7 +69,7 @@ Nothing.
 |---|---|---|
 | Q1 | Domain `cusati.us` | ADR-0001; issue #7 |
 | Q2 | New GCP project, intended id `cusati-hub`, personal account | ADR-0001 |
-| Q5 | **Proposed:** Astro app moves under `site/`; `gate/`, `contract/`, `infra/` at root. Owner approves at Checkpoint 1 — merging the PR accepts it. | ADR-0001 |
+| Q5 | **Proposed:** Astro app moves under `site/`; `gate/`, `contract/`, `infra/` at root. Merging PR #9 accepts it. | ADR-0001 |
 | — | Ownership chain on personal accounts, not institutional — survives graduation | Design doc §1; ADR-0001 |
 | — | Branch protection mirrors canon (enforce_admins off) — owner, 2026-09-14 | Delta §Platform Enforcement Reality |
 | — | Full label taxonomy + phase milestones — owner, 2026-09-14 | Delta §Milestone Labels |
@@ -90,6 +93,10 @@ Nothing.
 - **A7** — Constellize is not installed. The brief's delegations to its
   system-architect (Phase 1) and QA (Phase 3) personas cannot run as written.
   Raise at Checkpoint 1.
+- **A8** — The Chief Reviewer charter records outcomes with `gh pr review`, but
+  the brief forbids sub-agent gh mutations. The reviewer returns its review as a
+  final report; the Lead Architect persists it verbatim and posts it to the PR,
+  attributed to the Chief Reviewer role.
 
 ## ADR candidates
 
