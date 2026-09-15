@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The governance check command declared in
+  # llm/governance/governance-delta.md §Governance Check Command, run on every
+  # push to main and every PR rather than only at onboarding. agentic-governance
+  # is pinned by commit SHA so canon cannot change under this repo without a
+  # visible commit here. The two checkouts are siblings, not nested: the checker
+  # walks every .md under its target repo's git toplevel, so the canon tree must
+  # sit outside it.
+  #
+  # Actions are pinned by commit SHA for the same reason canon is: a retagged
+  # action must not change this gate without a commit here. v5 runs on Node 24.
+  #
+  # Kept separate from build.yml on purpose: build.yml is rewritten by the
+  # Phase 1 infra work, and the governance gate must not ride along with it.
+  governance-checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # The diff-based checks (adr-status) compare against origin/main.
+          fetch-depth: 0
+          path: repo
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: djjay0131/agentic-governance
+          # agentic-governance v0.8.3.
+          ref: 5689b69fdf5e99ce58f7d3d2ca6d227fd7904d21
+          path: governance-canon
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - name: Run governance convention checks
+        working-directory: repo
+        run: node ../governance-canon/plugin/scripts/governance-checks.mjs --layout
