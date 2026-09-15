@@ -59,6 +59,11 @@ Phase 1 — Foundation (issue #10) only.
 - Terraform outputs the first three; the owner sets them at Checkpoint 2.
 - The Firebase deploy runs only when `vars.GCP_PROJECT_ID` is non-empty. Until
   then it is skipped and the GitHub Pages path behaves exactly as today.
+- *Clarified at reconciliation:* `SITE_URL` is set only **after** the custom
+  domain's certificate is active. It is both the Firebase smoke-test target and
+  the fingerprint source (SEAM-5), so setting it early breaks both. Until then
+  the smoke test uses the default Hosting URL, `https://<hosting site id>.web.app`,
+  which equals the project id unless Terraform's `hosting_site_id` overrides it.
 
 ### SEAM-5 — GitHub Pages transition
 
@@ -76,6 +81,11 @@ Phase 1 — Foundation (issue #10) only.
   "to": "/<path>" }` for every route the GitHub Pages build serves. Generated from
   a route inventory and covered by a test. Recorded in Phase 1; not served until
   Phase 6.
+- *Clarified at reconciliation:* the map is a snapshot of the routes at
+  generation (48 in Phase 1). Data-dependent routes (`/cv/<variant>/`,
+  `/projects/<slug>/`, `/pdfs/<variant>.pdf`) change with `cv` releases, so Phase 6
+  regenerates and re-checks the map before serving it. The build-coverage test is
+  opt-in (`REDIRECT_MAP_CHECK_BUILD=1`); CI does not gate on it in Phase 1.
 
 ## Assumptions
 
@@ -86,7 +96,10 @@ Phase 1 — Foundation (issue #10) only.
 
 ## Open Questions
 
-- None.
+- SEAM-3 defines no 404 page; Firebase Hosting serves its default 404. Recommended
+  for a later phase (`src/pages/404.astro`).
+- The smoke-test route list exists twice (`build.yml` and
+  `site/scripts/site-routes.mjs`) and can drift. ADR candidate.
 
 ## Cross-References
 

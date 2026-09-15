@@ -1,7 +1,7 @@
 # Contract: Site Implementation Engineer — Phase 1
 
 Status: Active
-Last updated: 2026-09-15
+Last updated: 2026-09-15 (D2 amended at reconciliation)
 Owner: Chief Architect (Lead Architect)
 
 Instance of the Universal Bounded-Contract Skeleton (agentic-governance
@@ -61,9 +61,22 @@ DELIVERABLES:
      (display), IBM Plex Sans (body), IBM Plex Mono (metadata); petrol accent
      #0F5C5A; brass for caution and clay for risk; complete light and dark
      palettes as CSS custom properties, switched by prefers-color-scheme with no
-     JavaScript (ADR-0003). The design doc gives no hex values for brass and
-     clay: choose them, keep body text and links at WCAG AA contrast (at least
-     4.5:1) in both themes, and record every value and ratio in the handoff.
+     JavaScript (ADR-0003). AMENDED 2026-09-15: design doc §5 says to carry over
+     the palette the milestone tracker and committee dossier already use; the
+     original wording here ("the design doc gives no hex values ... choose
+     them") was wrong. Map these values onto the site's token names —
+     light: paper #F4F5F1, paper-2 #EAEBE5, card #FBFBF8, ink #14181B,
+     ink-2 #3C4448, ink-3 #6B7370, rule #D7D9D1, rule-2 #C3C6BC,
+     petrol #0F5C5A, petrol-soft #DDE9E7, brass #8A6512, brass-soft #F0E7D2,
+     clay #9C3B2E, clay-soft #F3E0DC; dark: paper #111413, paper-2 #181C1B,
+     card #1A1F1E, ink #EDEEE9, ink-2 #C0C5C0, ink-3 #8A918C, rule #2B312F,
+     rule-2 #3A423F, petrol #6FC4BE, petrol-soft #16302E, brass #D8AC5A,
+     brass-soft #2E2718, clay #E08A79, clay-soft #33201C. Keep body text and
+     links at WCAG AA (at least 4.5:1) in both themes. Where a carried-over
+     value fails AA for a text pairing, keep it for non-text use, report the
+     pairing, and use the nearest compliant value for that text — never
+     silently. Tokens with no tracker counterpart may stay only if needed, and
+     are listed. Record every value and ratio in the handoff.
      Fonts are self-hosted (npm packages or files under site/) — never loaded
      from a third-party CDN at runtime. Base.astro's ad hoc palette is replaced
      by the tokens.

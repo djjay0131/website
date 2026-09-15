@@ -15,11 +15,11 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. IN PROGRESS** (issue #10, branch `feat/foundation`).
-Checkpoint 1 passed: the owner approved PR #9 and gave the go. The Astro app is
-moved under `site/`; the Phase 1 contracts are written; the implementation wave
-(site + infra, then independent verification) launches next. Next stop:
-**Checkpoint 2**.
+**Phase 1 — Foundation. RECONCILING** (issue #10, branch `feat/foundation`).
+The implementation workflow completed and every verification passed; site and
+infra are committed. One re-work item is open — the design tokens must carry over
+the tracker/dossier palette (A16) — then the Chief Reviewer reviews the Phase 1
+PR. Next stop: **Checkpoint 2**.
 
 ## Done
 
@@ -86,10 +86,22 @@ moved under `site/`; the Phase 1 contracts are written; the implementation wave
       tests fails locally on data (A12).
 - [x] Contracts: `phase-1-seams.md` (SEAM-1..6), `site-phase-1.md`,
       `infra-phase-1.md`.
+- [x] **Phase 1 workflow** (`wf_89beac5f-e7f`, 8 agents, 0 errors): site and infra
+      implemented in parallel; both per-stream verifications passed with no
+      must-fix; the seam check raised two should-fix findings (Firebase-variant
+      build gating → infra; release-dependent test assertions → site), both fixed,
+      and the seam re-check passed.
+- [x] Lead Architect checks before commit: only in-scope paths changed; ci.yml
+      identical; no secrets, key files, state or machine paths; GitHub repository
+      and owner ids in Terraform verified against the API; actionlint clean;
+      terraform fmt + validate clean; `npm test` 45 passed, 1 skipped.
+- [x] Committed per scope: site `0ce2865`, infra `9f0718a`.
+- [x] Seams clarified (SEAM-4 `SITE_URL` ordering; SEAM-6 snapshot currency); site
+      contract D2 amended (A16).
 
 ## In flight
 
-Nothing yet — the Phase 1 implementation workflow launches after this commit.
+- **Site** — palette re-work under amended D2 (A16).
 
 ## Blocked
 
@@ -119,12 +131,11 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-1. Launch the Phase 1 workflow: `site` and `infra` in parallel → an independent
-   verifier per stream (with one fix round through the stream's owner) → a seam
-   verifier across both.
-2. Lead Architect reconciliation: check every deliverable against its contract;
-   commit per scope.
-3. Draft PR (L2) → Chief Reviewer → reconcile → mark ready → **Checkpoint 2**.
+1. Site palette re-work → verify (contrast test, builds) → commit.
+2. Draft PR for Phase 1 → CI green → Chief Reviewer (contract first) → reconcile.
+3. Mark the PR ready. **Checkpoint 2 — STOP.** The owner creates the project,
+   enables Blaze, applies Terraform, adds DNS, sets the Actions variables, merges;
+   the Lead Architect verifies the domain serves the site.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -249,6 +260,17 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **A14** — Phase 1 runs as a generated ultracode workflow (the Mode 3 fan-out
   deferred in A2). Verification inside the workflow does not replace the Chief
   Reviewer's review of the PR.
+- **A15** — Contract deviation accepted: the site contract said not to modify
+  `cv-data.test.ts`. The seam check found it pinned exact counts from whatever `cv`
+  release CI fetches, so a new release could fail CI on content alone. The fix
+  moved exact assertions onto an invented fixture and kept structural checks on
+  the fetched data. It may overlap the owner's `fix/derive-education-assertion`
+  branch.
+- **A16** — Lead Architect contract error: site contract D2 told the specialist to
+  choose brass and clay colours, but design doc §5 says to carry over the tracker
+  and dossier palette. The specialist never saw that palette (it lives in the
+  private tarball outside the repo). D2 is amended with the colour values only,
+  and the tokens are re-worked.
 
 ## ADR candidates
 
@@ -268,6 +290,14 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C8** — What public-build islands may call at runtime (review R7; ADR-0003).
 - **C9** — Handling private content found in a public repository — incident
   runbook (review R8; A1).
+- **C10** — Terraform state backend (local, git-ignored, in Phase 1; remote GCS
+  backend proposed — it needs a bucket, which K1 keeps out of Phase 1).
+- **C11** — Deploy identity: `roles/firebasehosting.admin` vs a custom role with
+  the four permissions firebase-tools uses; `apiKeysViewer` omitted on source
+  evidence.
+- **C12** — WIF admission policy: repository id + owner id + name, main-only deploy
+  binding via `repository_id/ref`, `pull_request_target` refused.
+- **C13** — One source for the smoke-test route list.
 
 ## Constraints discovered (bind later contracts)
 
@@ -280,6 +310,23 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **Phase 1 site scope must include** the files the `site/` move touches outside
   `site/**`: `.gitignore`, `.vscode/`, root `package.json`/lockfile removal,
   `scripts/`. (ADR-0001)
+
+## Decisions for the owner at Checkpoint 2 (with recommended defaults)
+
+- **State backend** — keep local, git-ignored state for the first apply and back
+  it up privately; adopt a GCS backend when Phase 2 introduces buckets. (C10)
+- **Deploy role** — keep `roles/firebasehosting.admin` for the first deploy;
+  tighten to a custom role once a real deploy has proved the permission set. (C11)
+- **`apiKeysViewer`** — leave it out; grant only if the first deploy reports a
+  missing `apikeys.*` permission (infra handoff manual step 9).
+- **Billing** — confirm you hold Billing Account Administrator or User on the
+  personal billing account (so budget emails reach you) and that it bills in USD.
+- **`/phd/` in the redirect map** — leave it in: it is a public, empty, noindex
+  shell.
+- **Two-hop legacy research redirects on Firebase** (301 to add the slash, then a
+  meta refresh) — accept for Phase 1; Phase 6 serves host-level redirects.
+- **Font payload** (~1.6 MB across 55 woff2 subsets; browsers fetch only what they
+  need) — subset to latin + latin-ext in a later phase.
 
 ## Risks carried forward
 
@@ -305,6 +352,9 @@ Phase 1's `firebase.json` carries no gate rewrites.
    auto-updates locally (delta §Canon Location).
 9. **Shared owner token + enforce_admins off** — any agent session can push to
    `main`; the controls are procedural.
+10. **Two CV fetches per run.** The Pages and Firebase builds each fetch the `cv`
+    latest release seconds apart; a release replaced in that window can leave the
+    hosts briefly out of step until the next scheduled poll.
 
 ## Follow-ups
 
