@@ -9,22 +9,22 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
-- Sprint `2026-09-hub`, **Phase 1 — Foundation**, in progress: issue #10, branch
-  `feat/foundation`.
-- Phase 0 merged via PR #9 on 2026-09-15. The merge was executed by the Lead
-  Architect on the owner's explicit instruction, recorded on PR #9.
-- **Next stop point: Checkpoint 2.** The owner creates the GCP project, enables
-  Blaze, runs `terraform apply`, adds DNS records and merges.
-- Live orchestration state: `llm/sprints/2026-09-hub/STATE.md` (on the active
-  sprint branch until it merges).
+- Sprint `2026-09-hub`: **Phase 1 — Foundation is complete.** PR #12 merged 2026-09-15;
+  Checkpoint 2 verified live the same day.
+- The hub is live at **https://jason.cusati.us** on Firebase Hosting, deployed from `main`
+  through Workload Identity Federation; `https://research.cusati.us` 301-redirects to it
+  (paths preserved). GitHub Pages still serves until Phase 6.
+- **Stop point:** no Phase 2 work, and no OpenClaw page build (#13), without the owner's
+  explicit go.
+- Orchestration state: `llm/sprints/2026-09-hub/STATE.md`.
 
 ## Decisions on record
 
 - Q1 — domain `cusati.us`, **amended by ADR-0006:** the hub is at `jason.cusati.us`
   (canonical); `research.cusati.us` redirects to it; `cusati.us` and `www` are reserved
   for a family site.
-- Q2 — a new GCP project on the owner's personal account (intended id
-  `cusati-hub`).
+- Q2 — GCP project `cusati-hub` (number 410552878319) on the owner's personal account,
+  created 2026-09-15, billing linked (Blaze).
 - Q5 — the Astro app moves under `site/`: proposed in ADR-0001, approved by
   merging PR #9.
 - ADRs 0001–0006: `llm/governance/adr/`.
@@ -33,8 +33,9 @@ what a contributor needs to pick up work today.
 ## Open
 
 - Design doc §10 Q3, Q4, Q6.
-- Brief / design-doc / canon conflicts K1–K13 (`STATE.md`): not ruled on
-  individually; Phase 1 takes the conservative choice for each (issue #10).
+- Before Phase 2: the satellite → hub dispatch credential (ADR-0002 / STATE C1, K13).
+- OpenClaw Email pages (#13): owner to approve the drafted wording.
+- Brief / design-doc / canon conflicts K1–K13 (`STATE.md`).
 
 ## Governance adoption
 
