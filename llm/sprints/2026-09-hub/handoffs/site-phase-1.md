@@ -1,6 +1,6 @@
 # Handoff: Site Implementation Engineer — Phase 1
 
-Status: Complete, verifier findings applied (awaiting re-verification and Lead Architect reconciliation)
+Status: Complete, remediation round 2 (palette) applied (awaiting re-verification and Lead Architect reconciliation)
 Last updated: 2026-09-15
 Owner: Site Implementation Engineer (Specialist 1)
 Contract: `llm/sprints/2026-09-hub/contracts/site-phase-1.md`
@@ -26,7 +26,9 @@ serves keeps its URL and content, and the build adds three shells: `/cv/`,
   sitemap URL, is replaced by the endpoint `src/pages/robots.txt.ts`. A default
   build contains no `/website/` anywhere.
 - **D2 Design system.** `src/styles/tokens.css` defines Spectral, IBM Plex Sans
-  and IBM Plex Mono, with the petrol accent `#0F5C5A`, brass (caution) and clay
+  and IBM Plex Mono. Since remediation round 2 it carries over the tracker and
+  dossier palette from amended D2 verbatim, as `--tracker-*`, and maps the site's
+  `--color-*` tokens onto it: petrol accent `#0F5C5A`, brass (caution) and clay
   (risk). It has complete light and dark palettes, switched by
   `prefers-color-scheme` with no JavaScript. Fonts are self-hosted from
   `@fontsource/*` 5.3.0 (OFL-1.1) and bundled into `/_astro/` under the base.
@@ -87,13 +89,89 @@ One should-fix finding (SEAM-1, SEAM-2) was applied:
   not modify that test". The Lead Architect's remediation instruction
   overrides that for this finding. `site/data/` was not touched.
 
+## Remediation round 2 (palette)
+
+The original D2 said the design doc gave no hex values and asked for brass and
+clay to be chosen. That was the Lead Architect's error: design doc §5 says to
+carry over the palette the milestone tracker and committee dossier already use.
+D2 was amended at reconciliation (commit `4fd73cc`) with those values. Every
+colour in round 1's `tokens.css` differed from them, so this round re-maps the
+tokens.
+
+- **Palette of record.** `tokens.css` declares the 14 amended-D2 values for each
+  theme, verbatim, as `--tracker-<name>` (`--tracker-paper`, `--tracker-ink-3`,
+  `--tracker-brass-soft` and so on). The dark block overrides only those values
+  and a few literal tokens. Each `var()` reference then resolves to the dark
+  value, the way the browser resolves custom properties declared on the same
+  element.
+- **Mapping onto the site's token names** (no component changed):
+  paper → `--color-bg`; card → `--color-surface`; rule → `--color-border`;
+  ink → `--color-text`; ink-3 → `--color-muted`; petrol → `--color-accent`,
+  `--color-link` and `--color-focus`; brass → `--color-caution`;
+  brass-soft → `--color-caution-bg`; clay → `--color-risk`;
+  clay-soft → `--color-risk-bg`. `--color-surface` becomes the lighter card on
+  the paper ground, as in the tracker.
+- **Carried over but not yet read by any site token:** paper-2, ink-2, rule-2
+  and petrol-soft. They are declared in both themes so later phases can use
+  them. No site token needed them, and adding site tokens would have meant
+  changing components.
+- **AA adjustments (reported, not silent).** Two carried-over colours fail AA as
+  text, both in the light theme only:
+  - ink-3 `#6B7370` as `--color-muted`: **4.45:1** on paper, and **3.96:1** on
+    brass-soft, which is the source explorer's flashed row (`tr.flash`). Muted
+    text uses `#636a68` instead.
+  - brass `#8A6512` as `--color-caution`: **4.32:1** on brass-soft (the
+    "minor fix" verdict chip). Caution text uses `#87620d` instead.
+
+  Each replacement is the nearest compliant colour. It keeps the source's OKLCH
+  hue and chroma and lowers lightness in 0.0005 steps, rounding to hex, until
+  every checked pair for that token reaches 4.5:1 (muted −0.0295 L, brass
+  −0.0090 L). The originals stay in `--tracker-ink-3` and `--tracker-brass` for
+  non-text use. No component reads them directly yet; chip borders use
+  `--color-caution`, so they take the adjusted brass. The dark theme needs no
+  adjustment.
+- **Tokens with no tracker counterpart, kept because the site uses them:**
+  - `--color-accent-strong` (primary button hover) and `--color-link-hover`:
+    petrol mixed 35% toward ink in sRGB, `#114444` in light and `#9bd3cd` in dark.
+  - `--color-on-accent` (primary button, skip link): card `#FBFBF8` in light
+    and paper `#111413` in dark, both through `var()`.
+  - `--color-ok` and `--color-ok-bg` (the "confirmed" verdict chip and the
+    open-source sector chip): the palette has no green, so round 1's values are
+    unchanged: `#2f6b35`/`#e3f0e2` in light and `#8cc98f`/`#1b2b1c` in dark.
+- **Check and tests.** `scripts/contrast.mjs` now resolves `var()` per theme and
+  adds two pairs for the flashed row, muted and link on caution-bg. That makes
+  26 pairs per theme, 52 in all. It exports `TOKEN_SOURCES` (site token →
+  tracker token) and prints the carried-over colour's ratio beside each adjusted
+  pair. `src/styles/tokens.test.ts` adds two tests:
+  - The `--tracker-*` values must equal the amended-D2 table in both themes.
+  - Each site token in `TOKEN_SOURCES` must read its tracker colour through
+    `var()`. A literal is allowed only where the carried-over colour fails a
+    checked text pair for that token.
+
+  A mutation check confirmed both. A literal `--color-risk` is flagged in both
+  themes, and pointing `--color-muted` back at ink-3 fails the AA test at 4.45
+  and 3.96.
+
 ## Validation
 
 All commands were run from `site/` unless stated. Local CV data is the owner's
 (newer than the `cv` release), except where a run says "release data".
 
-**Remediation round 1 (after the fixture change; this is the current state).**
-The contract sequence was re-run in full:
+**Remediation round 2 (palette; this is the current state).** Run from `site/`
+after the token re-map. `npm ci` was not re-run, because no dependency changed.
+
+| # | Command | Result |
+|---|---|---|
+| P1 | `node scripts/contrast.mjs` | `52 pairs, 0 below AA`, exit 0 (table below) |
+| P2 | `npm test` | `Test Files 6 passed (6)` · `Tests 47 passed \| 1 skipped (48)`, exit 0. The two new tests are the palette and mapping checks; the skip is the opt-in build-coverage test. |
+| P3 | `npm run build` (defaults) | `33 page(s) built`, `Complete!`, exit 0 |
+| P4 | `grep -r "/website/" dist-public \| wc -l` | `0` |
+| P5 | `SITE_URL=https://djjay0131.github.io SITE_BASE=/website/ npm run build` | `33 page(s) built`, `Complete!`, exit 0 |
+| P6 | `npx astro check` | `Result (42 files): 11 errors, 0 warnings, 3 hints` (exit 1). The same 11 pre-existing `ts(7006)` errors in `SourceExplorer.astro`, at the same positions; none added. |
+| P7 | `npm run build` (final, defaults) | `33 page(s) built`, `Complete!`, exit 0; `/website/` matches: `0`. **`site/dist-public` is the default build.** The built `/_astro/*.css` carries `--tracker-ink-3: #6b7370` and `#8a918c`, `--color-muted: #636a68` and `var(--tracker-ink-3)`, `--color-caution: #87620d` and `var(--tracker-brass)`, and one `prefers-color-scheme:dark` block. |
+
+**Remediation round 1 (after the fixture change; superseded by round 2 for
+tokens only).** The contract sequence was re-run in full:
 
 | # | Command | Result |
 |---|---|---|
@@ -125,7 +203,7 @@ and 10 no longer hold: that failure is gone.
 | 8 | `npm run redirects:check` (its own Pages build) | 48 routes, 48 entries, all covered, exit 0 |
 | 9 | `npm run build` (final, defaults) | `33 page(s) built`, exit 0; `/website/` matches: 0. |
 | 10 | `REDIRECT_MAP_CHECK_BUILD=1 npm test` (after 9) | `covers every route of the build in dist-public` ✓ · `1 failed \| 40 passed (41)` (baseline failure only) |
-| 11 | `node scripts/contrast.mjs` | 48 pairs, all AA (table below) |
+| 11 | `node scripts/contrast.mjs` | 48 pairs, all AA (round 1 palette; replaced in round 2) |
 
 `astro check` errors that predate this work (not fixed, per contract), all
 `ts(7006)` "Parameter implicitly has an 'any' type" in
@@ -195,48 +273,83 @@ links to them from outside.
 
 ### Design tokens and contrast (WCAG 2.x, AA = 4.5:1)
 
-| Token | Light | Dark |
-|---|---|---|
-| `--color-bg` | `#fbfaf7` | `#101615` |
-| `--color-surface` | `#f2efe8` | `#18201f` |
-| `--color-border` | `#d9d4c8` | `#2f3a38` |
-| `--color-text` | `#1b2422` | `#e4e7e2` |
-| `--color-muted` | `#4f5a57` | `#a3ada9` |
-| `--color-accent` (petrol) | `#0f5c5a` | `#5fb8b3` |
-| `--color-accent-strong` | `#0a4644` | `#86cfca` |
-| `--color-on-accent` | `#ffffff` | `#0b1413` |
-| `--color-link` | `#0f5c5a` | `#6cc4bf` |
-| `--color-link-hover` | `#0a4644` | `#9ad9d5` |
-| `--color-focus` | `#0f5c5a` | `#6cc4bf` |
-| `--color-caution` (brass) | `#7a5a12` | `#d9ae55` |
-| `--color-caution-bg` | `#f6edd6` | `#2e2512` |
-| `--color-risk` (clay) | `#9a3f27` | `#e68c70` |
-| `--color-risk-bg` | `#f7e4dc` | `#34201a` |
-| `--color-ok` | `#2f6b35` | `#8cc98f` |
-| `--color-ok-bg` | `#e3f0e2` | `#1b2b1c` |
+Remediation round 2 values. Tracker palette, carried over verbatim from amended
+D2:
 
-Fonts: `--font-display` Spectral (400, 400 italic, 600); `--font-body` IBM Plex
-Sans (400, 400 italic, 500, 600, 700); `--font-mono` IBM Plex Mono (400, 500).
-Each has a system fallback stack.
+| Token | Light | Dark | Read by |
+|---|---|---|---|
+| `--tracker-paper` | `#f4f5f1` | `#111413` | `--color-bg`; `--color-on-accent` (dark) |
+| `--tracker-paper-2` | `#eaebe5` | `#181c1b` | not yet used |
+| `--tracker-card` | `#fbfbf8` | `#1a1f1e` | `--color-surface`; `--color-on-accent` (light) |
+| `--tracker-ink` | `#14181b` | `#edeee9` | `--color-text` |
+| `--tracker-ink-2` | `#3c4448` | `#c0c5c0` | not yet used |
+| `--tracker-ink-3` | `#6b7370` | `#8a918c` | `--color-muted` (dark only; light is AA-adjusted) |
+| `--tracker-rule` | `#d7d9d1` | `#2b312f` | `--color-border` |
+| `--tracker-rule-2` | `#c3c6bc` | `#3a423f` | not yet used |
+| `--tracker-petrol` | `#0f5c5a` | `#6fc4be` | `--color-accent`, `--color-link`, `--color-focus` |
+| `--tracker-petrol-soft` | `#dde9e7` | `#16302e` | not yet used |
+| `--tracker-brass` | `#8a6512` | `#d8ac5a` | `--color-caution` (dark only; light is AA-adjusted) |
+| `--tracker-brass-soft` | `#f0e7d2` | `#2e2718` | `--color-caution-bg` |
+| `--tracker-clay` | `#9c3b2e` | `#e08a79` | `--color-risk` |
+| `--tracker-clay-soft` | `#f3e0dc` | `#33201c` | `--color-risk-bg` |
 
-Contrast ratios (output of `node scripts/contrast.mjs`):
+Site tokens: round 1 value → round 2 value (resolved).
+
+| Token | Source | Light (round 1 → round 2) | Dark (round 1 → round 2) |
+|---|---|---|---|
+| `--color-bg` | paper | `#fbfaf7` → `#f4f5f1` | `#101615` → `#111413` |
+| `--color-surface` | card | `#f2efe8` → `#fbfbf8` | `#18201f` → `#1a1f1e` |
+| `--color-border` | rule | `#d9d4c8` → `#d7d9d1` | `#2f3a38` → `#2b312f` |
+| `--color-text` | ink | `#1b2422` → `#14181b` | `#e4e7e2` → `#edeee9` |
+| `--color-muted` | ink-3 | `#4f5a57` → **`#636a68`** (AA-adjusted from `#6b7370`) | `#a3ada9` → `#8a918c` |
+| `--color-accent` | petrol | `#0f5c5a` → `#0f5c5a` | `#5fb8b3` → `#6fc4be` |
+| `--color-accent-strong` | derived: petrol 35% toward ink | `#0a4644` → `#114444` | `#86cfca` → `#9bd3cd` |
+| `--color-on-accent` | card / paper | `#ffffff` → `#fbfbf8` | `#0b1413` → `#111413` |
+| `--color-link` | petrol | `#0f5c5a` → `#0f5c5a` | `#6cc4bf` → `#6fc4be` |
+| `--color-link-hover` | derived: petrol 35% toward ink | `#0a4644` → `#114444` | `#9ad9d5` → `#9bd3cd` |
+| `--color-focus` | petrol | `#0f5c5a` → `#0f5c5a` | `#6cc4bf` → `#6fc4be` |
+| `--color-caution` | brass | `#7a5a12` → **`#87620d`** (AA-adjusted from `#8a6512`) | `#d9ae55` → `#d8ac5a` |
+| `--color-caution-bg` | brass-soft | `#f6edd6` → `#f0e7d2` | `#2e2512` → `#2e2718` |
+| `--color-risk` | clay | `#9a3f27` → `#9c3b2e` | `#e68c70` → `#e08a79` |
+| `--color-risk-bg` | clay-soft | `#f7e4dc` → `#f3e0dc` | `#34201a` → `#33201c` |
+| `--color-ok` | none (no tracker green) | `#2f6b35` (unchanged) | `#8cc98f` (unchanged) |
+| `--color-ok-bg` | none (no tracker green) | `#e3f0e2` (unchanged) | `#1b2b1c` (unchanged) |
+
+Fonts (unchanged): `--font-display` Spectral (400, 400 italic, 600);
+`--font-body` IBM Plex Sans (400, 400 italic, 500, 600, 700); `--font-mono` IBM
+Plex Mono (400, 500). Each has a system fallback stack.
+
+Contrast ratios, from `node scripts/contrast.mjs` (52 pairs, 0 below AA):
 
 | Foreground on background | Light | Dark |
 |---|---|---|
-| text on bg / surface | 15.22 / 13.83 | 14.66 / 13.30 |
-| muted on bg / surface | 6.86 / 6.24 | 7.94 / 7.20 |
-| accent on bg / surface | 7.45 / 6.78 | 7.84 / 7.11 |
-| link on bg / surface | 7.45 / 6.78 | 8.96 / 8.13 |
-| link-hover on bg / surface | 10.20 / 9.27 | 11.55 / 10.48 |
-| caution (brass) on bg / surface | 6.10 / 5.54 | 8.83 / 8.01 |
-| risk (clay) on bg / surface | 6.46 / 5.87 | 7.28 / 6.60 |
-| ok on bg / surface | 6.14 / 5.58 | 9.47 / 8.59 |
-| caution / risk / ok on own tint | 5.46 / 5.49 / 5.44 | 7.29 / 6.11 / 7.71 |
-| text on caution / risk / ok tint | 13.62 / 12.92 / 13.49 | 12.11 / 12.30 / 11.94 |
-| on-accent on accent / accent-strong | 7.78 / 10.65 | 8.00 / 10.49 |
+| text on bg / surface | 16.30 / 17.22 | 15.89 / 14.31 |
+| muted on bg / surface | 5.06 / 5.34 | 5.74 / 5.17 |
+| accent on bg / surface | 7.11 / 7.51 | 9.10 / 8.20 |
+| link on bg / surface | 7.11 / 7.51 | 9.10 / 8.20 |
+| link-hover on bg / surface | 9.92 / 10.47 | 11.11 / 10.01 |
+| caution (brass) on bg / surface | 5.07 / 5.35 | 8.80 / 7.92 |
+| risk (clay) on bg / surface | 6.23 / 6.58 | 7.13 / 6.42 |
+| ok on bg / surface | 5.86 / 6.18 | 9.59 / 8.63 |
+| caution on caution-bg | 4.51 | 7.02 |
+| risk on risk-bg | 5.36 | 5.92 |
+| ok on ok-bg | 5.44 | 7.71 |
+| text on caution-bg / risk-bg / ok-bg | 14.51 / 14.03 / 15.16 | 12.69 / 13.20 / 12.78 |
+| muted on caution-bg (flashed row) | 4.50 | 4.59 |
+| link on caution-bg (flashed row) | 6.32 | 7.27 |
+| on-accent on accent / accent-strong | 7.51 / 10.47 | 9.10 / 11.11 |
 
-Petrol `#0F5C5A` is 2.35:1 on the dark ground, which is why the dark theme lifts
-the accent to `#5fb8b3`.
+Carried-over colours that fail AA as text (light theme), and what was done:
+
+| Pairing | Carried-over ratio | Used for text | Ratio now |
+|---|---|---|---|
+| ink-3 `#6b7370` (muted) on paper `#f4f5f1` | 4.45 | `#636a68` | 5.06 |
+| ink-3 `#6b7370` (muted) on brass-soft `#f0e7d2` | 3.96 | `#636a68` | 4.50 |
+| brass `#8a6512` (caution) on brass-soft `#f0e7d2` | 4.32 | `#87620d` | 4.51 |
+
+For reference, the carried-over colours pass on their other pairs: ink-3 on
+card 4.70, and brass on paper 4.85 and on card 5.13. Dark petrol `#6FC4BE` is
+the tracker's own dark value, and the dark theme needs no adjustment.
 
 ### firebase.json URL behavior
 
@@ -327,12 +440,13 @@ the pre-change build is still produced at the same path. Visible changes:
 
 **(b) Which §5 details did I decide myself?**
 
-- Every hex value, including brass (`#7a5a12` light, `#d9ae55` dark) and clay
-  (`#9a3f27`, `#e68c70`).
-- The dark-theme petrol lift (`#5fb8b3`, links `#6cc4bf`).
-- The warm paper grounds and the surface and border colours.
-- A green `--color-ok` status token, which §5 does not name (used for
-  "confirmed").
+- *Superseded in remediation round 2:* round 1 chose every hex value itself.
+  The palette now comes from amended D2. What remains my own decision is the
+  mapping onto the site's tokens, the two AA adjustments (light muted
+  `#636a68`, light caution `#87620d`), and the derived hover shades
+  (`#114444`, `#9bd3cd`).
+- A green `--color-ok` status token, which §5 and the tracker palette do not
+  name (used for "confirmed"). Its values are round 1's.
 - Font weights and styles, and self-hosting through `@fontsource`.
 - Type roles: Spectral for the brand and `h1`–`h4`; Plex Sans for body and UI
   (replacing both the old serif body and the sans UI); Plex Mono for code and
@@ -345,8 +459,8 @@ the pre-change build is still produced at the same path. Visible changes:
 - Navigation composition (four primary sections, then Papers and Resumes).
 - The copy on the empty states.
 
-I did not see the tracker and dossier palette that §5 says to carry over. It is
-private and outside this repository, so these values are proposals.
+Round 1 did not have the tracker and dossier palette. Round 2 uses the values
+amended D2 states; I did not see the tracker or dossier themselves.
 
 ## Assumptions
 
@@ -379,8 +493,10 @@ private and outside this repository, so these values are proposals.
 4. Consider long-lived `Cache-Control: public, max-age=31536000, immutable` for
    `/_astro/**` in `firebase.json`. I left it out to keep SEAM-3 exactly to the
    design doc §8 headers.
-5. Have the owner review the palette against the tracker and dossier at
-   Checkpoint 2.
+5. At Checkpoint 2, have the owner confirm the two light-theme AA adjustments
+   (muted `#636a68`, caution `#87620d`) and the kept green `--color-ok`. If the
+   tracker and dossier render ink-3 and brass text on those grounds, they have
+   the same AA failures.
 6. Fix the 11 pre-existing `ts(7006)` errors in `SourceExplorer.astro` in a
    separate change.
 
@@ -428,6 +544,10 @@ private and outside this repository, so these values are proposals.
 - **Visual regressions** in pages I did not open in a browser, especially dark
   mode in the research source explorer (chips, filters, flash highlight).
   Contrast is tested; layout is not.
+- **AA margins are thin in the light theme.** Muted on caution-bg is 4.50 and
+  caution on caution-bg is 4.51, by construction (nearest compliant). Any
+  palette change to brass-soft can push them under; the AA test fails if it
+  does.
 - **Smoke routes duplicated.** `scripts/site-routes.mjs` repeats the
   `build.yml` smoke-test route list (infra-owned) and can drift from it.
 - **A misconfigured `SITE_URL`** (one with a path) fails the build loudly. That
@@ -446,8 +566,10 @@ private and outside this repository, so these values are proposals.
 
 - Should `/phd/` appear in the public redirect map? It names the path, which
   the build already serves.
-- Should the palette be reconciled with the private tracker and dossier values
-  that §5 refers to?
+- *Resolved in remediation round 2:* the palette is reconciled with the tracker
+  and dossier values in amended D2. Open: should the site use a status green at
+  all, given the palette has none? The source explorer needs a third chip colour
+  (open-source sector, "confirmed" verdict).
 - Is a two-hop redirect for the legacy research URLs on Firebase acceptable (a
   301 for the slash, then a meta refresh)? Phase 6 could redirect those at the
   host instead.
@@ -522,6 +644,9 @@ Added:
   `skills`, `misc`, `referees` (`.yaml`); `variants/academic.yaml`,
   `variants/short-industry.yaml`
 - `llm/sprints/2026-09-hub/handoffs/site-phase-1.md`
+
+Remediation round 2 (palette) changed only `site/src/styles/tokens.css`,
+`site/scripts/contrast.mjs`, `site/src/styles/tokens.test.ts` and this handoff.
 
 Untouched: `site/data/` (local CV data), `infra/**`, `.github/**`,
 `.gitignore`, and `llm/**` apart from this handoff.

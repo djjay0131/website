@@ -3,15 +3,41 @@
  *
  * Type: Spectral (display), IBM Plex Sans (body), IBM Plex Mono (metadata),
  * self-hosted from the @fontsource packages that Base.astro imports.
- * Colour: petrol accent #0F5C5A, brass for caution, clay for risk.
  *
- * The light palette sits on :root. The dark palette overrides it under
- * prefers-color-scheme: dark. No JavaScript switches themes (ADR-0003).
+ * Colour: the palette the milestone tracker and committee dossier already use,
+ * carried over verbatim as --tracker-* (contract site-phase-1 D2, amended
+ * 2026-09-15). Components never read --tracker-* directly; they read the site's
+ * --color-* tokens, which map onto it:
  *
- * Every text colour is at least 4.5:1 (WCAG AA) against --color-bg and
- * --color-surface in its theme. scripts/contrast.mjs lists the checked pairs
- * and src/styles/tokens.test.ts fails the test run when one drops below AA.
- * Keep every colour a six-digit hex so the check can read it.
+ *   paper → bg          card → surface       rule → border
+ *   ink → text          ink-3 → muted        petrol → accent, link, focus
+ *   brass → caution     brass-soft → caution-bg
+ *   clay → risk         clay-soft → risk-bg
+ *
+ * Carried over but not yet read by any site token: paper-2, ink-2, rule-2,
+ * petrol-soft (and ink-3 and brass in the light theme, below).
+ *
+ * WCAG AA adjustments (text only; the carried-over value stays in --tracker-*
+ * for non-text use). Each is the nearest compliant colour: same OKLCH hue and
+ * chroma, lightness lowered until every checked pair reaches 4.5:1.
+ *   light --color-muted   #636a68, not ink-3 #6b7370 (4.45:1 on paper, 3.96:1
+ *                         on brass-soft, the flashed row in the source explorer)
+ *   light --color-caution #87620d, not brass #8a6512 (4.32:1 on brass-soft)
+ *
+ * Tokens with no tracker counterpart, kept because the site uses them:
+ *   --color-accent-strong, --color-link-hover  petrol mixed 35% toward ink
+ *   --color-on-accent                          card (light) / paper (dark)
+ *   --color-ok, --color-ok-bg                  green "confirmed" status in the
+ *                                              source explorer; no tracker green
+ *
+ * The light palette sits on :root. The dark palette overrides the --tracker-*
+ * values (and the few literal tokens) under prefers-color-scheme: dark; every
+ * var() reference then resolves to the dark value. No JavaScript switches themes
+ * (ADR-0003).
+ *
+ * scripts/contrast.mjs lists every checked text pair and src/styles/tokens.test.ts
+ * fails the test run when one drops below AA. Keep each value a six-digit hex or
+ * a var() reference to one, so the check can read it.
  */
 
 :root {
@@ -26,56 +52,72 @@
   --max-width: 800px;
   --radius: 4px;
 
+  /* Tracker and dossier palette, light (carried over verbatim) */
+  --tracker-paper: #f4f5f1;
+  --tracker-paper-2: #eaebe5;
+  --tracker-card: #fbfbf8;
+  --tracker-ink: #14181b;
+  --tracker-ink-2: #3c4448;
+  --tracker-ink-3: #6b7370;
+  --tracker-rule: #d7d9d1;
+  --tracker-rule-2: #c3c6bc;
+  --tracker-petrol: #0f5c5a;
+  --tracker-petrol-soft: #dde9e7;
+  --tracker-brass: #8a6512;
+  --tracker-brass-soft: #f0e7d2;
+  --tracker-clay: #9c3b2e;
+  --tracker-clay-soft: #f3e0dc;
+
   /* Surfaces */
-  --color-bg: #fbfaf7;
-  --color-surface: #f2efe8;
-  --color-border: #d9d4c8;
+  --color-bg: var(--tracker-paper);
+  --color-surface: var(--tracker-card);
+  --color-border: var(--tracker-rule);
 
   /* Text */
-  --color-text: #1b2422;
-  --color-muted: #4f5a57;
+  --color-text: var(--tracker-ink);
+  --color-muted: #636a68; /* AA: ink-3 #6b7370 is 4.45:1 on paper */
 
   /* Accent: petrol */
-  --color-accent: #0f5c5a;
-  --color-accent-strong: #0a4644;
-  --color-on-accent: #ffffff;
-  --color-link: #0f5c5a;
-  --color-link-hover: #0a4644;
-  --color-focus: #0f5c5a;
+  --color-accent: var(--tracker-petrol);
+  --color-accent-strong: #114444; /* petrol mixed 35% toward ink */
+  --color-on-accent: var(--tracker-card);
+  --color-link: var(--tracker-petrol);
+  --color-link-hover: #114444;
+  --color-focus: var(--tracker-petrol);
 
   /* Status: brass = caution, clay = risk, green = confirmed */
-  --color-caution: #7a5a12;
-  --color-caution-bg: #f6edd6;
-  --color-risk: #9a3f27;
-  --color-risk-bg: #f7e4dc;
+  --color-caution: #87620d; /* AA: brass #8a6512 is 4.32:1 on brass-soft */
+  --color-caution-bg: var(--tracker-brass-soft);
+  --color-risk: var(--tracker-clay);
+  --color-risk-bg: var(--tracker-clay-soft);
   --color-ok: #2f6b35;
   --color-ok-bg: #e3f0e2;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Surfaces */
-    --color-bg: #101615;
-    --color-surface: #18201f;
-    --color-border: #2f3a38;
+    /* Tracker and dossier palette, dark (carried over verbatim) */
+    --tracker-paper: #111413;
+    --tracker-paper-2: #181c1b;
+    --tracker-card: #1a1f1e;
+    --tracker-ink: #edeee9;
+    --tracker-ink-2: #c0c5c0;
+    --tracker-ink-3: #8a918c;
+    --tracker-rule: #2b312f;
+    --tracker-rule-2: #3a423f;
+    --tracker-petrol: #6fc4be;
+    --tracker-petrol-soft: #16302e;
+    --tracker-brass: #d8ac5a;
+    --tracker-brass-soft: #2e2718;
+    --tracker-clay: #e08a79;
+    --tracker-clay-soft: #33201c;
 
-    /* Text */
-    --color-text: #e4e7e2;
-    --color-muted: #a3ada9;
-
-    /* Accent: petrol, lifted so it reads on a dark ground (#0f5c5a is 2.35:1 here) */
-    --color-accent: #5fb8b3;
-    --color-accent-strong: #86cfca;
-    --color-on-accent: #0b1413;
-    --color-link: #6cc4bf;
-    --color-link-hover: #9ad9d5;
-    --color-focus: #6cc4bf;
-
-    /* Status */
-    --color-caution: #d9ae55;
-    --color-caution-bg: #2e2512;
-    --color-risk: #e68c70;
-    --color-risk-bg: #34201a;
+    /* Tokens that are literal in the light theme */
+    --color-muted: var(--tracker-ink-3);
+    --color-accent-strong: #9bd3cd; /* petrol mixed 35% toward ink */
+    --color-on-accent: var(--tracker-paper);
+    --color-link-hover: #9bd3cd;
+    --color-caution: var(--tracker-brass);
     --color-ok: #8cc98f;
     --color-ok-bg: #1b2b1c;
   }

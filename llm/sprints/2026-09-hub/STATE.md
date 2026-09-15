@@ -15,11 +15,9 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. RECONCILING** (issue #10, branch `feat/foundation`).
-The implementation workflow completed and every verification passed; site and
-infra are committed. One re-work item is open — the design tokens must carry over
-the tracker/dossier palette (A16) — then the Chief Reviewer reviews the Phase 1
-PR. Next stop: **Checkpoint 2**.
+**Phase 1 — Foundation. IN REVIEW** (issue #10, draft PR #12). Implementation,
+verification and reconciliation are complete, including the palette re-work (A16).
+The Chief Reviewer reviews PR #12 next. Next stop: **Checkpoint 2**.
 
 ## Done
 
@@ -100,10 +98,16 @@ PR. Next stop: **Checkpoint 2**.
       contract D2 amended (A16).
 - [x] **Draft PR #12** opened (L2). Chief Reviewer contract written
       (`chief-reviewer-phase-1.md`); it launches after the palette re-work lands.
+- [x] **Palette re-work (A16)**: tokens carry over all 14 tracker/dossier colours per
+      theme exactly (verified against amended D2); all 52 text pairings at WCAG AA.
+      Two light-theme text colours adjusted to the nearest compliant shade — muted
+      #636a68 (carried-over ink-3 #6B7370 is 4.45:1 on paper) and caution #87620d
+      (brass #8A6512 is 4.32:1 on brass-soft) — with the originals kept for non-text
+      use. `npm test` 47 passed, 1 skipped; builds clean.
 
 ## In flight
 
-- **Site** — palette re-work under amended D2 (A16).
+- **Chief Reviewer** — PR #12 review and Terraform module-structure review.
 
 ## Blocked
 
@@ -133,11 +137,8 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-1. Site palette re-work → verify (contrast test, builds) → commit.
-2. Draft PR for Phase 1 → CI green → Chief Reviewer (contract first) → reconcile.
-3. Mark the PR ready. **Checkpoint 2 — STOP.** The owner creates the project,
-   enables Blaze, applies Terraform, adds DNS, sets the Actions variables, merges;
-   the Lead Architect verifies the domain serves the site.
+1. Persist and post the Chief Reviewer's report; reconcile findings through owners.
+2. Bring the PR #12 body current; mark it ready. **Checkpoint 2 — STOP.**
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -357,6 +358,9 @@ Phase 1's `firebase.json` carries no gate rewrites.
 10. **Two CV fetches per run.** The Pages and Firebase builds each fetch the `cv`
     latest release seconds apart; a release replaced in that window can leave the
     hosts briefly out of step until the next scheduled poll.
+11. **The tracker and dossier themselves likely fail AA** where they set ink-3 text on
+    paper or brass text on brass-soft (the same pairings the site had to adjust).
+    They live in `phd-milestones`; address when it becomes a satellite (Phase 3).
 
 ## Follow-ups
 
