@@ -15,10 +15,9 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 0 — Establish. RECONCILED.** Every Chief Reviewer finding is
-dispositioned (PR #9 body). Incident A1 is remediated, with one owner action
-outstanding outside this repository. Remaining: confirm CI green on the final
-commit, mark PR #9 ready, and stop at **Checkpoint 1**.
+**Phase 0 — Establish. CHECKPOINT 1 — STOPPED.** PR #9 is marked ready for the
+owner's review once CI is green on the commit that records this. **No Phase 1
+work starts without the owner's explicit go.**
 
 ## Done
 
@@ -100,9 +99,17 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-1. Confirm `governance-checks` and `build` green on the final commit of PR #9.
-2. Mark PR #9 ready; status label `in-progress` → `needs-review`.
-3. **Checkpoint 1 — STOP.** Post the checkpoint report to PR #9 and the terminal.
+Owner, at Checkpoint 1 (details in the Checkpoint 1 report on PR #9):
+
+1. Incident A1: request GitHub Support removal of cached views of the commit.
+2. Rule on K1–K13, above all K2 and K13; confirm or reject Q5 by merging PR #9.
+3. Review and merge PR #9.
+4. Before Phase 1: create the GCP project, link billing (Blaze), set the ADC quota
+   project; decide A3 (branch naming) and A7 (Constellize).
+
+Lead Architect, after an explicit go: add `governance-checks` as a required status
+check once it is green on `main`; open hub-001; write Phase 1 contracts that
+encode the owner's rulings on K1–K13.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
