@@ -14,12 +14,19 @@ changed or read; no credential exists.
 - **D1 — `infra/`**: a Terraform root module (google and google-beta `~> 8.2`,
   Terraform `>= 1.14.0, < 2.0.0`, lock file committed with hashes for linux_amd64,
   windows_amd64, darwin_amd64 and darwin_arm64). It reads the owner-created
-  project, enables 8 APIs, and creates a WIF pool and GitHub provider bound to this
-  repository's immutable IDs and name, a keyless `hub-deploy` service account with
-  `roles/firebasehosting.admin` usable only from `refs/heads/main`, a $5 project
-  budget guarded by `prevent_destroy`, Firebase on the project, the default Hosting
-  site, and `cusati.us` bound to it. Outputs: the SEAM-4 values, the default
-  Hosting URL, the custom domain's DNS records and its state.
+  project, enables 8 APIs, and creates:
+  - a WIF pool and GitHub provider bound to this repository's immutable IDs and
+    name;
+  - a keyless `hub-deploy` service account, usable only from `refs/heads/main`,
+    with `roles/firebasehosting.admin` and `roles/serviceusage.apiKeysViewer`;
+  - a $5 project budget. `prevent_destroy` guards it only while its block is in
+    the configuration, so a CI presence check and an apply-provenance rule back
+    it up;
+  - Firebase on the project, the default Hosting site (a postcondition requires
+    type `DEFAULT_SITE`), and `cusati.us` bound to it.
+
+  Outputs: the SEAM-4 values, the default Hosting URL, and the custom domain's
+  DNS records and state. `infra/deploy-tools/` locks firebase-tools 15.30.1.
 - **D2 — `.github/workflows/build.yml`**: all triggers, the concurrency model, the
   Pages deploy and smoke test, and the failure and recovery jobs kept. It builds
   and tests from `site/`, fetches data through `site/scripts/fetch-data.sh`, and
@@ -27,9 +34,13 @@ changed or read; no credential exists.
   variants from the same commit in two jobs, `build` and `build-firebase`. The
   Pages deploy needs only `build`, so no Firebase step can fail or skip it (SEAM-4).
   `build-firebase` runs on pull requests (build and test, no upload) and on the
-  deploy path only once `vars.GCP_PROJECT_ID` is set. New `firebase-deploy` (WIF, `firebase-tools@15.30.1`,
-  `--project`) and `firebase-smoke-test` jobs run only off pull requests and only
-  when `vars.GCP_PROJECT_ID` is non-empty. The fingerprint check reads
+  deploy path only once `vars.GCP_PROJECT_ID` is set. Both build jobs run the
+  SEAM-7 `npm run check:smoke-routes` before any upload. New `firebase-deploy` (WIF;
+  Node 22.23.1 exactly; firebase-tools 15.30.1 from the `infra/deploy-tools`
+  lockfile; `--project`) and `firebase-smoke-test` jobs run only off pull requests
+  and only when `vars.GCP_PROJECT_ID` is non-empty. A new `budget-guard` job, on
+  every pull request and push to `main`, fails when `infra/budget.tf` loses the
+  budget or its `prevent_destroy`. The fingerprint check reads
   `vars.SITE_URL` or else the Pages URL. `permissions: {}` at the top with a
   per-job grant, and every action is pinned by commit SHA.
 - **D3 — `infra/README.md`**; **D4 — this handoff**.
@@ -44,10 +55,17 @@ changed or read; no credential exists.
   `infra/README.md` (new)
 - `.github/workflows/build.yml` (modified)
 - `llm/sprints/2026-09-hub/handoffs/infra-phase-1.md` (this file)
+- Remediation of the Chief Reviewer's findings: `infra/budget.tf`, `infra/deploy.tf`,
+  `infra/wif.tf`, `infra/firebase.tf`, `infra/.gitignore`, `infra/README.md`,
+  `.github/workflows/build.yml` (modified); `infra/deploy-tools/package.json`,
+  `infra/deploy-tools/package-lock.json` (new). See §Remediation.
 
-`infra/.terraform/` exists locally from `terraform init` and is git-ignored.
+`infra/.terraform/` exists locally from `terraform init` and is git-ignored, as is
+`infra/deploy-tools/node_modules/`.
 
-## Validation (verbatim)
+## Validation (verbatim, original submission)
+
+The remediation re-run is in §Remediation.
 
 Terraform used: the Windows executable through WSL interop (Terraform v1.14.0 on
 windows_amd64); interop worked, so no Linux download was needed. Re-run from
@@ -103,7 +121,7 @@ paths: no hits.
 
 ## What `terraform apply` creates
 
-Expected `Plan: 17 to add, 0 to change, 0 to destroy.`
+Expected `Plan: 18 to add, 0 to change, 0 to destroy.`
 
 | # | Address | What |
 |---|---|---|
@@ -112,11 +130,12 @@ Expected `Plan: 17 to add, 0 to change, 0 to destroy.`
 | 10 | `google_iam_workload_identity_pool_provider.website` | GitHub OIDC provider `website` |
 | 11 | `google_service_account.hub_deploy` | `hub-deploy@<project>.iam.gserviceaccount.com` |
 | 12 | `google_project_iam_member.hub_deploy_hosting_admin` | `roles/firebasehosting.admin` to `hub-deploy` |
-| 13 | `google_service_account_iam_member.hub_deploy_wif_main` | `roles/iam.workloadIdentityUser` on `hub-deploy` for `…/attribute.repository_id_ref/1212933399/refs/heads/main` |
-| 14 | `google_billing_budget.hub` | $5/month, this project only, thresholds 50/90/100% actual and 100% forecast |
-| 15 | `google_firebase_project.hub` | Firebase added to the project |
-| 16 | `google_firebase_hosting_site.default` | Default site, id = project id |
-| 17 | `google_firebase_hosting_custom_domain.primary` | `cusati.us` on that site |
+| 13 | `google_project_iam_member.hub_deploy_api_keys_viewer` | `roles/serviceusage.apiKeysViewer` to `hub-deploy` |
+| 14 | `google_service_account_iam_member.hub_deploy_wif_main` | `roles/iam.workloadIdentityUser` on `hub-deploy` for `…/attribute.repository_id_ref/1212933399/refs/heads/main` |
+| 15 | `google_billing_budget.hub` | $5/month, this project only, thresholds 50/90/100% actual and 100% forecast |
+| 16 | `google_firebase_project.hub` | Firebase added to the project |
+| 17 | `google_firebase_hosting_site.default` | Default site, id = project id; postcondition: type `DEFAULT_SITE` |
+| 18 | `google_firebase_hosting_custom_domain.primary` | `cusati.us` on that site |
 
 Read, not created: `data.google_project.hub`.
 
@@ -172,12 +191,26 @@ The binding member is
 - Pull-request runs carry `refs/pull/<n>/merge`, and branch runs and
   `workflow_dispatch` on other branches carry their own ref, so none of them can
   impersonate the account.
-- The repository ID is part of the value so that a Phase 2 satellite provider
-  added to the same pool can never satisfy this binding from its own `main`.
+- The repository ID is part of the value to keep other repositories off this
+  binding. That holds **only while every provider in the `github-actions` pool
+  maps `attribute.repository_id_ref` from `assertion.repository_id + '/' + assertion.ref`**.
+  The `principalSet` is scoped to the pool, and each provider defines its own
+  mapping. A provider added to the pool with a different mapping could satisfy
+  this binding and deploy the hub. Terraform does not enforce the invariant;
+  `infra/wif.tf` states it.
+- Recommended for Phase 2: a separate pool for satellites, so the pool is the
+  trust boundary and the invariant is structural. Otherwise every provider added
+  to this pool must carry this exact mapping, checked in review.
+- The pool's description no longer announces satellites ("GitHub Actions OIDC
+  identities for the research hub website."), so it does not presume a shared
+  pool.
 
 ### Deploy identity roles (least privilege)
 
-Only `roles/firebasehosting.admin` is granted. According to the `iam-dataset`
+Two roles are granted: `roles/firebasehosting.admin` and
+`roles/serviceusage.apiKeysViewer`.
+
+**Hosting Admin.** According to the `iam-dataset`
 role export it contains `firebase.clients.get/list`, `firebase.projects.get`,
 `firebasehosting.sites.{create,delete,get,list,update}` and
 `resourcemanager.projects.{get,list}`. Firebase's "Firebase predefined roles" page
@@ -190,13 +223,27 @@ documents it for Hosting deploys. Evidence from the published firebase-tools
 - `lib/getDefaultHostingSite.js`: Firebase Management `projects.get`, with a
   fallback to `listSites` (`firebasehosting.sites.list`).
 
+**API Keys Viewer** (review F2). Firebase: "To deploy via the Firebase CLI, a
+project member must *also* be assigned the API Keys Viewer role
+(`roles/serviceusage.apiKeysViewer`)"
+(<https://firebase.google.com/docs/projects/iam/roles-predefined-product>).
+- It is granted so the first deploy follows the documented path. The trace of
+  firebase-tools 15.30.1 (the API Keys client imported only by
+  `lib/crashlytics/onboarding.js`) is not grounds to depart from the docs: a later
+  firebase-tools version could reach that client on the hosting path.
+- It is read-only, and Phase 1 creates no API keys.
+- **The owner may reverse this at Checkpoint 2.** If reversed, record it in C11 as
+  a deliberate departure from Firebase's docs, with the expected failure: a
+  permission error naming `apikeys.*`.
+
+**Narrowest supported grant** (review F3). Hosting Admin plus API Keys Viewer is
+the narrowest supported grant. There is no tighter custom role: "Custom roles
+cannot currently be used for controlling access to Firebase Hosting resources"
+(<https://firebase.google.com/docs/projects/iam/permissions>). The custom-role
+tightening this handoff once proposed is withdrawn.
+
 Not granted, with reasons:
 
-- `roles/serviceusage.apiKeysViewer`. Firebase's docs and
-  FirebaseExtended/action-hosting-deploy say "Required for CLI deploys". In
-  15.30.1, though, the API Keys client (`lib/gcp/apikeys.js`) is imported only by
-  `lib/crashlytics/onboarding.js`, never on the hosting path. **This conflicts with
-  Firebase's documentation and can only be settled by the first real deploy** (Risk R1).
 - `roles/run.viewer`: only needed for rewrites to Cloud Run; there are none (K2).
 - `roles/firebaseauth.admin`: only needed for preview channels; none are used.
 - `roles/serviceusage.serviceUsageConsumer`. It is needed only when requests name
@@ -224,8 +271,8 @@ Not granted, with reasons:
   `service_account` working) and #10716 (2026-06). #10716 shows this exact setup,
   `auth` + `create_credentials_file` + `GOOGLE_APPLICATION_CREDENTIALS` with
   `external_account`, in production use. Its regression was traced to Node
-  22.23.0 / 24.17.0 (nodejs/node#63989), fixed in 22.23.1, so the deploy job sets
-  `check-latest: true` on Node 22.
+  22.23.0 / 24.17.0 (nodejs/node#63989), fixed in 22.23.1, so the deploy job pins
+  Node to exactly `22.23.1` (review F10).
 
 ### Budget recipients and the guard
 
@@ -238,11 +285,27 @@ Not granted, with reasons:
   project" (google_billing_budget docs).
 - `monitoring_notification_channels = []` satisfies the provider's
   one-of requirement, following the docs' "Notify Project Recipient" example.
-- `lifecycle { prevent_destroy = true }` fails any plan that would delete or
-  replace the budget, including `terraform destroy`, before any API call. Removing
-  the guardrail therefore takes a reviewed commit that deletes the guard first.
-  Chosen because it is core Terraform, applies to this resource, and fails at plan
-  time. A budget alerts and does not cap spend (same Cloud Billing page).
+- `lifecycle { prevent_destroy = true }` fails a plan that would destroy or
+  replace the budget, including `terraform destroy`, before any API call. It does
+  so **only while the `google_billing_budget.hub` block is in the configuration.**
+  Terraform: "This rule doesn't prevent Terraform from destroying a resource if
+  you remove its configuration"
+  (<https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle>).
+  Deleting the block, or `infra/budget.tf`, destroys the budget in one apply.
+  (This corrects an earlier claim, refuted in review F1, that removal needs a
+  commit deleting the guard first.)
+- Two controls cover that gap:
+  - **CI presence check.** The `budget-guard` job in `build.yml`, on every pull
+    request and push to `main`, fails when `infra/budget.tf` is missing, lacks
+    `resource "google_billing_budget" "hub"`, or lacks `prevent_destroy = true`
+    in that block's `lifecycle`. It strips comments and tolerates whitespace, and
+    is not gated on `vars.GCP_PROJECT_ID`.
+  - **Apply provenance.** Apply only from a clean checkout of the reviewed PR
+    head or of `main`, and record the applied commit SHA (manual step 5).
+- No rollback removes `budget.tf` or the budget (manual step 10).
+- `prevent_destroy` is still the right first guard: it is core Terraform, applies
+  to this resource, and fails at plan time. A budget alerts and does not cap
+  spend (same Cloud Billing page).
 - The amount is a local constant (`5`), not a variable, so changing it is a code
   review, not a tfvars edit.
 
@@ -273,8 +336,21 @@ Not granted, with reasons:
   build and deploy.
   Its steps: check that the other two variables are set, checkout (for
   `firebase.json`; before auth, which writes its credentials file into the
-  workspace), download the artifact to `site/dist-public`, Node 22, auth, then
-  `npx --yes firebase-tools@15.30.1 deploy --only hosting --project … --non-interactive --message "<sha> (run <id>)"`.
+  workspace), download the artifact to `site/dist-public`, Node `22.23.1`
+  exactly, `npm ci --prefix infra/deploy-tools --no-audit --no-fund` (before
+  auth, so no Google credential exists while packages install), auth, then
+  `infra/deploy-tools/node_modules/.bin/firebase deploy --only hosting --project … --non-interactive --message "<sha> (run <id>)"`.
+  firebase-tools 15.30.1 and its whole tree come from the committed
+  `infra/deploy-tools/package-lock.json`; a bump is a reviewed lockfile change.
+- `build` and `build-firebase` each run `npm run check:smoke-routes` from `site/`
+  after `npm run build` and before any upload (SEAM-7). A `cv` release that drops
+  a smoke route fails the build, and so never reaches deploy. The build jobs keep
+  `node-version: 22`; only the deploy job, which holds credentials, is pinned
+  exactly.
+- `budget-guard` runs on `pull_request` and `push` events (pushes are `main`
+  only), checks out the repository, and runs the budget presence check (see
+  §Budget recipients and the guard). It is not gated on `vars.GCP_PROJECT_ID`,
+  deploys nothing, and no deploy job needs it, so the Pages path is unchanged.
 - `firebase-smoke-test` tests `vars.SITE_URL` or else
   `https://<GCP_PROJECT_ID>.web.app`, with the same 7 routes and the same body
   checks as the Pages smoke test.
@@ -288,9 +364,11 @@ Not granted, with reasons:
   (`gh help environment`). No `ci-failure` issue has ever been created
   (`gh issue list --label ci-failure --state all` returns `[]`), so the old path
   was never exercised.
-- `notify-failure` and `notify-recovery` also need `build-firebase`; it is
-  skipped until configured, which recovery tolerates for the same reason as above.
-- Per-job permissions: `check`, `build` and `build-firebase` `contents: read`; `deploy`
+- `notify-failure` and `notify-recovery` also need `build-firebase` and
+  `budget-guard`. Both may be skipped (the first until configured, the second on
+  schedule and dispatch runs), which recovery tolerates for the same reason as
+  above. A `budget-guard` failure on a push to `main` opens the tracking issue.
+- Per-job permissions: `check`, `budget-guard`, `build` and `build-firebase` `contents: read`; `deploy`
   `pages: write` and `id-token: write` (deploy-pages README); `firebase-deploy`
   `contents: read` and `id-token: write`; both smoke tests `{}`; both notify jobs
   `issues: write`.
@@ -302,6 +380,25 @@ Not granted, with reasons:
   - upload-artifact `043fb46…` (v7.0.1)
   - download-artifact `3e5f45b…` (v8.0.1)
   - google-github-actions/auth `7c6bc77…` (v3.0.0)
+
+### Major action-version bumps on the GitHub Pages path (review F11)
+
+Compared with `origin/main` (`d32cd36`), this PR moves the authoritative Pages
+path across major versions. Each is a potential behaviour change:
+
+| Action | Before (`main`) | After | Exercised before merge? |
+|---|---|---|---|
+| `actions/checkout` | `v4` | `v5` (`fbc6f39…`) | Yes: PR run 34930495246, `build` |
+| `actions/setup-node` | `v4` | `v5` (`a0853c2…`) | Yes: same run |
+| `actions/upload-pages-artifact` | `v3` | `v5.0.0` (`fc324d3…`) | Yes: "Upload Pages artifact: success" in the same run's `build` job (its step has no pull-request condition) |
+| `actions/deploy-pages` | `v4` | `v5.0.1` (`368f825…`) | **No.** `deploy` never runs on a pull request |
+
+**Verification step:** the first post-merge `build-and-deploy` run on `main`
+(manual step 9 and the Checkpoint 2 list). `build`, `deploy` and `smoke-test` must
+be green, and `https://djjay0131.github.io/website/` must return 200. This does
+not depend on GCP being configured. If `deploy` fails, Pages keeps its last
+deployment and `notify-failure` opens the tracking issue. Fix forward, or revert
+the action pins by PR.
 
 ## Open questions answered
 
@@ -365,13 +462,23 @@ account (`gcloud auth list` shows it as active).
    `gcloud auth application-default set-quota-project <project>`.
    Expected: `Credentials saved to file: […]` and `Quota project "<project>" was added to ADC …`.
 5. **Terraform init / plan / apply.**
+   **Apply provenance (review F1).** This step, and every later apply including
+   step 10, runs only from a clean checkout of the reviewed PR head or of `main`:
+   - `git fetch origin`; then `git status --porcelain` prints nothing;
+   - `git rev-parse HEAD` equals the PR's head commit (shown on the PR) or
+     `git rev-parse origin/main`;
+   - the `budget-guard` check is green on that commit.
+
+   After apply, record the applied commit SHA, the date, and the apply summary
+   line in `llm/sprints/2026-09-hub/STATE.md` (Lead Architect).
+
    `cd infra`; `cp terraform.tfvars.example terraform.tfvars` and set
    `project_id` and `billing_account`. Then:
    - `terraform init`. Expected: `Reusing previous version of hashicorp/google … v8.2.0`,
      then `Terraform has been successfully initialized!`
-   - `terraform plan -out=tfplan`. Expected: `Plan: 17 to add, 0 to change, 0 to destroy.`
+   - `terraform plan -out=tfplan`. Expected: `Plan: 18 to add, 0 to change, 0 to destroy.`
      Review every resource against the table above.
-   - `terraform apply tfplan`. Expected: `Apply complete! Resources: 17 added, 0 changed, 0 destroyed.`
+   - `terraform apply tfplan`. Expected: `Apply complete! Resources: 18 added, 0 changed, 0 destroyed.`
    - Then `terraform plan` again. Expected: `No changes.` (roadmap §12.5
      criterion). If it shows only computed custom-domain state, run
      `terraform apply -refresh-only` and plan again.
@@ -382,11 +489,18 @@ account (`gcloud auth list` shows it as active).
      propagating. Wait 2 minutes and run `terraform apply` again.
    - `google_firebase_project` reports that terms of service must be accepted:
      do step 6 first, then apply again.
-   - `google_firebase_project` or `google_firebase_hosting_site` reports
-     "already exists" (Firebase was added in the console earlier): run
-     `terraform import google_firebase_project.hub projects/<project>` and/or
-     `terraform import google_firebase_hosting_site.default projects/<project>/sites/<project>`,
-     then plan again.
+   - `google_firebase_project` reports "already exists" (Firebase was added in
+     the console earlier): run
+     `terraform import google_firebase_project.hub projects/<project>`, then plan
+     again. The Hosting site needs no import: the provider adopts an existing
+     site (it reads it, then updates it).
+   - `google_firebase_hosting_site.default` fails its postcondition ("… has type
+     USER_SITE, not DEFAULT_SITE"): the site Terraform manages is not the
+     project's default site, and a deploy would fail. In the Firebase console,
+     under Hosting, find the default site's ID, set `hosting_site_id` to it in
+     `terraform.tfvars`, and plan and apply again. The wrong site is abandoned,
+     not deleted (`deletion_policy = "ABANDON"`); delete it in the console if
+     unwanted. Then set `SITE_URL` per step 8.
 6. **Firebase steps Terraform does not do.**
    - Only if step 5 asked: open https://console.firebase.google.com as the owner
      and accept the Firebase terms once.
@@ -444,22 +558,63 @@ account (`gcloud auth list` shows it as active).
      credential, and
      `gcloud iam service-accounts keys list --iam-account=<GCP_DEPLOY_SA> --managed-by=user`
      lists nothing.
-   - If the deploy fails with a missing `apikeys.*` permission (Risk R1), add
-     `roles/serviceusage.apiKeysViewer` in `infra/deploy.tf` through a PR and apply.
-10. **Rollback.**
+   - `hub-deploy` holds API Keys Viewer, as Firebase documents. If the owner
+     removed it at Checkpoint 2 and the deploy then fails on a missing `apikeys.*`
+     permission, restore `google_project_iam_member.hub_deploy_api_keys_viewer`
+     by PR and apply under the step 5 provenance rule.
+   - **Action-version bumps (F11).** The first post-merge `build-and-deploy` run is
+     also the verification step for the Pages path's major action bumps
+     (§Major action-version bumps). `build`, `deploy` (deploy-pages v5.0.1, never
+     run on a pull request) and `smoke-test` must be green. This check applies
+     even if GCP is not yet configured.
+10. **Rollback.** **The budget is never removed.** No rollback deletes
+    `infra/budget.tf`, removes or edits out `google_billing_budget.hub`, or runs
+    `terraform destroy` without `-target` (§12.6; review F1). Every rollback
+    apply follows the step 5 provenance rule.
     - Bad site content: Firebase console → Hosting → Release history → hover over
-      the last good release → ⋮ → **Roll back**. Or, by CLI as the owner:
-      `npx firebase-tools@15.30.1 hosting:clone <project>:@<VERSION_ID> <project>:live`.
+      the last good release → ⋮ → **Roll back**. Or, by CLI as the owner, from a
+      clean checkout: `npm ci --prefix infra/deploy-tools`, then
+      `infra/deploy-tools/node_modules/.bin/firebase hosting:clone <project>:@<VERSION_ID> <project>:live`.
       Then revert the offending commit on `main`.
     - Stop Firebase deploys without touching Pages:
       `gh variable delete GCP_PROJECT_ID`. The Firebase jobs skip and Pages
       continues as before. Also `gh variable delete SITE_URL`, which points the
       fingerprint check back at Pages.
     - Take cusati.us off Firebase: remove the step 7 records at the registrar.
-    - Infrastructure: revert the Terraform change by PR and `terraform apply`. A
-      full `terraform destroy` stops at the budget's `prevent_destroy`, which is
-      intended. Remove other resources with `terraform destroy -target=<address>`.
-      The project, Firebase and the Hosting site are kept (data source /
+    - Infrastructure: remove named resources with a targeted destroy.
+      1. `terraform plan -destroy -target=<address> [-target=<address> …] -out=rollback.tfplan`
+      2. Read the plan. It must list only the named resources and their
+         dependents, and must not mention `google_billing_budget.hub`. If it
+         does, stop and do not apply.
+      3. `terraform apply rollback.tfplan`.
+      4. Remove the same resource blocks from `infra/` in a reviewed PR that leaves
+         `infra/budget.tf` unchanged, with `budget-guard` green. After merge,
+         `terraform plan` from `main` shows `No changes.` Until that PR merges, do
+         not run a plain `terraform apply`: it would re-create the resources.
+
+      Addresses that may be targeted:
+      - `google_service_account_iam_member.hub_deploy_wif_main` (cuts GitHub's
+        deploy access; target it first);
+      - `google_project_iam_member.hub_deploy_hosting_admin`,
+        `google_project_iam_member.hub_deploy_api_keys_viewer`;
+      - `google_service_account.hub_deploy` (its IAM members go with it);
+      - `google_firebase_hosting_custom_domain.primary` (takes cusati.us off
+        Firebase).
+
+      Never target:
+      - `google_billing_budget.hub`;
+      - `google_project_service.phase1`: the budget depends on it, so the plan
+        would include the budget, and the APIs stay enabled by design;
+      - the WIF pool and provider: a deleted pool may block re-creation under
+        the same ID during Google's soft-delete window (unverified).
+    - Infrastructure, reverting a Terraform change: only by a revert PR that leaves
+      `infra/budget.tf` unchanged (`git diff origin/main -- infra/budget.tf` prints
+      nothing), with `budget-guard` green, applied from `main` after merge. A
+      revert that deletes `budget.tf` is not a rollback option. That includes
+      reverting all of this PR's `infra/`.
+    - `terraform destroy` without `-target` is never run. `prevent_destroy` would
+      stop it at the budget, but only while `budget.tf` is present.
+    - The project, Firebase and the Hosting site are kept (data source /
       irreversible / `ABANDON`).
 
 ## Acceptance criteria (roadmap Phase 1, this scope)
@@ -504,7 +659,11 @@ Definition of Done (canon §Implementation Work):
 - The WIF surface: one repository, by immutable IDs and name; the deploy only
   from `refs/heads/main`; no `pull_request_target`.
 - The deploy account can modify Hosting sites in the project, including create
-  and delete, and nothing else.
+  and delete, and read API key metadata through API Keys Viewer (Phase 1 creates
+  no API keys). It holds nothing else.
+- firebase-tools and its dependency tree are installed from a committed lockfile
+  before the auth step (review F5); the deploy runtime is an exact Node version
+  (F10).
 
 ## Assumptions
 
@@ -513,8 +672,10 @@ Definition of Done (canon §Implementation Work):
 - The cusati.us registrar is outside Google Cloud DNS; records are added by hand.
 - New projects have Service Usage enabled or accept step 3; step 3 is idempotent.
 - The default Hosting site id equals the project id and is globally available.
-  If it is not, set `hosting_site_id` and set `SITE_URL` to the resulting
-  `default_url`.
+  If it is not, set `hosting_site_id` to the project's real default site and set
+  `SITE_URL` to the resulting `default_url`. The `DEFAULT_SITE` postcondition on
+  `google_firebase_hosting_site.default` fails the apply when this assumption is
+  wrong, instead of the first deploy.
 - The site stream's `site/scripts/fetch-data.sh` and `firebase.json` (SEAM-2,
   SEAM-3) are as observed in the working tree today (read-only check).
 - Firebase Terms of Service may need a one-time acceptance in the console
@@ -532,8 +693,16 @@ Definition of Done (canon §Implementation Work):
 3. Consider a `www.cusati.us` custom domain redirecting to the apex: one more
    `google_firebase_hosting_custom_domain` with `redirect_target`. It is not in
    the contract.
-4. Revisit the `apiKeysViewer` omission after the first deploy (R1), and the
-   custom-role tightening (ADR candidate I-3).
+4. Make `budget-guard` a required status check on `main`, alongside
+   `governance-checks`, so a pull request that removes the budget cannot merge.
+   This is a branch-protection change, outside this contract.
+5. Phase 2: put satellite WIF providers in a separate pool (ADR candidate I-2;
+   review F4).
+6. Consider `npm ci --ignore-scripts` for `infra/deploy-tools`. The install runs
+   in a job that holds `id-token: write`, although before auth. Three locked
+   packages have install scripts: `protobufjs` (required), and `re2` and
+   `fsevents` (optional). Skipping them needs a deploy test first, because `re2`
+   would then be absent.
 
 ## Alternatives considered
 
@@ -546,12 +715,20 @@ Definition of Done (canon §Implementation Work):
   ADC through `GOOGLE_APPLICATION_CREDENTIALS` is the supported non-interactive path.
 - **FirebaseExtended/action-hosting-deploy.** Rejected: it takes
   `firebaseServiceAccount`, a JSON key, which is forbidden by §12.2.
-- **A custom role instead of `roles/firebasehosting.admin`.** It would hold only
-  `firebase.projects.get` and `firebasehosting.sites.{get,list,update}`, dropping
-  `sites.create/delete` and `firebase.clients.*`. Deferred: tighter, but a
-  firebase-tools upgrade that needs a new permission would fail silently until the
-  next deploy, and it cannot be tested before Checkpoint 2. Recorded as ADR
-  candidate I-3.
+- **A custom role in place of the predefined Hosting roles.** Not an option, and
+  withdrawn (review F3): "Custom roles cannot currently be used for controlling
+  access to Firebase Hosting resources"
+  (<https://firebase.google.com/docs/projects/iam/permissions>). Hosting Admin
+  plus API Keys Viewer is the narrowest supported grant.
+- **Omitting API Keys Viewer.** Rejected after review F2: Firebase documents it as
+  required for CLI deploys. The owner may still choose it at Checkpoint 2.
+- **`npx firebase-tools@<version>` at deploy time.** Replaced after review F5: the
+  version was pinned, but its dependency tree resolved at run time with no
+  lockfile, in the job holding the deploy identity.
+- **`check-latest: true` on Node 22 for the deploy.** Replaced after review F10 by
+  an exact `22.23.1`, so the runtime does not float.
+- **Relying on `prevent_destroy` alone for the budget.** Rejected after review F1:
+  it does not stop removal when the block is deleted.
 - **Attribute condition on `repository_owner` only** (Google's baseline
   example). Rejected: it admits every repository of the owner, and names are
   reusable.
@@ -573,9 +750,10 @@ Definition of Done (canon §Implementation Work):
 
 ## Risks
 
-- **R1 — API Keys Viewer omission.** If firebase-tools touches the API Keys API
-  on a path not traced here, the first deploy fails with a permission error.
-  Mitigation: step 9 fallback; the failure is loud, and Pages is unaffected.
+- **R1 — Deploy permission set unproven until the first deploy.** Hosting Admin
+  plus API Keys Viewer follows Firebase's documentation (F2), but no deploy has
+  run. Mitigation: the failure is loud, and Pages is unaffected. If the owner
+  removes API Keys Viewer, the step 9 fallback applies.
 - **R2 — Beta resources.** The Firebase Hosting resources are beta and can change
   between provider minors. `~> 8.2` plus the lock file pins them.
 - **R3 — Custom domain drift.** Computed `required_dns_updates`, `cert` and
@@ -587,7 +765,8 @@ Definition of Done (canon §Implementation Work):
   Firebase succeeded, Pages can stay stale until the next push or cv change.
   Failures still open the tracking issue.
 - **R5 — Node regressions** in google-auth-library's STS exchange (#10716).
-  Mitigation: `check-latest: true`; the pinned firebase-tools version.
+  Mitigation: the deploy job pins Node `22.23.1` exactly, and firebase-tools
+  15.30.1 is locked. A bump of either is a reviewed commit.
 - **R6 — `pull_request_target` and `workflow_run`.** The condition refuses
   `pull_request_target`. A `workflow_run`-triggered workflow on `main` would carry
   `refs/heads/main` and could deploy; none exists, and adding one to `main` is an
@@ -604,6 +783,17 @@ Definition of Done (canon §Implementation Work):
   under the same `cv_fingerprint` (from `check`). The single-job design had the
   same window between `check` and the fetch. Mitigation: the next scheduled poll
   sees a new fingerprint and rebuilds both.
+- **R10 — Pages-path action majors** (F11). `deploy-pages` v5.0.1 first runs after
+  merge. Mitigation: the first post-merge run is the named verification step;
+  Pages keeps its last deployment on failure.
+- **R11 — Budget removal outside CI.** `budget-guard` and the provenance rule make
+  removal visible and procedural, but a local apply from an unreviewed checkout
+  can still delete the budget. Mitigation: the step 5 rule, and making
+  `budget-guard` a required check (Recommendation 4).
+- **R12 — SEAM-7 script dependency.** Both build jobs now run
+  `npm run check:smoke-routes`, which the site stream owns. If the script is
+  missing or wrong, every build fails before upload, and so every deploy. That is
+  loud, and Pages keeps its last deployment.
 
 ## Seam issues
 
@@ -641,11 +831,13 @@ Definition of Done (canon §Implementation Work):
   (a one-clause change; see §Workflow structure), or only on pull requests and
   once configured (as implemented)?
 - Does the owner want the GCS state backend (ADR candidate I-1) despite K1?
-- Should the deploy role be tightened to a custom role now (I-3), accepting the
-  untestable-until-deploy risk?
+- Does the owner keep API Keys Viewer on `hub-deploy` (granted per F2; reversible
+  at Checkpoint 2)?
 - The contract said the budget should email "the owner". Default IAM recipients
   cover this only if the owner holds Billing Account Administrator or User on the
-  billing account, which is true for a personal billing account. Confirm.
+  billing account, which is true for a personal billing account. Confirm. Creating
+  the budget needs Billing Account Administrator; Billing Account User is not
+  enough (review F13; STATE §Decisions).
 
 ## Related docs
 
@@ -671,6 +863,13 @@ Definition of Done (canon §Implementation Work):
     #10716; nodejs/node#63989
   - FirebaseExtended/action-hosting-deploy `docs/service-account.md`
   - actions/deploy-pages README @ v5.0.1
+  - Terraform, lifecycle meta-argument:
+    <https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle>
+  - Firebase, IAM permissions (custom roles and Hosting):
+    <https://firebase.google.com/docs/projects/iam/permissions>
+  - Firebase, product-level predefined roles (API Keys Viewer for CLI deploys):
+    <https://firebase.google.com/docs/projects/iam/roles-predefined-product>
+  - `llm/sprints/2026-09-hub/handoffs/chief-reviewer-phase-1.md` (findings F1–F14)
 
 ## ADR candidates
 
@@ -680,13 +879,332 @@ Definition of Done (canon §Implementation Work):
   adopted with `backend "gcs"` + `init -migrate-state`. Alternatives: local state
   with private backup (Phase 1 today), HCP Terraform. The tension with K1 (no
   buckets in Phase 1) needs the owner's ruling.
-- **I-2 — WIF attribute-condition policy.** One pool for the hub and its
-  satellites, one provider per repository. Each condition matches immutable
-  `repository_id` and `repository_owner_id` plus the name and refuses
-  `pull_request_target`. Deploy bindings use a `repository_id/ref` attribute so no
-  provider can satisfy another repository's binding. Sets the pattern for Phase 2
-  satellite identities.
-- **I-3 — Deploy identity roles.** `roles/firebasehosting.admin` only. Documented
-  omissions: `apiKeysViewer`, `run.viewer` (until the Phase 3 rewrites, when it
-  becomes required), `firebaseauth.admin`, `serviceUsageConsumer`. Alternative: a
-  custom role with the four permissions firebase-tools checks.
+- **I-2 — WIF attribute-condition policy and the pool as trust boundary.** One
+  provider per repository. Each condition matches immutable `repository_id` and
+  `repository_owner_id` plus the name, and refuses `pull_request_target`. Deploy
+  bindings use a `repository_id_ref` attribute.
+  - The binding is pool-scoped, so it excludes other repositories only while
+    every provider in the pool maps `attribute.repository_id_ref` from
+    `assertion.repository_id + '/' + assertion.ref` (review F4).
+  - Recommended for Phase 2: a separate pool for satellites, making the
+    invariant structural. The alternative, a shared pool, requires that mapping
+    in every provider, checked in review.
+  - Extends C12.
+- **I-3 — Deploy identity roles.** `roles/firebasehosting.admin` plus
+  `roles/serviceusage.apiKeysViewer` (Firebase-documented for CLI deploys; F2,
+  owner-reversible at Checkpoint 2). This is the narrowest supported grant:
+  custom roles cannot control Firebase Hosting resources (F3).
+  - Documented omissions: `run.viewer` (until the Phase 3 rewrites, when it
+    becomes required), `firebaseauth.admin`, `serviceUsageConsumer`.
+  - Extends C11.
+- **I-4 — Budget guardrail enforcement** (F1). `prevent_destroy`, the
+  `budget-guard` CI presence check, the apply-provenance rule (clean checkout of
+  the reviewed PR head or `main`, applied SHA recorded in STATE), and a rollback
+  runbook that never removes the budget.
+- **I-5 — CI supply-chain pinning** (F5, F10). Actions by commit SHA, CLI tools by
+  a committed lockfile (`infra/deploy-tools`), and the deploy runtime by exact
+  version.
+
+## Remediation (Chief Reviewer findings)
+
+Source: `llm/sprints/2026-09-hub/handoffs/chief-reviewer-phase-1.md` §A.2 and
+§A.3, all dispositions accepted (STATE §Phase 1 review dispositions). Branch
+`feat/foundation`, on top of `9a2ca88`. No git or gh mutation, no Terraform plan
+or apply, and no cloud read or change was made. Line numbers are as of this
+remediation. Handoff line numbers refer to this file.
+
+### F1 (must-fix): budget guardrail
+
+- **Claim corrected.** `prevent_destroy` blocks a destroy or replace only while
+  `google_billing_budget.hub` is in the configuration. Terraform: "This rule
+  doesn't prevent Terraform from destroying a resource if you remove its
+  configuration".
+  - `infra/budget.tf:15-29` (guard comment rewritten);
+  - `infra/README.md:104-128` (§Guardrails: Budget; new Apply provenance);
+  - handoff §Budget recipients and the guard (lines 277-310).
+- **Rollback rewritten.** Handoff step 10 (lines 570-618):
+  - The budget is never removed. No rollback deletes `budget.tf`, removes the
+    block, or runs `terraform destroy` without `-target`.
+  - Infrastructure rollback is a targeted destroy of named resources, through a
+    saved plan that must not mention the budget, followed by a PR that leaves
+    `budget.tf` unchanged.
+  - Alternatively, a revert PR that leaves `budget.tf` unchanged.
+  - The step lists which addresses may be targeted, and which may never be.
+- **CI presence check.** New job `budget-guard` in
+  `.github/workflows/build.yml:91-131`.
+  - Runs on `pull_request` and `push` (pushes are `main` only). Not gated on
+    `vars.GCP_PROJECT_ID`. Checks out the repository (`contents: read`,
+    `persist-credentials: false`).
+  - Fails when `infra/budget.tf` is missing, has no
+    `resource "google_billing_budget" "hub"`, or has no `prevent_destroy = true`
+    inside that block's `lifecycle`.
+  - Comments (`#`, `//`, `/* */`) are stripped first, so a commented-out block
+    or guard fails. Whitespace, and quoted or bare labels, are accepted.
+  - Added to `notify-failure` and `notify-recovery` `needs` (lines 462, 522), so
+    a failure on `main` opens the tracking issue. No deploy job needs it, so the
+    Pages path is unchanged.
+  - Tested locally with the same script against nine variants. It passes the
+    real file and a whitespace-mangled copy. It fails, as intended, on:
+    `prevent_destroy = false`; a commented-out guard; a renamed resource; a
+    block-commented `lifecycle`; `lifecycle` removed; the guard present only in
+    another resource; and the file missing.
+- **Apply-provenance rule.** Apply only from a clean checkout of the reviewed PR
+  head or of `main`, and record the applied commit SHA in STATE.
+  - `infra/README.md:66-69` (Running it) and `:121-128` (Guardrails);
+  - handoff step 5 (lines 465-474), which also governs step 10.
+
+### F2: API Keys Viewer granted
+
+- `infra/deploy.tf:53-57`: new
+  `google_project_iam_member.hub_deploy_api_keys_viewer` with
+  `roles/serviceusage.apiKeysViewer`, next to `hub_deploy_hosting_admin`.
+- `infra/deploy.tf:18-24`: the comment now explains the grant. The
+  "Deliberately NOT granted" list (line 30) no longer names API Keys Viewer.
+- `infra/README.md:24`: table row updated.
+- Handoff:
+  - §Deploy identity roles (lines 208-253);
+  - apply table (18 resources, row 13, line 133; `Plan: 18 to add`);
+  - step 5 expected counts;
+  - step 9 fallback, if the owner reverses the grant;
+  - §Data, security and privacy impacts;
+  - R1;
+  - §Open questions;
+  - I-3.
+- The owner may reverse this at Checkpoint 2.
+- Firebase quote re-checked this session: "To deploy via the Firebase CLI, a
+  project member must *also* be assigned the API Keys Viewer role".
+- Not verified this session: the exact permission list of API Keys Viewer.
+  Google's role page did not render through the fetch tool. The comment says
+  only "Read-only", which matches the role's name and the reviewer's finding.
+
+### F3: custom-role alternative withdrawn
+
+- `infra/deploy.tf:26-28`: Hosting Admin plus API Keys Viewer is the narrowest
+  supported grant, quoting "Custom roles cannot currently be used for
+  controlling access to Firebase Hosting resources". The custom-role alternative
+  sentence is removed.
+- Handoff:
+  - §Deploy identity roles, "Narrowest supported grant" (line 239);
+  - §Alternatives (line 718): now recorded as not an option and withdrawn;
+  - §Recommendations: old item 4 replaced;
+  - §Open questions: custom-role question removed;
+  - I-3 (line 893).
+
+### F4: shared-pool invariant recorded
+
+- `infra/wif.tf:19-34`: "can never satisfy this binding" is replaced by the
+  invariant. The binding excludes other repositories only while every provider
+  in the `github-actions` pool maps `attribute.repository_id_ref` from
+  `assertion.repository_id + '/' + assertion.ref`. Terraform does not enforce
+  that. The comment recommends a separate pool for satellites in Phase 2.
+- `infra/wif.tf:45`: the pool description no longer announces Phase 2
+  satellites. It is an in-place update, and nothing is applied yet.
+- Handoff:
+  - §Deploy binding (lines 185-206);
+  - I-2 (line 882);
+  - Recommendation 5.
+- C12 in STATE is the Lead Architect's.
+
+### F5: firebase-tools locked
+
+- New `infra/deploy-tools/package.json`: `"firebase-tools": "15.30.1"`, exact,
+  line 8.
+- New `infra/deploy-tools/package-lock.json`:
+  - generated with `npm install --package-lock-only --ignore-scripts` (npm
+    11.16.0);
+  - `lockfileVersion` 3, 674 package entries;
+  - `node_modules/firebase-tools` 15.30.1 at line 3472;
+  - all 673 `resolved` URLs on `https://registry.npmjs.org/`;
+  - no machine paths.
+- `infra/.gitignore:26-28`: `deploy-tools/node_modules/`.
+- `build.yml` `firebase-deploy`:
+  - new step "Install firebase-tools from the lockfile",
+    `npm ci --prefix infra/deploy-tools --no-audit --no-fund` (lines 381-385),
+    after Node setup and before the auth step;
+  - "Deploy to Firebase Hosting" invokes
+    `infra/deploy-tools/node_modules/.bin/firebase deploy --only hosting --project …`
+    (line 403);
+  - the `npx` invocation and `FIREBASE_TOOLS_VERSION` are removed.
+- Handoff:
+  - §Workflow structure (lines 335-344);
+  - step 10: `hosting:clone` now uses the locked CLI;
+  - §Alternatives;
+  - I-5.
+- Note: three locked packages have install scripts, `protobufjs` (required), and
+  `re2` and `fsevents` (optional). CI runs `npm ci` with scripts enabled, as
+  specified. Recommendation 6 records `--ignore-scripts` as a hardening to test.
+  `npm ci` also reports "7 moderate severity vulnerabilities" in the tree.
+
+### F8: SEAM-7, the build.yml half
+
+- `build.yml:192-196`: `build` (GitHub Pages variant) gains "Check smoke-test
+  routes exist (GitHub Pages variant)", `npm run check:smoke-routes`,
+  `working-directory: site`. It sits after "Build Astro" and before "Upload
+  Pages artifact".
+- `build.yml:261-265`: `build-firebase` gains the same step for the Firebase
+  Hosting variant. It sits after "Build Astro" and before "Upload Firebase
+  Hosting artifact".
+- The YAML parse confirms build < check < upload in both jobs.
+- No environment is passed, because SEAM-7 defines none. The script is the site
+  stream's, and was not created or touched here. It already appears as
+  `check:smoke-routes` in `site/package.json`, in the site stream's work (read
+  only).
+- Handoff: §Workflow structure (line 345); R12.
+
+### F10: Node pinned on the deploy path
+
+- `build.yml:370-379`: `firebase-deploy` sets `node-version: 22.23.1` in place of
+  `node-version: 22` plus `check-latest: true`. The comment about the 22.23.0
+  keep-alive regression (firebase-tools#10716, nodejs/node#63989) is kept.
+- The build jobs' `node-version: 22` is deliberately unchanged (lines 154 and
+  228, both "Set up Node" steps). They hold no cloud credential. This is
+  stated in the workflow comment and in the handoff §Workflow structure.
+- Handoff:
+  - §firebase-tools accepts the WIF credentials (last bullet);
+  - R5;
+  - §Alternatives;
+  - I-5.
+
+### F11: major action-version bumps documented
+
+- Handoff §Major action-version bumps on the GitHub Pages path (lines 384-401):
+  - checkout v4 to v5; setup-node v4 to v5; upload-pages-artifact v3 to v5.0.0;
+    deploy-pages v4 to v5.0.1;
+  - `origin/main` before the PR, read with `git show`.
+- **Verification step:** the first post-merge `build-and-deploy` run on `main`.
+  It is named in step 9 (line 565), in R10 (line 786), and for the Checkpoint 2
+  list.
+- **Correction to the review's A.2 text.** Upload-pages-artifact v5.0.0 *did*
+  run on a pull request. PR run 34930495246, job `build`: "Upload Pages
+  artifact: success" (`gh run view`, read-only). Its step has no pull-request
+  condition. Only `deploy-pages` v5.0.1 is unexercised before merge.
+
+### F12: default-site postcondition
+
+- `infra/firebase.tf:34-42`: `google_firebase_hosting_site.default` gains
+  `lifecycle { postcondition { condition = self.type == "DEFAULT_SITE" … } }`.
+  The error message names the site ID and type, and says to set
+  `hosting_site_id` to the project's default site.
+- Attribute confirmed in google-beta 8.2.0 from the local provider schema
+  (`terraform providers schema -json`, read locally, no cloud access): `type`,
+  string, computed, "The type of Hosting site, either 'DEFAULT_SITE' or
+  'USER_SITE'". `terraform validate` passes.
+- Handoff step 5:
+  - the `terraform import google_firebase_hosting_site.default …` line is
+    removed; the provider adopts an existing site;
+  - a recovery bullet is added for a postcondition failure (line 497).
+- Handoff also updated: apply table row 17; §Assumptions.
+
+### Remediation validation (verbatim)
+
+From `infra/`, with the Windows `terraform.exe` (v1.14.0, windows_amd64):
+
+```text
+$ terraform fmt -check -recursive
+exit=0
+$ terraform init -backend=false
+Initializing provider plugins...
+- Reusing previous version of hashicorp/google-beta from the dependency lock file
+- Reusing previous version of hashicorp/google from the dependency lock file
+- Using previously-installed hashicorp/google-beta v8.2.0
+- Using previously-installed hashicorp/google v8.2.0
+
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+exit=0
+$ terraform validate
+Success! The configuration is valid.
+
+exit=0
+```
+
+actionlint (container `rhysd/actionlint:latest`):
+
+```text
+1.7.12
+installed by building from source
+built with go1.26.1 compiler for linux/amd64
+verbose: Linting .github/workflows/build.yml
+verbose: Using project at /repo
+verbose: Found 0 parse errors in 1 ms for .github/workflows/build.yml
+verbose: Found total 0 errors in 88 ms for .github/workflows/build.yml
+exit=0
+```
+
+YAML parse (Python `yaml.safe_load`):
+
+```text
+yaml.safe_load OK; jobs: check, budget-guard, build, build-firebase, deploy, smoke-test, firebase-deploy, firebase-smoke-test, notify-failure, notify-recovery
+budget-guard if: github.event_name == 'pull_request' || github.event_name == 'push'
+build: build@6 smoke-check@7 upload@8 order_ok=True
+build-firebase: build@6 smoke-check@7 upload@8 order_ok=True
+firebase-deploy steps: ['Check deploy configuration', 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09', 'Download Firebase Hosting build', 'Set up Node', 'Install firebase-tools from the lockfile', 'Authenticate to Google Cloud', 'Deploy to Firebase Hosting']
+node: [{'node-version': '22.23.1'}]
+notify-failure needs: ['check', 'budget-guard', 'build', 'deploy', 'smoke-test', 'build-firebase', 'firebase-deploy', 'firebase-smoke-test']
+notify-recovery needs: ['check', 'budget-guard', 'build', 'deploy', 'smoke-test', 'build-firebase', 'firebase-deploy', 'firebase-smoke-test']
+```
+
+Lockfile install, then git status:
+
+```text
+$ npm ci --prefix infra/deploy-tools --ignore-scripts
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated json-ptr@3.1.1: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 671 packages, and audited 672 packages in 2m
+
+97 packages are looking for funding
+  run `npm fund` for details
+
+7 moderate severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+exit=0
+$ infra/deploy-tools/node_modules/.bin/firebase --version
+15.30.1
+$ git status --short
+ M .github/workflows/build.yml
+ M infra/.gitignore
+ M infra/README.md
+ M infra/budget.tf
+ M infra/deploy.tf
+ M infra/firebase.tf
+ M infra/wif.tf
+ M llm/sprints/2026-09-hub/handoffs/infra-phase-1.md
+?? infra/deploy-tools/
+$ git status --short | grep -c node_modules
+0
+```
+
+`git check-ignore -v infra/deploy-tools/node_modules` reports
+`infra/.gitignore:28:deploy-tools/node_modules/`.
+
+Scans of the changed files found:
+- no private keys, `credentials_json`, billing-account-shaped IDs or machine
+  paths, and no email address apart from generic service-account text;
+- no remaining statement the review refuted ("can never satisfy", "deletes the
+  guard first", `check-latest`, `npx firebase-tools`, "17 to add", the custom-role
+  alternative, or the site import line).
+
+### Noticed outside this scope (reported, not changed)
+
+- Making `budget-guard` a required status check on `main` is a
+  branch-protection change for the owner or Lead Architect (Recommendation 4).
+- STATE C11 and C12 and the PR #12 body still need the F2, F3, F4 and F11 wording
+  (Lead Architect, per the dispositions).
+- The handoff `Status: Draft` line is left for the Lead Architect (F14).

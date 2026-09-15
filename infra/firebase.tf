@@ -30,6 +30,16 @@ resource "google_firebase_hosting_site" "default" {
   # The default site cannot be deleted while the project exists; forget it on
   # destroy rather than fail.
   deletion_policy = "ABANDON"
+
+  lifecycle {
+    # firebase.json names no site, so firebase-tools deploys to the project's
+    # default site. If the site Terraform created or adopted is not typed
+    # DEFAULT_SITE, fail the apply here rather than the first deploy.
+    postcondition {
+      condition     = self.type == "DEFAULT_SITE"
+      error_message = "google_firebase_hosting_site.default (site ${self.site_id}) has type ${coalesce(self.type, "<unset>")}, not DEFAULT_SITE. firebase deploy needs the project's default Hosting site because firebase.json names no site. Find the project's default site in the Firebase console (Hosting) and set hosting_site_id to its ID."
+    }
+  }
 }
 
 resource "google_firebase_hosting_custom_domain" "primary" {

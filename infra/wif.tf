@@ -19,9 +19,19 @@
 # 2. The deploy binding on the service account admits only principals whose
 #    repository_id/ref attribute is "<repository_id>/refs/heads/main". Pull
 #    request runs carry refs/pull/<n>/merge and branch runs carry their own ref,
-#    so neither can deploy. The attribute joins the repository ID to the ref so
-#    that a future provider in the same pool (Phase 2 satellites) can never
-#    satisfy this binding with its own main branch.
+#    so neither can deploy.
+#
+#    Shared-pool invariant. A principalSet is scoped to the POOL, and every
+#    provider in a pool defines its own attribute_mapping. The repository ID in
+#    the attribute keeps other repositories off this binding ONLY WHILE every
+#    provider in the github-actions pool maps attribute.repository_id_ref from
+#    assertion.repository_id + '/' + assertion.ref, exactly as the provider
+#    below does. A provider added to this pool with any other mapping for that
+#    attribute could satisfy this binding and deploy the hub. Terraform does not
+#    enforce the invariant. Recommended for Phase 2: give satellites a separate
+#    pool, so the pool is the trust boundary and the invariant is structural;
+#    otherwise every new provider in this pool must carry this exact mapping,
+#    checked in review.
 
 locals {
   github_oidc_issuer = "https://token.actions.githubusercontent.com"
@@ -32,7 +42,7 @@ resource "google_iam_workload_identity_pool" "github" {
   project                   = var.project_id
   workload_identity_pool_id = "github-actions"
   display_name              = "GitHub Actions"
-  description               = "GitHub Actions OIDC identities for the research hub and, from Phase 2, its satellites."
+  description               = "GitHub Actions OIDC identities for the research hub website."
 
   depends_on = [google_project_service.phase1]
 }

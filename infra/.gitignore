@@ -23,4 +23,8 @@ override.tf.json
 crash.log
 crash.*.log
 
+# firebase-tools installed by `npm ci --prefix infra/deploy-tools`. Its
+# package.json and package-lock.json are committed.
+deploy-tools/node_modules/
+
 # .terraform.lock.hcl is intentionally NOT ignored.

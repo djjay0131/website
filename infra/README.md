@@ -21,9 +21,10 @@ the reference for the module itself.
 |---|---|---|
 | `main.tf` | `data.google_project.hub`; `google_project_service.phase1` (8 APIs) | The project is read, never created (§10 Q2). APIs: Cloud Resource Manager, Service Usage, IAM, STS, IAM Credentials, Firebase Management, Firebase Hosting, Billing Budgets |
 | `wif.tf` | `google_iam_workload_identity_pool.github`, `google_iam_workload_identity_pool_provider.website` | GitHub OIDC federation; the provider admits only this repository, by immutable ID and name |
-| `deploy.tf` | `google_service_account.hub_deploy`, `google_project_iam_member.hub_deploy_hosting_admin`, `google_service_account_iam_member.hub_deploy_wif_main` | The keyless deploy identity, `roles/firebasehosting.admin` only, usable only from `refs/heads/main` |
-| `budget.tf` | `google_billing_budget.hub` | $5/month for this project, emailing billing-account admins/users and project owners; `prevent_destroy` |
-| `firebase.tf` | `google_firebase_project.hub`, `google_firebase_hosting_site.default`, `google_firebase_hosting_custom_domain.primary` | Firebase on the project, its default Hosting site, and `var.domain` bound to it |
+| `deploy.tf` | `google_service_account.hub_deploy`, `google_project_iam_member.hub_deploy_hosting_admin`, `google_project_iam_member.hub_deploy_api_keys_viewer`, `google_service_account_iam_member.hub_deploy_wif_main` | The keyless deploy identity, usable only from `refs/heads/main`. It holds `roles/firebasehosting.admin` and `roles/serviceusage.apiKeysViewer`, which Firebase requires for CLI deploys. That is the narrowest supported grant: custom roles cannot control Firebase Hosting resources |
+| `budget.tf` | `google_billing_budget.hub` | $5/month for this project, emailing billing-account admins/users and project owners; `prevent_destroy`, a CI presence check and apply provenance (see Guardrails) |
+| `firebase.tf` | `google_firebase_project.hub`, `google_firebase_hosting_site.default`, `google_firebase_hosting_custom_domain.primary` | Firebase on the project, its default Hosting site (a postcondition requires type `DEFAULT_SITE`), and `var.domain` bound to it |
+| `deploy-tools/` | none: `package.json` and `package-lock.json` | Pins `firebase-tools` to exactly 15.30.1 with its whole dependency tree. `build.yml` installs it with `npm ci --prefix infra/deploy-tools`. `node_modules/` is git-ignored |
 
 Not managed, by design (Phase 1 scope, issue #10 K1): storage buckets, Artifact
 Registry, Cloud Run, Identity Platform, Firestore, per-satellite identities.
@@ -63,7 +64,9 @@ Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in.
 
 Prerequisites: Terraform `>= 1.14.0, < 2.0.0`; `gcloud` signed in as the owner;
 the project created, billing linked, and the bootstrap APIs enabled (handoff
-§Manual steps 1–3).
+§Manual steps 1–3). Apply only under the apply-provenance rule in §Guardrails:
+a clean checkout of the reviewed PR head or of `main`, with the applied commit
+SHA recorded.
 
 ```sh
 gcloud auth application-default login
@@ -98,9 +101,32 @@ terraform validate
 
 - **No keys.** Nothing here creates a service-account key, and nothing may
   (§12.2). GitHub Actions authenticates through WIF.
-- **Budget.** `google_billing_budget.hub` has `lifecycle { prevent_destroy = true }`,
-  so `terraform destroy` or a replacing change fails at plan time (§12.6).
-  Removing the budget takes a reviewed commit that deletes that guard first.
+- **Budget (§12.6: the budget alert is never removed).** Three controls:
+  - `google_billing_budget.hub` has `lifecycle { prevent_destroy = true }`. A plan
+    that would destroy or replace the budget (`terraform destroy`, or an edit
+    that forces replacement) fails, but **only while the resource block is in
+    the configuration**. Terraform: "This rule doesn't prevent Terraform from
+    destroying a resource if you remove its configuration"
+    (<https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle>).
+    Deleting the block, or `budget.tf`, destroys the budget in one apply.
+  - The `budget-guard` job in `.github/workflows/build.yml` runs on every pull
+    request and every push to `main`. It fails when `infra/budget.tf` is missing,
+    or lacks `resource "google_billing_budget" "hub"` or that block's
+    `prevent_destroy = true`.
+  - Apply provenance (below).
+
+  No rollback removes `budget.tf` or the budget. To remove other resources,
+  use a targeted destroy of named resources (handoff, manual step 10). If a plan
+  lists `google_billing_budget.hub` to be destroyed or replaced, do not apply it.
+- **Apply provenance.** Run `terraform apply` only from a clean checkout of the
+  reviewed PR head or of `main`:
+  - `git status --porcelain` prints nothing;
+  - `git rev-parse HEAD` equals the PR's head commit, or `origin/main` after
+    `git fetch`;
+  - the `budget-guard` check is green on that commit.
+
+  Apply a saved plan (`terraform plan -out=tfplan`, then `terraform apply tfplan`).
+  Record the applied commit SHA in the sprint `STATE.md`.
 - **Destroy.** The project is a data source and survives `terraform destroy`.
   Firebase cannot be removed from a project once added; the Hosting site uses
   `deletion_policy = "ABANDON"`. APIs are left enabled.

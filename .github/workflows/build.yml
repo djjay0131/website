@@ -88,6 +88,48 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+  # Budget presence check (design doc §12.6: the budget alert is never removed).
+  # prevent_destroy in infra/budget.tf stops a destroy only while the resource
+  # block is in the configuration; deleting the block or the file would destroy
+  # the budget in one apply. This job makes that removal fail review before any
+  # apply. It runs on every pull request and push to main, independently of
+  # vars.GCP_PROJECT_ID, and deploys nothing. Comments are stripped first, so a
+  # commented-out block or guard does not pass; whitespace is free.
+  budget-guard:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Check the budget and its prevent_destroy guard are declared
+        env:
+          FILE: infra/budget.tf
+        run: |
+          if [ ! -f "${FILE}" ]; then
+            echo "::error file=${FILE}::${FILE} is missing. The \$5 budget is never removed (design doc §12.6)."
+            exit 1
+          fi
+          set +e
+          perl -0777 -ne '
+            s{/\*.*?\*/}{}gs;
+            s{(?:#|//)[^\n]*}{}g;
+            unless (/\bresource\s+"?google_billing_budget"?\s+"?hub"?\s*(\{(?:[^{}]++|(?1))*\})/) { exit 2 }
+            my $block = $1;
+            unless ($block =~ /\blifecycle\s*(\{(?:[^{}]++|(?1))*\})/ && $1 =~ /\bprevent_destroy\s*=\s*true\b/) { exit 3 }
+          ' "${FILE}"
+          RC=$?
+          set -e
+          case "${RC}" in
+            0) echo "OK: ${FILE} declares google_billing_budget.hub with prevent_destroy = true." ;;
+            2) echo "::error file=${FILE}::${FILE} does not declare resource \"google_billing_budget\" \"hub\". The \$5 budget is never removed (design doc §12.6)."; exit 1 ;;
+            3) echo "::error file=${FILE}::google_billing_budget.hub in ${FILE} has no lifecycle { prevent_destroy = true }."; exit 1 ;;
+            *) echo "::error file=${FILE}::budget check could not run (perl exit ${RC})."; exit 1 ;;
+          esac
+
   # Builds and tests the GitHub Pages variant (SEAM-1, SEAM-5). This is the only
   # build the Pages deploy depends on, so the Firebase variant (build-firebase,
   # below) cannot fail or block it (SEAM-4). Pull requests stop here: nothing
@@ -146,6 +188,12 @@ jobs:
           SITE_URL: https://djjay0131.github.io
           SITE_BASE: /website/
         run: npm run build
+
+      # SEAM-7: fail before the upload (and so before deploy) when a smoke-test
+      # route has no file in site/dist-public.
+      - name: Check smoke-test routes exist (GitHub Pages variant)
+        working-directory: site
+        run: npm run check:smoke-routes
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
@@ -209,6 +257,12 @@ jobs:
 
       - name: Build Astro (Firebase Hosting variant)
         run: npm run build
+
+      # SEAM-7: fail before any upload when a smoke-test route has no file in
+      # site/dist-public.
+      - name: Check smoke-test routes exist (Firebase Hosting variant)
+        working-directory: site
+        run: npm run check:smoke-routes
 
       # Only the deploy path consumes the artifact; a pull request stores none.
       - name: Upload Firebase Hosting artifact
@@ -313,15 +367,22 @@ jobs:
           name: firebase-hosting
           path: site/dist-public
 
-      # check-latest: Node 22.23.0 shipped an http.Agent keep-alive regression
-      # that breaks google-auth-library's STS token exchange and so WIF deploys
-      # (firebase/firebase-tools#10716, nodejs/node#63989; fixed in 22.23.1).
-      # Without it setup-node may serve the runner's cached 22.x.
+      # Exact Node version. Node 22.23.0 shipped an http.Agent keep-alive
+      # regression that breaks google-auth-library's STS token exchange and so
+      # WIF deploys (firebase/firebase-tools#10716, nodejs/node#63989; fixed in
+      # 22.23.1). An exact pin avoids it without floating the deploy runtime:
+      # the version changes only by a reviewed commit. (The build jobs keep
+      # node-version: 22; they hold no cloud credential.)
       - name: Set up Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: 22
-          check-latest: true
+          node-version: 22.23.1
+
+      # firebase-tools and its whole dependency tree come from the committed
+      # lockfile (infra/deploy-tools), installed before any credential exists in
+      # this job. Bump through a reviewed lockfile change.
+      - name: Install firebase-tools from the lockfile
+        run: npm ci --prefix infra/deploy-tools --no-audit --no-fund
 
       # Writes an external_account credentials file (service account
       # impersonation) and exports GOOGLE_APPLICATION_CREDENTIALS, which
@@ -334,12 +395,12 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOY_SA }}
 
+      # The locked firebase-tools (15.30.1, infra/deploy-tools/package-lock.json).
       - name: Deploy to Firebase Hosting
         env:
-          FIREBASE_TOOLS_VERSION: 15.30.1
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
-          npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy \
+          infra/deploy-tools/node_modules/.bin/firebase deploy \
             --only hosting \
             --project "${GCP_PROJECT_ID}" \
             --non-interactive \
@@ -398,7 +459,7 @@ jobs:
   # emailed by GitHub) even with no secrets configured at all. Without this,
   # nothing surfaced ~190 consecutive scheduled failures over 8 days.
   notify-failure:
-    needs: [check, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test]
+    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test]
     runs-on: ubuntu-24.04
     # A failed PR check already shows up on the PR itself; only page out for
     # failures on the real deploy path.
@@ -458,7 +519,7 @@ jobs:
   # skipped, do not count) and no failed job anywhere. The Firebase jobs may be
   # skipped -- they are until the owner configures them -- but not failed.
   notify-recovery:
-    needs: [check, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test]
+    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test]
     runs-on: ubuntu-24.04
     if: >-
       !cancelled()

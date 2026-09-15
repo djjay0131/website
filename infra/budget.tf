@@ -12,12 +12,21 @@
 # A budget alerts; it does not cap spend ("Setting an alerts-only budget doesn't
 # automatically cap ... usage or spending").
 #
-# Guard: prevent_destroy makes any plan that would delete or replace the budget
-# fail -- including `terraform destroy` and an accidental edit that forces
-# replacement -- so removing the guardrail takes a reviewed code change that
-# deletes this line first. Chosen over deletion_policy-style flags because it is
-# core Terraform, works on every resource, and fails at plan time rather than
-# at the API.
+# Guard, and its limit. prevent_destroy makes a plan fail if it would destroy
+# or replace this budget -- `terraform destroy`, or an edit that forces
+# replacement -- but ONLY while this resource block is in the configuration.
+# Terraform: "This rule doesn't prevent Terraform from destroying a resource if
+# you remove its configuration" (language/meta-arguments/lifecycle). Deleting
+# this block, or this file, destroys the budget in a single apply; the guard is
+# never evaluated. Two further controls cover that case:
+# - CI presence check: the budget-guard job in .github/workflows/build.yml, on
+#   every pull request and push to main, fails when this file lacks
+#   resource "google_billing_budget" "hub" or its prevent_destroy = true.
+# - Apply provenance: apply only from a clean checkout of the reviewed PR head or
+#   of main, and record the applied commit SHA (README.md, Guardrails).
+# No rollback removes this file or the budget (§12.6). prevent_destroy is kept
+# over deletion_policy-style flags because it is core Terraform, works on every
+# resource, and fails at plan time rather than at the API.
 
 locals {
   budget_amount_usd = 5

@@ -13,15 +13,21 @@
 #     (lib/deploy/index.js TARGET_PERMISSIONS.hosting), which covers creating a
 #     version, uploading files and creating the release.
 #   Firebase documents this role for Hosting deploys ("Firebase predefined
-#   roles"). It is the narrowest predefined role holding those permissions; a
-#   custom role with only the four listed above is the tighter alternative
-#   (handoff, Alternatives; ADR candidate).
+#   roles"). It is the narrowest predefined role holding those permissions.
+#
+# roles/serviceusage.apiKeysViewer (project), "API Keys Viewer". Read-only.
+#   Firebase: a member deploying with the Firebase CLI "must also be assigned the
+#   API Keys Viewer role" (firebase.google.com/docs/projects/iam/
+#   roles-predefined-product). Granted so the first deploy follows the documented
+#   path, although firebase-tools 15.30.1 was not seen to call the API Keys API on
+#   the hosting path. Phase 1 creates no API keys. The owner may reverse this at
+#   Checkpoint 2.
+#
+# These two roles are the narrowest SUPPORTED grant. A custom role is not an
+# option: "Custom roles cannot currently be used for controlling access to
+# Firebase Hosting resources" (firebase.google.com/docs/projects/iam/permissions).
 #
 # Deliberately NOT granted:
-# - roles/serviceusage.apiKeysViewer: Firebase's docs list it for CLI deploys, but
-#   in firebase-tools 15.30.1 the API Keys client (lib/gcp/apikeys.js) is imported
-#   only by crashlytics/onboarding.js, never on the hosting deploy path. Add it
-#   only if a real deploy reports a missing apikeys.* permission.
 # - roles/run.viewer: needed only for Hosting rewrites to Cloud Run, which Phase 1
 #   does not have (issue #10 K2).
 # - roles/firebaseauth.admin: needed only for preview channels, which are not used.
@@ -41,6 +47,12 @@ resource "google_service_account" "hub_deploy" {
 resource "google_project_iam_member" "hub_deploy_hosting_admin" {
   project = var.project_id
   role    = "roles/firebasehosting.admin"
+  member  = google_service_account.hub_deploy.member
+}
+
+resource "google_project_iam_member" "hub_deploy_api_keys_viewer" {
+  project = var.project_id
+  role    = "roles/serviceusage.apiKeysViewer"
   member  = google_service_account.hub_deploy.member
 }
 

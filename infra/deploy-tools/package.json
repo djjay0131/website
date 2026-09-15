@@ -1,0 +1,10 @@
+{
+  "name": "hub-deploy-tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Firebase CLI used by .github/workflows/build.yml firebase-deploy, pinned exactly and locked by package-lock.json. Bump through a reviewed lockfile change.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "firebase-tools": "15.30.1"
+  }
+}
