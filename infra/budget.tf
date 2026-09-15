@@ -20,10 +20,14 @@
 # this block, or this file, destroys the budget in a single apply; the guard is
 # never evaluated. Two further controls cover that case:
 # - CI presence check: the budget-guard job in .github/workflows/build.yml, on
-#   every pull request and push to main, fails when this file lacks
-#   resource "google_billing_budget" "hub" or its prevent_destroy = true.
+#   every trigger, fails when this file lacks
+#   resource "google_billing_budget" "hub" or its prevent_destroy = true, or
+#   when any override.tf* or *_override.tf* file is tracked under infra/.
+#   Terraform merges override files into this block's lifecycle argument by
+#   argument, so an override could set prevent_destroy = false.
 # - Apply provenance: apply only from a clean checkout of the reviewed PR head or
-#   of main, and record the applied commit SHA (README.md, Guardrails).
+#   of main with no override file in infra/ (tracked or git-ignored), and record
+#   the applied commit SHA (README.md, Guardrails).
 # No rollback removes this file or the budget (§12.6). prevent_destroy is kept
 # over deletion_policy-style flags because it is core Terraform, works on every
 # resource, and fails at plan time rather than at the API.

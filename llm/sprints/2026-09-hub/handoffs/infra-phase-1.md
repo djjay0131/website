@@ -39,8 +39,10 @@ changed or read; no credential exists.
   Node 22.23.1 exactly; firebase-tools 15.30.1 from the `infra/deploy-tools`
   lockfile; `--project`) and `firebase-smoke-test` jobs run only off pull requests
   and only when `vars.GCP_PROJECT_ID` is non-empty. A new `budget-guard` job, on
-  every pull request and push to `main`, fails when `infra/budget.tf` loses the
-  budget or its `prevent_destroy`. The fingerprint check reads
+  every trigger, fails when `infra/budget.tf` loses the budget or its
+  `prevent_destroy`, or when a Terraform override file is tracked under `infra/`.
+  A credential-free `deploy-tools` job runs the locked firebase-tools install on
+  pull requests and pushes. The fingerprint check reads
   `vars.SITE_URL` or else the Pages URL. `permissions: {}` at the top with a
   per-job grant, and every action is pinned by commit SHA.
 - **D3 — `infra/README.md`**; **D4 — this handoff**.
@@ -295,10 +297,12 @@ Not granted, with reasons:
   (This corrects an earlier claim, refuted in review F1, that removal needs a
   commit deleting the guard first.)
 - Two controls cover that gap:
-  - **CI presence check.** The `budget-guard` job in `build.yml`, on every pull
-    request and push to `main`, fails when `infra/budget.tf` is missing, lacks
+  - **CI presence check.** The `budget-guard` job in `build.yml`, on every
+    trigger (delta review B1), fails when `infra/budget.tf` is missing, lacks
     `resource "google_billing_budget" "hub"`, or lacks `prevent_destroy = true`
-    in that block's `lifecycle`. It strips comments and tolerates whitespace, and
+    in that block's `lifecycle`. It also fails when any tracked file under
+    `infra/` matches `override.tf*` or `*_override.tf*` (delta review B2). It
+    strips comments and tolerates whitespace, and
     is not gated on `vars.GCP_PROJECT_ID`.
   - **Apply provenance.** Apply only from a clean checkout of the reviewed PR
     head or of `main`, and record the applied commit SHA (manual step 5).
@@ -347,8 +351,13 @@ Not granted, with reasons:
   a smoke route fails the build, and so never reaches deploy. The build jobs keep
   `node-version: 22`; only the deploy job, which holds credentials, is pinned
   exactly.
-- `budget-guard` runs on `pull_request` and `push` events (pushes are `main`
-  only), checks out the repository, and runs the budget presence check (see
+- `deploy-tools` (delta review B3) runs on `pull_request` and `push` with
+  `contents: read` and no credential. It sets up Node `22.23.1`, runs the same
+  `npm ci --prefix infra/deploy-tools --no-audit --no-fund` as `firebase-deploy`,
+  and fails unless `infra/deploy-tools/node_modules/.bin/firebase --version`
+  prints `15.30.1`. It is not a need of the notification jobs.
+- `budget-guard` runs on every trigger (delta review B1), checks out the
+  repository, and runs the override-file check and the budget presence check (see
   §Budget recipients and the guard). It is not gated on `vars.GCP_PROJECT_ID`,
   deploys nothing, and no deploy job needs it, so the Pages path is unchanged.
 - `firebase-smoke-test` tests `vars.SITE_URL` or else
@@ -365,9 +374,10 @@ Not granted, with reasons:
   (`gh issue list --label ci-failure --state all` returns `[]`), so the old path
   was never exercised.
 - `notify-failure` and `notify-recovery` also need `build-firebase` and
-  `budget-guard`. Both may be skipped (the first until configured, the second on
-  schedule and dispatch runs), which recovery tolerates for the same reason as
-  above. A `budget-guard` failure on a push to `main` opens the tracking issue.
+  `budget-guard`. `build-firebase` may be skipped until configured, which recovery
+  tolerates for the same reason as above. `budget-guard` runs on every trigger,
+  so while `main` lacks the guard, every deploy-path run fails it: the tracking
+  issue stays open and gains a "Still failing" comment (delta review B1).
 - Per-job permissions: `check`, `budget-guard`, `build` and `build-firebase` `contents: read`; `deploy`
   `pages: write` and `id-token: write` (deploy-pages README); `firebase-deploy`
   `contents: read` and `id-token: write`; both smoke tests `{}`; both notify jobs
@@ -467,7 +477,13 @@ account (`gcloud auth list` shows it as active).
    - `git fetch origin`; then `git status --porcelain` prints nothing;
    - `git rev-parse HEAD` equals the PR's head commit (shown on the PR) or
      `git rev-parse origin/main`;
-   - the `budget-guard` check is green on that commit.
+   - the `budget-guard` check is green on that commit;
+   - from the repository root, `ls infra/override.tf* infra/*_override.tf* 2>/dev/null`
+     prints nothing (delta review B2). `infra/.gitignore` ignores override files,
+     so `git status --porcelain` cannot show a local one, and Terraform merges
+     override files into resource blocks, `lifecycle` argument by argument. An
+     override could set `prevent_destroy = false` on the budget while `budget.tf`
+     is unchanged. If it prints a file, move it out of `infra/` before planning.
 
    After apply, record the applied commit SHA, the date, and the apply summary
    line in `llm/sprints/2026-09-hub/STATE.md` (Lead Architect).
@@ -932,7 +948,8 @@ remediation. Handoff line numbers refer to this file.
   - The step lists which addresses may be targeted, and which may never be.
 - **CI presence check.** New job `budget-guard` in
   `.github/workflows/build.yml:91-131`.
-  - Runs on `pull_request` and `push` (pushes are `main` only). Not gated on
+  - Runs on `pull_request` and `push` (pushes are `main` only); superseded in
+    round 2, B1: it now runs on every trigger. Not gated on
     `vars.GCP_PROJECT_ID`. Checks out the repository (`contents: read`,
     `persist-credentials: false`).
   - Fails when `infra/budget.tf` is missing, has no
@@ -1208,3 +1225,243 @@ Scans of the changed files found:
 - STATE C11 and C12 and the PR #12 body still need the F2, F3, F4 and F11 wording
   (Lead Architect, per the dispositions).
 - The handoff `Status: Draft` line is left for the Lead Architect (F14).
+
+## Remediation round 2 (delta review B1–B3)
+
+Source: `llm/sprints/2026-09-hub/handoffs/chief-reviewer-phase-1-delta.md` Part B
+(verdict Comment; F1–F12 resolved at `3ec90ed`). Applied on `feat/foundation` at
+`205eb8a`. No git or gh mutation was made in the repository, and no Terraform
+plan or apply, and no cloud read or change. Line numbers are as of this round.
+B4 (SEAM-7 wording) is the Lead Architect's and was not touched.
+
+### B1: `budget-guard` runs on every trigger
+
+- `.github/workflows/build.yml:104`: the job-level
+  `if: github.event_name == 'pull_request' || github.event_name == 'push'` is
+  removed. The YAML parse shows `budget-guard: if: (none: runs on every trigger)`.
+- `build.yml:91-103`: the job comment says why. Both notification jobs need it,
+  so a skipped run must never let `notify-recovery` close the tracking issue
+  while `main` lacks the guard.
+- The job is still in both notification jobs' `needs`. While `main` lacks the
+  budget or its guard, every deploy-path run (`push`, `repository_dispatch`,
+  `schedule`, `workflow_dispatch`) fails it. `notify-recovery` therefore cannot
+  close the issue, and `notify-failure` adds "Still failing".
+- Stale wording updated:
+  - `infra/budget.tf:22-30` ("on every trigger");
+  - `infra/README.md:112-120`;
+  - handoff Summary D2, §Budget recipients and the guard (line 301),
+    §Workflow structure (lines 359 and 377-380);
+  - the round 1 record at line 951, marked superseded.
+
+### B2: Terraform override files
+
+- **Provenance rule.** Before planning or applying, from the repository root,
+  `ls infra/override.tf* infra/*_override.tf* 2>/dev/null` must print nothing.
+  - `infra/README.md:132-136` (§Guardrails, Apply provenance);
+  - handoff manual step 5 (lines 481-486), which also governs step 10.
+  - The rule explains why: `infra/.gitignore` ignores override files, so
+    `git status --porcelain` cannot show one, and Terraform merges the
+    `lifecycle` block argument by argument.
+- **CI.** New step "Check no Terraform override file is tracked under infra/" in
+  `budget-guard`, `build.yml:113-128`.
+  - It lists tracked files with `git -c core.quotePath=false ls-files -- infra`,
+    and fails on any basename matching `override.tf*` or `*_override.tf*`, with
+    `::error file=<path>::` naming each file.
+  - The existing budget step (`build.yml:130-132`) now has
+    `if: ${{ !cancelled() }}`, so it runs, and reports, even when the override
+    step fails.
+  - `infra/budget.tf:22-30` and `infra/README.md:115-120` describe the check.
+- **Local test.** The two run scripts were extracted verbatim from `build.yml`
+  and run with GitHub's default `bash --noprofile --norc -eo pipefail`. The
+  second step always runs, as `!cancelled()` does.
+  - Case 1 ran read-only in the real repository.
+  - Cases 2–4 ran in temporary git repositories outside the working tree, each
+    holding a copy of the tracked `infra/` files.
+  - Nothing in the real repository was modified or staged; `git status` after
+    the test shows only the edits listed under Files changed.
+
+### B3: credential-free locked-install job
+
+- New job `deploy-tools`, `build.yml:157-189`:
+  - `if: github.event_name == 'pull_request' || github.event_name == 'push'`
+    (line 165);
+  - `permissions: contents: read`;
+  - checkout (`fbc6f39…`, v5, `persist-credentials: false`), then
+    `actions/setup-node@a0853c2…` (v5, the same SHA as elsewhere) with
+    `node-version: 22.23.1`;
+  - `npm ci --prefix infra/deploy-tools --no-audit --no-fund`, identical to
+    `firebase-deploy`'s install step (checked by the YAML parse);
+  - "Check the locked firebase-tools version" (lines 182-189): runs
+    `infra/deploy-tools/node_modules/.bin/firebase --version` and exits 1 with
+    an `::error` unless it prints exactly `15.30.1`.
+- No auth step, no secrets, no `id-token`. The job is not in either notification
+  job's `needs`.
+- A firebase-tools bump now changes `package.json`, the lockfile and the
+  expected version in this job. The job comment says so.
+- Handoff §Workflow structure (lines 354-358) and Summary D2 describe it.
+- **Local proof under npm 10.9.8** (the npm bundled with Node 22.23.1):
+  - `npx --yes npm@10.9.8 ci` installs a temporary copy of the lockfile, and the
+    CLI prints `15.30.1`;
+  - the job's exact commands also pass in a `node:22.23.1` container (node
+    v22.23.1, npm 10.9.8, install scripts enabled as in CI).
+- First CI run of the job: on the next push to PR #12.
+
+### Round 2 validation (verbatim)
+
+actionlint:
+
+```text
+$ actionlint -version
+1.7.12
+installed by building from source
+built with go1.26.1 compiler for linux/amd64
+$ actionlint -verbose .github/workflows/build.yml
+verbose: Linting .github/workflows/build.yml
+verbose: Using project at /repo
+verbose: Found 0 parse errors in 1 ms for .github/workflows/build.yml
+verbose: Found total 0 errors in 72 ms for .github/workflows/build.yml
+exit=0
+```
+
+YAML parse, with every job's `if:`:
+
+```text
+yaml.safe_load OK; top-level permissions: {}
+check: if: (none: runs on every trigger) | needs: - | permissions: {'contents': 'read'}
+budget-guard: if: (none: runs on every trigger) | needs: - | permissions: {'contents': 'read'}
+deploy-tools: if: github.event_name == 'pull_request' || github.event_name == 'push' | needs: - | permissions: {'contents': 'read'}
+build: if: needs.check.outputs.changed == 'true' | needs: check | permissions: {'contents': 'read'}
+build-firebase: if: needs.check.outputs.changed == 'true' && (github.event_name == 'pull_request' || vars.GCP_PROJECT_ID != '') | needs: check | permissions: {'contents': 'read'}
+deploy: if: github.event_name != 'pull_request' | needs: build | permissions: {'pages': 'write', 'id-token': 'write'}
+smoke-test: if: github.event_name != 'pull_request' | needs: deploy | permissions: {}
+firebase-deploy: if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != '' | needs: build-firebase | permissions: {'contents': 'read', 'id-token': 'write'}
+firebase-smoke-test: if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != '' | needs: firebase-deploy | permissions: {}
+notify-failure: if: failure() && github.event_name != 'pull_request' | needs: ['check', 'budget-guard', 'build', 'deploy', 'smoke-test', 'build-firebase', 'firebase-deploy', 'firebase-smoke-test'] | permissions: {'issues': 'write'}
+notify-recovery: if: !cancelled() && github.event_name != 'pull_request' && needs.smoke-test.result == 'success' && !contains(needs.*.result, 'failure') | needs: ['check', 'budget-guard', 'build', 'deploy', 'smoke-test', 'build-firebase', 'firebase-deploy', 'firebase-smoke-test'] | permissions: {'issues': 'write'}
+deploy-tools steps: ['actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09', 'Set up Node', 'Install firebase-tools from the lockfile', 'Check the locked firebase-tools version']
+deploy-tools node: [{'node-version': '22.23.1'}]
+install command identical to firebase-deploy: True ['npm ci --prefix infra/deploy-tools --no-audit --no-fund']
+deploy-tools uses auth/secrets/id-token: False False False
+deploy-tools in notify needs: False False
+budget-guard step ifs: [('actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09', None), ('Check no Terraform override file is tracked under infra/', None), ('Check the budget and its prevent_destroy guard are declared', '${{ !cancelled() }}')]
+```
+
+Budget-guard local test:
+
+```text
+step1: 'Check no Terraform override file is tracked under infra/' if=None env=None
+step2: 'Check the budget and its prevent_destroy guard are declared' if='${{ !cancelled() }}' env={'FILE': 'infra/budget.tf'}
+
+### case 1: the real repository (read-only; nothing written or staged)
+OK: no override.tf* or *_override.tf* file is tracked under infra/.
+OK: infra/budget.tf declares google_billing_budget.hub with prevent_destroy = true.
+=> job PASSES (step1 rc=0, step2 rc=0)
+
+### case 2: temporary copy with a staged infra/budget_override.tf
+A  infra/budget_override.tf
+::error file=infra/budget_override.tf::infra/budget_override.tf is a Terraform override file. Overrides merge into resource blocks, lifecycle argument by argument, and can disable prevent_destroy on the budget. None may be tracked under infra/.
+OK: infra/budget.tf declares google_billing_budget.hub with prevent_destroy = true.
+=> job FAILS (step1 rc=1, step2 rc=0)
+
+### case 3: temporary copy with prevent_destroy = false in budget.tf
+78:    prevent_destroy = false
+OK: no override.tf* or *_override.tf* file is tracked under infra/.
+::error file=infra/budget.tf::google_billing_budget.hub in infra/budget.tf has no lifecycle { prevent_destroy = true }.
+=> job FAILS (step1 rc=0, step2 rc=1)
+
+### case 4 (extra): temporary copy with an ignored, untracked infra/budget_override.tf
+!! infra/budget_override.tf
+OK: no override.tf* or *_override.tf* file is tracked under infra/.
+OK: infra/budget.tf declares google_billing_budget.hub with prevent_destroy = true.
+=> job PASSES (step1 rc=0, step2 rc=0)
+provenance check in case 4: $ ls infra/override.tf* infra/*_override.tf* 2>/dev/null
+infra/budget_override.tf
+(prints a file, so provenance refuses the apply)
+provenance check in the real repository:
+(printed nothing: rc=2)
+```
+
+The case 2 override is `resource "google_billing_budget" "hub" { lifecycle { prevent_destroy = false } }`.
+Case 4 shows why the B2 provenance `ls` is needed alongside CI: a git-ignored
+local override passes `budget-guard` but is caught by the `ls` check.
+
+Lockfile under npm 10.9.8 (host Node v24.18.0; temporary copy of
+`infra/deploy-tools`):
+
+```text
+$ npx --yes npm@10.9.8 --version
+10.9.8
+$ npx --yes npm@10.9.8 ci --prefix <temporary copy of infra/deploy-tools> --no-audit --no-fund
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated json-ptr@3.1.1: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 672 packages in 14s
+exit=0
+$ <tmp>/deploy-tools/node_modules/.bin/firebase --version
+15.30.1
+exit=0
+```
+
+The same commands in container `node:22.23.1` (image digest
+`sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37`), after
+the image pull:
+
+```text
+node v22.23.1, npm 10.9.8
+$ npm ci --prefix infra/deploy-tools --no-audit --no-fund
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated json-ptr@3.1.1: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 672 packages in 15s
+$ infra/deploy-tools/node_modules/.bin/firebase --version
+15.30.1
+version check: OK
+exit=0
+```
+
+Terraform (`infra/budget.tf` comment changed), from `infra/`:
+
+```text
+$ terraform fmt -check -recursive
+exit=0
+$ terraform init -backend=false
+Initializing provider plugins...
+- Reusing previous version of hashicorp/google-beta from the dependency lock file
+- Reusing previous version of hashicorp/google from the dependency lock file
+- Using previously-installed hashicorp/google-beta v8.2.0
+- Using previously-installed hashicorp/google v8.2.0
+
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+exit=0
+$ terraform validate
+Success! The configuration is valid.
+
+exit=0
+```
+
+### Round 2 files changed
+
+- `.github/workflows/build.yml`: B1, B2 (CI), B3.
+- `infra/budget.tf`: comment only; B1 and B2 wording. No resource change.
+- `infra/README.md`: B1 wording, B2 provenance and CI description.
+- `llm/sprints/2026-09-hub/handoffs/infra-phase-1.md`: step 5, Summary,
+  §Budget, §Workflow structure, round 1 record note, and this section.
+
+### Round 2 notes
+
+- `deploy-tools` hard-codes the expected `15.30.1`, a third place to change on a
+  firebase-tools bump. The job fails loudly if it is missed.
+- The round 1 "Noticed outside this scope" item about `Status: Draft` is
+  outdated: the Lead Architect has since set the Status line.

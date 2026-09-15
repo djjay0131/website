@@ -91,12 +91,17 @@ jobs:
   # Budget presence check (design doc §12.6: the budget alert is never removed).
   # prevent_destroy in infra/budget.tf stops a destroy only while the resource
   # block is in the configuration; deleting the block or the file would destroy
-  # the budget in one apply. This job makes that removal fail review before any
-  # apply. It runs on every pull request and push to main, independently of
-  # vars.GCP_PROJECT_ID, and deploys nothing. Comments are stripped first, so a
-  # commented-out block or guard does not pass; whitespace is free.
+  # the budget in one apply. Terraform override files (override.tf*,
+  # *_override.tf*) merge into resource blocks, lifecycle argument by argument,
+  # so a tracked override could switch the guard off while budget.tf is
+  # unchanged. This job fails on either, before any apply.
+  #
+  # It runs on EVERY trigger, independently of vars.GCP_PROJECT_ID, and deploys
+  # nothing. Both notification jobs need it: a skipped run would let
+  # notify-recovery close the tracking issue while main still lacks the guard
+  # (delta review B1). Comments are stripped first, so a commented-out block or
+  # guard does not pass; whitespace is free.
   budget-guard:
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -105,7 +110,26 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check no Terraform override file is tracked under infra/
+        run: |
+          TRACKED_FILES="$(git -c core.quotePath=false ls-files -- infra)"
+          FOUND=0
+          while IFS= read -r TRACKED; do
+            case "$(basename -- "${TRACKED:-.}")" in
+              override.tf* | *_override.tf*)
+                echo "::error file=${TRACKED}::${TRACKED} is a Terraform override file. Overrides merge into resource blocks, lifecycle argument by argument, and can disable prevent_destroy on the budget. None may be tracked under infra/."
+                FOUND=1
+                ;;
+            esac
+          done <<< "${TRACKED_FILES}"
+          if [ "${FOUND}" -eq 0 ]; then
+            echo "OK: no override.tf* or *_override.tf* file is tracked under infra/."
+          fi
+          exit "${FOUND}"
+
+      # Runs even if the override check failed, so both problems are reported.
       - name: Check the budget and its prevent_destroy guard are declared
+        if: ${{ !cancelled() }}
         env:
           FILE: infra/budget.tf
         run: |
@@ -129,6 +153,40 @@ jobs:
             3) echo "::error file=${FILE}::google_billing_budget.hub in ${FILE} has no lifecycle { prevent_destroy = true }."; exit 1 ;;
             *) echo "::error file=${FILE}::budget check could not run (perl exit ${RC})."; exit 1 ;;
           esac
+
+  # Exercises firebase-deploy's locked install without any credential (delta
+  # review B3). firebase-deploy is skipped on pull requests and dormant until
+  # the GitHub Actions variables are set, so otherwise its install step would
+  # first run at the first real deploy. Same Node version and same install
+  # command as firebase-deploy. No auth step, no secrets, no id-token, and not a
+  # need of the notification jobs. A firebase-tools bump changes
+  # infra/deploy-tools/package.json, its lockfile and the expected version here.
+  deploy-tools:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22.23.1
+
+      - name: Install firebase-tools from the lockfile
+        run: npm ci --prefix infra/deploy-tools --no-audit --no-fund
+
+      - name: Check the locked firebase-tools version
+        run: |
+          VERSION="$(infra/deploy-tools/node_modules/.bin/firebase --version)"
+          echo "firebase --version: ${VERSION}"
+          if [ "${VERSION}" != "15.30.1" ]; then
+            echo "::error file=infra/deploy-tools/package-lock.json::firebase --version printed '${VERSION}', expected 15.30.1."
+            exit 1
+          fi
 
   # Builds and tests the GitHub Pages variant (SEAM-1, SEAM-5). This is the only
   # build the Pages deploy depends on, so the Firebase variant (build-firebase,

@@ -109,10 +109,15 @@ terraform validate
     destroying a resource if you remove its configuration"
     (<https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle>).
     Deleting the block, or `budget.tf`, destroys the budget in one apply.
-  - The `budget-guard` job in `.github/workflows/build.yml` runs on every pull
-    request and every push to `main`. It fails when `infra/budget.tf` is missing,
+  - The `budget-guard` job in `.github/workflows/build.yml` runs on every
+    trigger of the workflow. It fails when `infra/budget.tf` is missing,
     or lacks `resource "google_billing_budget" "hub"` or that block's
-    `prevent_destroy = true`.
+    `prevent_destroy = true`. It also fails when any tracked file under `infra/`
+    matches `override.tf*` or `*_override.tf*`: Terraform merges override files
+    into resource blocks, "the contents of any `lifecycle` nested block … on an
+    argument-by-argument basis", so an override can set
+    `prevent_destroy = false` while `budget.tf` is unchanged. The job runs on
+    every trigger.
   - Apply provenance (below).
 
   No rollback removes `budget.tf` or the budget. To remove other resources,
@@ -123,7 +128,12 @@ terraform validate
   - `git status --porcelain` prints nothing;
   - `git rev-parse HEAD` equals the PR's head commit, or `origin/main` after
     `git fetch`;
-  - the `budget-guard` check is green on that commit.
+  - the `budget-guard` check is green on that commit;
+  - from the repository root,
+    `ls infra/override.tf* infra/*_override.tf* 2>/dev/null` prints nothing.
+    `infra/.gitignore` ignores override files, so neither `git status --porcelain`
+    nor `budget-guard` sees a local one, yet Terraform would merge it into the
+    budget's `lifecycle`.
 
   Apply a saved plan (`terraform plan -out=tfplan`, then `terraform apply tfplan`).
   Record the applied commit SHA in the sprint `STATE.md`.
