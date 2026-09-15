@@ -15,10 +15,9 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. DELTA REVIEW PASSED; CLOSING NOTES** (issue #10, draft
-PR #12). The delta review resolved F1–F14 on evidence (verdict **Comment**; the PR may
-be marked ready) and raised four notes, B1–B4, which are being fixed before the PR is
-marked ready. Next stop: **Checkpoint 2**.
+**Phase 1 — Foundation. CHECKPOINT 2 — STOPPED.** PR #12 is marked ready for the
+owner's review once CI is green on the commit that records this. **No Phase 2 work
+starts without the owner's explicit go.**
 
 ## Done
 
@@ -123,13 +122,14 @@ marked ready. Next stop: **Checkpoint 2**.
       RESOLVED on evidence; persisted to `handoffs/chief-reviewer-phase-1-delta.md`
       and posted to PR #12. B4 (SEAM-7 "one source" overstated) corrected in the
       seams.
+- [x] Delta-review notes B1–B3 closed by infra (budget-guard on every trigger; tracked
+      and local override-file checks; credential-free locked-install job); B4 closed by
+      the Lead Architect. Lead Architect checks: actionlint clean, terraform fmt +
+      validate clean, `budget.tf` change comment-only.
 
 ## In flight
 
-- **Infra** — delta-review notes B1 (run `budget-guard` on every trigger so a dispatch
-  or schedule run cannot close the failure issue while the budget is still missing),
-  B2 (override files can disable `prevent_destroy`: provenance rule + `budget-guard`
-  check), B3 (a credential-free CI job that runs the locked firebase-tools install).
+Nothing.
 
 ## Blocked
 
@@ -159,9 +159,18 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-1. Verify B1–B3; commit; CI green on the final head.
-2. Record the delta-review outcome in the PR #12 body; mark it ready. **Checkpoint 2 —
-   STOP.**
+Owner, at Checkpoint 2 (details in the Checkpoint 2 report on PR #12 and the infra
+handoff's manual steps):
+
+1. Review PR #12; rule on §Decisions for the owner at Checkpoint 2.
+2. Create the GCP project, link billing (Blaze), and apply Terraform from a clean
+   checkout of the reviewed PR head, recording the applied SHA here.
+3. Add the DNS records, set the Actions variables, merge PR #12.
+4. Merge PR #11; file the Incident A1 purge request.
+
+Lead Architect, after an explicit go: verify `cusati.us` serves the site and Pages still
+does; record the applied SHA and the result here; close issue #10; memory-bank sync
+(issue #10, F9); roadmap Phase 1 bookkeeping.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
