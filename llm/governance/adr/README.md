@@ -28,10 +28,7 @@ from `0000-template.md`.
 Each row's Status cell must match the first word of the corresponding
 file's `Status:` line; the `adr-index` governance check enforces this.
 
-Creating or modifying ADR *content* is L1. Flipping an ADR *status* to
-record a decision already approved in a merged PR is L0, and must be
-status-line-only in the constrained form
-`Status: <Proposed|Accepted|Superseded|Deprecated> (via PR #n[, YYYY-MM-DD])`.
-
-Policy: agentic-governance `llm/governance/architecture-governance.md`
-§ADR Process.
+Which ADR changes are semantic and which status flips are administrative,
+and the required form of an administrative status flip: agentic-governance
+`llm/governance/architecture-governance.md` §ADR Process and
+`llm/governance/l0-fast-track.md` §L0 Path Allowlist.

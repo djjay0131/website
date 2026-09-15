@@ -19,7 +19,7 @@ turn requires the Blaze plan.
 
 Two owner answers bind this decision: the domain is `cusati.us` (§10 Q1), and
 the system lives in a new GCP project (§10 Q2, intended id `cusati-hub`)
-under the personal account `djjay0131@gmail.com`, not the institutional one,
+under the owner's personal Google account, not the institutional one,
 so ownership survives graduation with no transfer. Design doc §9 leaves the
 repository layout (§10 Q5) for this ADR to propose.
 
@@ -34,6 +34,8 @@ repository layout (§10 Q5) for this ADR to propose.
    repository root beside it, with the `llm/` control plane, and `docs/` as
    the data plane once it has content. The move uses `git mv` so history
    follows, and it happens in Phase 1, not in the PR that records this ADR.
+   This layout is proposed under design doc §10 Q5 for owner approval at
+   Checkpoint 1; merging PR #9 records that approval.
 4. **GitHub Pages stays live and authoritative** until the Firebase deploy is
    verified at Checkpoint 2, and is retired in Phase 6 with redirects from
    `djjay0131.github.io/website`.
@@ -91,6 +93,11 @@ design-authority document to avoid a directory move.
   `.gitignore`, `.vscode/` and test paths all change.
 - Inbound links to `djjay0131.github.io/website/...` break for any path the
   Phase 6 redirects do not cover.
+- `main` already carries base-path-dependent routing beyond the smoke-test
+  routes: PR #8 moved the research pages under `/research/soa-agentic-se/**`
+  and added `redirects` to `astro.config.mjs` whose targets hardcode
+  `/website/research/soa-agentic-se/...`. On `cusati.us` those redirects point
+  at paths that do not exist unless Phase 1 rewrites them.
 - For the length of the transition two hosts serve the site.
 
 ### Risks
@@ -99,7 +106,8 @@ design-authority document to avoid a directory move.
   delivers a redirect map and proves route parity against the routes
   `build.yml`'s smoke test already checks (`/`, `/resumes/`, `/cv/academic`,
   `/cv/research-professional`, `/papers/`, `/pdfs/academic.pdf`,
-  `/projects/`).
+  `/projects/`) **and** every other route in the current build, including
+  `/research/**` and the existing Astro redirects.
 - **The hourly `cv` fingerprint check reads
   `https://djjay0131.github.io/website/build-info.json`.** It silently
   compares against a stale deploy once the site moves, unless repointed in
@@ -128,6 +136,7 @@ design-authority document to avoid a directory move.
 ## Related Issues / PRs
 
 - #7 — hub-000: Adopt agentic-governance and record hub design
+- PR #9 — Phase 0; merging it accepts this ADR
 
 ## Supersedes
 

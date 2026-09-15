@@ -16,11 +16,15 @@ must stay static (§12.4), and one source tree should produce both areas
    `site/dist-public` (deployed to Firebase Hosting) and `site/dist-private`
    (synced to the private bucket).
 2. A post-build leak check loads every manifest, collects every
-   `visibility: private` slug, and fails the job if any path under
-   `site/dist-public` matches.
+   `visibility: private` slug, and searches every file under
+   `site/dist-public` — its path **and its contents** — failing the job on any
+   occurrence (design doc §5: the check "greps `public/` for any private
+   slug"). Matching file paths alone is not sufficient: a private slug in the
+   sitemap, navigation or an index lives in file contents, not in a path.
 3. The bucket IAM test runs on every deploy alongside it (§12.1 requires
    both).
-4. Private navigation exists only in the private build.
+4. Private navigation exists only in the private build (orchestration brief
+   §4, Phase 3).
 
 ## Rationale
 
@@ -56,11 +60,17 @@ system, and contradicts one hub (§1).
 
 ### Risks
 
-- **The leak check is necessary, not sufficient.** It matches slugs and paths.
-  Private text quoted into a public page, a renamed PDF, or a private title in
-  the sitemap, RSS feed, search index (Phase 6) or an OG image would pass it.
-  The exact matching rules and every derived output they cover must be defined
-  when the check is built in Phase 3 — ADR candidate.
+- **The leak check is necessary, not sufficient.** It finds private slugs in
+  paths and file contents, so a slug in the sitemap, navigation, RSS feed or a
+  search index fails it. Private text quoted into a public page without its
+  slug, a renamed PDF, a private title rendered into an OG image, or content in
+  a format the check does not decode would still pass. The exact matching rules
+  and every derived output they cover must be defined when the check is built
+  in Phase 3 — ADR candidate.
+- **The brief describes a weaker check.** Orchestration brief §4 (Phase 3)
+  says the check fails "if any path under dist-public matches". Design doc §5
+  ranks above the brief and greps contents; this ADR follows §5, and the
+  conflict is routed to the owner.
 - **Where the check lives is ambiguous.** The brief names
   `scripts/check-no-private-in-public.mjs` while scoping the site specialist to
   `site/**`; the Phase 3 contract must settle the path.
@@ -81,11 +91,13 @@ system, and contradicts one hub (§1).
 ## Related Documents
 
 - `llm/specs/2026-09-10-research-hub-design.md` §1, §3, §5, §12.1, §12.4
+- `llm/plans/2026-09-10-research-hub-orchestration-brief.md` §4 Phase 3
 - ADR-0003 (static output), ADR-0004 (the private area this build feeds)
 
 ## Related Issues / PRs
 
 - #7 — hub-000: Adopt agentic-governance and record hub design
+- PR #9 — Phase 0; merging it accepts this ADR
 
 ## Supersedes
 

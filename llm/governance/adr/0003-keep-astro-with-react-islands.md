@@ -66,8 +66,10 @@ gate only (ADR-0004).
 ### Risks
 
 - An island that fetches private data at runtime would reintroduce execution on
-  the public path. Islands in the public build may call only the gate, and only
-  for the member or share tiers.
+  the public path. This ADR therefore adds a constraint the design doc does not
+  state, derived from §12.4: islands in the public build may call only the
+  gate, and only for the member or share tiers. It is an ADR candidate in its
+  own right (what public-build islands may call at runtime).
 
 ## Impacted Areas
 
@@ -89,6 +91,7 @@ gate only (ADR-0004).
 ## Related Issues / PRs
 
 - #7 — hub-000: Adopt agentic-governance and record hub design
+- PR #9 — Phase 0; merging it accepts this ADR
 
 ## Supersedes
 

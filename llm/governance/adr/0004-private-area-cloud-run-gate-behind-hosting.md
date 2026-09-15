@@ -12,7 +12,8 @@ the run rate must stay within a $5 budget (§8, §12.6).
 ## Decision
 
 1. **Gate.** One FastAPI service, `hub-gate`, on Cloud Run in `us-east1`
-   (minimum 0, maximum 3 instances), reached through Firebase Hosting rewrites
+   (minimum 0 instances, design doc §6; maximum 3, orchestration brief §4
+   Phase 3), reached through Firebase Hosting rewrites
    for `/p/**`, `/s/**`, `/session` and `/share/**` (§6, §8).
 2. **Sessions.** Firebase Auth (Google and email-link sign-in) issues an ID
    token; `POST /session` verifies it with the Firebase Admin SDK and mints a
@@ -34,10 +35,14 @@ three tiers, including anonymous per-link sharing.
 
 ### Identity-Aware Proxy (IAP)
 
-No authentication code to own. But IAP requires an external HTTPS load
-balancer, whose standing cost alone exceeds the $5 budget; it has no notion of
-an anonymous, expiring, single-document share link; and it moves the private
-area off the Hosting-served domain.
+No authentication code to own. IAP can be enabled directly on a Cloud Run
+service with no load balancer to provision (Google Cloud, "Configure IAP for
+Cloud Run"), so cost is not the reason to reject it; only the older
+load-balancer setup carries a standing forwarding-rule charge (about $18 a
+month, over the $5 budget). It is rejected because it admits only
+authenticated principals, so it cannot provide §7's Shared tier: an anonymous,
+expiring, single-document link. Whether an IAP-protected service can sit
+behind a Firebase Hosting rewrite is unverified.
 
 ### Allowlist only, without share links
 
@@ -62,16 +67,22 @@ account. §10 Q3 keeps this alternative open for the owner.
 ### Risks
 
 - **Firebase Hosting forwards only the cookie named `__session`** to a Cloud Run
-  rewrite and strips all others. The gate's session cookie must use that name,
-  or sessions silently fail behind Hosting while working when the service is
-  called directly. This is a binding constraint on Phase 3.
+  rewrite and strips all others (Firebase, "Manage cache behavior"). The gate's
+  session cookie must use that name, or sessions silently fail behind Hosting
+  while working when the service is called directly. This is a binding
+  constraint on Phase 3.
 - **The invoker is `allUsers`** because authentication is at the application
   level (§8), so the service's `*.run.app` URL is reachable without going
   through Hosting. Every check must hold on direct requests; nothing may rely on
   a header or path shape that only Hosting adds.
-- **CDN caching of private responses.** Hosting caches rewrite responses unless
-  told not to; `Cache-Control: private, no-store` is required on every private
-  and share response, and a regression here leaks content to other visitors.
+- **CDN caching of private responses.** Firebase Hosting marks dynamic
+  (rewrite) responses `Cache-Control: private` by default and varies on
+  `Cookie` and `Authorization` (Firebase, "Manage cache behavior"), so the CDN
+  caches a gate response only if the gate itself sends `public` or `s-maxage`.
+  The risk is a framework or file-serving default that does. Every `/p/**` and
+  `/s/**` response sets `Cache-Control: private, no-store` (§6), and a test
+  asserts that none carries `public` or `s-maxage`; a regression leaks private
+  content to other visitors.
 
 ## Impacted Areas
 
@@ -89,10 +100,12 @@ account. §10 Q3 keeps this alternative open for the owner.
 ## Related Documents
 
 - `llm/specs/2026-09-10-research-hub-design.md` §3, §6, §7, §8, §10 (Q3, Q4), §12.4, §12.6
+- `llm/plans/2026-09-10-research-hub-orchestration-brief.md` §4 Phase 3 (instance limit)
 
 ## Related Issues / PRs
 
 - #7 — hub-000: Adopt agentic-governance and record hub design
+- PR #9 — Phase 0; merging it accepts this ADR
 
 ## Supersedes
 

@@ -24,7 +24,9 @@ entire interface (§4).
    `contract/manifest.schema.json`, uploads to
    `gs://<content-bucket>/sources/<source>/` using Workload Identity
    Federation, and fires `repository_dispatch` (`event_type: publish`) at the
-   hub.
+   hub (design doc §4). **The dispatch step is conditional:** as written it
+   contradicts Decision 2 (see Risks), and it is not built until a follow-up
+   ADR settles how a publish reaches the hub.
 2. Each satellite has its own service account, scoped by IAM conditions to its
    own bucket prefix. No satellite has write access to the hub repository.
 3. The hub build syncs the bucket, then builds. The manifest schema is mirrored
@@ -74,14 +76,24 @@ release shape (violates §3). Rebuilds still need polling.
 
 ### Risks
 
-- **The dispatch credential is unspecified.** `repository_dispatch` is a GitHub
-  API call and needs a GitHub-side credential; a GCP service account cannot
-  hold GitHub permissions, although the brief assigns "dispatch permission" to
-  satellite service accounts. A fine-grained personal access token stored in
-  each satellite would be a long-lived credential (domain review question 2).
-  A GitHub App installation token, or the publish action's own token scoped
-  to dispatch only, avoids that. It must be decided before Phase 2
-  implementation — ADR candidate.
+- **Decision 1's dispatch step contradicts Decision 2 as written.** GitHub's
+  "Create a repository dispatch event" endpoint requires a token with
+  **Contents: write** on the target repository (a fine-grained personal access
+  token or a GitHub App installation token; the `repo` scope for a classic
+  token), and a workflow's own `GITHUB_TOKEN` cannot call another repository at
+  all. Any credential a satellite holds to fire the dispatch can therefore write
+  to `website`, which breaks Decision 2 and principle 3; a token or App private
+  key stored in a satellite is also a long-lived secret (domain review
+  question 2). A GCP service account cannot hold GitHub permissions, so the
+  brief's "dispatch permission for satellite service accounts" does not exist
+  either. The follow-up ADR must satisfy one constraint: **no satellite holds
+  any GitHub credential for `website`.** Candidate mechanisms: a Cloud Storage
+  object-finalize notification consumed by a hub-owned component that alone
+  holds a GitHub credential; or a scheduled hub workflow that detects new
+  manifest generations in the bucket. Design doc §3 and §4 carry the same
+  contradiction; that is routed to the owner. Sources: GitHub REST API, "Create
+  a repository dispatch event" (Contents: write); GitHub Docs,
+  "GITHUB_TOKEN" (token scoped to its own repository).
 - A malformed or malicious manifest. Mitigation: validation in the action and
   again in the hub build; `slug` is unique within `source`; `path` is relative
   to `dist/` and must not escape it.
@@ -106,6 +118,7 @@ release shape (violates §3). Rebuilds still need polling.
 ## Related Issues / PRs
 
 - #7 — hub-000: Adopt agentic-governance and record hub design
+- PR #9 — Phase 0; merging it accepts this ADR
 
 ## Supersedes
 
