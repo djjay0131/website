@@ -15,11 +15,10 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 0 — Establish. RECONCILING.** Draft **PR #9** is open. The Chief
-Reviewer returned **Request Changes** (4 must-fix, 9 should-fix, 9 notes); the
-Phase 0 Governance Audit is **COMPLIANT** with should-fix findings. Incident A1
-is remediated (residual owner action outside this repository). Waiting on the
-Chief Product Officer's roadmap amendments.
+**Phase 0 — Establish. RECONCILED.** Every Chief Reviewer finding is
+dispositioned (PR #9 body). Incident A1 is remediated, with one owner action
+outstanding outside this repository. Remaining: confirm CI green on the final
+commit, mark PR #9 ready, and stop at **Checkpoint 1**.
 
 ## Done
 
@@ -63,11 +62,15 @@ Chief Product Officer's roadmap amendments.
       (`f4a32e9`). Issue #7 no longer carries the billing account ID (A16).
 - [x] Chief Reviewer report committed (one commit SHA redacted, A10) and posted
       to PR #9.
+- [x] **Chief Product Officer amendments** integrated for A2, A7, A9, A10, A17,
+      A18, A19 — verified: only its two files changed, 137 checkboxes (A7 added one),
+      all unchecked, no machine paths, governance checks 4/4 PASS. Left unchanged by
+      decision: five factual mentions of the handoff branch or tarball (scope and
+      history, no SHA), and three Q5 lines that remain accurate.
 
 ## In flight
 
-- **Chief Product Officer** — amending the roadmap and its handoff for routed
-  findings A2, A7, A9, A10, A17, A18, A19.
+Nothing.
 
 ## Blocked
 
@@ -97,12 +100,9 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-1. Integrate the CPO's amendments after checking them against the routed findings;
-   commit the roadmap and handoff.
-2. A8: relabel PR #9 `gov-L3` (the reviewer's upward escalation; only the owner
-   may move it back down) and add `priority-high`, `adr` (A20).
-3. A4: bring the PR body current (roadmap, review, dispositions, K1–K13, A1).
-4. Mark PR #9 ready. **Checkpoint 1 — STOP.**
+1. Confirm `governance-checks` and `build` green on the final commit of PR #9.
+2. Mark PR #9 ready; status label `in-progress` → `needs-review`.
+3. **Checkpoint 1 — STOP.** Post the checkpoint report to PR #9 and the terminal.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 

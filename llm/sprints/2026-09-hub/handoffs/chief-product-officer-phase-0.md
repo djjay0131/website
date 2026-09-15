@@ -1,6 +1,6 @@
 # Handoff: Chief Product Officer — Phase 0 Roadmap
 
-Status: Complete (awaiting Lead Architect verification)
+Status: Review
 Last updated: 2026-09-14
 Owner: Chief Product Officer
 Contract: `llm/sprints/2026-09-hub/contracts/chief-product-officer-phase-0.md`
@@ -75,7 +75,7 @@ Inside the brief:
 
 Brief vs platform behavior:
 
-12. §4 says Hosting tolerates rewrites to a Cloud Run service that does not exist. Public reports indicate the Hosting API rejects that deploy ("HTTP Error: 400, Cloud Run service X does not exist in region Y"). If they are right, Checkpoint 2 fails as briefed. This is unverified in this project; the Phase 1 infra contract should test it.
+12. §4 says Hosting tolerates rewrites to a Cloud Run service that does not exist. The Firebase Hosting REST v1beta1 `CloudRunRewrite` reference says the request fails if the Cloud Run service does not exist when the Hosting configuration is set or updated. Checkpoint 2 therefore fails as briefed.
 
 Inside the design doc (defects in a file I do not own; reported, not fixed):
 
@@ -118,7 +118,7 @@ For the Lead Architect and the owner at Checkpoint 1. These are recommendations,
 ## Risks
 
 - **Two hosts, one stale.** From Checkpoint 2 until Phase 6, the old URL may serve a frozen site while `cusati.us` updates. Search engines see duplicate content, and visitors on inbound links see old CV data (Recommendation 4).
-- **Phase 1 deploy may fail as briefed.** A Hosting rewrite to the Cloud Run service `hub-gate`, which does not yet exist, is reported to be rejected at deploy (item 12). Source: firebase-talk thread "Error: HTTP Error: 400, Cloud Run service X does not exist in region Y in this project." (https://groups.google.com/g/firebase-talk/c/T57aJLhVkOg), and firebase-tools issue #1444 (https://github.com/firebase/firebase-tools/issues/1444).
+- **Phase 1 deploy fails as briefed.** A Hosting rewrite to the Cloud Run service `hub-gate`, which does not yet exist, is rejected at deploy (item 12). Source: Firebase Hosting REST v1beta1 `CloudRunRewrite` reference (https://firebase.google.com/docs/reference/hosting/rest/v1beta1/sites.versions): "If the Cloud Run service does not exist when setting or updating your Firebase Hosting configuration, then the request fails."
 - **The roadmap may be read as approval for Phases 4–6.** Assumption R-A3 states otherwise, but a reader skimming checkboxes may miss it.
 - **Evidence gaps for L0 flips.** Owner-run steps leave no diff. If `STATE.md` does not record evidence per criterion at each checkpoint, the auditor cannot confirm a flip "verifiably complete via merged work".
 - **Overtrust in the leak check.** It matches slugs and paths (ADR-0005). The Phase 3 and Phase 6 criteria extend it to titles and derived outputs, but "check passes" can still be misread as "no leak".

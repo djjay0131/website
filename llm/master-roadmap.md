@@ -27,12 +27,7 @@ re-decide, add, or cut scope. The design document binds each phase through §10
   satisfies it has merged, or for owner-run steps (`terraform apply`, DNS,
   member seeding), after the Lead Architect records the result at the
   checkpoint in `llm/sprints/2026-09-hub/STATE.md`.
-- A checkbox flip is L0 bookkeeping. This path is on the L0 allowlist as
-  `checkbox-only` (`llm/governance/governance-delta.md` §L0 Path Allowlist), so
-  a flip PR changes the `[ ]` toggle and nothing else. It does not change the
-  "Last updated" line either.
-- Any other edit to this file is semantic (L1) and takes human review. That
-  includes adding, removing, or rewording an item, or recording a §10 answer.
+- Checkbox flips and every other edit to this file follow agentic-governance `llm/governance/l0-fast-track.md` §L0 Path Allowlist.
 
 ## Assumptions
 
@@ -94,7 +89,7 @@ listed:
 - [ ] The governance check with `--layout` passes: the `governance-checks` CI job is green on the Phase 0 PR
 - [ ] The delta's Project Principles match design doc §12 word for word, and the delta names the design doc as design authority
 - [ ] `llm/governance/adr/README.md` indexes ADRs 0001–0005, and each index status matches its file (the `adr-index` check passes)
-- [ ] Each of ADRs 0001–0005 has context, decision, alternatives, consequences, a status, and links to design doc sections (canon Definition of Done §ADR Work)
+- [ ] Each of ADRs 0001–0005 has context, decision, alternatives, consequences, a status, and links to design doc sections (canon Definition of Done §ADR Work; links to design doc sections per brief §4 Phase 0 step 5)
 - [ ] The committed design doc is byte-identical to the copy on `handoff/research-hub`
 - [ ] No `phd-milestones` tarball exists anywhere in the PR branch's tree
 - [ ] This roadmap has one section per milestone label, `phase-0-establish` through `phase-6-polish`, and each label exists on the GitHub repository
@@ -139,16 +134,16 @@ explicit go.
 - [ ] GitHub Actions deploy to Firebase Hosting on push to `main` (§9, §11)
 - [ ] Design tokens in `site/src/styles/tokens.css`, light and dark (§5)
 - [ ] Layouts (base, section index, item page) and section shells for `research`, `projects`, `writing`, `cv`, `phd` (§4, §11; brief §4)
-- [ ] A redirect map from every old `/website/...` route to its new path (ADR-0001). It is recorded here and served in Phase 6.
+- [ ] A redirect map from every route the current build serves under `/website/`, including `/research/**` and the existing Astro `redirects`, to its new path (ADR-0001). It is recorded here and served in Phase 6.
 - [ ] The hourly `cv` fingerprint check is repointed from the GitHub Pages URL to the new host (ADR-0001)
 - [ ] The infra handoff states what `terraform apply` creates, the estimated cost, and the manual steps that remain (brief §4)
 
 ### Acceptance criteria
 
 - [ ] `https://cusati.us/` serves the site over HTTPS from Firebase Hosting with a valid certificate
-- [ ] Each smoke-test route in the current `build.yml` returns HTTP 200 at `https://cusati.us`: `/`, `/resumes/`, `/cv/academic`, `/cv/research-professional`, `/papers/`, `/pdfs/academic.pdf`, `/projects/`
+- [ ] Every route the current build serves returns HTTP 200 at `https://cusati.us` under base path `/`: the `build.yml` smoke-test routes (`/`, `/resumes/`, `/cv/academic`, `/cv/research-professional`, `/papers/`, `/pdfs/academic.pdf`, `/projects/`) and every `/research/**` page; each existing Astro `redirects` source forwards to its target under `/`
 - [ ] `/cv/academic` and `/papers/` on `cusati.us` return bodies of at least 500 bytes (the existing smoke check)
-- [ ] The built `site/dist-public` has no link or asset reference under `/website/`
+- [ ] The built `site/dist-public` has no link, asset reference or redirect target under `/website/`, including the hardcoded `/website/research/soa-agentic-se/agentic-harnesses*` targets in the existing Astro `redirects`
 - [ ] `djjay0131.github.io/website/` still serves the site, since Pages is retired only in Phase 6 (ADR-0001)
 - [ ] The CV on `cusati.us` matches the latest `cv` release, and the hourly fingerprint check reads the new host's build info
 - [ ] `git log --follow` on a moved file under `site/src/` shows its history from before the move
@@ -160,7 +155,7 @@ explicit go.
 - [ ] Rendered pages use Spectral, IBM Plex Sans and IBM Plex Mono with the `#0F5C5A` petrol accent, and switch between light and dark themes (§5)
 - [ ] All five section shells exist, and the public navigation has no link to `phd` (brief §4)
 - [ ] The GCP project belongs to the personal account, and its project id is a Terraform variable (ADR-0001)
-- [ ] The redirect map covers every smoke-test route listed above
+- [ ] The redirect map covers every route the current build serves, including `/research/**` and the existing Astro `redirects`, not only the smoke-test routes
 
 ### Not in this phase
 
@@ -177,7 +172,7 @@ explicit go.
 - Checkpoint 1 (owner approval and merge of Phase 0)
 - §10 Q1: answered, `cusati.us`
 - §10 Q2: answered, a new GCP project with intended id `cusati-hub`. Blaze confirmation is not yet on the record, and the brief makes enabling Blaze an owner step at Checkpoint 2.
-- §10 Q5: proposed in ADR-0001 (`site/` subdirectory), pending owner approval at Checkpoint 1
+- §10 Q5 (`site/` subdirectory): Proposed in ADR-0001; approved by merging PR #9
 
 ### Closing checkpoint
 
@@ -268,9 +263,10 @@ that the CV appears.
 - [ ] A signed-in account that is not on the allowlist gets the "not shared with you" page and no private content (§6)
 - [ ] The same signed-out and non-member requests, sent straight to the `hub-gate` `*.run.app` URL, are refused the same way (ADR-0004)
 - [ ] A session minted through `cusati.us` persists across page loads served through Hosting (ADR-0004 `__session` constraint)
-- [ ] Every response under `/p/` carries `Cache-Control: private, no-store` (§6)
+- [ ] Every response under `/p/` carries `Cache-Control: private, no-store` (§6). Firebase Hosting marks rewrite responses `private` by default, and its CDN caches a gate response only if the gate itself sends `public` or `s-maxage` (ADR-0004).
+- [ ] A gate test asserts that no `/p/**` or `/s/**` response carries `public` or `s-maxage` in `Cache-Control` (ADR-0004)
 - [ ] The gate pytest suite passes in CI and covers session mint and verify, non-member rejection, and path-traversal rejection on `/p/` (§6)
-- [ ] The leak check runs on every deploy, and a deliberate test run shows it failing the build when a private slug appears under `site/dist-public` (§12.1)
+- [ ] The leak check runs on every deploy, and a deliberate test run shows it failing the build when a private slug appears in any path or file content under `site/dist-public` (§12.1)
 - [ ] The bucket IAM test runs on every deploy and fails if the private bucket grants public access or any reader other than the gate's service account. An anonymous request for a private object is refused (§12.1).
 - [ ] No page on the public site lists, links or names a private item, and private navigation exists only in the private build (ADR-0005)
 - [ ] The gate's service account can read only the private bucket and Firestore (brief §4; ADR-0004)
@@ -322,7 +318,7 @@ checkpoint the brief defines.
 - [ ] A revoked link and an expired link are both refused, shown by tests (§6)
 - [ ] Path-traversal requests under `/s/` are refused, shown by test (§6)
 - [ ] A member without `role: owner` cannot mint or revoke a share (§6)
-- [ ] Every share response carries `Cache-Control: private, no-store` (ADR-0004)
+- [ ] Every share response carries `Cache-Control: private, no-store`. Firebase Hosting marks rewrite responses `private` by default, and its CDN caches a gate response only if the gate itself sends `public` or `s-maxage` (ADR-0004).
 - [ ] The owner can see active shares on the Shares page and revoke one there
 
 ### Not in this phase
@@ -436,7 +432,7 @@ Only the owner answers these. Recording an answer here is an L1 edit.
 | Q2 | GCP project id; Blaze confirmed | Phase 1 infra | Answered: new project, intended id `cusati-hub`, personal account (ADR-0001). Blaze confirmation not yet on the record. |
 | Q3 | Share links wanted, or cut | Phase 4 | Open |
 | Q4 | Initial members to seed | Phase 3 | Open |
-| Q5 | `site/` subdirectory or root layout | Phase 1 | Proposed in ADR-0001 (`site/` subdirectory); owner approves at Checkpoint 1 |
+| Q5 | `site/` subdirectory or root layout | Phase 1 | Proposed in ADR-0001 (`site/` subdirectory); approved by merging PR #9 |
 | Q6 | Order of `agentic-kg` and `construction-ai-proposal` | Phase 5 | Open |
 
 ### Sequencing disagreements between the brief and design doc §11
@@ -445,7 +441,7 @@ The design document wins (R-A1). Each of these is for the owner or the Chief
 Architect to reconcile. Details are in the CPO Phase 0 handoff.
 
 - **O1.** Brief §3–§4 provisions the content bucket, the private bucket and Artifact Registry in Phase 1. §11 places the content bucket in Phase 2 and the private bucket in Phase 3.
-- **O2.** Brief §4 has Phase 1 ship `firebase.json` with all four gate rewrites. §11 places the `/p/**` rewrite in Phase 3, and share links, with their rewrite paths, in Phase 4. Also, Firebase Hosting is reported to reject a deploy whose rewrite names a Cloud Run service that does not exist, which contradicts the brief's "Hosting tolerates this".
+- **O2.** Brief §4 has Phase 1 ship `firebase.json` with all four gate rewrites. §11 places the `/p/**` rewrite in Phase 3, and share links, with their rewrite paths, in Phase 4. Also, Firebase Hosting rejects a deploy whose rewrite names a Cloud Run service that does not exist, which contradicts the brief's "Hosting tolerates this".
 - **O3.** Brief §4 has the Phase 3 gate implement `POST /share`, `DELETE /share/{token}` and `GET /s/{token}/{path}`. §11 places share links in Phase 4, and §10 Q3 may cut them.
 - **O4.** Brief §4 adds a stubbed `repository_dispatch` trigger to `build.yml` in Phase 1. §11 places the dispatch rebuild in Phase 2.
 - **O5.** §11 Phase 4 names share "list", but §6 defines no list route and the brief's route list has none.
