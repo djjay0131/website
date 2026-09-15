@@ -73,28 +73,28 @@ listed:
 
 ### Scope
 
-- [ ] Issue `hub-000` (#7) opened, declaring Mode 3 and level L2 (brief §4)
-- [ ] Branch `gov/establish-hub` cut from `main`, with the design doc and brief brought across and the `phd-milestones` tarball kept out of the tree (brief §4)
-- [ ] `/governance:establish` run on `website` (§11)
-- [ ] Governance delta written, with mission, design authority, principles, domain review questions, check command, platform enforcement reality, steward status and related repos (§11; brief §4)
-- [ ] Governance checks wired into CI (brief §4)
-- [ ] ADRs 0001–0005 written, with index (§9, §11)
-- [ ] Design doc committed at `llm/specs/2026-09-10-research-hub-design.md` (§11)
-- [ ] Master roadmap written (this document) (§11)
-- [ ] Orchestration state written to `llm/sprints/2026-09-hub/STATE.md` (brief §0)
-- [ ] Draft PR opened, reviewed by the Chief Reviewer, and marked ready (brief §4)
+- [x] Issue `hub-000` (#7) opened, declaring Mode 3 and level L2 (brief §4)
+- [x] Branch `gov/establish-hub` cut from `main`, with the design doc and brief brought across and the `phd-milestones` tarball kept out of the tree (brief §4)
+- [x] `/governance:establish` run on `website` (§11)
+- [x] Governance delta written, with mission, design authority, principles, domain review questions, check command, platform enforcement reality, steward status and related repos (§11; brief §4)
+- [x] Governance checks wired into CI (brief §4)
+- [x] ADRs 0001–0005 written, with index (§9, §11)
+- [x] Design doc committed at `llm/specs/2026-09-10-research-hub-design.md` (§11)
+- [x] Master roadmap written (this document) (§11)
+- [x] Orchestration state written to `llm/sprints/2026-09-hub/STATE.md` (brief §0)
+- [x] Draft PR opened, reviewed by the Chief Reviewer, and marked ready (brief §4)
 
 ### Acceptance criteria
 
-- [ ] The governance check with `--layout` passes: the `governance-checks` CI job is green on the Phase 0 PR
-- [ ] The delta's Project Principles match design doc §12 word for word, and the delta names the design doc as design authority
-- [ ] `llm/governance/adr/README.md` indexes ADRs 0001–0005, and each index status matches its file (the `adr-index` check passes)
-- [ ] Each of ADRs 0001–0005 has context, decision, alternatives, consequences, a status, and links to design doc sections (canon Definition of Done §ADR Work; links to design doc sections per brief §4 Phase 0 step 5)
-- [ ] The committed design doc is byte-identical to the copy on `handoff/research-hub`
-- [ ] No `phd-milestones` tarball exists anywhere in the PR branch's tree
-- [ ] This roadmap has one section per milestone label, `phase-0-establish` through `phase-6-polish`, and each label exists on the GitHub repository
+- [x] The governance check with `--layout` passes: the `governance-checks` CI job is green on the Phase 0 PR
+- [x] The delta's Project Principles match design doc §12 word for word, and the delta names the design doc as design authority
+- [x] `llm/governance/adr/README.md` indexes ADRs 0001–0005, and each index status matches its file (the `adr-index` check passes)
+- [x] Each of ADRs 0001–0005 has context, decision, alternatives, consequences, a status, and links to design doc sections (canon Definition of Done §ADR Work; links to design doc sections per brief §4 Phase 0 step 5)
+- [x] The committed design doc is byte-identical to the copy on `handoff/research-hub`
+- [x] No `phd-milestones` tarball exists anywhere in the PR branch's tree
+- [x] This roadmap has one section per milestone label, `phase-0-establish` through `phase-6-polish`, and each label exists on the GitHub repository
 - [ ] Branch protection on `main`, read through the GitHub API, matches the delta's §Platform Enforcement Reality
-- [ ] The Q1 and Q2 answers are on the record (ADR-0001, issue #7), and ADR-0001 states the Q5 proposal for owner approval
+- [x] The Q1 and Q2 answers are on the record (ADR-0001, issue #7), and ADR-0001 states the Q5 proposal for owner approval
 - [ ] The Chief Reviewer's review is recorded on the PR, and no agent merged it
 
 ### Not in this phase
