@@ -8,7 +8,9 @@ billing_account = "000000-000000-000000"
 
 # Defaults, shown for reference; uncomment only to change.
 # region                     = "us-east1"
-# domain                     = "cusati.us"
+# domain                     = "jason.cusati.us"        # canonical hub host (ADR-0006)
+# redirect_domains           = ["research.cusati.us"]   # 301 to domain
+# Never cusati.us or www.cusati.us: reserved for a family site (ADR-0006).
 # github_repository          = "djjay0131/website"
 # github_repository_id       = "1212933399"
 # github_repository_owner_id = "5666389"

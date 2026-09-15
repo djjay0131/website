@@ -14,10 +14,39 @@ variable "region" {
   default     = "us-east1"
 }
 
+# Hub hostnames (ADR-0006). The apex cusati.us and www.cusati.us are reserved for
+# a family site outside this project, and the zone's apex carries Google
+# Workspace mail. The validations below keep both out of the hub's Terraform.
 variable "domain" {
-  description = "Custom domain bound to the default Firebase Hosting site (design doc §10 Q1)."
+  description = "The canonical hub host, bound to the default Firebase Hosting site (ADR-0006: jason.cusati.us). Never the apex cusati.us or www.cusati.us, which are reserved for a family site."
   type        = string
-  default     = "cusati.us"
+  default     = "jason.cusati.us"
+
+  validation {
+    condition     = !contains(["cusati.us", "www.cusati.us"], lower(trimsuffix(var.domain, ".")))
+    error_message = "domain must not be cusati.us or www.cusati.us: the apex and www are reserved for a family site (ADR-0006)."
+  }
+}
+
+variable "redirect_domains" {
+  description = "Hostnames connected to the same Hosting site that answer with a 301 redirect to var.domain (ADR-0006: research.cusati.us). Connected rather than a bare CNAME, because Hosting issues certificates only for connected hostnames. Never the apex or www."
+  type        = list(string)
+  default     = ["research.cusati.us"]
+
+  validation {
+    condition     = !contains([for d in var.redirect_domains : lower(trimsuffix(d, "."))], lower(trimsuffix(var.domain, ".")))
+    error_message = "redirect_domains must not contain var.domain: the canonical host cannot redirect to itself."
+  }
+
+  validation {
+    condition     = alltrue([for d in var.redirect_domains : !contains(["cusati.us", "www.cusati.us"], lower(trimsuffix(d, ".")))])
+    error_message = "redirect_domains must not contain cusati.us or www.cusati.us: the apex and www are reserved for a family site (ADR-0006)."
+  }
+
+  validation {
+    condition     = length(distinct(var.redirect_domains)) == length(var.redirect_domains)
+    error_message = "redirect_domains must not list a hostname twice."
+  }
 }
 
 variable "billing_account" {

@@ -23,7 +23,9 @@ changed or read; no credential exists.
     the configuration, so a CI presence check and an apply-provenance rule back
     it up;
   - Firebase on the project, the default Hosting site (a postcondition requires
-    type `DEFAULT_SITE`), and `cusati.us` bound to it.
+    type `DEFAULT_SITE`), `jason.cusati.us` bound to it as the canonical host, and
+    `research.cusati.us` connected to the same site as a 301 redirect to it
+    (ADR-0006). The apex `cusati.us` and `www` are never bound.
 
   Outputs: the SEAM-4 values, the default Hosting URL, and the custom domain's
   DNS records and state. `infra/deploy-tools/` locks firebase-tools 15.30.1.
@@ -123,7 +125,7 @@ paths: no hits.
 
 ## What `terraform apply` creates
 
-Expected `Plan: 18 to add, 0 to change, 0 to destroy.`
+Expected `Plan: 19 to add, 0 to change, 0 to destroy.`
 
 | # | Address | What |
 |---|---|---|
@@ -137,7 +139,8 @@ Expected `Plan: 18 to add, 0 to change, 0 to destroy.`
 | 15 | `google_billing_budget.hub` | $5/month, this project only, thresholds 50/90/100% actual and 100% forecast |
 | 16 | `google_firebase_project.hub` | Firebase added to the project |
 | 17 | `google_firebase_hosting_site.default` | Default site, id = project id; postcondition: type `DEFAULT_SITE` |
-| 18 | `google_firebase_hosting_custom_domain.primary` | `cusati.us` on that site |
+| 18 | `google_firebase_hosting_custom_domain.primary` | `jason.cusati.us` (`var.domain`), the canonical host, on that site |
+| 19 | `google_firebase_hosting_custom_domain.redirect["research.cusati.us"]` | `research.cusati.us` on the same site, `redirect_target = "jason.cusati.us"` (HTTP 301) |
 
 Read, not created: `data.google_project.hub`.
 
@@ -419,7 +422,7 @@ the action pins by PR.
 | Creating the GCP project | Terraform could, but the contract and design doc §10 Q2 make it an owner input; it is a data source here so `destroy` can never delete it | Contract D1; §10 Q2 |
 | Linking billing / Blaze | Needs the project to exist and the owner's billing-account role; `google_project.billing_account` would require managing the project resource. Blaze is simply "a project with a billing account" | Contract D4; Firebase pricing page |
 | Uploading site content (versions, files, releases) | `google_firebase_hosting_version` / `_release` carry Hosting *config* (redirects, rewrites, headers) but no file upload; file hashes and uploads are firebase-tools' job | Provider docs for `google_firebase_hosting_version` and the Cloud Run example in `google_firebase_hosting_custom_domain`; design doc §8 ("Hosting is not fully Terraformable") |
-| DNS records at the registrar | cusati.us is not hosted in Cloud DNS; the registrar is outside Google Cloud. Terraform outputs the records instead | `google_firebase_hosting_custom_domain.required_dns_updates` |
+| DNS records at the registrar | The `cusati.us` zone, which holds `jason.` and `research.`, is not hosted in Cloud DNS; the registrar is outside Google Cloud. The zone's apex also carries Google Workspace mail, which the hub must not touch (ADR-0006). Terraform outputs the records for the two hub hostnames instead | `google_firebase_hosting_custom_domain.required_dns_updates` |
 | Release storage retention (number of releases kept) | Console setting only ("Release storage settings"); no provider argument found | Firebase, "Manage live & preview channels, releases, and versions" |
 | Bootstrap APIs and the ADC quota project | Terraform's own API calls need them before it can run | google_billing_budget docs (user ADC needs `billing_project` + override); Firebase Terraform guide (no-override provider) |
 | Firebase Terms of Service acceptance (if never accepted on the account) | A one-time account action in the Firebase console | Assumption; see manual step 6 |
@@ -492,9 +495,9 @@ account (`gcloud auth list` shows it as active).
    `project_id` and `billing_account`. Then:
    - `terraform init`. Expected: `Reusing previous version of hashicorp/google … v8.2.0`,
      then `Terraform has been successfully initialized!`
-   - `terraform plan -out=tfplan`. Expected: `Plan: 18 to add, 0 to change, 0 to destroy.`
+   - `terraform plan -out=tfplan`. Expected: `Plan: 19 to add, 0 to change, 0 to destroy.`
      Review every resource against the table above.
-   - `terraform apply tfplan`. Expected: `Apply complete! Resources: 18 added, 0 changed, 0 destroyed.`
+   - `terraform apply tfplan`. Expected: `Apply complete! Resources: 19 added, 0 changed, 0 destroyed.`
    - Then `terraform plan` again. Expected: `No changes.` (roadmap §12.5
      criterion). If it shows only computed custom-domain state, run
      `terraform apply -refresh-only` and plan again.
@@ -526,19 +529,47 @@ account (`gcloud auth list` shows it as active).
      **Release storage settings** → keep, for example, 20 releases. Expected:
      older releases are scheduled for deletion, oldest first. This bounds storage
      and keeps enough history for rollback.
-7. **DNS records at the registrar for cusati.us.**
+7. **DNS records at the registrar for `jason.cusati.us` and `research.cusati.us`**
+   (ADR-0006).
+   **Do not touch the apex `cusati.us`, `www.cusati.us`, the MX records, or any
+   existing TXT record.** The apex carries Google Workspace mail (MX) and a Google
+   site-verification TXT record, and the apex and `www` are reserved for a family
+   site. Hub records go only on the two hub hostnames.
+   - Before changing anything, save the apex's current records to compare against
+     at the end:
+     `dig +short MX cusati.us; dig +short TXT cusati.us; dig +short A cusati.us; dig +short CNAME www.cusati.us`.
    - Run `terraform output custom_domain_dns_records`. If it is empty, run
-     `terraform apply -refresh-only` first.
-   - At the registrar, add every record listed with `required_action = "ADD"`
-     (typically an `A` record for `cusati.us` and a `TXT` ownership record). Delete
-     every record listed as `REMOVE`, and any other `A`/`AAAA` records on the apex.
-     If the domain has `CAA` records, they must allow the issuer Hosting names.
-   - Verify: `dig +short A cusati.us` and `dig +short TXT cusati.us` match the
-     output.
+     `terraform apply -refresh-only` first. Each entry has these fields:
+     - `custom_domain`: the connected hostname the record is for,
+       `jason.cusati.us` or `research.cusati.us`;
+     - `domain_name`: the DNS name to set it on;
+     - `type`, `rdata` and `required_action`.
+   - At the registrar, for each entry, **exactly as output**: add the record when
+     `required_action = "ADD"`, and remove it when `"REMOVE"`. Expect records for
+     both hostnames, typically `A` and `TXT` records on each; use whatever the
+     output lists. Change no other record.
+   - **Stop, and change nothing,** if any entry would do one of these:
+     - set or remove a record on `cusati.us` or `www.cusati.us`;
+     - remove or replace an `MX` record;
+     - remove or replace a TXT record that already existed.
+
+     Raise it on issue #10 instead.
+   - If `dig +short CAA cusati.us` lists CAA records, they apply to both
+     subdomains. If they do not allow the certificate issuer Hosting uses, the
+     certificates will fail. Changing apex CAA records is an apex change, outside
+     this step: stop and decide it separately.
+   - Verify the hub hostnames match the output:
+     `dig +short A jason.cusati.us`, `dig +short TXT jason.cusati.us`,
+     `dig +short A research.cusati.us`, `dig +short TXT research.cusati.us`.
+   - Verify the apex is unchanged: the saved commands above print exactly what
+     they printed before.
    - After propagation (minutes, and up to 24 hours for ownership and the
      certificate), run `terraform apply -refresh-only` and then
-     `terraform output custom_domain_state`. Expected: `OWNERSHIP_ACTIVE`,
-     `HOST_ACTIVE`, `CERT_ACTIVE`.
+     `terraform output custom_domain_state`. Expected, for **each** of
+     `jason.cusati.us` and `research.cusati.us`:
+     - `ownership_state = "OWNERSHIP_ACTIVE"`, `host_state = "HOST_ACTIVE"` and
+       `cert_state = "CERT_ACTIVE"`;
+     - `research.cusati.us` also shows `redirect_target = "jason.cusati.us"`.
 8. **Set the GitHub Actions variables** (Settings → Secrets and variables →
    Actions → **Variables**; not secrets). With gh, from the repository:
    - `gh variable set GCP_PROJECT_ID --body "$(terraform -chdir=infra output -raw project_id)"`
@@ -547,9 +578,11 @@ account (`gcloud auth list` shows it as active).
 
    Expected: `gh variable list` shows all three. The provider value has the form
    `projects/<number>/locations/global/workloadIdentityPools/github-actions/providers/website`.
-   **Do not set `SITE_URL` yet.** Set it only after step 7 shows `CERT_ACTIVE`:
-   `gh variable set SITE_URL --body "https://cusati.us"`. From then on the smoke test
-   and the hourly fingerprint check use cusati.us.
+   **Do not set `SITE_URL` yet.** Set it only after step 7 shows `CERT_ACTIVE` for
+   `jason.cusati.us`:
+   `gh variable set SITE_URL --body "https://jason.cusati.us"`. From then on the
+   smoke test and the hourly fingerprint check use jason.cusati.us. Never set it
+   to `https://research.cusati.us`: that host only redirects.
 
    If `terraform output hosting_default_url` is not `https://<project>.web.app`,
    set `SITE_URL` to it until the domain is active.
@@ -562,11 +595,18 @@ account (`gcloud auth list` shows it as active).
      routes and both body sizes.
    - Verify by hand:
      - `curl -sI https://<project>.web.app/` returns `HTTP/2 200`.
-     - After `SITE_URL` is set, `curl -sI https://cusati.us/` returns `HTTP/2 200`,
-       and `curl -svo /dev/null https://cusati.us/ 2>&1 | grep -iE "subject:|issuer:"`
-       shows a valid certificate for cusati.us.
-     - `curl -s https://cusati.us/build-info.json` shows `built_from_sha` equal to
-       the merged commit and `cv_fingerprint` equal to the `check` job's value.
+     - After `SITE_URL` is set, `curl -sI https://jason.cusati.us/` returns
+       `HTTP/2 200`. `curl -svo /dev/null https://jason.cusati.us/ 2>&1 | grep -iE "subject:|issuer:"`
+       shows a valid certificate for jason.cusati.us.
+     - `curl -sI https://research.cusati.us/` returns `301` with
+       `Location: https://jason.cusati.us/` (curl prints HTTP/2 header names in
+       lower case). `curl -svo /dev/null https://research.cusati.us/ 2>&1 | grep -iE "subject:|issuer:"`
+       shows a valid certificate for research.cusati.us.
+     - `curl -s https://jason.cusati.us/build-info.json` shows `built_from_sha`
+       equal to the merged commit and `cv_fingerprint` equal to the `check` job's
+       value.
+     - The apex is unchanged: `dig +short MX cusati.us` and
+       `dig +short TXT cusati.us` still print what step 7 saved.
      - `curl -sI https://djjay0131.github.io/website/` still returns `200`.
      - Firebase console → Hosting → Release history shows the release message
        `<sha> (run <id>)`.
@@ -596,7 +636,9 @@ account (`gcloud auth list` shows it as active).
       `gh variable delete GCP_PROJECT_ID`. The Firebase jobs skip and Pages
       continues as before. Also `gh variable delete SITE_URL`, which points the
       fingerprint check back at Pages.
-    - Take cusati.us off Firebase: remove the step 7 records at the registrar.
+    - Take the hub hostnames off Firebase: remove the step 7 records for
+      `jason.cusati.us` and `research.cusati.us` at the registrar. Never touch the
+      apex, `www`, MX or existing TXT records (ADR-0006).
     - Infrastructure: remove named resources with a targeted destroy.
       1. `terraform plan -destroy -target=<address> [-target=<address> …] -out=rollback.tfplan`
       2. Read the plan. It must list only the named resources and their
@@ -614,8 +656,10 @@ account (`gcloud auth list` shows it as active).
       - `google_project_iam_member.hub_deploy_hosting_admin`,
         `google_project_iam_member.hub_deploy_api_keys_viewer`;
       - `google_service_account.hub_deploy` (its IAM members go with it);
-      - `google_firebase_hosting_custom_domain.primary` (takes cusati.us off
-        Firebase).
+      - `'google_firebase_hosting_custom_domain.redirect["research.cusati.us"]'`
+        (takes research.cusati.us off Firebase; quote it in the shell);
+      - `google_firebase_hosting_custom_domain.primary` (takes jason.cusati.us off
+        Firebase). The redirect domains reference it, so the plan includes them.
 
       Never target:
       - `google_billing_budget.hub`;
@@ -640,15 +684,16 @@ account (`gcloud auth list` shows it as active).
 | Scope: Terraform in `infra/` with provider, project, APIs, and variables for project id, region, domain | Met locally | `infra/*.tf`; validate passes |
 | Scope: WIF pool and provider for `djjay0131/website`, least-privilege deploy SA | Met locally | `infra/wif.tf`, `infra/deploy.tf` |
 | Scope: $5 budget with email alert | Met locally (config) | `infra/budget.tf` |
-| Scope: Firebase project and Hosting bound to `cusati.us` | Met locally (config); live at Checkpoint 2 | `infra/firebase.tf` |
+| Scope: Firebase project and Hosting bound to the hub host, `jason.cusati.us`, with `research.cusati.us` redirecting to it (ADR-0006) | Met locally (config); live at Checkpoint 2 | `infra/firebase.tf` |
 | Scope: Actions deploy to Firebase Hosting on push to `main` | Met locally (actionlint 0 errors); first run at Checkpoint 2 | `build.yml` `firebase-deploy` |
 | Scope: the hourly fingerprint check repointed | Met locally, activated when `SITE_URL` is set | `build.yml` `check` |
 | Scope: the handoff states what apply creates, cost, manual steps | Met | this file |
-| `https://cusati.us/` serves over HTTPS with a valid certificate | Checkpoint 2 | manual steps 7, 9 |
-| Every current route returns 200 on cusati.us | Checkpoint 2 | `firebase-smoke-test` (7 smoke routes; `/research/**` parity is the site stream's) |
+| `https://jason.cusati.us/` serves over HTTPS with a valid certificate (host per ADR-0006) | Checkpoint 2 | manual steps 7, 9 |
+| `https://research.cusati.us/` answers 301 to `https://jason.cusati.us/` (ADR-0006) | Checkpoint 2 | manual step 9 |
+| Every current route returns 200 on jason.cusati.us | Checkpoint 2 | `firebase-smoke-test` (7 smoke routes; `/research/**` parity is the site stream's) |
 | `/cv/academic`, `/papers/` bodies ≥ 500 bytes | Checkpoint 2 | `firebase-smoke-test` body check |
 | `djjay0131.github.io/website/` still serves | Met locally (Pages path unchanged, same smoke test; `deploy` needs only the Pages `build`, which has no Firebase step); confirmed at Checkpoint 2 | `build.yml` `build`, `deploy`, `smoke-test` |
-| CV on cusati.us matches the latest release; fingerprint check reads the new host | Checkpoint 2 | `check` reads `SITE_URL`; step 9 |
+| CV on jason.cusati.us matches the latest release; fingerprint check reads the new host | Checkpoint 2 | `check` reads `SITE_URL`; step 9 |
 | Every Phase 1 cloud resource is declared in `infra/`; `plan` shows no changes after apply | Declared locally; no-change plan at Checkpoint 2 | step 5 |
 | The manual steps Terraform cannot perform are written in the repository | Met | this file; `infra/README.md` |
 | The billing account has a $5 budget that emails the owner | Checkpoint 2 | `budget.tf`; the owner receives the first threshold email or sees the budget in the console |
@@ -658,7 +703,7 @@ account (`gcloud auth list` shows it as active).
 Definition of Done (canon §Implementation Work):
 
 - Approved issue: #10.
-- Design docs and ADRs: ADR-0001, ADR-0004, design doc.
+- Design docs and ADRs: ADR-0001, ADR-0004, ADR-0006, design doc.
 - PR review: pending, owned by the Lead Architect.
 - Validation: included above.
 - Documentation: `infra/README.md` and this handoff.
@@ -674,6 +719,10 @@ Definition of Done (canon §Implementation Work):
   committed.
 - The WIF surface: one repository, by immutable IDs and name; the deploy only
   from `refs/heads/main`; no `pull_request_target`.
+- Hostnames (ADR-0006): the hub binds only `jason.cusati.us` and
+  `research.cusati.us`. The apex, `www`, and the zone's MX and existing TXT
+  records (Google Workspace mail, site verification) are never changed.
+  `variables.tf` rejects the apex and `www`.
 - The deploy account can modify Hosting sites in the project, including create
   and delete, and read API key metadata through API Keys Viewer (Phase 1 creates
   no API keys). It holds nothing else.
@@ -685,7 +734,9 @@ Definition of Done (canon §Implementation Work):
 
 - The billing account's currency is USD. The budget's `currency_code` must match
   it, or apply fails.
-- The cusati.us registrar is outside Google Cloud DNS; records are added by hand.
+- The `cusati.us` zone is at a registrar outside Google Cloud DNS; the records for
+  `jason.` and `research.` are added by hand. The zone's apex carries Google
+  Workspace MX and a site-verification TXT record, which stay as they are.
 - New projects have Service Usage enabled or accept step 3; step 3 is idempotent.
 - The default Hosting site id equals the project id and is globally available.
   If it is not, set `hosting_site_id` to the project's real default site and set
@@ -706,9 +757,9 @@ Definition of Done (canon §Implementation Work):
 2. Protect a `firebase-hosting` GitHub environment later if a human approval
    gate on production deploys is wanted. Environments change the OIDC `sub` but
    not `ref`, so the WIF binding keeps working.
-3. Consider a `www.cusati.us` custom domain redirecting to the apex: one more
-   `google_firebase_hosting_custom_domain` with `redirect_target`. It is not in
-   the contract.
+3. Withdrawn by ADR-0006: a `www.cusati.us` redirect is not hub work, because the
+   apex and `www` are reserved for a family site. The same mechanism now serves
+   `research.cusati.us` (`google_firebase_hosting_custom_domain.redirect`).
 4. Make `budget-guard` a required status check on `main`, alongside
    `governance-checks`, so a pull request that removes the budget cannot merge.
    This is a branch-protection change, outside this contract.
@@ -776,7 +827,7 @@ Definition of Done (canon §Implementation Work):
   states change as Hosting reconciles, which could make `plan` noisy.
   Mitigation: `apply -refresh-only`. If a real diff persists, report it rather
   than adding `ignore_changes` blindly.
-- **R4 — One `SITE_URL` for two jobs.** Once `SITE_URL` points at cusati.us, the
+- **R4 — One `SITE_URL` for two jobs.** Once `SITE_URL` points at jason.cusati.us, the
   hourly skip compares against Firebase only. If a Pages deploy failed while
   Firebase succeeded, Pages can stay stale until the next push or cv change.
   Failures still open the tracking issue.
@@ -810,6 +861,13 @@ Definition of Done (canon §Implementation Work):
   `npm run check:smoke-routes`, which the site stream owns. If the script is
   missing or wrong, every build fails before upload, and so every deploy. That is
   loud, and Pages keeps its last deployment.
+- **R13 — Mail breakage at the DNS step** (ADR-0006). The `cusati.us` apex carries
+  Google Workspace MX and a site-verification TXT record. A registrar edit that
+  replaces apex records, or "cleans up" the zone, would break mail.
+  Mitigation: step 7 changes only the records Terraform outputs for the two hub
+  hostnames, stops on any apex, `www`, MX or existing TXT change, and compares
+  the apex before and after. Variable validation keeps the apex and `www` out of
+  Terraform.
 
 ## Seam issues
 
@@ -861,7 +919,8 @@ Definition of Done (canon §Implementation Work):
   `llm/sprints/2026-09-hub/contracts/phase-1-seams.md`
 - `llm/specs/2026-09-10-research-hub-design.md` §3, §8, §10, §11, §12
 - `llm/governance/adr/0001-promote-website-to-hub-on-firebase-hosting.md`,
-  `llm/governance/adr/0004-private-area-cloud-run-gate-behind-hosting.md`
+  `llm/governance/adr/0004-private-area-cloud-run-gate-behind-hosting.md`,
+  `llm/governance/adr/0006-hub-on-jason-cusati-us-subdomain.md`
 - `llm/master-roadmap.md` §phase-1-foundation
 - `infra/README.md`
 - External:
@@ -1465,3 +1524,273 @@ exit=0
   firebase-tools bump. The job fails loudly if it is missed.
 - The round 1 "Noticed outside this scope" item about `Status: Draft` is
   outdated: the Lead Architect has since set the Status line.
+
+## Remediation round 3 (ADR-0006 domain)
+
+Source: `llm/governance/adr/0006-hub-on-jason-cusati-us-subdomain.md` (Accepted,
+`20e9f41`), and the amendment note in the contract. Applied on `feat/foundation`
+before any apply. No git or gh mutation, no Terraform plan or apply, and no cloud
+read or change was made. Line numbers are as of this round. The earlier
+remediation sections above are historical and were left as written; the
+current-facing sections were updated.
+
+### Decision implemented
+
+- The canonical hub host is `jason.cusati.us`.
+- `research.cusati.us` is connected to the same Hosting site as a second custom
+  domain that 301-redirects to it.
+- The apex `cusati.us` and `www.cusati.us` are reserved for a family site. The
+  hub never binds them, and no hub step changes the apex, `www`, MX or existing
+  TXT records.
+
+### Changes
+
+- **`infra/variables.tf:17-50`**
+  - `domain` (lines 20-29): default `"jason.cusati.us"`, with a description
+    naming it the canonical hub host (ADR-0006). Its validation (line 25)
+    rejects `cusati.us` and `www.cusati.us`, case-insensitively and ignoring a
+    trailing dot.
+  - New `redirect_domains` (lines 31-50): `list(string)`, default
+    `["research.cusati.us"]`. Three validations:
+    - line 36 rejects `var.domain`. This is a cross-variable reference, which
+      Terraform 1.14 allows; it fired in the test below.
+    - line 41 rejects the apex and `www`;
+    - line 46 rejects duplicates.
+- **`infra/firebase.tf`**
+  - Header (lines 7-23): `primary` binds `var.domain`, and `redirect` connects
+    each redirect domain with a 301. It explains why a connected domain is used
+    rather than a bare CNAME, and states the apex/`www`/MX/TXT rule.
+  - New `google_firebase_hosting_custom_domain.redirect` (lines 67-80):
+    - `for_each = toset(var.redirect_domains)`, on the same project and site;
+    - `redirect_target = google_firebase_hosting_custom_domain.primary.custom_domain`
+      (equal to `var.domain`). The reference also orders creation after
+      `primary`;
+    - `wait_dns_verification = false`.
+  - `redirect_target` is confirmed in the google-beta 8.2.0 schema: optional
+    string, "If specified, Hosting will respond to requests against this
+    CustomDomain with an HTTP 301 code". `terraform validate` accepts the
+    resource.
+- **`infra/outputs.tf:38-76`**
+  - New `local.hosting_custom_domains` (lines 40-45): every connected hostname
+    mapped to its resource, merging `primary` (keyed by `var.domain`) with the
+    `redirect` instances.
+  - `custom_domain_dns_records` (lines 47-64): one flat, readable list across
+    all connected hostnames. Each entry carries `custom_domain`, the hostname the
+    record is for, plus `domain_name`, `type`, `rdata` and `required_action`. The
+    description says to change only these records, never the apex, `www`, MX or
+    existing TXT records.
+  - `custom_domain_state` (lines 66-76): now a map keyed by hostname, each with
+    `redirect_target` and ownership, host and certificate state. The old "means
+    cusati.us serves the site" description is gone.
+- **`infra/terraform.tfvars.example:11-13`**: `domain = "jason.cusati.us"`,
+  `redirect_domains = ["research.cusati.us"]`, and a line saying never the apex
+  or `www`.
+- **`infra/README.md`**
+  - intro (line 4) cites ADR-0006;
+  - module table `firebase.tf` row (line 26);
+  - manual items (line 33);
+  - variables `domain` and `redirect_domains` (lines 43-44);
+  - outputs (lines 61-62);
+  - new Guardrails bullet **Domains (ADR-0006)** (lines 105-114), stating the
+    apex/`www`/MX/TXT rule and the stop condition.
+- **`.github/workflows/build.yml:311`**: the comment now names the SEAM-1
+  default `https://jason.cusati.us`. There was no other occurrence of the old
+  host in `.github`, so nothing else changed there.
+- **Handoff, current-facing sections**
+  - Summary (lines 25-28).
+  - Apply table: `Plan: 19 to add` (line 128), row 18 `primary` =
+    `jason.cusati.us`, and new row 19 `redirect["research.cusati.us"]`
+    (lines 142-143).
+  - Not-Terraformable DNS row (line 425).
+  - Step 5 counts 19 (lines 498 and 500).
+  - **Step 7** (lines 532-572), rewritten:
+    - do not touch the apex, `www`, MX or existing TXT records;
+    - save the apex records first;
+    - apply each output entry exactly as listed for `jason.cusati.us` and
+      `research.cusati.us`;
+    - stop on any apex, `www`, MX or existing-TXT change, and treat apex CAA
+      records as out of scope;
+    - `dig` checks for both hostnames and an unchanged apex;
+    - per-hostname ACTIVE states, with `research.cusati.us` showing
+      `redirect_target`.
+  - **Step 8** (lines 581-585): `SITE_URL` = `https://jason.cusati.us`, set only
+    after its certificate is active; never `research.`.
+  - **Step 9** (lines 598-609): HTTPS checks on `jason.cusati.us`, and
+    `curl -sI https://research.cusati.us/` must return 301 with
+    `Location: https://jason.cusati.us/`; apex MX/TXT unchanged.
+  - Step 10 (lines 639-641 and 659-662): take the hub hostnames off Firebase;
+    both custom-domain addresses listed as targets.
+  - Acceptance rows (lines 687-696), including a new `research.cusati.us` 301
+    row.
+  - DoD ADR list (line 706), Data and security (line 722), Assumptions
+    (line 737).
+  - Recommendation 3, the `www` redirect, withdrawn by ADR-0006 (line 760).
+  - R4 (line 830), new R13 mail breakage (line 864), Related docs (line 923).
+
+### Round 3 validation (verbatim)
+
+From `infra/`, Windows `terraform.exe` v1.14.0:
+
+```text
+$ terraform fmt -check -recursive
+exit=0
+$ terraform init -backend=false
+Initializing provider plugins...
+- Reusing previous version of hashicorp/google-beta from the dependency lock file
+- Reusing previous version of hashicorp/google from the dependency lock file
+- Using previously-installed hashicorp/google-beta v8.2.0
+- Using previously-installed hashicorp/google v8.2.0
+
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+exit=0
+$ terraform validate
+Success! The configuration is valid.
+
+exit=0
+```
+
+actionlint:
+
+```text
+$ actionlint -version
+1.7.12
+installed by building from source
+built with go1.26.1 compiler for linux/amd64
+$ actionlint -verbose .github/workflows/build.yml
+verbose: Linting .github/workflows/build.yml
+verbose: Using project at /repo
+verbose: Found 0 parse errors in 3 ms for .github/workflows/build.yml
+verbose: Found total 0 errors in 123 ms for .github/workflows/build.yml
+exit=0
+```
+
+Variable-validation behaviour. `terraform console` ran in container
+`hashicorp/terraform:1.14.0` on a scratch directory holding only a copy of
+`variables.tf`: no providers, no resources, no plan. The console exits 0 even
+when it prints variable diagnostics, so each `Error: Invalid value for variable`
+line is the evidence. `plan` and `apply` treat these as errors; not run, by
+contract.
+
+```text
+Terraform v1.14.0
+### defaults (expect OK)
+  "{\"domain\":\"jason.cusati.us\",\"redirect_domains\":[\"research.cusati.us\"]}"
+  exit=0
+### redirect_domains contains domain (expect error)
+  Error: Invalid value for variable
+    on variables.tf line 31:
+    31: variable "redirect_domains" {
+      ├────────────────
+      │ var.domain is "jason.cusati.us"
+      │ var.redirect_domains is list of string with 2 elements
+  redirect_domains must not contain var.domain: the canonical host cannot
+  redirect to itself.
+  This was checked by the validation rule at variables.tf:36,3-13.
+  Warning: Due to the problems above, some expressions may produce unexpected results.
+  "{\"domain\":\"jason.cusati.us\",\"redirect_domains\":[\"research.cusati.us\",\"jason.cusati.us\"]}"
+  exit=0
+### domain = cusati.us (expect error)
+  Error: Invalid value for variable
+    on variables.tf line 20:
+    20: variable "domain" {
+      ├────────────────
+      │ var.domain is "cusati.us"
+  domain must not be cusati.us or www.cusati.us: the apex and www are reserved
+  for a family site (ADR-0006).
+  This was checked by the validation rule at variables.tf:25,3-13.
+  Warning: Due to the problems above, some expressions may produce unexpected results.
+  "{\"domain\":\"cusati.us\",\"redirect_domains\":[\"research.cusati.us\"]}"
+  exit=0
+### redirect_domains contains www.cusati.us (expect error)
+  Error: Invalid value for variable
+    on variables.tf line 31:
+    31: variable "redirect_domains" {
+      ├────────────────
+      │ var.redirect_domains is list of string with 1 element
+  redirect_domains must not contain cusati.us or www.cusati.us: the apex and
+  www are reserved for a family site (ADR-0006).
+  This was checked by the validation rule at variables.tf:41,3-13.
+  Warning: Due to the problems above, some expressions may produce unexpected results.
+  "{\"domain\":\"jason.cusati.us\",\"redirect_domains\":[\"www.cusati.us\"]}"
+  exit=0
+### duplicate redirect domain (expect error)
+  Error: Invalid value for variable
+    on variables.tf line 31:
+    31: variable "redirect_domains" {
+      ├────────────────
+      │ var.redirect_domains is list of string with 2 elements
+  redirect_domains must not list a hostname twice.
+  This was checked by the validation rule at variables.tf:46,3-13.
+  Warning: Due to the problems above, some expressions may produce unexpected results.
+  "{\"domain\":\"jason.cusati.us\",\"redirect_domains\":[\"research.cusati.us\",\"research.cusati.us\"]}"
+  exit=0
+```
+
+`git grep -n "cusati\.us" -- infra .github` (tracked files, working tree; the
+`--untracked` variant printed the same 22 hits; ignored `.terraform/` and
+`node_modules/` have none):
+
+```text
+.github/workflows/build.yml:311:      # SEAM-1 defaults (https://jason.cusati.us, base /), so SITE_URL and SITE_BASE
+infra/README.md:26:| `firebase.tf` | … `var.domain`, the canonical host `jason.cusati.us`, is bound to the site, and `research.cusati.us` is connected to the same site with a 301 redirect to it (`redirect_target`) |
+infra/README.md:43:| `domain` | no | `jason.cusati.us` | The canonical hub host, bound to the default Hosting site (ADR-0006). Validation rejects `cusati.us` and `www.cusati.us` |
+infra/README.md:44:| `redirect_domains` | no | `["research.cusati.us"]` | Hostnames connected to the same site that 301-redirect to `domain`. Validation rejects `domain` itself, the apex, `www`, and duplicates |
+infra/README.md:105:- **Domains (ADR-0006).** The hub is `jason.cusati.us`. `research.cusati.us`
+infra/README.md:107:  - `cusati.us` and `www.cusati.us` are reserved for a family site outside this
+infra/firebase.tf:8:#   canonical hub host (jason.cusati.us, ADR-0006), to that site.
+infra/firebase.tf:10:#   (research.cusati.us), connected to the same site and answering every request
+infra/firebase.tf:15:# Never bound here (ADR-0006): the apex cusati.us and www.cusati.us are reserved
+infra/firebase.tf:67:# research.cusati.us (and any other redirect domain): connected to the same site,
+infra/outputs.tf:48:  description = "DNS records to add … Change only these records: never the apex cusati.us, www.cusati.us, MX or existing TXT records (ADR-0006). …"
+infra/terraform.tfvars.example:11:# domain                     = "jason.cusati.us"        # canonical hub host (ADR-0006)
+infra/terraform.tfvars.example:12:# redirect_domains           = ["research.cusati.us"]   # 301 to domain
+infra/terraform.tfvars.example:13:# Never cusati.us or www.cusati.us: reserved for a family site (ADR-0006).
+infra/variables.tf:17:# Hub hostnames (ADR-0006). The apex cusati.us and www.cusati.us are reserved for
+infra/variables.tf:21:  description = "The canonical hub host, bound to the default Firebase Hosting site (ADR-0006: jason.cusati.us). Never the apex cusati.us or www.cusati.us, which are reserved for a family site."
+infra/variables.tf:23:  default     = "jason.cusati.us"
+infra/variables.tf:26:    condition     = !contains(["cusati.us", "www.cusati.us"], lower(trimsuffix(var.domain, ".")))
+infra/variables.tf:27:    error_message = "domain must not be cusati.us or www.cusati.us: the apex and www are reserved for a family site (ADR-0006)."
+infra/variables.tf:32:  description = "Hostnames connected to the same Hosting site that answer with a 301 redirect to var.domain (ADR-0006: research.cusati.us). …"
+infra/variables.tf:34:  default     = ["research.cusati.us"]
+infra/variables.tf:42:    condition     = alltrue([for d in var.redirect_domains : !contains(["cusati.us", "www.cusati.us"], lower(trimsuffix(d, ".")))])
+infra/variables.tf:43:    error_message = "redirect_domains must not contain cusati.us or www.cusati.us: the apex and www are reserved for a family site (ADR-0006)."
+```
+
+(Long lines are elided with "…" here only; the command printed them in full.)
+
+**Every remaining hit is intentional. None binds, targets or points at the apex
+or `www`.**
+- The new hub hostnames, as values or documentation:
+  - `build.yml:311`, the SEAM-1 default in a comment;
+  - `README.md:26`, `:43`, `:44`, `:105`;
+  - `firebase.tf:8`, `:10`, `:67`, comments;
+  - `terraform.tfvars.example:11-12`, commented defaults;
+  - `variables.tf:21`, `:23`, `:32`, `:34`.
+- The apex and `www` named only to forbid them:
+  - validation conditions and messages at `variables.tf:26-27` and `:42-43`;
+  - the rule stated at `variables.tf:17`, `firebase.tf:15`, `outputs.tf:48`,
+    `README.md:107` and `terraform.tfvars.example:13`.
+
+### Round 3 notes
+
+- **Validation scope.** The apex/`www` rejection uses string literals. It guards
+  only these two names, exactly as ADR-0006 reserves them, not other apex-level
+  forms.
+- **Hosting behaviour, unverified until Checkpoint 2:**
+  - that `research.cusati.us`'s 301 preserves the request path (step 9 checks
+    `/` only);
+  - which record types Hosting asks for on each subdomain. Step 7 follows the
+    output exactly and stops on any apex change.
+- **Outside this file contract.** SEAM-1's default `SITE_URL`, the design
+  doc/ADR-0001 host, and the roadmap criteria text still say `cusati.us` unless
+  their owners have updated them. The site specialist, the CPO and the Lead
+  Architect own those. The Lead Architect's seam and contract documents were not
+  read for changes this round.

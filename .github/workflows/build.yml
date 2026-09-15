@@ -308,7 +308,7 @@ jobs:
             > public/build-info.json
           cat public/build-info.json
 
-      # SEAM-1 defaults (https://cusati.us, base /), so SITE_URL and SITE_BASE
+      # SEAM-1 defaults (https://jason.cusati.us, base /), so SITE_URL and SITE_BASE
       # are deliberately unset.
       - name: Run tests (Firebase Hosting variant)
         run: npm test
