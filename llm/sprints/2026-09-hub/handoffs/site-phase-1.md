@@ -1,6 +1,6 @@
 # Handoff: Site Implementation Engineer — Phase 1
 
-Status: Complete, remediation round 2 (palette) applied (awaiting re-verification and Lead Architect reconciliation)
+Status: Complete, remediation round 3 (SEAM-7, review F8) applied (palette round 2 committed in `8867946`; round 3 awaiting re-verification)
 Last updated: 2026-09-15
 Owner: Site Implementation Engineer (Specialist 1)
 Contract: `llm/sprints/2026-09-hub/contracts/site-phase-1.md`
@@ -152,13 +152,81 @@ tokens.
   themes, and pointing `--color-muted` back at ink-3 fails the AA test at 4.45
   and 3.96.
 
+## Remediation round 3 (SEAM-7, review F8)
+
+Chief Reviewer finding F8 (PR #12): making `cv-data.test.ts`
+release-independent (round 1) removed the one pre-deploy check that the CV
+variants the smoke test requests exist in the fetched data. A `cv` release that
+renamed `research-professional` would pass tests and build, deploy to Pages, and
+fail only in the post-deploy smoke test. SEAM-7 (commit `9a2ca88`) restores the
+check as a build-output presence check.
+
+- **`npm run check:smoke-routes [-- <output-dir>]`**, backed by
+  `site/scripts/check-smoke-routes.mjs`.
+  - **Routes.** It reads `SMOKE_ROUTES` from `site/scripts/site-routes.mjs`,
+    which stays their one source; the script has no route list of its own.
+  - **Route → file.** Each route goes through the existing `normalizeRoute`.
+    A page route needs `<route>/index.html`, written with or without a trailing
+    slash: `/cv/academic` and `/cv/academic/` both need
+    `cv/academic/index.html`, and `/` needs `index.html`. A file route (a last
+    segment with an extension) needs the file itself: `/pdfs/academic.pdf` needs
+    `pdfs/academic.pdf`. It must be a regular file, so a bare directory does not
+    count.
+  - **Output directory.** An optional argument; by default `site/dist-public`,
+    resolved from the script's location, so it does not depend on the working
+    directory. Astro writes output without `SITE_BASE`, so the same check
+    applies after the GitHub Pages build.
+  - **Output and exit codes.** It prints `OK` or `MISSING` for every route with
+    its expected file, then a summary naming each missing route on stderr.
+    Exit 0 when all are present; 1 when any route is missing; 2 when the output
+    directory does not exist (for example, no build ran).
+  - **No network or credentials.** It only reads the file system.
+- **Tests.** `site/scripts/check-smoke-routes.test.ts` (7 tests) builds a
+  temporary output directory from `SMOKE_ROUTES`:
+  - All routes present: the function returns nothing, and the CLI exits 0.
+  - `/cv/research-professional` (page) and `/pdfs/academic.pdf` (file) removed:
+    the function returns both, and the CLI exits 1 and names both.
+  - The route → file mapping with and without a trailing slash.
+  - A directory without `index.html` counts as missing.
+  - A missing output directory exits 2.
+- **Not changed.** `.github/workflows/build.yml` is infra's; the infra specialist
+  adds the step that runs the check after each build. `SMOKE_ROUTES` and
+  `site/data/` are unchanged.
+- **Documented** in `site/README.md` §Build interface.
+- **Genuine gap with local data (reported, not changed).** This checkout's
+  `site/public/pdfs/` is empty; CI's `fetch-data.sh` downloads the PDFs. So
+  after a local build the check reports `/pdfs/academic.pdf` missing and exits
+  1, for both variants. The six page routes, including `/cv/research-professional`,
+  are present with the local CV data. On a scratch copy of each build with a
+  stub `pdfs/academic.pdf` added, the check exits 0 ("all 7 smoke routes
+  present"). In CI, where the PDFs are fetched before the build, it should pass.
+  The one evidence of that is the round 1 CI replay, whose fetch produced 4 PDFs
+  including `academic.pdf`.
+
 ## Validation
 
 All commands were run from `site/` unless stated. Local CV data is the owner's
 (newer than the `cv` release), except where a run says "release data".
 
-**Remediation round 2 (palette; this is the current state).** Run from `site/`
-after the token re-map. `npm ci` was not re-run, because no dependency changed.
+**Remediation round 3 (SEAM-7; this is the current state).** Run from `site/`
+with the owner's local CV data. `npm ci` was not re-run, because no dependency
+changed.
+
+| # | Command | Result |
+|---|---|---|
+| S1 | `npm test` | `Test Files 7 passed (7)` · `Tests 54 passed \| 1 skipped (55)`, exit 0. The 7 new tests are in `scripts/check-smoke-routes.test.ts`; the skip is the opt-in build-coverage test. |
+| S2 | `npm run build` (defaults) | `33 page(s) built`, `Complete!`, exit 0 |
+| S3 | `npm run check:smoke-routes` (after S2) | `OK` for `/`, `/resumes/`, `/cv/academic`, `/cv/research-professional`, `/papers/`, `/projects/`; `MISSING /pdfs/academic.pdf → pdfs/academic.pdf`; `check:smoke-routes: 1 of 7 smoke routes missing from dist-public: /pdfs/academic.pdf`, exit 1. The local checkout has no CV PDFs (see round 3). |
+| S3b | the same check on a scratch copy of the S2 output with a stub `pdfs/academic.pdf` | `check:smoke-routes: all 7 smoke routes present in <scratch copy>`, exit 0 |
+| S4 | `SITE_URL=https://djjay0131.github.io SITE_BASE=/website/ npm run build` | `33 page(s) built`, `Complete!`, exit 0 |
+| S5 | `npm run check:smoke-routes` (after S4) | Same as S3: 6 `OK`, `MISSING /pdfs/academic.pdf → pdfs/academic.pdf`, `1 of 7 smoke routes missing from dist-public: /pdfs/academic.pdf`, exit 1 |
+| S5b | the same check on a scratch copy of the S4 output with a stub `pdfs/academic.pdf` | `all 7 smoke routes present`, exit 0 (the build's `index.html` carried `/website/` links, confirming the Pages variant) |
+| S6 | `npx astro check` | `Result (44 files): 11 errors, 0 warnings, 3 hints` (exit 1). The same 11 pre-existing `ts(7006)` errors in `SourceExplorer.astro`, at the same positions; none added. There are 44 files, not 42, because of the two new script files. |
+| S7 | `npm run build` (final, defaults) | `33 page(s) built`, `Complete!`, exit 0; `/website/` matches: `0`. **`site/dist-public` is the default build.** |
+| S8 | `npm run check:smoke-routes` (after S7) | Same as S3, exit 1 on `/pdfs/academic.pdf` only |
+
+**Remediation round 2 (palette; tokens).** Run from `site/` after the token
+re-map. `npm ci` was not re-run, because no dependency changed.
 
 | # | Command | Result |
 |---|---|---|
@@ -548,7 +616,13 @@ amended D2 states; I did not see the tracker or dossier themselves.
   caution on caution-bg is 4.51, by construction (nearest compliant). Any
   palette change to brass-soft can push them under; the AA test fails if it
   does.
-- **Smoke routes duplicated.** `scripts/site-routes.mjs` repeats the
+- **Local smoke-route check fails without fetched PDFs.** A developer running
+  `npm run check:smoke-routes` after a build on unfetched local data sees
+  `/pdfs/academic.pdf` missing (exit 1). That is correct, since the file really
+  is absent, and the README says so.
+- **Smoke routes duplicated.** SEAM-7 makes `SMOKE_ROUTES` the source for the
+  pre-deploy check, but `build.yml`'s two post-deploy smoke loops still inline
+  the same seven routes (infra; C13). `scripts/site-routes.mjs` repeats the
   `build.yml` smoke-test route list (infra-owned) and can drift from it.
 - **A misconfigured `SITE_URL`** (one with a path) fails the build loudly. That
   is intentional.
@@ -647,6 +721,11 @@ Added:
 
 Remediation round 2 (palette) changed only `site/src/styles/tokens.css`,
 `site/scripts/contrast.mjs`, `site/src/styles/tokens.test.ts` and this handoff.
+
+Remediation round 3 (SEAM-7) added `site/scripts/check-smoke-routes.mjs` and
+`site/scripts/check-smoke-routes.test.ts`, and modified `site/package.json`
+(the `check:smoke-routes` script), `site/README.md` (§Build interface) and this
+handoff.
 
 Untouched: `site/data/` (local CV data), `infra/**`, `.github/**`,
 `.gitignore`, and `llm/**` apart from this handoff.

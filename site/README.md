@@ -14,10 +14,19 @@ directory.
 npm ci          # install
 npm test        # unit tests; no network, no credentials
 npm run build   # static site into dist-public/
+npm run check:smoke-routes   # fail if a smoke-test route has no file in dist-public/
 ```
 
 The build reads the CV data described under [CV data](#cv-data). It needs no
 credentials.
+
+`npm run check:smoke-routes [-- <output-dir>]` (SEAM-7) runs after either
+build variant. It reads `SMOKE_ROUTES` from `scripts/site-routes.mjs` and
+requires `<route>/index.html` for each page route and the file itself for each
+file route, such as `/pdfs/academic.pdf`. Output paths never include
+`SITE_BASE`. It prints each missing route and exits 1, or exits 2 when there is
+no build output. A local build has no CV PDFs unless the data was fetched, so
+`/pdfs/academic.pdf` is reported missing there.
 
 ### Environment variables
 

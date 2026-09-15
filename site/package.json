@@ -17,7 +17,8 @@
     "data:fetch": "./scripts/fetch-data.sh",
     "redirects:generate": "node scripts/generate-redirect-map.mjs",
     "redirects:check": "node scripts/generate-redirect-map.mjs --check",
-    "contrast": "node scripts/contrast.mjs"
+    "contrast": "node scripts/contrast.mjs",
+    "check:smoke-routes": "node scripts/check-smoke-routes.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.8",
