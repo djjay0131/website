@@ -1,7 +1,7 @@
 # Research Hub — Master Roadmap
 
 Status: Draft
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 Owner: Chief Product Officer
 
 ## Purpose
@@ -129,7 +129,7 @@ explicit go.
 - [ ] Terraform in `infra/`: provider, project, required APIs, and variables for project id, region and domain (§8; brief §4)
 - [ ] Workload Identity Federation pool and provider for `djjay0131/website`, with a least-privilege hub deploy service account (§8)
 - [ ] Billing budget of $5 with an email alert (§8)
-- [ ] Firebase project and Hosting on the new GCP project, bound to `cusati.us` (§8, §10 Q1, Q2)
+- [ ] Firebase project and Hosting on the new GCP project, bound to `jason.cusati.us` (§8, §10 Q1, Q2; ADR-0006)
 - [ ] `firebase.json` at the repository root, publishing `site/dist-public` (§8)
 - [ ] GitHub Actions deploy to Firebase Hosting on push to `main` (§9, §11)
 - [ ] Design tokens in `site/src/styles/tokens.css`, light and dark (§5)
@@ -140,12 +140,13 @@ explicit go.
 
 ### Acceptance criteria
 
-- [ ] `https://cusati.us/` serves the site over HTTPS from Firebase Hosting with a valid certificate
-- [ ] Every route the current build serves returns HTTP 200 at `https://cusati.us` under base path `/`: the `build.yml` smoke-test routes (`/`, `/resumes/`, `/cv/academic`, `/cv/research-professional`, `/papers/`, `/pdfs/academic.pdf`, `/projects/`) and every `/research/**` page; each existing Astro `redirects` source forwards to its target under `/`
-- [ ] `/cv/academic` and `/papers/` on `cusati.us` return bodies of at least 500 bytes (the existing smoke check)
+- [ ] `https://jason.cusati.us/` serves the site over HTTPS from Firebase Hosting with a valid certificate
+- [ ] `https://research.cusati.us/` answers with a 301 redirect to `https://jason.cusati.us/` over HTTPS with a valid certificate (ADR-0006)
+- [ ] Every route the current build serves returns HTTP 200 at `https://jason.cusati.us` under base path `/`: the `build.yml` smoke-test routes (`/`, `/resumes/`, `/cv/academic`, `/cv/research-professional`, `/papers/`, `/pdfs/academic.pdf`, `/projects/`) and every `/research/**` page; each existing Astro `redirects` source forwards to its target under `/`
+- [ ] `/cv/academic` and `/papers/` on `jason.cusati.us` return bodies of at least 500 bytes (the existing smoke check)
 - [ ] The built `site/dist-public` has no link, asset reference or redirect target under `/website/`, including the hardcoded `/website/research/soa-agentic-se/agentic-harnesses*` targets in the existing Astro `redirects`
 - [ ] `djjay0131.github.io/website/` still serves the site, since Pages is retired only in Phase 6 (ADR-0001)
-- [ ] The CV on `cusati.us` matches the latest `cv` release, and the hourly fingerprint check reads the new host's build info
+- [ ] The CV on `jason.cusati.us` matches the latest `cv` release, and the hourly fingerprint check reads the new host's build info
 - [ ] `git log --follow` on a moved file under `site/src/` shows its history from before the move
 - [ ] Every cloud resource Phase 1 uses is declared in `infra/`. After the owner's apply, `terraform plan` reports no changes (§12.5).
 - [ ] The manual steps Terraform cannot perform are written down in the repository (§12.5)
@@ -165,12 +166,13 @@ explicit go.
 - Share links and their rewrites (§11 Phase 4)
 - Serving redirects from the old URL, and retiring GitHub Pages (§11 Phase 6)
 - React, which enters with the first island (ADR-0003)
+- The family home page at `cusati.us` / `www.cusati.us`, which is outside this project (ADR-0006)
 - Brief §4 schedules several of these items into Phase 1; see Open Questions O1–O4
 
 ### Blocked on
 
 - Checkpoint 1 (owner approval and merge of Phase 0)
-- §10 Q1: answered, `cusati.us`
+- §10 Q1: answered `cusati.us` (ADR-0001), amended by ADR-0006 to `jason.cusati.us`
 - §10 Q2: answered, a new GCP project with intended id `cusati-hub`. Blaze confirmation is not yet on the record, and the brief makes enabling Blaze an owner step at Checkpoint 2.
 - §10 Q5 (`site/` subdirectory): Proposed in ADR-0001; approved by merging PR #9
 
@@ -205,7 +207,7 @@ serves the site and records it in `STATE.md`.
 - [ ] The schema accepts the §4 example manifest. It rejects a manifest whose `section`, `format` or `visibility` falls outside the fixed sets, and one missing a required field.
 - [ ] A manifest the JSON Schema rejects also fails the hub build, so both ends validate (§4)
 - [ ] The publish action rejects a manifest whose `path` escapes `dist/` (ADR-0002)
-- [ ] A push to `cv`, with no commit to `website`, triggers a hub build through `repository_dispatch` `publish`, and the updated CV appears on `cusati.us`
+- [ ] A push to `cv`, with no commit to `website`, triggers a hub build through `repository_dispatch` `publish`, and the updated CV appears on `jason.cusati.us`
 - [ ] Each `cv` URL that Phase 1 served still resolves, or the `satellite-cv` handoff lists every changed URL with its redirect (brief §4)
 - [ ] A recorded test shows the `cv` satellite identity cannot write outside `sources/cv/`: an attempt to write under another source's prefix is denied (§12.3)
 - [ ] The `cv` satellite's credentials give it no write access to the `website` repository (§12.3)
@@ -258,11 +260,11 @@ that the CV appears.
 
 ### Acceptance criteria
 
-- [ ] A seeded member signs in at `cusati.us` and sees the milestone tracker and the committee dossier
+- [ ] A seeded member signs in at `jason.cusati.us` and sees the milestone tracker and the committee dossier
 - [ ] Signed out, a request for the tracker or dossier under `/p/` returns no private content
 - [ ] A signed-in account that is not on the allowlist gets the "not shared with you" page and no private content (§6)
 - [ ] The same signed-out and non-member requests, sent straight to the `hub-gate` `*.run.app` URL, are refused the same way (ADR-0004)
-- [ ] A session minted through `cusati.us` persists across page loads served through Hosting (ADR-0004 `__session` constraint)
+- [ ] A session minted through `jason.cusati.us` persists across page loads served through Hosting (ADR-0004 `__session` constraint)
 - [ ] Every response under `/p/` carries `Cache-Control: private, no-store` (§6). Firebase Hosting marks rewrite responses `private` by default, and its CDN caches a gate response only if the gate itself sends `public` or `s-maxage` (ADR-0004).
 - [ ] A gate test asserts that no `/p/**` or `/s/**` response carries `public` or `s-maxage` in `Cache-Control` (ADR-0004)
 - [ ] The gate pytest suite passes in CI and covers session mint and verify, non-member rejection, and path-traversal rejection on `/p/` (§6)
@@ -353,8 +355,8 @@ None defined. The brief ends at Checkpoint 4 (brief §3).
 
 ### Acceptance criteria
 
-- [ ] A docs change pushed to `agentic-kg`, with no commit to `website`, updates its project page on `cusati.us`
-- [ ] A change pushed to `construction-ai-proposal`, with no commit to `website`, updates its project page on `cusati.us`
+- [ ] A docs change pushed to `agentic-kg`, with no commit to `website`, updates its project page on `jason.cusati.us`
+- [ ] A change pushed to `construction-ai-proposal`, with no commit to `website`, updates its project page on `jason.cusati.us`
 - [ ] The project index lists both projects from their manifests, without a hand-maintained entry per project
 - [ ] A recorded test shows each new satellite identity cannot write outside its own `sources/<source>/` prefix (§12.3)
 - [ ] Both satellites authenticate through WIF only (§12.2)
@@ -388,15 +390,15 @@ None defined. The brief ends at Checkpoint 4 (brief §3).
 - [ ] Pagefind search over public content only (§11)
 - [ ] RSS feed (§11)
 - [ ] OG images (§11)
-- [ ] Redirects from `djjay0131.github.io/website` to `cusati.us`, covering the Phase 1 redirect map (§11; ADR-0001)
+- [ ] Redirects from `djjay0131.github.io/website` to `jason.cusati.us`, covering the Phase 1 redirect map (§11; ADR-0001)
 - [ ] GitHub Pages retired as the site's host (§11; ADR-0001); see Open Questions O6
 
 ### Acceptance criteria
 
-- [ ] Opening each Phase 1 smoke-test route under `https://djjay0131.github.io/website` lands the browser on the matching `cusati.us` URL
-- [ ] Every entry in the Phase 1 redirect map forwards to its `cusati.us` target
+- [ ] Opening each Phase 1 smoke-test route under `https://djjay0131.github.io/website` lands the browser on the matching `jason.cusati.us` URL
+- [ ] Every entry in the Phase 1 redirect map forwards to its `jason.cusati.us` target
 - [ ] GitHub Pages no longer serves the site's own pages
-- [ ] Search on `cusati.us` returns public items, and the search index contains no private slug or title (§11; ADR-0005)
+- [ ] Search on `jason.cusati.us` returns public items, and the search index contains no private slug or title (§11; ADR-0005)
 - [ ] The RSS feed validates and contains no private item (ADR-0005)
 - [ ] No OG image exists for a private item, and none shows a private title (ADR-0005)
 - [ ] The leak check covers the sitemap, RSS feed, search index and OG images (ADR-0005)
@@ -428,7 +430,7 @@ Only the owner answers these. Recording an answer here is an L1 edit.
 
 | # | Question | Blocks | Status |
 |---|---|---|---|
-| Q1 | Domain name | Phase 1 deploy | Answered: `cusati.us` (ADR-0001; issue #7) |
+| Q1 | Domain name | Phase 1 deploy | Answered: `cusati.us` (ADR-0001; issue #7); amended by ADR-0006 to `jason.cusati.us` |
 | Q2 | GCP project id; Blaze confirmed | Phase 1 infra | Answered: new project, intended id `cusati-hub`, personal account (ADR-0001). Blaze confirmation not yet on the record. |
 | Q3 | Share links wanted, or cut | Phase 4 | Open |
 | Q4 | Initial members to seed | Phase 3 | Open |
@@ -466,6 +468,7 @@ the project index.
 - `llm/governance/adr/0003-keep-astro-with-react-islands.md`
 - `llm/governance/adr/0004-private-area-cloud-run-gate-behind-hosting.md`
 - `llm/governance/adr/0005-two-output-build-with-leak-check.md`
+- `llm/governance/adr/0006-hub-on-jason-cusati-us-subdomain.md`
 - `llm/sprints/2026-09-hub/STATE.md`: checkpoint records, risks, ADR candidates C1–C4
 - `llm/sprints/2026-09-hub/handoffs/chief-product-officer-phase-0.md`: rationale, disagreements, MVP classification
 - agentic-governance `llm/governance/definition-of-done.md` §Design Work
