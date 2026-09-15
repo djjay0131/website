@@ -17,6 +17,7 @@ from `0000-template.md`.
 | [0003](0003-keep-astro-with-react-islands.md) | Keep Astro, with React islands for interactive widgets | Accepted |
 | [0004](0004-private-area-cloud-run-gate-behind-hosting.md) | Private area via a Cloud Run gate behind Hosting rewrites | Accepted |
 | [0005](0005-two-output-build-with-leak-check.md) | Two-output build with a leak check | Accepted |
+| [0006](0006-hub-on-jason-cusati-us-subdomain.md) | The hub lives at `jason.cusati.us`; `research.cusati.us` redirects; `cusati.us` is reserved for a family site | Accepted |
 
 ## Lifecycle
 

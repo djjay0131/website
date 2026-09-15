@@ -1,0 +1,36 @@
+---
+/** Renders a pre-built synthesis HTML fragment with a table of contents from its h2 headings. */
+interface Props { html: string }
+const { html: raw } = Astro.props;
+const toc: { id: string; text: string }[] = [];
+const html = raw.replace(/<h2>(.*?)<\/h2>/g, (_m, text: string) => {
+  const plain = text.replace(/<[^>]+>/g, "");
+  const id = plain.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  toc.push({ id, text: plain });
+  return `<h2 id="${id}">${text}</h2>`;
+});
+---
+
+<nav class="toc" aria-label="Contents">
+  <strong>Contents</strong>
+  <ol>{toc.map((t) => <li><a href={`#${t.id}`}>{t.text}</a></li>)}</ol>
+</nav>
+
+<article class="synthesis" set:html={html} />
+
+<style is:global>
+  .toc { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; padding: 1rem 1.25rem; margin-bottom: 2rem; font-family: var(--font-body); font-size: 0.9rem; }
+  .toc ol { margin: 0.5rem 0 0 1.25rem; padding: 0; }
+  .toc li { margin: 0.2rem 0; }
+  .synthesis p { margin-bottom: 1rem; }
+  .synthesis ul, .synthesis ol { margin: 0 0 1rem 1.5rem; }
+  .synthesis li { margin-bottom: 0.4rem; }
+  .synthesis h3 { margin-top: 1.5rem; }
+  .synthesis hr { border: 0; border-top: 1px solid var(--color-border); margin: 2rem 0; }
+  .synthesis code { font-family: var(--font-mono); font-size: 0.85em; background: var(--color-surface); padding: 0 0.25em; }
+  .synthesis a.cite { font-family: var(--font-mono); font-size: 0.78em; color: var(--color-accent); overflow-wrap: anywhere; }
+  .synthesis a.cite:hover { color: var(--color-link); }
+  .synthesis table { border-collapse: collapse; font-family: var(--font-body); font-size: 0.85rem; margin: 1rem 0 1.5rem; display: block; overflow-x: auto; max-width: 100%; }
+  .synthesis th, .synthesis td { border: 1px solid var(--color-border); padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; }
+  .synthesis th { background: var(--color-surface); }
+</style>

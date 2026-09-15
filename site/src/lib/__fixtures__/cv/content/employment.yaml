@@ -1,0 +1,28 @@
+- id: lab-researcher
+  dates: "2024 -- Present"
+  company: "Example University"
+  location: "Anytown"
+  title: "Researcher"
+  bullets:
+    - id: lab-a
+      text: "First research bullet."
+    - id: lab-b
+      text: "Second research bullet."
+    - id: lab-c
+      text: "Third research bullet."
+- id: acme-engineer
+  dates: "2018 -- 2024"
+  company: "Acme Corp"
+  location: "Elsewhere"
+  title: "Engineer"
+  bullets:
+    - id: acme-a
+      text: "Engineering bullet."
+- id: early-job
+  dates: "2015 -- 2018"
+  company: "Startup Inc"
+  location: "Anytown"
+  title: "Developer"
+  bullets:
+    - id: early-a
+      text: "Early bullet."

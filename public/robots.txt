@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://djjay0131.github.io/website/sitemap-index.xml

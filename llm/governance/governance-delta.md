@@ -1,7 +1,7 @@
 # Governance Delta: website (Research Hub)
 
 Status: Draft
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 Governance: agentic-governance v0.8
 
 This file localizes the canonical governance in
@@ -173,10 +173,11 @@ Verified against the GitHub API on 2026-09-14, not assumed.
   bypass the PR requirement, and every agent session uses the owner's token,
   so an agent can too. The gate binds ordinary flow; it does not bind the
   token.
-- **Required status checks: none yet.** The `ci.yml` `governance-checks` job
-  is added in the adoption PR. It becomes a required context only after it
-  has a green run on `main`. `build.yml` (build and unit tests) also runs on
-  pull requests and is not required.
+- **Required status checks: enabled 2026-09-15.** The `ci.yml`
+  `governance-checks` job is a required context on `main`, non-strict (a PR need
+  not be rebased onto the newest `main` to merge), added after its first green run
+  on `main`. A PR whose governance checks fail cannot be merged. `build.yml`
+  (build and unit tests) also runs on pull requests and is not required.
 - **Repository:** public, user-owned (no organization), single collaborator
   (`djjay0131`). Branch protection is available on this plan.
 - **Token/identity model:** all agent sessions authenticate as `djjay0131`
@@ -186,8 +187,7 @@ Verified against the GitHub API on 2026-09-14, not assumed.
   sub-agents make no git or gh mutations is procedural.
 - **CODEOWNERS:** present (`* @djjay0131`), not enforced.
 - **Hardening path:**
-  - Add `governance-checks` as a required status check after its first green
-    run on `main`. Not blocked; the next step.
+  - Add `governance-checks` as a required status check. **Done 2026-09-15.**
   - `enforce_admins` on. Not taken — the owner's choice on 2026-09-14,
     keeping the single maintainer's emergency path.
   - Required approvals ≥ 1. **Blocked:** a single-maintainer repo cannot

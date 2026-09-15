@@ -1,0 +1,6 @@
+- id: languages
+  group: "Languages"
+  items: ["Python", "TypeScript", "Rust"]
+- id: tools
+  group: "Tools"
+  items: ["Git", "Docker"]

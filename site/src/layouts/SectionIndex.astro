@@ -1,0 +1,170 @@
+---
+// A section landing page: title, lede, and a list of items, or an empty state
+// when the section has no items yet.
+import Base from "./Base.astro";
+
+export interface SectionLink {
+  href: string;
+  label: string;
+  external?: boolean;
+}
+
+export interface SectionItem {
+  title: string;
+  href?: string;
+  /** ISO date, shown as metadata. */
+  date?: string;
+  /** Short metadata line, e.g. "268 sources". */
+  meta?: string;
+  /** Plain-text summary. */
+  summary?: string;
+  /** Pre-rendered HTML summary; use instead of `summary`. */
+  summaryHtml?: string;
+  links?: SectionLink[];
+}
+
+interface Props {
+  /** The page heading. */
+  title: string;
+  /** The document <title>; defaults to "Jason Cusati — <title>". */
+  pageTitle?: string;
+  description?: string;
+  lede?: string;
+  /** Heading above the item list. */
+  listTitle?: string;
+  items?: SectionItem[];
+  emptyTitle?: string;
+  emptyMessage?: string;
+  noindex?: boolean;
+}
+
+const {
+  title,
+  pageTitle = `Jason Cusati — ${title}`,
+  description,
+  lede,
+  listTitle,
+  items = [],
+  emptyTitle = "Nothing here yet",
+  emptyMessage = "Items will appear here once they are published.",
+  noindex = false,
+} = Astro.props;
+---
+
+<Base title={pageTitle} description={description} noindex={noindex}>
+  <header class="section-head">
+    <h1>{title}</h1>
+    {lede && <p class="lede">{lede}</p>}
+    <slot name="intro" />
+  </header>
+
+  {items.length > 0 ? (
+    <section class="section-items" aria-label={listTitle ?? title}>
+      {listTitle && <h2>{listTitle}</h2>}
+      <ul class="item-list">
+        {items.map((item) => (
+          <li class="item">
+            <h3 class="item-title">
+              {item.href ? <a href={item.href}>{item.title}</a> : item.title}
+            </h3>
+            {(item.date || item.meta) && (
+              <p class="item-meta meta-mono">
+                {item.date && <time datetime={item.date}>{item.date}</time>}
+                {item.date && item.meta && " · "}
+                {item.meta}
+              </p>
+            )}
+            {item.summaryHtml ? (
+              <p class="item-summary" set:html={item.summaryHtml} />
+            ) : (
+              item.summary && <p class="item-summary">{item.summary}</p>
+            )}
+            {item.links && item.links.length > 0 && (
+              <p class="item-links">
+                {item.links.map((link) => (
+                  link.external ? (
+                    <a href={link.href} target="_blank" rel="noopener noreferrer">{link.label}</a>
+                  ) : (
+                    <a href={link.href}>{link.label}</a>
+                  )
+                ))}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  ) : (
+    <div class="empty-state" role="status">
+      <p class="empty-title">{emptyTitle}</p>
+      <p>{emptyMessage}</p>
+    </div>
+  )}
+
+  <slot />
+</Base>
+
+<style>
+  .section-head {
+    margin-bottom: 1.5rem;
+  }
+
+  .lede {
+    font-size: 1.1rem;
+    color: var(--color-muted);
+    margin-bottom: 1rem;
+  }
+
+  .item-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .item {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .item:last-child {
+    border-bottom: none;
+  }
+
+  .item-title {
+    font-size: 1.2rem;
+    margin: 0 0 0.25rem;
+  }
+
+  .item-meta {
+    margin-bottom: 0.35rem;
+  }
+
+  .item-summary {
+    color: var(--color-muted);
+  }
+
+  .item-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .empty-state {
+    padding: 1.5rem;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-muted);
+  }
+
+  .empty-title {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 0.25rem;
+  }
+</style>

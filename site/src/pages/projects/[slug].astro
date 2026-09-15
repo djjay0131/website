@@ -1,0 +1,51 @@
+---
+import ItemPage from "../../layouts/ItemPage.astro";
+import { loadContentPool } from "../../lib/cv-data";
+import { mdToHtml } from "../../lib/md";
+import path from "node:path";
+
+export function getStaticPaths() {
+  const pool = loadContentPool(path.resolve("data/content"));
+  return Object.values(pool.projects).map((p) => ({
+    params: { slug: p.id },
+    props: { project: p },
+  }));
+}
+
+const { project } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<ItemPage
+  title={project.name}
+  pageTitle={`${project.name} — Jason Cusati`}
+  description={project.summary}
+  backHref={`${base}projects/`}
+  backLabel="Projects"
+>
+  <p set:html={mdToHtml(project.summary)} />
+
+  {project.github && (
+    <p class="project-link">
+      <a href={project.github} target="_blank" rel="noopener noreferrer">
+        View on GitHub
+      </a>
+    </p>
+  )}
+</ItemPage>
+
+<style>
+  .project-link {
+    margin-top: 1.5rem;
+    font-family: var(--font-body);
+  }
+
+  .project-link a {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-weight: 500;
+  }
+</style>

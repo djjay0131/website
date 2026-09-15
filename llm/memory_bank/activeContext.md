@@ -20,12 +20,14 @@ what a contributor needs to pick up work today.
 
 ## Decisions on record
 
-- Q1 — domain `cusati.us`.
+- Q1 — domain `cusati.us`, **amended by ADR-0006:** the hub is at `jason.cusati.us`
+  (canonical); `research.cusati.us` redirects to it; `cusati.us` and `www` are reserved
+  for a family site.
 - Q2 — a new GCP project on the owner's personal account (intended id
   `cusati-hub`).
 - Q5 — the Astro app moves under `site/`: proposed in ADR-0001, approved by
   merging PR #9.
-- ADRs 0001–0005: `llm/governance/adr/`.
+- ADRs 0001–0006: `llm/governance/adr/`.
 - Roadmap: `llm/master-roadmap.md`.
 
 ## Open

@@ -1,0 +1,22 @@
+---
+import SectionIndex from "../../layouts/SectionIndex.astro";
+const base = import.meta.env.BASE_URL;
+
+const items = [
+  {
+    title: "State of the Art in Agentic Software Engineering",
+    href: `${base}research/soa-agentic-se/`,
+    summary:
+      "A paper project mapping what the field has built against what it has measured. Two research tracks so far: agentic harnesses and agent memory.",
+  },
+];
+---
+
+<SectionIndex
+  title="Research"
+  pageTitle="Jason Cusati — Research"
+  description="Research digests and source explorers from Jason Cusati's PhD work on agentic software engineering."
+  lede="Working digests from my PhD research, grouped by project. Each digest is a synthesized state-of-the-art read on one question, backed by a source dataset you can filter and trace. They carry a date and a method note and are regenerated from a research store in the project's repository."
+  listTitle="Projects"
+  items={items}
+/>

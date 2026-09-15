@@ -1,0 +1,9 @@
+name: "Ada Example"
+contact:
+  email: "ada@example.org"
+  github: "ada-example"
+photo: "photo.jpeg"
+include_photo: false
+name_variants:
+  - family: "Example"
+    given: "Ada"

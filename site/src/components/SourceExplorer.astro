@@ -1,0 +1,192 @@
+---
+/**
+ * Filterable source explorer used by each SoA research track.
+ * Props:
+ *   records  — the track's sources.json array
+ *   facets   — optional extra facets: [{ key, label, get: (r) => string|null }]
+ *              (evaluated at build time; the value is stored on the slim record as `x[key]`)
+ */
+interface Facet { key: string; label: string; get: (r: any) => string | null | undefined }
+interface Props { records: any[]; facets?: Facet[] }
+const { records: raw, facets = [] } = Astro.props;
+
+const records = raw.map((r) => {
+  const x: Record<string, string | null> = {};
+  for (const f of facets) x[f.key] = f.get(r) ?? null;
+  return {
+    id: r.id, title: r.title, who: r.authors_or_org, year: r.year, date: r.date, type: r.source_type,
+    sector: r.sector, venue: r.venue, url: r.url, ident: r.identifier, cat: r.category ?? [],
+    dims: r.harness_dimensions ?? [], summary: r.summary, claims: r.key_claims ?? [], ev: r.evidence_type,
+    systems: r.systems_mentioned ?? [], relevance: r.relevance, conf: r.confidence, via: r.found_via ?? "web",
+    cq: r.consensus_query ?? [], ver: r.verification?.verdict ?? "UNCHECKED", vnote: r.verification?.notes ?? null, x,
+  };
+});
+const uniq = (xs: (string | null | undefined)[]) => Array.from(new Set(xs.filter((v): v is string => !!v))).sort();
+const categories = uniq(records.flatMap((r) => r.cat));
+const years = Array.from(new Set(records.map((r) => r.year).filter(Boolean))).sort((a, b) => (b as number) - (a as number));
+const evidence = uniq(records.map((r) => r.ev));
+const types = uniq(records.map((r) => r.type));
+const facetOptions = facets.map((f) => ({ key: f.key, label: f.label, values: uniq(records.map((r) => r.x[f.key])) }));
+const facetKeys = facets.map((f) => f.key);
+---
+
+<form class="filters" id="filters" onsubmit="return false;">
+  <label class="search"><span>Search</span><input type="search" id="q" placeholder="title, author, org, system, claim…" autocomplete="off" /></label>
+  <label><span>Sector</span><select id="sector"><option value="">all</option><option value="academic">academic</option><option value="industry">industry</option><option value="open-source">open-source</option></select></label>
+  <label><span>Year</span><select id="year"><option value="">all</option>{years.map((y) => <option value={String(y)}>{y}</option>)}</select></label>
+  <label><span>Category</span><select id="cat"><option value="">all</option>{categories.map((c) => <option value={c}>{c}</option>)}</select></label>
+  <label><span>Evidence</span><select id="ev"><option value="">all</option>{evidence.map((e) => <option value={e}>{e}</option>)}</select></label>
+  <label><span>Type</span><select id="type"><option value="">all</option>{types.map((t) => <option value={t}>{t}</option>)}</select></label>
+  {facetOptions.map((f) => (
+    <label><span>{f.label}</span><select id={`x-${f.key}`} data-facet={f.key}><option value="">all</option>{f.values.map((v) => <option value={v}>{v}</option>)}</select></label>
+  ))}
+  <label><span>Found via</span><select id="via"><option value="">all</option><option value="consensus">Consensus (any)</option><option value="consensus-only">Consensus only</option><option value="web">web / arXiv only</option></select></label>
+  <label><span>Verified</span><select id="ver"><option value="">all</option><option value="CONFIRMED">confirmed</option><option value="MINOR-FIX">minor fix</option><option value="NUMBER-NOT-FOUND">number not found</option><option value="NOT-FOUND">not found</option><option value="UNCHECKED">unchecked</option></select></label>
+  <label><span>Sort</span><select id="sort"><option value="year-desc">newest first</option><option value="year-asc">oldest first</option><option value="title">title</option><option value="sector">sector</option></select></label>
+  <button type="button" id="reset">Reset</button>
+</form>
+
+<p class="count" id="count" aria-live="polite"></p>
+
+<div class="tablewrap">
+  <table class="sources" id="table">
+    <thead><tr><th>Year</th><th>Source</th><th>Sector</th><th>Categories</th><th>Evidence</th><th>Via</th><th>Verified</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<script is:inline type="application/json" id="data" set:html={JSON.stringify(records)} />
+<script is:inline type="application/json" id="facet-keys" set:html={JSON.stringify(facetKeys)} />
+<script is:inline type="application/json" id="facet-labels" set:html={JSON.stringify(Object.fromEntries(facets.map((f) => [f.key, f.label])))} />
+
+<script is:inline>
+  (function () {
+    var data = JSON.parse(document.getElementById("data").textContent);
+    var facetKeys = JSON.parse(document.getElementById("facet-keys").textContent);
+    var facetLabels = JSON.parse(document.getElementById("facet-labels").textContent);
+    var $ = function (id) { return document.getElementById(id); };
+    var ids = ["q", "sector", "year", "cat", "ev", "type", "via", "ver", "sort"].concat(facetKeys.map(function (k) { return "x-" + k; }));
+    var rows = $("rows");
+    var open = {};
+    function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+    function chip(txt, cls) { return '<span class="chip ' + (cls || "") + '">' + esc(txt) + "</span>"; }
+    function matches(r, f) {
+      if (f.sector && r.sector !== f.sector) return false;
+      if (f.year && String(r.year) !== f.year) return false;
+      if (f.cat && r.cat.indexOf(f.cat) < 0) return false;
+      if (f.ev && r.ev !== f.ev) return false;
+      if (f.type && r.type !== f.type) return false;
+      if (f.ver && r.ver !== f.ver) return false;
+      if (f.via === "consensus" && (r.via || "").indexOf("consensus") < 0) return false;
+      if (f.via === "consensus-only" && r.via !== "consensus") return false;
+      if (f.via === "web" && (r.via || "").indexOf("consensus") >= 0) return false;
+      for (var i = 0; i < facetKeys.length; i++) { var k = facetKeys[i]; if (f["x-" + k] && (r.x[k] || "") !== f["x-" + k]) return false; }
+      if (f.q) {
+        var hay = [r.id, r.title, r.who, r.venue, r.summary, r.relevance, r.ident, (r.systems || []).join(" "), (r.claims || []).join(" "), (r.dims || []).join(" ")].join(" ").toLowerCase();
+        var terms = f.q.toLowerCase().split(/\s+/).filter(Boolean);
+        for (var j = 0; j < terms.length; j++) if (hay.indexOf(terms[j]) < 0) return false;
+      }
+      return true;
+    }
+    function sortFn(kind) {
+      if (kind === "year-asc") return function (a, b) { return (a.year || 0) - (b.year || 0) || a.title.localeCompare(b.title); };
+      if (kind === "title") return function (a, b) { return a.title.localeCompare(b.title); };
+      if (kind === "sector") return function (a, b) { return a.sector.localeCompare(b.sector) || (b.year || 0) - (a.year || 0); };
+      return function (a, b) { return (b.year || 0) - (a.year || 0) || (b.date || "").localeCompare(a.date || "") || a.title.localeCompare(b.title); };
+    }
+    function detail(r) {
+      var h = '<div class="detail">';
+      h += '<p class="who">' + esc(r.who || "") + (r.venue ? " · " + esc(r.venue) : "") + (r.date ? " · " + esc(r.date) : "") + "</p>";
+      h += "<p>" + esc(r.summary) + "</p>";
+      if (r.claims && r.claims.length) { h += '<p class="lbl">Key claims</p><ul>'; for (var i = 0; i < r.claims.length; i++) h += "<li>" + esc(r.claims[i]) + "</li>"; h += "</ul>"; }
+      if (r.relevance) h += '<p class="lbl">Why it matters here</p><p>' + esc(r.relevance) + "</p>";
+      var fx = [];
+      for (var k = 0; k < facetKeys.length; k++) { var key = facetKeys[k]; if (r.x[key]) fx.push(esc(facetLabels[key]) + ": " + esc(r.x[key])); }
+      h += '<p class="meta">';
+      if (fx.length) h += fx.join(" · ") + " · ";
+      if (r.dims && r.dims.length) h += "Dimensions: " + esc(r.dims.join(", ")) + " · ";
+      if (r.systems && r.systems.length) h += "Systems: " + esc(r.systems.join(", ")) + " · ";
+      h += "Confidence: " + esc(r.conf) + " · Found via: " + esc(r.via);
+      if (r.cq && r.cq.length) h += " (" + esc(r.cq.join(", ")) + ")";
+      if (r.vnote) h += " · Verification note: " + esc(r.vnote);
+      h += ' · id <code>' + esc(r.id) + "</code></p>";
+      h += '<p><a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' + esc(r.ident || r.url) + " ↗</a></p>";
+      return h + "</div>";
+    }
+    var lastKey = null;
+    function currentFilters() { var f = {}; ids.forEach(function (k) { f[k] = $(k).value; }); return f; }
+    function renderIfChanged() { var key = JSON.stringify(currentFilters()); if (key === lastKey) return; render(); }
+    function verLabel(v) { return v === "CONFIRMED" ? "confirmed" : v === "MINOR-FIX" ? "minor fix" : v === "NUMBER-NOT-FOUND" ? "number not found" : v === "NOT-FOUND" ? "not found" : "unchecked"; }
+    function render() {
+      var f = currentFilters(); lastKey = JSON.stringify(f);
+      var out = data.filter(function (r) { return matches(r, f); }).sort(sortFn(f.sort));
+      var html = "";
+      for (var i = 0; i < out.length; i++) {
+        var r = out[i]; var isOpen = !!open[r.id];
+        html += '<tr class="row' + (isOpen ? " open" : "") + '" id="' + esc(r.id) + '" data-id="' + esc(r.id) + '">';
+        html += "<td>" + esc(r.year || "") + "</td>";
+        html += '<td class="src"><button type="button" class="toggle" aria-expanded="' + isOpen + '">' + esc(r.title) + "</button>";
+        html += '<div class="sub">' + esc(r.who || "") + (r.venue ? " · " + esc(r.venue) : "") + "</div></td>";
+        html += "<td>" + chip(r.sector, "s-" + r.sector) + "</td>";
+        html += "<td>" + r.cat.map(function (c) { return chip(c, "c"); }).join(" ") + "</td>";
+        html += "<td>" + esc(r.ev) + "</td>";
+        html += "<td>" + esc(r.via) + "</td>";
+        html += "<td>" + chip(verLabel(r.ver), "v-" + r.ver) + "</td>";
+        html += "</tr>";
+        if (isOpen) html += '<tr class="drow"><td colspan="7">' + detail(r) + "</td></tr>";
+      }
+      rows.innerHTML = html;
+      $("count").textContent = out.length + " of " + data.length + " records";
+    }
+    rows.addEventListener("click", function (e) { var btn = e.target.closest(".toggle"); if (!btn) return; var id = btn.closest("tr").getAttribute("data-id"); open[id] = !open[id]; render(); });
+    ids.forEach(function (k) { $(k).addEventListener("input", renderIfChanged); $(k).addEventListener("change", renderIfChanged); });
+    $("reset").addEventListener("click", function () { ids.forEach(function (k) { $(k).value = k === "sort" ? "year-desc" : ""; }); render(); });
+    function openHash() {
+      var id = decodeURIComponent(location.hash.replace(/^#/, "")); if (!id) return;
+      if (!data.some(function (r) { return r.id === id; })) return;
+      ids.forEach(function (k) { $(k).value = k === "sort" ? "year-desc" : ""; });
+      open[id] = true; render();
+      var el = document.getElementById(id); if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("flash"); }
+    }
+    window.addEventListener("hashchange", openHash);
+    render(); openHash();
+  })();
+</script>
+
+<style is:global>
+  main { max-width: 1100px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 0.6rem 0.9rem; align-items: flex-end; font-family: var(--font-body); font-size: 0.85rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; padding: 0.75rem 1rem; }
+  .filters label { display: flex; flex-direction: column; gap: 0.2rem; }
+  .filters label span { color: var(--color-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .filters .search { flex: 1 1 220px; }
+  .filters input, .filters select { font: inherit; padding: 0.35rem 0.45rem; border: 1px solid var(--color-border); border-radius: 3px; background: var(--color-bg); color: var(--color-text); min-width: 0; max-width: 220px; }
+  .filters button { font: inherit; padding: 0.4rem 0.8rem; border: 1px solid var(--color-border); border-radius: 3px; background: var(--color-bg); color: var(--color-text); cursor: pointer; }
+  .filters button:hover { border-color: var(--color-link); color: var(--color-link); }
+  .count { font-family: var(--font-body); font-size: 0.85rem; color: var(--color-muted); margin: 0.75rem 0; }
+  .tablewrap { overflow-x: auto; }
+  .sources { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: 0.85rem; }
+  .sources th { text-align: left; padding: 0.5rem 0.5rem; border-bottom: 2px solid var(--color-accent); white-space: nowrap; }
+  .sources td { padding: 0.5rem 0.5rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+  .sources tr.open td { border-bottom: none; background: var(--color-surface); }
+  .sources tr.drow td { background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+  .sources tr.flash td { background: var(--color-caution-bg); }
+  .sources .src { min-width: 260px; }
+  .sources .toggle { font: inherit; font-weight: 600; text-align: left; background: none; border: none; padding: 0; color: var(--color-link); cursor: pointer; }
+  .sources .toggle:hover { text-decoration: underline; }
+  .sources .sub { color: var(--color-muted); font-size: 0.8rem; margin-top: 0.15rem; }
+  .chip { display: inline-block; padding: 0.05rem 0.4rem; border-radius: 999px; font-size: 0.72rem; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); white-space: nowrap; margin: 0.05rem 0; }
+  .chip.s-academic { border-color: var(--color-accent); color: var(--color-accent); }
+  .chip.s-industry { border-color: var(--color-caution); color: var(--color-caution); }
+  .chip.s-open-source { border-color: var(--color-ok); color: var(--color-ok); }
+  .chip.v-CONFIRMED { background: var(--color-ok-bg); border-color: var(--color-ok); color: var(--color-ok); }
+  .chip.v-MINOR-FIX { background: var(--color-caution-bg); border-color: var(--color-caution); color: var(--color-caution); }
+  .chip.v-NUMBER-NOT-FOUND, .chip.v-NOT-FOUND { background: var(--color-risk-bg); border-color: var(--color-risk); color: var(--color-risk); }
+  .chip.v-UNCHECKED { color: var(--color-muted); }
+  .detail { font-family: var(--font-body); font-size: 0.92rem; padding: 0.25rem 0.25rem 0.5rem; }
+  .detail .who { font-family: var(--font-body); color: var(--color-muted); font-size: 0.82rem; margin-bottom: 0.5rem; }
+  .detail .lbl { font-family: var(--font-body); font-weight: 600; font-size: 0.8rem; margin: 0.6rem 0 0.2rem; }
+  .detail ul { margin: 0 0 0.5rem 1.2rem; }
+  .detail li { margin-bottom: 0.25rem; }
+  .detail .meta { font-family: var(--font-body); font-size: 0.78rem; color: var(--color-muted); margin: 0.5rem 0; }
+  .detail code { font-family: var(--font-mono); font-size: 0.85em; }
+</style>

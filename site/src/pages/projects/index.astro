@@ -1,0 +1,25 @@
+---
+import SectionIndex from "../../layouts/SectionIndex.astro";
+import { loadContentPool } from "../../lib/cv-data";
+import { mdToHtml } from "../../lib/md";
+import path from "node:path";
+
+const pool = loadContentPool(path.resolve("data/content"));
+const projects = Object.values(pool.projects);
+const base = import.meta.env.BASE_URL;
+
+const items = projects.map((p) => ({
+  title: p.name,
+  href: `${base}projects/${p.id}`,
+  summaryHtml: mdToHtml(p.summary),
+  links: p.github ? [{ href: p.github, label: "View on GitHub", external: true }] : [],
+}));
+---
+
+<SectionIndex
+  title="Selected Projects & Research"
+  pageTitle="Jason Cusati — Projects"
+  description="Selected projects and research by Jason Cusati."
+  items={items}
+  emptyMessage="No projects are available in this build."
+/>
