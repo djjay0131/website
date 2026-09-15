@@ -40,7 +40,12 @@ describe("resolveVariant", () => {
     expect(resolved.employment.length).toBe(6);
     expect(resolved.employment[0].role.id).toBe("vt-gra-mrs");
     expect(resolved.employment[0].collapse).toBe(false);
-    expect(resolved.education.length).toBe(3);
+    // Derived from the variant, not hardcoded. The include list lives in the
+    // cv repo and changes without warning here; what actually matters is that
+    // the resolver returns exactly those ids, in that order.
+    const educationIds = variant.sections.find((s) => s.type === "education")
+      ?.include as string[];
+    expect(resolved.education.map((e) => e.id)).toEqual(educationIds);
     expect(resolved.projects.length).toBe(4);
     expect(resolved.skills.length).toBe(4);
     expect(resolved.referee?.text).toBe("Available on Request");
