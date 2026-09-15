@@ -15,11 +15,11 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. CHECKPOINT 2 — STOPPED** (issue #10, PR #12 ready once CI is
-green on the commit that records this). The ADR-0006 domain amendment is implemented and
-reviewed: `jason.cusati.us` canonical, `research.cusati.us` redirecting, the `cusati.us`
-apex, `www` and mail records untouched. PR #12 is declared **L3**. **No Phase 2 work, and
-no OpenClaw page build, starts without the owner's explicit go.**
+**Phase 1 — Foundation. CHECKPOINT 2 — INFRASTRUCTURE APPLIED; WAITING ON DNS AND MERGE**
+(issue #10, PR #12 ready, L3). The owner instructed the Lead Architect to run every
+Checkpoint 2 step that can be automated (A19). The GCP project exists, billing is linked,
+Terraform is applied, and the deploy variables are set. Remaining: two CNAME records at the
+registrar, the owner's merge of PR #12, then live verification.
 
 ## Done
 
@@ -149,10 +149,32 @@ no OpenClaw page build, starts without the owner's explicit go.**
       failure, cross-variable validation). Persisted to `handoffs/chief-reviewer-phase-1-delta-2.md`.
       Required before ready: B1 PR body, B2 declare L3 — done. Notes B3 (this correction record),
       B4 (STATE), B5 (memory bank Q1 + ADR range), B7 (ADR-0006 cross-reference) — done.
+- [x] **Checkpoint 2, runbook steps 1–5, 6 (partial) and 8 — run by the Lead Architect on the
+      owner's instruction (2026-09-15, A19):**
+  - Project `cusati-hub` (number 410552878319) created; ACTIVE; no parent (personal account).
+  - Billing linked to the owner's personal billing account (Blaze). Preflight: the owner holds
+    `roles/billing.admin`; the account is open and bills in USD (review F13 confirmed).
+  - Bootstrap APIs enabled; ADC quota project set to `cusati-hub`.
+  - **Terraform applied from `2cece92`** (clean checkout of the reviewed PR head; `budget-guard`
+    green; no override files), 2026-09-15T18:29:11Z–18:30:05Z, via the `hashicorp/terraform:1.14.0`
+    container: `Apply complete! Resources: 19 added, 0 changed, 0 destroyed.` Post-apply plan
+    after `apply -refresh-only`: `No changes.` State backed up privately outside the repository.
+  - Outputs: WIF provider
+    `projects/410552878319/locations/global/workloadIdentityPools/github-actions/providers/website`;
+    deploy SA `hub-deploy@cusati-hub.iam.gserviceaccount.com`; default Hosting URL
+    `https://cusati-hub.web.app` (404 until the first deploy).
+  - Custom domains `jason.cusati.us` and `research.cusati.us` (redirect target `jason.cusati.us`)
+    created: `OWNERSHIP_MISSING`, `HOST_UNHOSTED`, `CERT_VALIDATING` until DNS exists.
+  - Actions variables set: `GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA`. `SITE_URL`
+    deliberately not set until `jason.cusati.us` is `CERT_ACTIVE`.
+  - Hosting release retention set to 20 through the Hosting API (runbook step 6).
+  - Verified: no user-managed keys on `hub-deploy`; no Actions secrets; the applied WIF
+    attribute condition admits only repository id 1212933399, owner id 5666389 and
+    `djjay0131/website`, and refuses `pull_request_target`.
 
 ## In flight
 
-Nothing.
+Nothing — waiting on the owner's DNS records and merge.
 
 ## Blocked
 
@@ -182,20 +204,21 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-Owner, at Checkpoint 2 (the Checkpoint 2 report on PR #12; infra handoff §Manual steps):
+Owner:
 
-1. Review PR #12 (L3) and rule on §Decisions for the owner at Checkpoint 2.
-2. Create the GCP project, link billing (Blaze), apply Terraform from a clean checkout of the
-   reviewed PR head (expect **19** resources to add), and record the applied SHA here.
-3. Add DNS records for `jason.cusati.us` and `research.cusati.us` only; set the Actions
-   variables; merge PR #12.
-4. Approve or amend the OpenClaw page wording on issue #13.
-5. Merge PR #11; file the Incident A1 purge request.
+1. **DNS at GoDaddy** — add exactly two records, change nothing else:
+   - `jason` → CNAME → `cusati-hub.web.app`
+   - `research` → CNAME → `cusati-hub.web.app`
 
-Lead Architect, after an explicit go: verify `jason.cusati.us` serves the site, `research.`
-301-redirects (including whether the path is preserved), Pages still serves, and the apex
-MX/TXT are unchanged; record the applied SHA; close issue #10; memory-bank sync; roadmap
-bookkeeping; then the OpenClaw pages (issue #13).
+   (Or provide a GoDaddy API key and the Lead Architect adds them.)
+2. **Merge PR #12** — the merge push runs the first Firebase deploy to `cusati-hub.web.app`.
+3. Rule on §Decisions for the owner at Checkpoint 2; approve the OpenClaw wording (#13); merge
+   PR #11; file the Incident A1 purge request.
+
+Lead Architect, as each lands: poll `custom_domain_state` until both hosts are `CERT_ACTIVE`;
+set `SITE_URL`; verify runbook step 9 (both hosts, the redirect and whether it keeps the path,
+`build-info.json`, Pages still up, apex DNS unchanged against the snapshot below); record the
+result; close issue #10; memory-bank sync and roadmap bookkeeping; then the OpenClaw pages.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -338,6 +361,12 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **A18** — Dated records (review reports, Phase 0 contracts and handoffs) keep their
   `cusati.us` references; canon forbids rewriting where things were. Current-facing docs,
   code and the infra contract move to `jason.cusati.us`.
+- **A19** — Brief §4 and the infra handoff have the owner run the Checkpoint 2 cloud steps. On
+  2026-09-15 the owner instructed the Lead Architect to perform every step that can be automated
+  and hand over only what cannot be. The Lead Architect ran project creation, billing link, API
+  enablement, the ADC quota project, the Terraform apply (under the review F1 provenance rule),
+  the Actions variables and Hosting release retention. Still the owner's: DNS at the registrar
+  (no registrar API credential), merges, and decisions.
 
 ## ADR candidates
 
@@ -425,6 +454,20 @@ All accepted. Owner of each fix in brackets.
 Notes only; fixed before merge rather than tracked. No further re-review: none changes
 what `terraform apply` creates.
 
+## Apex DNS snapshot before any hub DNS change (2026-09-15T18:29Z)
+
+Runbook step 7 and step 9 compare against these. Public records, recorded here because the
+working snapshot lived in temporary storage.
+
+- `cusati.us` MX: `10 aspmx.l.google.com.`, `20 alt1.aspmx.l.google.com.`,
+  `30 alt2.aspmx.l.google.com.`, `40 aspmx2.googlemail.com.`, `50 aspmx3.googlemail.com.`
+- `cusati.us` TXT: one `google-site-verification=…` record
+- `cusati.us` A: `15.197.148.33`, `3.33.130.190` (registrar parking)
+- `cusati.us` CAA: none (nothing restricts Hosting's certificate issuer)
+- `www.cusati.us`: CNAME `cusati.us.`
+- `jason.cusati.us`, `research.cusati.us`: no records
+- NS: `ns65.domaincontrol.com.`, `ns66.domaincontrol.com.`
+
 ## Decisions for the owner at Checkpoint 2 (with recommended defaults)
 
 - **State backend** — keep local, git-ignored state for the first apply and back
@@ -436,9 +479,8 @@ what `terraform apply` creates.
   `#636a68`, caution `#87620d`; the tracker originals kept for non-text use) and a
   status green the tracker palette lacks. Recommended: accept, and the tracker
   adopts the same values when it becomes a satellite (F7).
-- **Billing** — confirm you are **Billing Account Administrator** on the personal
-  billing account: it is needed to create the budget (Billing Account User is not
-  enough) and it receives the budget emails. Confirm the account bills in USD.
+- **Billing** — *verified 2026-09-15:* the owner holds `roles/billing.admin` on the personal
+  billing account, which is open and bills in USD; the budget was created at apply.
 - **`/phd/` in the redirect map** — leave it in: it is a public, empty, noindex
   shell.
 - **Two-hop legacy research redirects on Firebase** (301 to add the slash, then a
