@@ -1,7 +1,7 @@
 # Active Context
 
 Status: Draft
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 Owner: Chief Architect
 
 What belongs here: the current focus, the current stop point, and next steps —
@@ -9,11 +9,14 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
-- Sprint `2026-09-hub`, **Phase 0 — Establish**. Draft PR #9 is open and being
-  reconciled against the Chief Reviewer's findings.
-- **Stop point: Checkpoint 1.** No Phase 1 work starts without the owner's
-  explicit go. Do not re-ask answered questions below.
-- Live orchestration state: `llm/sprints/2026-09-hub/STATE.md`.
+- Sprint `2026-09-hub`, **Phase 1 — Foundation**, in progress: issue #10, branch
+  `feat/foundation`.
+- Phase 0 merged via PR #9 on 2026-09-15. The merge was executed by the Lead
+  Architect on the owner's explicit instruction, recorded on PR #9.
+- **Next stop point: Checkpoint 2.** The owner creates the GCP project, enables
+  Blaze, runs `terraform apply`, adds DNS records and merges.
+- Live orchestration state: `llm/sprints/2026-09-hub/STATE.md` (on the active
+  sprint branch until it merges).
 
 ## Decisions on record
 
@@ -28,8 +31,8 @@ what a contributor needs to pick up work today.
 ## Open
 
 - Design doc §10 Q3, Q4, Q6.
-- Brief / design-doc / canon conflicts K1–K13 in `STATE.md`, for the owner at
-  Checkpoint 1.
+- Brief / design-doc / canon conflicts K1–K13 (`STATE.md`): not ruled on
+  individually; Phase 1 takes the conservative choice for each (issue #10).
 
 ## Governance adoption
 
