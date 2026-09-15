@@ -15,11 +15,10 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. CHECKPOINT 2 — INFRASTRUCTURE APPLIED; WAITING ON DNS AND MERGE**
-(issue #10, PR #12 ready, L3). The owner instructed the Lead Architect to run every
-Checkpoint 2 step that can be automated (A19). The GCP project exists, billing is linked,
-Terraform is applied, and the deploy variables are set. Remaining: two CNAME records at the
-registrar, the owner's merge of PR #12, then live verification.
+**Phase 1 — Foundation. COMPLETE. Checkpoint 2 passed (2026-09-15).** The hub is live at
+`https://jason.cusati.us` on Firebase Hosting; `https://research.cusati.us` redirects to it.
+**Stopped: no Phase 2 work, and no OpenClaw page build (#13), without the owner's explicit
+go.**
 
 ## Done
 
@@ -171,14 +170,34 @@ registrar, the owner's merge of PR #12, then live verification.
   - Verified: no user-managed keys on `hub-deploy`; no Actions secrets; the applied WIF
     attribute condition admits only repository id 1212933399, owner id 5666389 and
     `djjay0131/website`, and refuses `pull_request_target`.
+- [x] **Checkpoint 2 passed (2026-09-15)** — verified live; evidence on issue #10:
+  - Owner added the two CNAMEs (`jason`, `research` → `cusati-hub.web.app`) and merged PR #12 at
+    18:53:37Z (merge `59e576f`); the owner also merged PR #11.
+  - First post-merge `build-and-deploy` run 35010300517: every job green — `firebase-deploy`
+    (`Deploy complete!`, 159 files, released by `hub-deploy` through WIF), `firebase-smoke-test`,
+    Pages `deploy` (deploy-pages v5, first real run — review F11) and `smoke-test`, `budget-guard`,
+    `deploy-tools`.
+  - Firebase activated both domains at about 20:06Z (roughly 80 minutes after DNS);
+    `SITE_URL` set to `https://jason.cusati.us` at 20:06:43Z once its certificate was valid.
+  - `https://jason.cusati.us`: all 48 inventory routes return 200; certificate `CN=jason.cusati.us`
+    (Google Trust Services); `build-info.json` from `59e576f`; nav has no `/phd`; `/phd/` noindex
+    and out of the sitemap; fonts self-hosted; petrol accent and dark theme in the served CSS.
+  - `https://research.cusati.us`: 301 to `https://jason.cusati.us/`, **paths preserved**
+    (`/cv/academic/` → `/cv/academic/`); valid certificate.
+  - Legacy Astro redirects (`/research/agentic-harnesses*`): all forward to their targets under `/` (meta refresh; targets return 200).
+  - `terraform apply -refresh-only`: 0 changes; `plan`: `No changes.`; state backed up privately.
+  - GitHub Pages still serves; apex `cusati.us` MX, TXT, A, CAA and `www` unchanged.
+- [x] Phase 1 bookkeeping PR: roadmap checkboxes, this record, memory-bank sync (issue #10, F9).
 
 ## In flight
 
-Nothing — waiting on the owner's DNS records and merge.
+- **Background check:** the next scheduled `build-and-deploy` run should read `build-info.json`
+  from `https://jason.cusati.us` (roadmap Phase 1 fingerprint criterion). GitHub runs the hourly
+  cron irregularly; the roadmap box stays unchecked until a scheduled run shows it.
 
 ## Blocked
 
-Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repository.
+Nothing. Phase 2 waits for the owner's go.
 
 ## Incident A1 — private material on a public branch
 
@@ -206,19 +225,16 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 Owner:
 
-1. **DNS at GoDaddy** — add exactly two records, change nothing else:
-   - `jason` → CNAME → `cusati-hub.web.app`
-   - `research` → CNAME → `cusati-hub.web.app`
+1. **Go / no-go for Phase 2.** Before its contracts: decide the satellite → hub dispatch
+   credential (ADR-0002 conflict; STATE C1, K13) — the constraint proposed is that no
+   satellite holds any GitHub credential for `website`.
+2. Approve or amend the OpenClaw Email wording (#13).
+3. Remaining Checkpoint 2 decisions (§Decisions for the owner at Checkpoint 2), notably
+   whether `budget-guard` becomes a required status check.
+4. File the Incident A1 GitHub Support purge request.
 
-   (Or provide a GoDaddy API key and the Lead Architect adds them.)
-2. **Merge PR #12** — the merge push runs the first Firebase deploy to `cusati-hub.web.app`.
-3. Rule on §Decisions for the owner at Checkpoint 2; approve the OpenClaw wording (#13); merge
-   PR #11; file the Incident A1 purge request.
-
-Lead Architect, as each lands: poll `custom_domain_state` until both hosts are `CERT_ACTIVE`;
-set `SITE_URL`; verify runbook step 9 (both hosts, the redirect and whether it keeps the path,
-`build-info.json`, Pages still up, apex DNS unchanged against the snapshot below); record the
-result; close issue #10; memory-bank sync and roadmap bookkeeping; then the OpenClaw pages.
+Lead Architect, after the relevant go: OpenClaw pages (#13) on their own branch; hub-002
+(Phase 2) with contracts that encode the owner's dispatch-credential decision; C17 fix.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -495,6 +511,10 @@ working snapshot lived in temporary storage.
   moderate advisories in its dependency tree. Recommended: accept for the first
   deploy; evaluate `--ignore-scripts` after one real deploy (infra handoff
   Recommendation 6).
+**Status after merge (2026-09-15):** PR #12 merged, so the L3 classification is settled. Billing
+admin and USD are verified. Still open: keep API Keys Viewer; accept the AA-adjusted tokens and
+status green; accept the deploy tools' install scripts and advisories; `budget-guard` as a
+required status check; remote state backend timing.
 
 ## Risks carried forward
 
@@ -536,6 +556,11 @@ working snapshot lived in temporary storage.
 
 - The tarball follow-up formerly here (delete it in Phase 3) is **withdrawn**: it
   is now immediate — see Blocked, A1.
+- Delete the merged remote branches (`gov/establish-hub`, `feat/foundation`,
+  `admin/phase-0-bookkeeping`) — administrative cleanup, with the owner's word.
+- Keep the local `handoff/research-hub` branch until the Incident A1 purge is confirmed (it holds
+  the commit SHA the request needs).
+- C17: normalise the redirect-domain duplicate check.
 
 ## Standing constraints
 

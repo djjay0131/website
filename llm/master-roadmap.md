@@ -93,7 +93,7 @@ listed:
 - [x] The committed design doc is byte-identical to the copy on `handoff/research-hub`
 - [x] No `phd-milestones` tarball exists anywhere in the PR branch's tree
 - [x] This roadmap has one section per milestone label, `phase-0-establish` through `phase-6-polish`, and each label exists on the GitHub repository
-- [ ] Branch protection on `main`, read through the GitHub API, matches the delta's §Platform Enforcement Reality
+- [x] Branch protection on `main`, read through the GitHub API, matches the delta's §Platform Enforcement Reality
 - [x] The Q1 and Q2 answers are on the record (ADR-0001, issue #7), and ADR-0001 states the Q5 proposal for owner approval
 - [ ] The Chief Reviewer's review is recorded on the PR, and no agent merged it
 
@@ -114,7 +114,7 @@ Checkpoint 1 (brief §5). The owner reviews the PR, and merging it accepts
 ADR-0001's Q5 proposal. Then the agents stop until the owner gives an
 explicit go.
 
-- [ ] Checkpoint 1 passed and recorded in `STATE.md`
+- [x] Checkpoint 1 passed and recorded in `STATE.md`
 
 ---
 
@@ -124,39 +124,39 @@ explicit go.
 
 ### Scope
 
-- [ ] The Astro application moves under `site/` with history preserved, per ADR-0001, as the owner approves it at Checkpoint 1 (§10 Q5)
-- [ ] The site's base path moves from `/website/` to `/` (ADR-0001)
-- [ ] Terraform in `infra/`: provider, project, required APIs, and variables for project id, region and domain (§8; brief §4)
-- [ ] Workload Identity Federation pool and provider for `djjay0131/website`, with a least-privilege hub deploy service account (§8)
-- [ ] Billing budget of $5 with an email alert (§8)
-- [ ] Firebase project and Hosting on the new GCP project, bound to `jason.cusati.us` (§8, §10 Q1, Q2; ADR-0006)
-- [ ] `firebase.json` at the repository root, publishing `site/dist-public` (§8)
-- [ ] GitHub Actions deploy to Firebase Hosting on push to `main` (§9, §11)
-- [ ] Design tokens in `site/src/styles/tokens.css`, light and dark (§5)
-- [ ] Layouts (base, section index, item page) and section shells for `research`, `projects`, `writing`, `cv`, `phd` (§4, §11; brief §4)
-- [ ] A redirect map from every route the current build serves under `/website/`, including `/research/**` and the existing Astro `redirects`, to its new path (ADR-0001). It is recorded here and served in Phase 6.
-- [ ] The hourly `cv` fingerprint check is repointed from the GitHub Pages URL to the new host (ADR-0001)
-- [ ] The infra handoff states what `terraform apply` creates, the estimated cost, and the manual steps that remain (brief §4)
+- [x] The Astro application moves under `site/` with history preserved, per ADR-0001, as the owner approves it at Checkpoint 1 (§10 Q5)
+- [x] The site's base path moves from `/website/` to `/` (ADR-0001)
+- [x] Terraform in `infra/`: provider, project, required APIs, and variables for project id, region and domain (§8; brief §4)
+- [x] Workload Identity Federation pool and provider for `djjay0131/website`, with a least-privilege hub deploy service account (§8)
+- [x] Billing budget of $5 with an email alert (§8)
+- [x] Firebase project and Hosting on the new GCP project, bound to `jason.cusati.us` (§8, §10 Q1, Q2; ADR-0006)
+- [x] `firebase.json` at the repository root, publishing `site/dist-public` (§8)
+- [x] GitHub Actions deploy to Firebase Hosting on push to `main` (§9, §11)
+- [x] Design tokens in `site/src/styles/tokens.css`, light and dark (§5)
+- [x] Layouts (base, section index, item page) and section shells for `research`, `projects`, `writing`, `cv`, `phd` (§4, §11; brief §4)
+- [x] A redirect map from every route the current build serves under `/website/`, including `/research/**` and the existing Astro `redirects`, to its new path (ADR-0001). It is recorded here and served in Phase 6.
+- [x] The hourly `cv` fingerprint check is repointed from the GitHub Pages URL to the new host (ADR-0001)
+- [x] The infra handoff states what `terraform apply` creates, the estimated cost, and the manual steps that remain (brief §4)
 
 ### Acceptance criteria
 
-- [ ] `https://jason.cusati.us/` serves the site over HTTPS from Firebase Hosting with a valid certificate
-- [ ] `https://research.cusati.us/` answers with a 301 redirect to `https://jason.cusati.us/` over HTTPS with a valid certificate (ADR-0006)
-- [ ] Every route the current build serves returns HTTP 200 at `https://jason.cusati.us` under base path `/`: the `build.yml` smoke-test routes (`/`, `/resumes/`, `/cv/academic`, `/cv/research-professional`, `/papers/`, `/pdfs/academic.pdf`, `/projects/`) and every `/research/**` page; each existing Astro `redirects` source forwards to its target under `/`
-- [ ] `/cv/academic` and `/papers/` on `jason.cusati.us` return bodies of at least 500 bytes (the existing smoke check)
-- [ ] The built `site/dist-public` has no link, asset reference or redirect target under `/website/`, including the hardcoded `/website/research/soa-agentic-se/agentic-harnesses*` targets in the existing Astro `redirects`
-- [ ] `djjay0131.github.io/website/` still serves the site, since Pages is retired only in Phase 6 (ADR-0001)
+- [x] `https://jason.cusati.us/` serves the site over HTTPS from Firebase Hosting with a valid certificate
+- [x] `https://research.cusati.us/` answers with a 301 redirect to `https://jason.cusati.us/` over HTTPS with a valid certificate (ADR-0006)
+- [x] Every route the current build serves returns HTTP 200 at `https://jason.cusati.us` under base path `/`: the `build.yml` smoke-test routes (`/`, `/resumes/`, `/cv/academic`, `/cv/research-professional`, `/papers/`, `/pdfs/academic.pdf`, `/projects/`) and every `/research/**` page; each existing Astro `redirects` source forwards to its target under `/`
+- [x] `/cv/academic` and `/papers/` on `jason.cusati.us` return bodies of at least 500 bytes (the existing smoke check)
+- [x] The built `site/dist-public` has no link, asset reference or redirect target under `/website/`, including the hardcoded `/website/research/soa-agentic-se/agentic-harnesses*` targets in the existing Astro `redirects`
+- [x] `djjay0131.github.io/website/` still serves the site, since Pages is retired only in Phase 6 (ADR-0001)
 - [ ] The CV on `jason.cusati.us` matches the latest `cv` release, and the hourly fingerprint check reads the new host's build info
-- [ ] `git log --follow` on a moved file under `site/src/` shows its history from before the move
-- [ ] Every cloud resource Phase 1 uses is declared in `infra/`. After the owner's apply, `terraform plan` reports no changes (§12.5).
-- [ ] The manual steps Terraform cannot perform are written down in the repository (§12.5)
-- [ ] The project's billing account has a $5 budget that emails the owner (§12.6)
-- [ ] The deploy authenticates through WIF only: no service-account JSON key in the repository and none in its Actions secrets (§12.2)
-- [ ] `firebase.json` configures no Cloud Functions, server-side rendering or framework backend. Everything outside the gate rewrite paths is a static file from `site/dist-public` (§12.4).
-- [ ] Rendered pages use Spectral, IBM Plex Sans and IBM Plex Mono with the `#0F5C5A` petrol accent, and switch between light and dark themes (§5)
-- [ ] All five section shells exist, and the public navigation has no link to `phd` (brief §4)
-- [ ] The GCP project belongs to the personal account, and its project id is a Terraform variable (ADR-0001)
-- [ ] The redirect map covers every route the current build serves, including `/research/**` and the existing Astro `redirects`, not only the smoke-test routes
+- [x] `git log --follow` on a moved file under `site/src/` shows its history from before the move
+- [x] Every cloud resource Phase 1 uses is declared in `infra/`. After the owner's apply, `terraform plan` reports no changes (§12.5).
+- [x] The manual steps Terraform cannot perform are written down in the repository (§12.5)
+- [x] The project's billing account has a $5 budget that emails the owner (§12.6)
+- [x] The deploy authenticates through WIF only: no service-account JSON key in the repository and none in its Actions secrets (§12.2)
+- [x] `firebase.json` configures no Cloud Functions, server-side rendering or framework backend. Everything outside the gate rewrite paths is a static file from `site/dist-public` (§12.4).
+- [x] Rendered pages use Spectral, IBM Plex Sans and IBM Plex Mono with the `#0F5C5A` petrol accent, and switch between light and dark themes (§5)
+- [x] All five section shells exist, and the public navigation has no link to `phd` (brief §4)
+- [x] The GCP project belongs to the personal account, and its project id is a Terraform variable (ADR-0001)
+- [x] The redirect map covers every route the current build serves, including `/research/**` and the existing Astro `redirects`, not only the smoke-test routes
 
 ### Not in this phase
 
@@ -182,7 +182,7 @@ Checkpoint 2 (brief §4, §5). The owner runs `terraform apply`, enables Blaze,
 adds the DNS records and merges. The Lead Architect verifies that the domain
 serves the site and records it in `STATE.md`.
 
-- [ ] Checkpoint 2 passed and recorded in `STATE.md`
+- [x] Checkpoint 2 passed and recorded in `STATE.md`
 
 ---
 

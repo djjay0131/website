@@ -9,27 +9,32 @@ merged reality, not plans.
 
 ## What works
 
-- The current site builds and deploys to GitHub Pages (`build.yml`).
-- Governance adopted (agentic-governance v0.8): PR #9, merged 2026-09-15.
-- `main` is branch-protected: PR required, and `governance-checks` is a required
-  status check (since 2026-09-15).
-- ADRs 0001–0005 Accepted; master roadmap in force.
+- **https://jason.cusati.us** serves the site from Firebase Hosting (project `cusati-hub`),
+  deployed on every push to `main` through WIF; no service-account keys exist.
+- `https://research.cusati.us` 301-redirects to it, preserving paths.
+- GitHub Pages (`djjay0131.github.io/website/`) still serves the same build until Phase 6.
+- Terraform in `infra/` declares every Phase 1 cloud resource; the owner's $5 budget alert
+  is live and guarded in CI.
+- Governance adopted (agentic-governance v0.8); `main` requires `governance-checks`.
+- ADRs 0001–0006 Accepted; master roadmap in force.
 
 ## Pending merge
 
-None from Phase 0.
+None.
 
 ## What is left
 
-- Phases 1–6 of `llm/master-roadmap.md`. Phase 1 is in progress (issue #10).
+- Phases 2–6 of `llm/master-roadmap.md`, starting with Phase 2 on the owner's go.
+- OpenClaw Email pages (#13).
 
 ## Known issues
 
-- ADR-0002's dispatch step contradicts its own no-write-access decision; a
-  follow-up ADR must settle it before Phase 2.
+- ADR-0002's dispatch step contradicts its own no-write-access decision; a follow-up ADR
+  must settle it before Phase 2.
 - Brief and design-doc conflicts K1–K13 (`llm/sprints/2026-09-hub/STATE.md`).
-- Incident A1 (`STATE.md`): a removal request for GitHub's cached views is an
-  outstanding owner action.
+- Redirect-domain duplicate validation ignores case and trailing dots (STATE C17).
+- Incident A1 (`STATE.md`): the GitHub cached-view removal request is an outstanding owner
+  action.
 
 ## Governance adoption
 
