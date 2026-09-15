@@ -102,6 +102,13 @@ Skills and agents running as the installed plugin resolve canon from
 checkout either: `.github/workflows/ci.yml` fetches canon itself, pinned by
 commit SHA.
 
+**Which pin binds.** The CI pin is binding: `.github/workflows/ci.yml` checks
+out canon at a fixed commit SHA, and that is what runs on every pull request.
+The installed plugin auto-updates on workstations (`autoUpdate` in
+`.claude/settings.json`), so a local session can run a newer canon than CI.
+When the two disagree, CI's result is authoritative. Bumping the CI SHA is an L2
+pull request that also updates this file's `Governance:` line.
+
 ## Governance Check Command
 
 With the plugin loaded:
@@ -234,7 +241,7 @@ repository (principle 3), and nothing here depends on how a satellite builds.
 
 | Repo | Relationship | Phase |
 |---|---|---|
-| `agentic-governance` | Canon. Pinned at v0.8 (CI: SHA `5689b69`, v0.8.3). | — |
+| `agentic-governance` | Canon. Binding pin: CI at SHA `5689b69` (v0.8.3); the plugin auto-updates locally (§Canon Location). | — |
 | `cv` | Satellite #1, public items. Private repo, public output. Today consumed ad hoc via release download in `build.yml`; formalized under the manifest contract. | 2 |
 | `phd-milestones` | Satellite #2, private items: milestone tracker, committee dossier. To be created as a private repo from the handoff tarball. | 3 |
 | `agentic-kg` | Satellite #3, project page (public), optional private notes. | 5 |
