@@ -1,7 +1,7 @@
 # Research Hub — Orchestration State
 
 Status: Active
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 Owner: Chief Architect (Lead Architect)
 
 **Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 (all work streams)
@@ -15,9 +15,11 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 0 — Establish. CHECKPOINT 1 — STOPPED.** PR #9 is marked ready for the
-owner's review once CI is green on the commit that records this. **No Phase 1
-work starts without the owner's explicit go.**
+**Phase 1 — Foundation. IN PROGRESS** (issue #10, branch `feat/foundation`).
+Checkpoint 1 passed: the owner approved PR #9 and gave the go. The Astro app is
+moved under `site/`; the Phase 1 contracts are written; the implementation wave
+(site + infra, then independent verification) launches next. Next stop:
+**Checkpoint 2**.
 
 ## Done
 
@@ -66,10 +68,28 @@ work starts without the owner's explicit go.**
       all unchecked, no machine paths, governance checks 4/4 PASS. Left unchanged by
       decision: five factual mentions of the handoff branch or tarball (scope and
       history, no SHA), and three Q5 lines that remain accurate.
+- [x] **Checkpoint 1 passed** (2026-09-15). Owner: "PR 9 looks good please merge ad
+      move o to phase 1". PR #9 merged (`d32cd36`) by the Lead Architect on that
+      instruction, with the instruction recorded on the PR (A11). Issue #7 closed.
+- [x] `governance-checks` made a **required status check** on `main` after its
+      green run there; verified via the API. Delta updated on `feat/foundation`.
+- [x] Post-merge `build-and-deploy` on `main` green, Pages smoke test included.
+- [x] Phase 0 bookkeeping opened as a separate L0 PR, **#11** (`admin/phase-0-bookkeeping`):
+      18 roadmap checkboxes and a memory-bank sync. Three Phase 0 boxes stay
+      unchecked (branch-protection match pending this delta update; "no agent
+      merged it" — A11; Checkpoint 1 recorded here).
+- [x] Issue **hub-001** (#10) opened: Mode 3, L2, preconditions, and the
+      conservative choice for each of K1–K13.
+- [x] Astro app moved under `site/` as a pure rename (42 files at 100%
+      similarity; `git log --follow` verified), with `.gitignore` following.
+      Commit message corrected before any PR: the moved app builds, and 1 of 22
+      tests fails locally on data (A12).
+- [x] Contracts: `phase-1-seams.md` (SEAM-1..6), `site-phase-1.md`,
+      `infra-phase-1.md`.
 
 ## In flight
 
-Nothing.
+Nothing yet — the Phase 1 implementation workflow launches after this commit.
 
 ## Blocked
 
@@ -99,17 +119,12 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-Owner, at Checkpoint 1 (details in the Checkpoint 1 report on PR #9):
-
-1. Incident A1: request GitHub Support removal of cached views of the commit.
-2. Rule on K1–K13, above all K2 and K13; confirm or reject Q5 by merging PR #9.
-3. Review and merge PR #9.
-4. Before Phase 1: create the GCP project, link billing (Blaze), set the ADC quota
-   project; decide A3 (branch naming) and A7 (Constellize).
-
-Lead Architect, after an explicit go: add `governance-checks` as a required status
-check once it is green on `main`; open hub-001; write Phase 1 contracts that
-encode the owner's rulings on K1–K13.
+1. Launch the Phase 1 workflow: `site` and `infra` in parallel → an independent
+   verifier per stream (with one fix round through the stream's owner) → a seam
+   verifier across both.
+2. Lead Architect reconciliation: check every deliverable against its contract;
+   commit per scope.
+3. Draft PR (L2) → Chief Reviewer → reconcile → mark ready → **Checkpoint 2**.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -169,6 +184,10 @@ Inside the design doc:
   write on `website` — contradicting §3's "a satellite never has write access to
   the hub" and principle 3. Recorded in ADR-0002; the owner decides the
   constraint before Phase 2.
+**Outcome at Checkpoint 1:** the owner merged without ruling on K1–K13
+individually. Phase 1 takes the conservative choice for each — the design doc and
+the merged roadmap over the brief — recorded in issue #10. K2 in particular:
+Phase 1's `firebase.json` carries no gate rewrites.
 
 ## Decisions on the record
 
@@ -213,6 +232,23 @@ Inside the design doc:
 - **A10** — The commit SHA that carried the tarball is redacted from every public
   artifact, including the otherwise-verbatim Chief Reviewer report, until GitHub
   confirms the cached views are purged.
+- **A11** — PR #9 was merged by the Lead Architect on the owner's explicit
+  instruction. Canon (`governance-levels.md` §Level-Aware Merge Authority) says no
+  AI role merges semantic work; the decision was the owner's and is recorded on
+  PR #9, but the platform action was an agent's. The roadmap criterion "no agent
+  merged it" is left unchecked for the owner to accept or not. Default for later
+  PRs: the owner merges, unless the owner again instructs otherwise on that PR.
+- **A12** — Local test baseline: `cv-data.test.ts > resolveVariant > resolves
+  academic variant with correct section order` fails locally (education 4 vs 3)
+  because the local CV data (2026-08-17) is newer than the `cv` release CI tests
+  against (assets 2026-07-27); CI passes. Not Phase 1 work; the owner's
+  `fix/derive-education-assertion` branch appears to address it.
+- **A13** — GitHub Pages and Firebase Hosting are both built from each commit
+  until Phase 6 (ADR-0001 Decision 4); the Firebase deploy stays switched off
+  until the owner sets the SEAM-4 variables at Checkpoint 2.
+- **A14** — Phase 1 runs as a generated ultracode workflow (the Mode 3 fan-out
+  deferred in A2). Verification inside the workflow does not replace the Chief
+  Reviewer's review of the PR.
 
 ## ADR candidates
 
