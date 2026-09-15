@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Never commit the copy.
+
+# The project you created by hand (design doc §10 Q2).
+project_id = "cusati-hub"
+
+# Your Cloud Billing account ID: `gcloud billing accounts list`.
+billing_account = "000000-000000-000000"
+
+# Defaults, shown for reference; uncomment only to change.
+# region                     = "us-east1"
+# domain                     = "cusati.us"
+# github_repository          = "djjay0131/website"
+# github_repository_id       = "1212933399"
+# github_repository_owner_id = "5666389"
+# hosting_site_id            = null # null = the project ID

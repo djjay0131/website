@@ -1,0 +1,26 @@
+# Provider plugins and module cache (re-created by `terraform init`).
+.terraform/
+
+# State: never committed. It records resource IDs and the billing account.
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+
+# Real variable values, including the billing account. Only
+# terraform.tfvars.example is committed (it does not match these patterns).
+*.tfvars
+*.tfvars.json
+
+# Saved plans embed variable values.
+*.tfplan
+tfplan
+
+# Local overrides and crash logs.
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+crash.log
+crash.*.log
+
+# .terraform.lock.hcl is intentionally NOT ignored.

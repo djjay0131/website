@@ -11,11 +11,8 @@ on:
     - cron: "0 * * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-  issues: write   # failure notifications fall back to opening an issue.
+# No workflow-wide grant. Each job asks for exactly what it uses.
+permissions: {}
 
 # Real deploys (push/schedule/dispatch) stay serialized under a single "pages"
 # group so they never race each other. PR validation builds get their own
@@ -24,6 +21,17 @@ permissions:
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'pages' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Two hosts are built from every commit until Phase 6 (ADR-0001 Decision 4;
+# phase-1-seams.md SEAM-5):
+#   - GitHub Pages at https://djjay0131.github.io/website/ -- live and
+#     authoritative, deployed exactly as before;
+#   - Firebase Hosting -- deployed only once the owner sets the GitHub Actions
+#     variable GCP_PROJECT_ID (with GCP_WIF_PROVIDER and GCP_DEPLOY_SA, the
+#     outputs of infra/). Until then the Firebase jobs are skipped.
+#
+# Actions are pinned by full commit SHA with the version in a comment, as in
+# ci.yml, so a retagged action cannot change this pipeline without a commit.
 
 jobs:
   # This site has no CV content of its own -- it pulls it from the cv repo's
@@ -37,6 +45,8 @@ jobs:
   # site code changed, which the fingerprint alone would not catch.
   check:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
       changed: ${{ steps.compare.outputs.changed }}
       fingerprint: ${{ steps.compare.outputs.fingerprint }}
@@ -46,6 +56,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
+          # SEAM-5: read the deployed build info from SITE_URL when the owner has
+          # set it, else from GitHub Pages.
+          SITE_URL: ${{ vars.SITE_URL }}
         run: |
           FP=$(gh release view latest --repo djjay0131/cv --json assets \
             --jq '[.assets[] | "\(.name):\(.updatedAt)"] | sort | join(",")')
@@ -58,9 +71,13 @@ jobs:
             exit 0
           fi
 
+          DEPLOYED_SITE="${SITE_URL:-https://djjay0131.github.io/website}"
+          DEPLOYED_SITE="${DEPLOYED_SITE%/}"
+          echo "reading deployed build info from ${DEPLOYED_SITE}/build-info.json"
+
           # A missing or unreadable build-info.json (first run after this
           # lands, or a failed deploy) falls through to "changed" and builds.
-          DEPLOYED=$(curl -sfL "https://djjay0131.github.io/website/build-info.json" \
+          DEPLOYED=$(curl -sfL "${DEPLOYED_SITE}/build-info.json" \
             | jq -r '.cv_fingerprint // ""' 2>/dev/null || true)
           echo "deployed fingerprint: ${DEPLOYED:-<none>}"
 
@@ -71,39 +88,45 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+  # Builds and tests the GitHub Pages variant (SEAM-1, SEAM-5). This is the only
+  # build the Pages deploy depends on, so the Firebase variant (build-firebase,
+  # below) cannot fail or block it (SEAM-4). Pull requests stop here: nothing
+  # below deploys on a pull_request event.
   build:
     needs: check
     if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: site
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
 
       - name: Install deps
         run: npm ci
 
+      # SEAM-2: the one place that downloads the CV data and PDFs.
       - name: Fetch CV data and PDF
         env:
           GH_TOKEN: ${{ github.token }}
+        run: bash scripts/fetch-data.sh
+
+      # Astro copies public/ verbatim into the build output, so this ships to
+      # <site>/build-info.json on both hosts and becomes the state the next
+      # scheduled poll compares against. jq handles the quoting.
+      - name: Record build info
+        env:
           CV_FINGERPRINT: ${{ needs.check.outputs.fingerprint }}
         run: |
-          mkdir -p data/content data/variants public/pdfs
-          gh release download latest --repo djjay0131/cv --pattern "cv-data.zip" --dir /tmp/cv-fetch --clobber
-          # Pull every variant PDF in the release (one per data/variants/<name>.yaml).
-          gh release download latest --repo djjay0131/cv --pattern "*.pdf" --dir public/pdfs --clobber
-          unzip -o /tmp/cv-fetch/cv-data.zip -d /tmp/cv-fetch/extracted
-          cp -r /tmp/cv-fetch/extracted/data/* data/ 2>/dev/null || true
-          cp /tmp/cv-fetch/extracted/own-bib.bib data/ 2>/dev/null || true
-          cp /tmp/cv-fetch/extracted/photo_jason_1.jpeg public/ 2>/dev/null || true
-          rm -rf /tmp/cv-fetch
-
-          # Astro copies public/ verbatim into dist/, so this ships to
-          # <site>/build-info.json and becomes the state the next scheduled
-          # poll compares against. jq handles the quoting.
           jq -n \
             --arg fp "${CV_FINGERPRINT}" \
             --arg sha "${GITHUB_SHA}" \
@@ -112,33 +135,111 @@ jobs:
             > public/build-info.json
           cat public/build-info.json
 
-      - name: Run tests
+      - name: Run tests (GitHub Pages variant)
+        env:
+          SITE_URL: https://djjay0131.github.io
+          SITE_BASE: /website/
         run: npm test
 
-      - name: Build Astro
+      - name: Build Astro (GitHub Pages variant)
+        env:
+          SITE_URL: https://djjay0131.github.io
+          SITE_BASE: /website/
         run: npm run build
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: dist
+          path: site/dist-public
+
+  # Builds and tests the Firebase Hosting variant from the same commit, as a
+  # separate job (SEAM-5), so nothing here is a new failure point for the Pages
+  # path (SEAM-4). It runs on pull requests, which validate both variants and
+  # upload nothing, and on the deploy path only once the owner has set
+  # vars.GCP_PROJECT_ID. Until then an unconfigured push, dispatch or schedule
+  # runs exactly the jobs it ran before this workflow gained Firebase.
+  build-firebase:
+    needs: check
+    if: >-
+      needs.check.outputs.changed == 'true'
+      && (github.event_name == 'pull_request' || vars.GCP_PROJECT_ID != '')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+
+      - name: Install deps
+        run: npm ci
+
+      # SEAM-2: the one place that downloads the CV data and PDFs.
+      - name: Fetch CV data and PDF
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/fetch-data.sh
+
+      # Same build-info.json as the Pages build: the fingerprint comes from the
+      # check job, the SHA and run id from this run.
+      - name: Record build info
+        env:
+          CV_FINGERPRINT: ${{ needs.check.outputs.fingerprint }}
+        run: |
+          jq -n \
+            --arg fp "${CV_FINGERPRINT}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg run "${GITHUB_RUN_ID}" \
+            '{cv_fingerprint: $fp, built_from_sha: $sha, run_id: $run}' \
+            > public/build-info.json
+          cat public/build-info.json
+
+      # SEAM-1 defaults (https://cusati.us, base /), so SITE_URL and SITE_BASE
+      # are deliberately unset.
+      - name: Run tests (Firebase Hosting variant)
+        run: npm test
+
+      - name: Build Astro (Firebase Hosting variant)
+        run: npm run build
+
+      # Only the deploy path consumes the artifact; a pull request stores none.
+      - name: Upload Firebase Hosting artifact
+        if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: firebase-hosting
+          path: site/dist-public
+          if-no-files-found: error
+          retention-days: 1
 
   deploy:
     needs: build
     runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request'
+    permissions:
+      pages: write # to create the Pages deployment
+      id-token: write # deploy-pages verifies the deployment's origin with OIDC
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   smoke-test:
     needs: deploy
     runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request'
+    permissions: {}
     steps:
       - name: Wait for Pages propagation
         run: sleep 30
@@ -173,16 +274,137 @@ jobs:
             echo "OK: ${ROUTE} body is ${BODY_SIZE} bytes"
           done
 
+  # Firebase Hosting deploy (SEAM-3, SEAM-4). Runs only on the deploy path and
+  # only after the owner sets vars.GCP_PROJECT_ID. Authentication is Workload
+  # Identity Federation: GitHub's OIDC token is exchanged for a short-lived
+  # credential that impersonates the deploy service account. No key file, no
+  # token secret. The WIF binding admits only refs/heads/main (infra/deploy.tf).
+  firebase-deploy:
+    needs: build-firebase
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
+    permissions:
+      contents: read # checkout, for firebase.json
+      id-token: write # the GitHub OIDC token exchanged through WIF
+    steps:
+      - name: Check deploy configuration
+        env:
+          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          GCP_DEPLOY_SA: ${{ vars.GCP_DEPLOY_SA }}
+        run: |
+          MISSING=0
+          for NAME in GCP_WIF_PROVIDER GCP_DEPLOY_SA; do
+            if [ -z "${!NAME}" ]; then
+              echo "::error::GCP_PROJECT_ID is set but the GitHub Actions variable ${NAME} is not (see infra/README.md)."
+              MISSING=1
+            fi
+          done
+          exit "${MISSING}"
+
+      # Checkout comes before auth: auth writes its credentials file into the
+      # workspace, and a later checkout would delete it.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Download Firebase Hosting build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: firebase-hosting
+          path: site/dist-public
+
+      # check-latest: Node 22.23.0 shipped an http.Agent keep-alive regression
+      # that breaks google-auth-library's STS token exchange and so WIF deploys
+      # (firebase/firebase-tools#10716, nodejs/node#63989; fixed in 22.23.1).
+      # Without it setup-node may serve the runner's cached 22.x.
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          check-latest: true
+
+      # Writes an external_account credentials file (service account
+      # impersonation) and exports GOOGLE_APPLICATION_CREDENTIALS, which
+      # firebase-tools reads through google-auth-library's GoogleAuth
+      # (firebase-tools src/requireAuth.ts, autoAuth).
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - name: Deploy to Firebase Hosting
+        env:
+          FIREBASE_TOOLS_VERSION: 15.30.1
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy \
+            --only hosting \
+            --project "${GCP_PROJECT_ID}" \
+            --non-interactive \
+            --message "${GITHUB_SHA} (run ${GITHUB_RUN_ID})"
+
+  # Same routes and body-size checks as the Pages smoke test, against the
+  # Firebase host at base path "/".
+  firebase-smoke-test:
+    needs: firebase-deploy
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
+    permissions: {}
+    steps:
+      - name: Resolve the Firebase site URL
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          SITE="${SITE_URL:-https://${GCP_PROJECT_ID}.web.app}"
+          echo "SITE=${SITE%/}" >> "$GITHUB_ENV"
+          echo "Smoke testing ${SITE%/}"
+
+      - name: Wait for Hosting propagation
+        run: sleep 15
+
+      - name: Smoke test live routes
+        run: |
+          FAILED=0
+          for ROUTE in "/" "/resumes/" "/cv/academic" "/cv/research-professional" "/papers/" "/pdfs/academic.pdf" "/projects/"; do
+            STATUS=$(curl -sL -o /dev/null -w "%{http_code}" "${SITE}${ROUTE}")
+            if [ "$STATUS" = "200" ]; then
+              echo "OK: ${ROUTE} → ${STATUS}"
+            else
+              echo "FAIL: ${ROUTE} → ${STATUS}"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::One or more Firebase smoke tests failed."
+            exit 1
+          fi
+
+      - name: Verify non-empty body on key routes
+        run: |
+          for ROUTE in "/cv/academic" "/papers/"; do
+            BODY_SIZE=$(curl -sL "${SITE}${ROUTE}" | wc -c)
+            if [ "$BODY_SIZE" -lt 500 ]; then
+              echo "::error::${ROUTE} returned suspiciously small body (${BODY_SIZE} bytes)"
+              exit 1
+            fi
+            echo "OK: ${ROUTE} body is ${BODY_SIZE} bytes"
+          done
+
   # Single place that reports failures anywhere in the pipeline. The webhook is
   # optional; the tracking issue is not, so a broken build is visible (and
   # emailed by GitHub) even with no secrets configured at all. Without this,
   # nothing surfaced ~190 consecutive scheduled failures over 8 days.
   notify-failure:
-    needs: [check, build, deploy, smoke-test]
+    needs: [check, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test]
     runs-on: ubuntu-24.04
     # A failed PR check already shows up on the PR itself; only page out for
     # failures on the real deploy path.
     if: failure() && github.event_name != 'pull_request'
+    permissions:
+      issues: write # label, list, comment on and open the tracking issue
     steps:
       - name: Send webhook notification
         env:
@@ -199,6 +421,8 @@ jobs:
       - name: Open or update the failure tracking issue
         env:
           GH_TOKEN: ${{ github.token }}
+          # No checkout in this job, so gh cannot infer the repository.
+          GH_REPO: ${{ github.repository }}
         run: |
           gh label create ci-failure \
             --color B60205 \
@@ -229,16 +453,26 @@ jobs:
                 "This issue is opened automatically and closes on the next fully successful run.")"
           fi
 
-  # Closes the tracking issue once the pipeline is healthy again. Skipped
-  # automatically on no-op scheduled runs, since its needs are skipped too.
+  # Closes the tracking issue once the pipeline is healthy again. It needs a
+  # successful Pages smoke test (so no-op scheduled runs, where build is
+  # skipped, do not count) and no failed job anywhere. The Firebase jobs may be
+  # skipped -- they are until the owner configures them -- but not failed.
   notify-recovery:
-    needs: [check, build, deploy, smoke-test]
+    needs: [check, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test]
     runs-on: ubuntu-24.04
-    if: success() && github.event_name != 'pull_request'
+    if: >-
+      !cancelled()
+      && github.event_name != 'pull_request'
+      && needs.smoke-test.result == 'success'
+      && !contains(needs.*.result, 'failure')
+    permissions:
+      issues: write # list and close the tracking issue
     steps:
       - name: Close the failure tracking issue
         env:
           GH_TOKEN: ${{ github.token }}
+          # No checkout in this job, so gh cannot infer the repository.
+          GH_REPO: ${{ github.repository }}
         run: |
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           for N in $(gh issue list --label ci-failure --state open --json number --jq '.[].number'); do
