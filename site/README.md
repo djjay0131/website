@@ -1,9 +1,9 @@
 # site
 
 The Astro site behind the Research Hub: static output, no server runtime
-(ADR-0003). It is served from Firebase Hosting at `https://cusati.us/` and,
-until Phase 6, from GitHub Pages at `https://djjay0131.github.io/website/`
-(ADR-0001).
+(ADR-0003). It is served from Firebase Hosting at its canonical host,
+`https://jason.cusati.us/` (ADR-0006), and, until Phase 6, from GitHub Pages at
+`https://djjay0131.github.io/website/` (ADR-0001).
 
 `site/` is a self-contained npm project. Run every command below from this
 directory.
@@ -32,10 +32,10 @@ no build output. A local build has no CV PDFs unless the data was fetched, so
 
 Both are optional. An unset or empty variable takes its default.
 
-| Variable    | Meaning                                         | Default             |
-| ----------- | ----------------------------------------------- | ------------------- |
-| `SITE_URL`  | Absolute origin, no path and no trailing slash  | `https://cusati.us` |
-| `SITE_BASE` | Path the site is served under                   | `/`                 |
+| Variable    | Meaning                                         | Default                   |
+| ----------- | ----------------------------------------------- | ------------------------- |
+| `SITE_URL`  | Absolute origin, no path and no trailing slash  | `https://jason.cusati.us` |
+| `SITE_BASE` | Path the site is served under                   | `/`                       |
 
 ```sh
 npm run build                                                            # Firebase Hosting

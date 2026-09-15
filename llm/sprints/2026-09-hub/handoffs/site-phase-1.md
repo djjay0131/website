@@ -10,7 +10,7 @@ Issue: #10 · Branch: `feat/foundation` · No git or gh mutations were run.
 ## Summary
 
 The Astro site under `site/` now builds for the new host at base `/` by
-default (`https://cusati.us`). With `SITE_URL=https://djjay0131.github.io
+default (`https://jason.cusati.us`, ADR-0006). With `SITE_URL=https://djjay0131.github.io
 SITE_BASE=/website/` it builds for GitHub Pages. Every route the current site
 serves keeps its URL and content, and the build adds three shells: `/cv/`,
 `/writing/` and `/phd/`.
@@ -203,12 +203,63 @@ check as a build-output presence check.
   The one evidence of that is the round 1 CI replay, whose fetch produced 4 PDFs
   including `academic.pdf`.
 
+## Remediation round 4 (ADR-0006 host)
+
+Before any deploy, the owner moved the hub to its own canonical host (ADR-0006).
+`cusati.us` and `www` are reserved for a family site, the hub lives at
+`https://jason.cusati.us`, and `research.cusati.us` 301-redirects to it at the
+Hosting layer. SEAM-1's default `SITE_URL` is now `https://jason.cusati.us`
+(commit `46136e5`).
+
+- **Changes.**
+  - `site/scripts/site-env.mjs`: `DEFAULT_SITE_URL` is
+    `"https://jason.cusati.us"`. The header comment names ADR-0006, and adds
+    that aliases redirect at the Hosting layer.
+  - `site/scripts/site-env.test.ts`: every expectation and example uses the new
+    host, including the default, origin normalisation, the bare-host rejection
+    and the sitemap exclusion. It also asserts `DEFAULT_SITE_URL` directly.
+  - `site/astro.config.mjs`: the header comment.
+  - `site/README.md`: the intro, and the default in the Environment variables
+    table.
+  - This handoff: the Summary line and the three roadmap criteria that named
+    the host.
+- **Host-agnostic, confirmed, unchanged.**
+  - `site/redirects/github-pages.json` holds only paths (`/website/<path>` →
+    `/<path>`), with 0 URLs.
+  - The route inventory, redirect-map generator, `site-routes.mjs` and the
+    smoke-route check contain no host.
+  - Every host in the build output comes from Astro's `site`: canonical links,
+    the sitemap, `robots.txt` and the CV page's JSON-LD.
+  - `firebase.json` names no host.
+- **Nothing added for `research.cusati.us` or the apex**, per ADR-0006: Hosting
+  performs the redirect, and the site is unaware of it.
+- **Historical sections** (Validation for rounds 1 to 3 and the original run,
+  and the superstatic evidence) are left as written. They describe builds made
+  when the default was `https://cusati.us`.
+
+Validation, from `site/` with the owner's local CV data:
+
+| # | Command | Result |
+|---|---|---|
+| H1 | `npm test` | `Test Files 7 passed (7)` · `Tests 54 passed \| 1 skipped (55)`, exit 0 |
+| H2 | `npm run build` (defaults) | `33 page(s) built`, `Complete!`, exit 0 |
+| H3 | `grep -r "https://cusati.us" dist-public \| wc -l` | `0` |
+| H4 | `grep -o "https://jason.cusati.us[^<\"]*" dist-public/sitemap-0.xml \| head -3` | `https://jason.cusati.us/` · `https://jason.cusati.us/cv/` · `https://jason.cusati.us/cv/academic/` |
+| H5 | `grep -r "/website/" dist-public \| wc -l` | `0` |
+| H5b | `robots.txt`; canonical link of `/cv/academic/` | `Sitemap: https://jason.cusati.us/sitemap-index.xml`; `rel="canonical" href="https://jason.cusati.us/cv/academic/"`. Every `cusati.us` URL in the build is `https://jason.cusati.us` (178 occurrences). |
+| H6 | `SITE_URL=https://djjay0131.github.io SITE_BASE=/website/ npm run build` | `33 page(s) built`, `Complete!`, exit 0; `cusati.us` occurrences in the Pages build: `0` |
+| H7 | `npm run check:smoke-routes` (after H6) | 6 `OK`; `MISSING /pdfs/academic.pdf → pdfs/academic.pdf`; `check:smoke-routes: 1 of 7 smoke routes missing from dist-public: /pdfs/academic.pdf`, exit 1. That is the known local gap (no fetched PDFs), and nothing else is missing. |
+| H8 | `npx astro check` | `Result (44 files): 11 errors, 0 warnings, 3 hints` (exit 1). All 11 are the pre-existing `ts(7006)` errors in `SourceExplorer.astro`; 0 errors elsewhere. |
+| H9 | `npm run build` (final, defaults) | `33 page(s) built`, `Complete!`, exit 0; `https://cusati.us`: `0`; `/website/`: `0`. **`site/dist-public` is the default build.** `npm run check:smoke-routes` afterwards: the same single `/pdfs/academic.pdf` miss, exit 1. |
+| H10 | `git grep -n "cusati\.us" -- site` | 15 hits, all `jason.cusati.us` in the files changed above (`README.md` 5, 37; `astro.config.mjs` 2; `site-env.mjs` 4, 10; `site-env.test.ts` 6–9, 25, 27, 36, 38, 39) plus one mention of the alias, `site-env.mjs` 8 ("Aliases such as research.cusati.us redirect to the canonical host at the Hosting layer"). The alias mention is documentation, not configuration. There is no hit for the bare `https://cusati.us`. |
+
 ## Validation
 
 All commands were run from `site/` unless stated. Local CV data is the owner's
 (newer than the `cv` release), except where a run says "release data".
 
-**Remediation round 3 (SEAM-7; this is the current state).** Run from `site/`
+**Remediation round 3 (SEAM-7).** For the current state after the ADR-0006 host
+change, see §Remediation round 4. Run from `site/`
 with the owner's local CV data. `npm ci` was not re-run, because no dependency
 changed.
 
@@ -481,10 +532,10 @@ Roadmap Phase 1 criteria in my scope:
 | AC: rendered pages use Spectral, Plex Sans, Plex Mono with `#0F5C5A`, and switch light/dark | met in the build; visual check at Checkpoint 2 | `/_astro/Base.*.css` carries the `@font-face` rules and tokens; `tokens.test.ts` |
 | AC: all five shells exist; navigation has no `phd` link | met | built pages; no built page links `/phd` |
 | AC: redirect map covers every route the current build serves | met | route inventory; validation 6, 8, 10; CI replay with release data |
-| AC: every current route returns 200 at `https://cusati.us` under `/`; each redirect source forwards | verifiable at Checkpoint 2 | local superstatic probe: 84 of 84 |
-| AC: `/cv/academic` and `/papers/` bodies ≥ 500 bytes on `cusati.us` | verifiable at Checkpoint 2 | local: 23772 and 6146 bytes |
+| AC: every current route returns 200 at `https://jason.cusati.us` under `/` (ADR-0006; was `cusati.us`); each redirect source forwards | verifiable at Checkpoint 2 | local superstatic probe: 84 of 84 |
+| AC: `/cv/academic` and `/papers/` bodies ≥ 500 bytes on `jason.cusati.us` | verifiable at Checkpoint 2 | local: 23772 and 6146 bytes |
 | AC: `djjay0131.github.io/website/` still serves the site | verifiable at Checkpoint 2 | Pages-variant build passes (validation 5) |
-| AC: CV on `cusati.us` matches the latest `cv` release | verifiable at Checkpoint 2 | `fetch-data.sh` identical to the former inline step |
+| AC: CV on `jason.cusati.us` matches the latest `cv` release | verifiable at Checkpoint 2 | `fetch-data.sh` identical to the former inline step |
 
 ## Open questions (contract)
 
@@ -721,6 +772,11 @@ Added:
 
 Remediation round 2 (palette) changed only `site/src/styles/tokens.css`,
 `site/scripts/contrast.mjs`, `site/src/styles/tokens.test.ts` and this handoff.
+
+Remediation round 4 (ADR-0006 host) modified `site/scripts/site-env.mjs`,
+`site/scripts/site-env.test.ts`, `site/astro.config.mjs`, `site/README.md` and
+this handoff. `site/redirects/github-pages.json` and `firebase.json` are
+host-agnostic and unchanged.
 
 Remediation round 3 (SEAM-7) added `site/scripts/check-smoke-routes.mjs` and
 `site/scripts/check-smoke-routes.test.ts`, and modified `site/package.json`

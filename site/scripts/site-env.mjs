@@ -1,11 +1,13 @@
 // SEAM-1 build interface: where the site is served from.
 //
-//   SITE_URL   absolute origin, no path and no trailing slash. Default https://cusati.us
+//   SITE_URL   absolute origin, no path and no trailing slash. Default
+//              https://jason.cusati.us, the hub's canonical host (ADR-0006)
 //   SITE_BASE  path base. Default /
 //
 // An unset or empty variable takes the default, so a CI step may pass an empty
-// repository variable through.
-export const DEFAULT_SITE_URL = "https://cusati.us";
+// repository variable through. Aliases such as research.cusati.us redirect to
+// the canonical host at the Hosting layer; the build knows only SITE_URL.
+export const DEFAULT_SITE_URL = "https://jason.cusati.us";
 export const DEFAULT_SITE_BASE = "/";
 
 // The GitHub Pages variant, built until Phase 6 (SEAM-5).

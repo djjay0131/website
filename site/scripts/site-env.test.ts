@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { normalizeBase, normalizeSiteUrl, resolveSiteEnv, withBase } from "./site-env.mjs";
+import { DEFAULT_SITE_URL, normalizeBase, normalizeSiteUrl, resolveSiteEnv, withBase } from "./site-env.mjs";
 import { isExcludedFromSitemap } from "./site-routes.mjs";
 
 describe("SEAM-1 environment", () => {
-  it("defaults to https://cusati.us at /", () => {
-    expect(resolveSiteEnv({})).toEqual({ site: "https://cusati.us", base: "/" });
-    expect(resolveSiteEnv({ SITE_URL: "", SITE_BASE: "" })).toEqual({ site: "https://cusati.us", base: "/" });
+  it("defaults to https://jason.cusati.us at / (ADR-0006)", () => {
+    expect(DEFAULT_SITE_URL).toBe("https://jason.cusati.us");
+    expect(resolveSiteEnv({})).toEqual({ site: "https://jason.cusati.us", base: "/" });
+    expect(resolveSiteEnv({ SITE_URL: "", SITE_BASE: "" })).toEqual({ site: "https://jason.cusati.us", base: "/" });
   });
 
   it("builds the GitHub Pages variant", () => {
@@ -21,9 +22,9 @@ describe("SEAM-1 environment", () => {
   });
 
   it("accepts an origin and rejects a URL with a path", () => {
-    expect(normalizeSiteUrl("https://cusati.us/")).toBe("https://cusati.us");
+    expect(normalizeSiteUrl("https://jason.cusati.us/")).toBe("https://jason.cusati.us");
     expect(() => normalizeSiteUrl("https://djjay0131.github.io/website")).toThrow(/SITE_BASE/);
-    expect(() => normalizeSiteUrl("cusati.us")).toThrow();
+    expect(() => normalizeSiteUrl("jason.cusati.us")).toThrow();
   });
 
   it("joins base and path", () => {
@@ -32,9 +33,9 @@ describe("SEAM-1 environment", () => {
   });
 
   it("keeps phd out of the sitemap under either base", () => {
-    expect(isExcludedFromSitemap("https://cusati.us/phd/", "/")).toBe(true);
+    expect(isExcludedFromSitemap("https://jason.cusati.us/phd/", "/")).toBe(true);
     expect(isExcludedFromSitemap("https://djjay0131.github.io/website/phd/", "/website/")).toBe(true);
-    expect(isExcludedFromSitemap("https://cusati.us/research/", "/")).toBe(false);
-    expect(isExcludedFromSitemap("https://cusati.us/phdx/", "/")).toBe(false);
+    expect(isExcludedFromSitemap("https://jason.cusati.us/research/", "/")).toBe(false);
+    expect(isExcludedFromSitemap("https://jason.cusati.us/phdx/", "/")).toBe(false);
   });
 });
