@@ -15,11 +15,9 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. RECONCILING THE REVIEW** (issue #10, draft PR #12). The
-Chief Reviewer returned **Request Changes**: one must-fix (F1, the budget guardrail's
-documented protection and rollback step) and should-fix findings. Every finding is
-accepted and routed to its document owner (§Phase 1 review dispositions). Next stop:
-**Checkpoint 2**.
+**Phase 1 — Foundation. REMEDIATED; DELTA REVIEW NEXT** (issue #10, draft PR #12).
+Every Chief Reviewer finding is fixed or dispositioned. A delta review confirms
+resolution from evidence before the PR is marked ready. Next stop: **Checkpoint 2**.
 
 ## Done
 
@@ -109,11 +107,21 @@ accepted and routed to its document owner (§Phase 1 review dispositions). Next 
 - [x] **Chief Reviewer report** received (Request Changes: 1 must-fix, 7 should-fix,
       6 notes; L2 confirmed) and persisted to `handoffs/chief-reviewer-phase-1.md`;
       posted to PR #12. SEAM-7 added to the seams (F8).
+- [x] **Review remediation committed**: site SEAM-7 check `b5327b1`; infra F1–F5, F8,
+      F10–F12 `3ec90ed`. Lead Architect reruns: terraform fmt + validate clean,
+      actionlint clean, `npm test` 54 passed / 1 skipped, lockfile resolves only from
+      registry.npmjs.org, no node_modules / secrets / machine paths committed.
+- [x] Checked the one wiring change that could have regressed notifications:
+      `budget-guard` runs only on push and pull_request, and is in the needs of both
+      notify jobs. Both gate on status functions (`failure()`; `!cancelled()` with
+      explicit result checks), so a skipped `budget-guard` on schedule or dispatch
+      runs neither suppresses recovery nor triggers failure.
+- [x] F9 tracked on issue #10; F14 handoff status lines updated. Delta-review contract
+      `chief-reviewer-phase-1-delta.md` committed (`d54204d`).
 
 ## In flight
 
-- **Infra** — review findings F1, F2, F3, F4, F5, F8 (build.yml half), F10, F11, F12.
-- **Site** — review finding F8 (smoke-route presence check, SEAM-7).
+- Waiting for CI on the final head, then the **Chief Reviewer delta review**.
 
 ## Blocked
 
@@ -143,9 +151,9 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-1. Verify the infra and site remediation against the findings; commit per scope.
-2. Lead Architect items: F6 (PR body), F14 (handoff status lines).
-3. Mark PR #12 ready. **Checkpoint 2 — STOP.**
+1. CI green on the final head (including `budget-guard` and `check:smoke-routes` on
+   fetched CV data) → launch the delta review.
+2. Persist and post it; F6 (PR body); mark PR #12 ready. **Checkpoint 2 — STOP.**
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -373,6 +381,14 @@ All accepted. Owner of each fix in brackets.
   meta refresh) — accept for Phase 1; Phase 6 serves host-level redirects.
 - **Font payload** (~1.6 MB across 55 woff2 subsets; browsers fetch only what they
   need) — subset to latin + latin-ext in a later phase.
+- **Make `budget-guard` a required status check on `main`** (alongside
+  `governance-checks`), so a PR that removes the budget cannot merge. Recommended:
+  yes. It is a branch-protection change, so it waits for your word.
+- **Deploy-tool install scripts and advisories** — `npm ci` for firebase-tools runs
+  package install scripts in the deploy job (before authentication) and reports 7
+  moderate advisories in its dependency tree. Recommended: accept for the first
+  deploy; evaluate `--ignore-scripts` after one real deploy (infra handoff
+  Recommendation 6).
 
 ## Risks carried forward
 
