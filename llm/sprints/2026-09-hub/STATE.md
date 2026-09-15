@@ -15,9 +15,10 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. REMEDIATED; DELTA REVIEW NEXT** (issue #10, draft PR #12).
-Every Chief Reviewer finding is fixed or dispositioned. A delta review confirms
-resolution from evidence before the PR is marked ready. Next stop: **Checkpoint 2**.
+**Phase 1 — Foundation. DELTA REVIEW PASSED; CLOSING NOTES** (issue #10, draft
+PR #12). The delta review resolved F1–F14 on evidence (verdict **Comment**; the PR may
+be marked ready) and raised four notes, B1–B4, which are being fixed before the PR is
+marked ready. Next stop: **Checkpoint 2**.
 
 ## Done
 
@@ -118,10 +119,17 @@ resolution from evidence before the PR is marked ready. Next stop: **Checkpoint 
       runs neither suppresses recovery nor triggers failure.
 - [x] F9 tracked on issue #10; F14 handoff status lines updated. Delta-review contract
       `chief-reviewer-phase-1-delta.md` committed (`d54204d`).
+- [x] **Chief Reviewer delta review** (verdict Comment): F1 must-fix and F2–F14 all
+      RESOLVED on evidence; persisted to `handoffs/chief-reviewer-phase-1-delta.md`
+      and posted to PR #12. B4 (SEAM-7 "one source" overstated) corrected in the
+      seams.
 
 ## In flight
 
-- Waiting for CI on the final head, then the **Chief Reviewer delta review**.
+- **Infra** — delta-review notes B1 (run `budget-guard` on every trigger so a dispatch
+  or schedule run cannot close the failure issue while the budget is still missing),
+  B2 (override files can disable `prevent_destroy`: provenance rule + `budget-guard`
+  check), B3 (a credential-free CI job that runs the locked firebase-tools install).
 
 ## Blocked
 
@@ -151,9 +159,9 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-1. CI green on the final head (including `budget-guard` and `check:smoke-routes` on
-   fetched CV data) → launch the delta review.
-2. Persist and post it; F6 (PR body); mark PR #12 ready. **Checkpoint 2 — STOP.**
+1. Verify B1–B3; commit; CI green on the final head.
+2. Record the delta-review outcome in the PR #12 body; mark it ready. **Checkpoint 2 —
+   STOP.**
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -360,6 +368,18 @@ All accepted. Owner of each fix in brackets.
 | F12 | Terraform-created default site's type unverified; import line unnecessary | Add a `DEFAULT_SITE` postcondition; drop the import line [infra] |
 | F13 | Budget creation needs Billing Account Administrator, not User | Reworded in the Checkpoint 2 decisions [Lead Architect] |
 | F14 | Handoff status lines stale | Update after remediation [Lead Architect] |
+
+## Delta review notes (B1–B4) — dispositions
+
+| # | Note | Disposition |
+|---|---|---|
+| B1 | `budget-guard` skipped on dispatch/schedule/manual runs, so recovery can close the failure issue without it | Run it on every trigger [infra] |
+| B2 | Git-ignored Terraform override files can set `prevent_destroy = false` without touching `budget.tf` | Provenance rule checks for override files; `budget-guard` fails on tracked override files [infra] |
+| B3 | The locked firebase-tools install is never exercised before the first real deploy | Credential-free CI job running the same `npm ci` and `firebase --version` [infra] |
+| B4 | SEAM-7 claimed one source for the smoke routes; `build.yml` keeps two copies | Seam wording corrected; unification stays C13 [Lead Architect] |
+
+Notes only; fixed before merge rather than tracked. No further re-review: none changes
+what `terraform apply` creates.
 
 ## Decisions for the owner at Checkpoint 2 (with recommended defaults)
 

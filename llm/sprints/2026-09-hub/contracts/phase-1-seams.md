@@ -1,7 +1,7 @@
 # Phase 1 Seams: site ↔ build and deploy
 
 Status: Active
-Last updated: 2026-09-15
+Last updated: 2026-09-15 (SEAM-7 wording corrected, delta review B4)
 Owner: Chief Architect (Lead Architect)
 
 ## Purpose
@@ -90,8 +90,10 @@ Phase 1 — Foundation (issue #10) only.
 ### SEAM-7 — Smoke-route presence (added after the Phase 1 review, finding F8)
 
 - **Owner:** site. **Consumer:** infra.
-- `site/scripts/site-routes.mjs` exports the smoke-test routes; it is their one
-  source.
+- `site/scripts/site-routes.mjs` exports the smoke-test routes this check reads.
+  *Corrected after the delta review (B4):* it is not yet their only source —
+  `build.yml`'s two post-deploy smoke-test loops keep inline copies until C13 unifies
+  them, so a route added only to a loop is not checked before deploy.
 - From `site/`, `npm run check:smoke-routes` exits non-zero when any smoke route
   has no file in `site/dist-public` — `<route>/index.html` for page routes, the
   file itself for file routes such as `/pdfs/academic.pdf`. It needs no network
