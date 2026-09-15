@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Replace website data/ + assets with symlinks into the local cv repo.
+# Replace site/data/ + assets with symlinks into a local checkout of the cv repo.
 # After running, `npm run dev` reads live data and Astro hot-reloads on cv edits.
 #
-# Override the cv repo path: CV_REPO_PATH=/some/where ./scripts/sync-local-data.sh
+# CV_REPO_PATH is resolved from site/. The default, ../../cv, is a cv checkout
+# beside this repository's checkout.
+# Override: CV_REPO_PATH=/some/where ./scripts/sync-local-data.sh
 set -euo pipefail
 
-CV_REPO_PATH="${CV_REPO_PATH:-../cv}"
-WEBSITE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CV_ABS="$(cd "$WEBSITE_ROOT/$CV_REPO_PATH" 2>/dev/null && pwd)" || {
-  echo "error: cannot resolve CV_REPO_PATH=$CV_REPO_PATH from $WEBSITE_ROOT" >&2
+CV_REPO_PATH="${CV_REPO_PATH:-../../cv}"
+SITE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CV_ABS="$(cd "$SITE_ROOT" && cd "$CV_REPO_PATH" 2>/dev/null && pwd)" || {
+  echo "error: cannot resolve CV_REPO_PATH=$CV_REPO_PATH from $SITE_ROOT" >&2
   exit 1
 }
 
@@ -16,7 +18,7 @@ CV_ABS="$(cd "$WEBSITE_ROOT/$CV_REPO_PATH" 2>/dev/null && pwd)" || {
 [[ -d "$CV_ABS/data/variants" ]] || { echo "error: $CV_ABS/data/variants missing" >&2; exit 1; }
 [[ -f "$CV_ABS/own-bib.bib"   ]] || { echo "error: $CV_ABS/own-bib.bib missing"   >&2; exit 1; }
 
-cd "$WEBSITE_ROOT"
+cd "$SITE_ROOT"
 
 rm -rf data
 mkdir -p data

@@ -155,38 +155,38 @@ const facetKeys = facets.map((f) => f.key);
 
 <style is:global>
   main { max-width: 1100px; }
-  .filters { display: flex; flex-wrap: wrap; gap: 0.6rem 0.9rem; align-items: flex-end; font-family: var(--font-sans); font-size: 0.85rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; padding: 0.75rem 1rem; }
+  .filters { display: flex; flex-wrap: wrap; gap: 0.6rem 0.9rem; align-items: flex-end; font-family: var(--font-body); font-size: 0.85rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; padding: 0.75rem 1rem; }
   .filters label { display: flex; flex-direction: column; gap: 0.2rem; }
   .filters label span { color: var(--color-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
   .filters .search { flex: 1 1 220px; }
-  .filters input, .filters select { font: inherit; padding: 0.35rem 0.45rem; border: 1px solid var(--color-border); border-radius: 3px; background: #fff; color: var(--color-text); min-width: 0; max-width: 220px; }
-  .filters button { font: inherit; padding: 0.4rem 0.8rem; border: 1px solid var(--color-border); border-radius: 3px; background: #fff; cursor: pointer; }
-  .filters button:hover { border-color: var(--color-primary); color: var(--color-primary); }
-  .count { font-family: var(--font-sans); font-size: 0.85rem; color: var(--color-muted); margin: 0.75rem 0; }
+  .filters input, .filters select { font: inherit; padding: 0.35rem 0.45rem; border: 1px solid var(--color-border); border-radius: 3px; background: var(--color-bg); color: var(--color-text); min-width: 0; max-width: 220px; }
+  .filters button { font: inherit; padding: 0.4rem 0.8rem; border: 1px solid var(--color-border); border-radius: 3px; background: var(--color-bg); color: var(--color-text); cursor: pointer; }
+  .filters button:hover { border-color: var(--color-link); color: var(--color-link); }
+  .count { font-family: var(--font-body); font-size: 0.85rem; color: var(--color-muted); margin: 0.75rem 0; }
   .tablewrap { overflow-x: auto; }
-  .sources { width: 100%; border-collapse: collapse; font-family: var(--font-sans); font-size: 0.85rem; }
+  .sources { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: 0.85rem; }
   .sources th { text-align: left; padding: 0.5rem 0.5rem; border-bottom: 2px solid var(--color-accent); white-space: nowrap; }
   .sources td { padding: 0.5rem 0.5rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }
   .sources tr.open td { border-bottom: none; background: var(--color-surface); }
   .sources tr.drow td { background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
-  .sources tr.flash td { background: #fff7d6; }
+  .sources tr.flash td { background: var(--color-caution-bg); }
   .sources .src { min-width: 260px; }
-  .sources .toggle { font: inherit; font-weight: 600; text-align: left; background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; }
+  .sources .toggle { font: inherit; font-weight: 600; text-align: left; background: none; border: none; padding: 0; color: var(--color-link); cursor: pointer; }
   .sources .toggle:hover { text-decoration: underline; }
   .sources .sub { color: var(--color-muted); font-size: 0.8rem; margin-top: 0.15rem; }
-  .chip { display: inline-block; padding: 0.05rem 0.4rem; border-radius: 999px; font-size: 0.72rem; border: 1px solid var(--color-border); background: #fff; white-space: nowrap; margin: 0.05rem 0; }
-  .chip.s-academic { border-color: #4b6ea8; color: #2f4d80; }
-  .chip.s-industry { border-color: #b3661f; color: #7a4310; }
-  .chip.s-open-source { border-color: #4f8a3a; color: #2f5d22; }
-  .chip.v-CONFIRMED { background: #e8f3e6; border-color: #6da95c; color: #2f5d22; }
-  .chip.v-MINOR-FIX { background: #fff3dc; border-color: #d9a24a; color: #7a4f0e; }
-  .chip.v-NUMBER-NOT-FOUND, .chip.v-NOT-FOUND { background: #fbe9e7; border-color: #d9534f; color: #8a2b27; }
+  .chip { display: inline-block; padding: 0.05rem 0.4rem; border-radius: 999px; font-size: 0.72rem; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); white-space: nowrap; margin: 0.05rem 0; }
+  .chip.s-academic { border-color: var(--color-accent); color: var(--color-accent); }
+  .chip.s-industry { border-color: var(--color-caution); color: var(--color-caution); }
+  .chip.s-open-source { border-color: var(--color-ok); color: var(--color-ok); }
+  .chip.v-CONFIRMED { background: var(--color-ok-bg); border-color: var(--color-ok); color: var(--color-ok); }
+  .chip.v-MINOR-FIX { background: var(--color-caution-bg); border-color: var(--color-caution); color: var(--color-caution); }
+  .chip.v-NUMBER-NOT-FOUND, .chip.v-NOT-FOUND { background: var(--color-risk-bg); border-color: var(--color-risk); color: var(--color-risk); }
   .chip.v-UNCHECKED { color: var(--color-muted); }
-  .detail { font-family: var(--font-serif); font-size: 0.92rem; padding: 0.25rem 0.25rem 0.5rem; }
-  .detail .who { font-family: var(--font-sans); color: var(--color-muted); font-size: 0.82rem; margin-bottom: 0.5rem; }
-  .detail .lbl { font-family: var(--font-sans); font-weight: 600; font-size: 0.8rem; margin: 0.6rem 0 0.2rem; }
+  .detail { font-family: var(--font-body); font-size: 0.92rem; padding: 0.25rem 0.25rem 0.5rem; }
+  .detail .who { font-family: var(--font-body); color: var(--color-muted); font-size: 0.82rem; margin-bottom: 0.5rem; }
+  .detail .lbl { font-family: var(--font-body); font-weight: 600; font-size: 0.8rem; margin: 0.6rem 0 0.2rem; }
   .detail ul { margin: 0 0 0.5rem 1.2rem; }
   .detail li { margin-bottom: 0.25rem; }
-  .detail .meta { font-family: var(--font-sans); font-size: 0.78rem; color: var(--color-muted); margin: 0.5rem 0; }
+  .detail .meta { font-family: var(--font-body); font-size: 0.78rem; color: var(--color-muted); margin: 0.5rem 0; }
   .detail code { font-family: var(--font-mono); font-size: 0.85em; }
 </style>

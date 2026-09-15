@@ -1,0 +1,4 @@
+- id: academic
+  text: "Fixture summary for the academic variant."
+- id: industry
+  text: "Fixture summary for the industry variant."

@@ -1,0 +1,10 @@
+- id: alpha
+  name: "Project Alpha"
+  summary: "The first fixture project."
+  github: "https://github.com/ada-example/alpha"
+- id: beta
+  name: "Project Beta"
+  summary: "The second fixture project."
+- id: gamma
+  name: "Project Gamma"
+  summary: "The third fixture project."

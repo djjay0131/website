@@ -19,7 +19,7 @@ const html = raw.replace(/<h2>(.*?)<\/h2>/g, (_m, text: string) => {
 <article class="synthesis" set:html={html} />
 
 <style is:global>
-  .toc { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; padding: 1rem 1.25rem; margin-bottom: 2rem; font-family: var(--font-sans); font-size: 0.9rem; }
+  .toc { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; padding: 1rem 1.25rem; margin-bottom: 2rem; font-family: var(--font-body); font-size: 0.9rem; }
   .toc ol { margin: 0.5rem 0 0 1.25rem; padding: 0; }
   .toc li { margin: 0.2rem 0; }
   .synthesis p { margin-bottom: 1rem; }
@@ -29,8 +29,8 @@ const html = raw.replace(/<h2>(.*?)<\/h2>/g, (_m, text: string) => {
   .synthesis hr { border: 0; border-top: 1px solid var(--color-border); margin: 2rem 0; }
   .synthesis code { font-family: var(--font-mono); font-size: 0.85em; background: var(--color-surface); padding: 0 0.25em; }
   .synthesis a.cite { font-family: var(--font-mono); font-size: 0.78em; color: var(--color-accent); overflow-wrap: anywhere; }
-  .synthesis a.cite:hover { color: var(--color-primary); }
-  .synthesis table { border-collapse: collapse; font-family: var(--font-sans); font-size: 0.85rem; margin: 1rem 0 1.5rem; display: block; overflow-x: auto; max-width: 100%; }
+  .synthesis a.cite:hover { color: var(--color-link); }
+  .synthesis table { border-collapse: collapse; font-family: var(--font-body); font-size: 0.85rem; margin: 1rem 0 1.5rem; display: block; overflow-x: auto; max-width: 100%; }
   .synthesis th, .synthesis td { border: 1px solid var(--color-border); padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; }
   .synthesis th { background: var(--color-surface); }
 </style>

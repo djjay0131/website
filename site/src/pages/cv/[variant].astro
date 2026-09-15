@@ -26,8 +26,8 @@ const personJsonLd = {
   "@type": "Person",
   name: cv.meta.name,
   email: cv.meta.contact.email,
-  url: `https://djjay0131.github.io/website/cv/${variant}`,
-  image: `https://djjay0131.github.io/website/photo_jason_1.jpeg`,
+  url: new URL(`${base}cv/${variant}`, Astro.site).href,
+  image: new URL(`${base}photo_jason_1.jpeg`, Astro.site).href,
   alumniOf: cv.education.map((e) => ({
     "@type": "CollegeOrUniversity",
     name: e.institution,
@@ -221,14 +221,14 @@ const personJsonLd = {
     flex-wrap: wrap;
     gap: 1rem;
     margin: 0.5rem 0 1rem;
-    font-family: var(--font-sans);
+    font-family: var(--font-body);
     font-size: 0.9rem;
     color: var(--color-muted);
   }
 
   .pdf-link {
     display: inline-block;
-    font-family: var(--font-sans);
+    font-family: var(--font-body);
     font-size: 0.875rem;
     padding: 0.35rem 0.75rem;
     background: var(--color-surface);
@@ -249,7 +249,7 @@ const personJsonLd = {
   .entry-dates {
     flex-shrink: 0;
     min-width: 90px;
-    font-family: var(--font-sans);
+    font-family: var(--font-body);
     font-size: 0.85rem;
     color: var(--color-muted);
   }
@@ -270,7 +270,7 @@ const personJsonLd = {
     display: flex;
     gap: 0.75rem;
     margin-top: 0.25rem;
-    font-family: var(--font-sans);
+    font-family: var(--font-body);
     font-size: 0.825rem;
   }
 

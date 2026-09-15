@@ -1,0 +1,194 @@
+[
+  {
+    "from": "/website/",
+    "to": "/"
+  },
+  {
+    "from": "/website/build-info.json",
+    "to": "/build-info.json"
+  },
+  {
+    "from": "/website/cv/",
+    "to": "/cv/"
+  },
+  {
+    "from": "/website/cv/academic/",
+    "to": "/cv/academic/"
+  },
+  {
+    "from": "/website/cv/anthropic-fellow/",
+    "to": "/cv/anthropic-fellow/"
+  },
+  {
+    "from": "/website/cv/research-professional/",
+    "to": "/cv/research-professional/"
+  },
+  {
+    "from": "/website/cv/sde-long/",
+    "to": "/cv/sde-long/"
+  },
+  {
+    "from": "/website/favicon.ico",
+    "to": "/favicon.ico"
+  },
+  {
+    "from": "/website/favicon.svg",
+    "to": "/favicon.svg"
+  },
+  {
+    "from": "/website/papers/",
+    "to": "/papers/"
+  },
+  {
+    "from": "/website/pdfs/academic.pdf",
+    "to": "/pdfs/academic.pdf"
+  },
+  {
+    "from": "/website/pdfs/anthropic-fellow.pdf",
+    "to": "/pdfs/anthropic-fellow.pdf"
+  },
+  {
+    "from": "/website/pdfs/research-professional.pdf",
+    "to": "/pdfs/research-professional.pdf"
+  },
+  {
+    "from": "/website/pdfs/sde-long.pdf",
+    "to": "/pdfs/sde-long.pdf"
+  },
+  {
+    "from": "/website/phd/",
+    "to": "/phd/"
+  },
+  {
+    "from": "/website/photo_jason_1.jpeg",
+    "to": "/photo_jason_1.jpeg"
+  },
+  {
+    "from": "/website/projects/",
+    "to": "/projects/"
+  },
+  {
+    "from": "/website/projects/agentic-kg/",
+    "to": "/projects/agentic-kg/"
+  },
+  {
+    "from": "/website/projects/construction-ai/",
+    "to": "/projects/construction-ai/"
+  },
+  {
+    "from": "/website/projects/insurance-schema-framework/",
+    "to": "/projects/insurance-schema-framework/"
+  },
+  {
+    "from": "/website/projects/llm-coding-assistant/",
+    "to": "/projects/llm-coding-assistant/"
+  },
+  {
+    "from": "/website/projects/llm-data-importer/",
+    "to": "/projects/llm-data-importer/"
+  },
+  {
+    "from": "/website/projects/mrs-cloud-architecture/",
+    "to": "/projects/mrs-cloud-architecture/"
+  },
+  {
+    "from": "/website/projects/nfl-ml/",
+    "to": "/projects/nfl-ml/"
+  },
+  {
+    "from": "/website/projects/remote-robotics-control/",
+    "to": "/projects/remote-robotics-control/"
+  },
+  {
+    "from": "/website/projects/security-classifier/",
+    "to": "/projects/security-classifier/"
+  },
+  {
+    "from": "/website/projects/sentiment-yelp/",
+    "to": "/projects/sentiment-yelp/"
+  },
+  {
+    "from": "/website/projects/vttsi/",
+    "to": "/projects/vttsi/"
+  },
+  {
+    "from": "/website/projects/vvuq-beam-solver/",
+    "to": "/projects/vvuq-beam-solver/"
+  },
+  {
+    "from": "/website/research/",
+    "to": "/research/"
+  },
+  {
+    "from": "/website/research/agentic-harnesses/",
+    "to": "/research/agentic-harnesses/"
+  },
+  {
+    "from": "/website/research/agentic-harnesses/consensus/",
+    "to": "/research/agentic-harnesses/consensus/"
+  },
+  {
+    "from": "/website/research/agentic-harnesses/sources/",
+    "to": "/research/agentic-harnesses/sources/"
+  },
+  {
+    "from": "/website/research/agentic-harnesses/synthesis/",
+    "to": "/research/agentic-harnesses/synthesis/"
+  },
+  {
+    "from": "/website/research/soa-agentic-se/",
+    "to": "/research/soa-agentic-se/"
+  },
+  {
+    "from": "/website/research/soa-agentic-se/agentic-harnesses/",
+    "to": "/research/soa-agentic-se/agentic-harnesses/"
+  },
+  {
+    "from": "/website/research/soa-agentic-se/agentic-harnesses/consensus/",
+    "to": "/research/soa-agentic-se/agentic-harnesses/consensus/"
+  },
+  {
+    "from": "/website/research/soa-agentic-se/agentic-harnesses/sources/",
+    "to": "/research/soa-agentic-se/agentic-harnesses/sources/"
+  },
+  {
+    "from": "/website/research/soa-agentic-se/agentic-harnesses/synthesis/",
+    "to": "/research/soa-agentic-se/agentic-harnesses/synthesis/"
+  },
+  {
+    "from": "/website/research/soa-agentic-se/agentic-memory/",
+    "to": "/research/soa-agentic-se/agentic-memory/"
+  },
+  {
+    "from": "/website/research/soa-agentic-se/agentic-memory/consensus/",
+    "to": "/research/soa-agentic-se/agentic-memory/consensus/"
+  },
+  {
+    "from": "/website/research/soa-agentic-se/agentic-memory/sources/",
+    "to": "/research/soa-agentic-se/agentic-memory/sources/"
+  },
+  {
+    "from": "/website/research/soa-agentic-se/agentic-memory/synthesis/",
+    "to": "/research/soa-agentic-se/agentic-memory/synthesis/"
+  },
+  {
+    "from": "/website/resumes/",
+    "to": "/resumes/"
+  },
+  {
+    "from": "/website/robots.txt",
+    "to": "/robots.txt"
+  },
+  {
+    "from": "/website/sitemap-0.xml",
+    "to": "/sitemap-0.xml"
+  },
+  {
+    "from": "/website/sitemap-index.xml",
+    "to": "/sitemap-index.xml"
+  },
+  {
+    "from": "/website/writing/",
+    "to": "/writing/"
+  }
+]

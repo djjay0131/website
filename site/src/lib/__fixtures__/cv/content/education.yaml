@@ -1,0 +1,10 @@
+- id: phd
+  dates: "2024 -- Present"
+  degree: "PhD, Computer Science"
+  institution: "Example University"
+  location: "Anytown"
+- id: bs
+  dates: "2011 -- 2015"
+  degree: "BS, Mathematics"
+  institution: "Example College"
+  location: "Elsewhere"

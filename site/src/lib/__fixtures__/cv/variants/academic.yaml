@@ -1,0 +1,38 @@
+variant: academic
+label: "Academic CV"
+description: "Fixture variant with publications and every section type."
+
+sections:
+  - type: summary
+    content_id: academic
+
+  - type: employment
+    include:
+      - id: lab-researcher
+        bullets: [lab-c, lab-a]
+      - acme-engineer
+      - id: early-job
+        collapse: true
+
+  - type: education
+    include:
+      - phd
+      - bs
+
+  - type: projects
+    include:
+      - beta
+      - alpha
+
+  - type: publications
+
+  - type: skills
+    include:
+      - id: languages
+        items: ["Python", "Rust"]
+      - tools
+
+  - type: misc
+
+  - type: referee
+    content_id: available

@@ -1,0 +1,7 @@
+awards:
+  - id: fixture-award
+    dates: "2020"
+    text: "A fixture award."
+certifications:
+  - id: fixture-cert
+    text: "A fixture certification."

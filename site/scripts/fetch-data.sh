@@ -1,33 +1,36 @@
 #!/usr/bin/env bash
+# Download the CV data and PDFs from the cv repository's release (SEAM-2).
+#
+# The one place that downloads CV data. It produces, relative to site/, exactly
+# what build.yml's former inline "Fetch CV data and PDF" step produced:
+#   data/content/, data/variants/, data/own-bib.bib   from cv-data.zip
+#   public/pdfs/*.pdf                                 every PDF in the release
+#   public/photo_jason_1.jpeg                         when the zip carries it
+# It does not write public/build-info.json; CI writes that.
+#
+# Usage, from site/:   GH_TOKEN=<token> ./scripts/fetch-data.sh
+# Overrides:           CV_REPO (default djjay0131/cv), CV_TAG (default latest)
+# Requires:            gh, unzip
 set -euo pipefail
 
 REPO="${CV_REPO:-djjay0131/cv}"
 TAG="${CV_TAG:-latest}"
 
-echo "Fetching data from ${REPO}@${TAG}..."
+SITE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$SITE_ROOT"
 
-mkdir -p data public/pdfs /tmp/cv-fetch
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
 
-gh release download "${TAG}" --repo "${REPO}" --pattern "cv-data.zip" --dir /tmp/cv-fetch --clobber
-# Pull every variant PDF in the release. The cv repo CI publishes one PDF per
-# variant in data/variants/, named <variant>.pdf.
+echo "Fetching CV data from ${REPO}@${TAG} into ${SITE_ROOT}..."
+
+mkdir -p data/content data/variants public/pdfs
+gh release download "${TAG}" --repo "${REPO}" --pattern "cv-data.zip" --dir "$WORK" --clobber
+# Pull every variant PDF in the release (one per data/variants/<name>.yaml).
 gh release download "${TAG}" --repo "${REPO}" --pattern "*.pdf" --dir public/pdfs --clobber
+unzip -o "$WORK/cv-data.zip" -d "$WORK/extracted"
+cp -r "$WORK"/extracted/data/* data/ 2>/dev/null || true
+cp "$WORK/extracted/own-bib.bib" data/ 2>/dev/null || true
+cp "$WORK/extracted/photo_jason_1.jpeg" public/ 2>/dev/null || true
 
-# Extract data zip (contains data/ and own-bib.bib at top level inside the zip).
-unzip -o /tmp/cv-fetch/cv-data.zip -d /tmp/cv-fetch/extracted
-
-# Flatten: the zip puts files under data/ inside itself.
-if [ -d /tmp/cv-fetch/extracted/data ]; then
-  cp -r /tmp/cv-fetch/extracted/data/* data/
-fi
-if [ -f /tmp/cv-fetch/extracted/own-bib.bib ]; then
-  cp /tmp/cv-fetch/extracted/own-bib.bib data/
-fi
-if [ -f /tmp/cv-fetch/extracted/photo_jason_1.jpeg ]; then
-  cp /tmp/cv-fetch/extracted/photo_jason_1.jpeg public/
-fi
-
-rm -rf /tmp/cv-fetch
-
-echo "Data fetched successfully."
-ls data/ public/pdfs/
+echo "CV data fetched."

@@ -1,0 +1,13 @@
+variant: short-industry
+
+sections:
+  - type: summary
+    content_id: industry
+
+  - type: skills
+    include:
+      - tools
+
+  - type: employment
+    include:
+      - acme-engineer

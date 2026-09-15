@@ -1,0 +1,25 @@
+---
+import SectionIndex from "../../layouts/SectionIndex.astro";
+import { loadVariantSummaries } from "../../lib/cv-data";
+import path from "node:path";
+
+const variants = loadVariantSummaries(path.resolve("data/variants"));
+const base = import.meta.env.BASE_URL;
+const items = variants.map((v) => ({
+  title: v.label,
+  href: `${base}cv/${v.slug}`,
+  summary: v.description || undefined,
+  links: [
+    { href: `${base}cv/${v.slug}`, label: "View on web" },
+    { href: `${base}pdfs/${v.slug}.pdf`, label: "Download PDF" },
+  ],
+}));
+---
+
+<SectionIndex
+  title="CV"
+  description="Jason Cusati's CV in each of its variants, on the web and as PDF."
+  lede="The CV in each of its variants, built from the same source. Read one on the web or download its PDF."
+  items={items}
+  emptyMessage="No CV variants are available in this build."
+/>

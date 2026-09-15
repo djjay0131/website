@@ -1,0 +1,82 @@
+/*
+ * Research Hub design tokens (design doc §5).
+ *
+ * Type: Spectral (display), IBM Plex Sans (body), IBM Plex Mono (metadata),
+ * self-hosted from the @fontsource packages that Base.astro imports.
+ * Colour: petrol accent #0F5C5A, brass for caution, clay for risk.
+ *
+ * The light palette sits on :root. The dark palette overrides it under
+ * prefers-color-scheme: dark. No JavaScript switches themes (ADR-0003).
+ *
+ * Every text colour is at least 4.5:1 (WCAG AA) against --color-bg and
+ * --color-surface in its theme. scripts/contrast.mjs lists the checked pairs
+ * and src/styles/tokens.test.ts fails the test run when one drops below AA.
+ * Keep every colour a six-digit hex so the check can read it.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Type */
+  --font-display: "Spectral", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* Layout */
+  --max-width: 800px;
+  --radius: 4px;
+
+  /* Surfaces */
+  --color-bg: #fbfaf7;
+  --color-surface: #f2efe8;
+  --color-border: #d9d4c8;
+
+  /* Text */
+  --color-text: #1b2422;
+  --color-muted: #4f5a57;
+
+  /* Accent: petrol */
+  --color-accent: #0f5c5a;
+  --color-accent-strong: #0a4644;
+  --color-on-accent: #ffffff;
+  --color-link: #0f5c5a;
+  --color-link-hover: #0a4644;
+  --color-focus: #0f5c5a;
+
+  /* Status: brass = caution, clay = risk, green = confirmed */
+  --color-caution: #7a5a12;
+  --color-caution-bg: #f6edd6;
+  --color-risk: #9a3f27;
+  --color-risk-bg: #f7e4dc;
+  --color-ok: #2f6b35;
+  --color-ok-bg: #e3f0e2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Surfaces */
+    --color-bg: #101615;
+    --color-surface: #18201f;
+    --color-border: #2f3a38;
+
+    /* Text */
+    --color-text: #e4e7e2;
+    --color-muted: #a3ada9;
+
+    /* Accent: petrol, lifted so it reads on a dark ground (#0f5c5a is 2.35:1 here) */
+    --color-accent: #5fb8b3;
+    --color-accent-strong: #86cfca;
+    --color-on-accent: #0b1413;
+    --color-link: #6cc4bf;
+    --color-link-hover: #9ad9d5;
+    --color-focus: #6cc4bf;
+
+    /* Status */
+    --color-caution: #d9ae55;
+    --color-caution-bg: #2e2512;
+    --color-risk: #e68c70;
+    --color-risk-bg: #34201a;
+    --color-ok: #8cc98f;
+    --color-ok-bg: #1b2b1c;
+  }
+}
