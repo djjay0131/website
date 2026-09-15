@@ -98,6 +98,8 @@ PR. Next stop: **Checkpoint 2**.
 - [x] Committed per scope: site `0ce2865`, infra `9f0718a`.
 - [x] Seams clarified (SEAM-4 `SITE_URL` ordering; SEAM-6 snapshot currency); site
       contract D2 amended (A16).
+- [x] **Draft PR #12** opened (L2). Chief Reviewer contract written
+      (`chief-reviewer-phase-1.md`); it launches after the palette re-work lands.
 
 ## In flight
 
