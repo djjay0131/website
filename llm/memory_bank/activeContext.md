@@ -14,7 +14,7 @@ what a contributor needs to pick up work today.
 - The hub is live at **https://jason.cusati.us** on Firebase Hosting, deployed from `main`
   through Workload Identity Federation; `https://research.cusati.us` 301-redirects to it
   (paths preserved). GitHub Pages still serves until Phase 6.
-- **Stop point:** no Phase 2 work, and no OpenClaw page build (#13), without the owner's
+- **Stop point:** no Phase 2 work, and no further page work beyond #13, without the owner's
   explicit go.
 - Orchestration state: `llm/sprints/2026-09-hub/STATE.md`.
 
@@ -33,8 +33,9 @@ what a contributor needs to pick up work today.
 ## Open
 
 - Design doc §10 Q3, Q4, Q6.
-- Before Phase 2: the satellite → hub dispatch credential (ADR-0002 / STATE C1, K13).
-- OpenClaw Email pages (#13): owner to approve the drafted wording.
+- Phase 2 publish notification decided: option A — the hub polls the content bucket;
+  satellites hold no GitHub credential (owner, 2026-09-15). ADR to be written at Phase 2 start.
+- Email and Privacy pages at `/email/` and `/privacy/` (#13): in progress, owner's wording as supplied.
 - Brief / design-doc / canon conflicts K1–K13 (`STATE.md`).
 
 ## Governance adoption

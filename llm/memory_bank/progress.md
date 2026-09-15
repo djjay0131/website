@@ -25,7 +25,7 @@ None.
 ## What is left
 
 - Phases 2–6 of `llm/master-roadmap.md`, starting with Phase 2 on the owner's go.
-- OpenClaw Email pages (#13).
+- Email and Privacy pages at `/email/` and `/privacy/` (#13), in progress.
 
 ## Known issues
 
@@ -33,8 +33,6 @@ None.
   must settle it before Phase 2.
 - Brief and design-doc conflicts K1–K13 (`llm/sprints/2026-09-hub/STATE.md`).
 - Redirect-domain duplicate validation ignores case and trailing dots (STATE C17).
-- Incident A1 (`STATE.md`): the GitHub cached-view removal request is an outstanding owner
-  action.
 
 ## Governance adoption
 

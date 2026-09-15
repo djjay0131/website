@@ -15,10 +15,10 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. COMPLETE. Checkpoint 2 passed (2026-09-15).** The hub is live at
-`https://jason.cusati.us` on Firebase Hosting; `https://research.cusati.us` redirects to it.
-**Stopped: no Phase 2 work, and no OpenClaw page build (#13), without the owner's explicit
-go.**
+**Phase 1 — Foundation. COMPLETE** (Checkpoint 2 passed 2026-09-15; PR #14 merged, issue #10
+closed). The hub is live at `https://jason.cusati.us`. **In progress:** the Email and Privacy
+pages (issue #13), which the owner requested. **Phase 2 has not started** and waits for the
+owner's go.
 
 ## Done
 
@@ -191,9 +191,11 @@ go.**
 
 ## In flight
 
-- **Background check:** the next scheduled `build-and-deploy` run should read `build-info.json`
-  from `https://jason.cusati.us` (roadmap Phase 1 fingerprint criterion). GitHub runs the hourly
-  cron irregularly; the roadmap box stays unchecked until a scheduled run shows it.
+- **Email and Privacy pages** (issue #13, branch `feat/email-privacy-pages`): contract
+  `contracts/site-email-privacy-pages.md`; pages at `/email/` and `/privacy/` carrying the owner's
+  wording exactly.
+- **Background check:** the first scheduled `build-and-deploy` run to read `build-info.json` from
+  `https://jason.cusati.us` (roadmap Phase 1 fingerprint criterion).
 
 ## Blocked
 
@@ -220,6 +222,8 @@ Nothing. Phase 2 waits for the owner's go.
   committee material should be told.
 - **Prevention:** ADR candidate C9 (incident runbook); review recommendation 5 (a
   secret and large-binary scan in `ci.yml`).
+**Closed by owner decision (2026-09-15):** the owner chose not to file the GitHub Support purge
+request and accepts the residual exposure ("it's fine leave it"). No further action.
 
 ## Next
 
@@ -231,7 +235,6 @@ Owner:
 2. Approve or amend the OpenClaw Email wording (#13).
 3. Remaining Checkpoint 2 decisions (§Decisions for the owner at Checkpoint 2), notably
    whether `budget-guard` becomes a required status check.
-4. File the Incident A1 GitHub Support purge request.
 
 Lead Architect, after the relevant go: OpenClaw pages (#13) on their own branch; hub-002
 (Phase 2) with contracts that encode the owner's dispatch-credential decision; C17 fix.
@@ -309,6 +312,8 @@ Phase 1's `firebase.json` carries no gate rewrites.
 | — | Ownership chain on personal accounts, not institutional — survives graduation | Design doc §1; ADR-0001 |
 | — | Branch protection mirrors canon (enforce_admins off) — owner, 2026-09-14 | Delta §Platform Enforcement Reality |
 | — | Full label taxonomy + phase milestones — owner, 2026-09-14 | Delta §Milestone Labels |
+| — | **Phase 2 publish notification — option A:** the hub polls the content bucket on a schedule and rebuilds on change; satellites hold no GitHub credential for `website` (resolves the direction of C1/K13; the ADR is written at Phase 2 start) — owner, 2026-09-15 | STATE C1 |
+| — | **Email and Privacy pages** at `/email/` and `/privacy/`, titled "Email" and "Privacy", no "OpenClaw" name, owner's wording used as supplied — owner, 2026-09-15 | Issue #13 |
 
 ## Assumptions (conservative choices, not §10 questions)
 
@@ -389,6 +394,8 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C1** — Satellite → hub dispatch credential. `repository_dispatch` needs a
   GitHub-side credential; a GCP service account cannot hold it. A per-satellite
   PAT is a long-lived credential. Decide before Phase 2. (ADR-0002)
+  **Owner direction 2026-09-15: option A (hub polls the bucket); satellites hold no GitHub
+  credential.** Record as an ADR when Phase 2 starts.
 - **C2** — Leak-check matching rules and the derived outputs they cover
   (sitemap, RSS, search index, OG images). Decide in Phase 3. (ADR-0005)
 - **C3** — Branch naming convention for this repo vs canon (A3).
