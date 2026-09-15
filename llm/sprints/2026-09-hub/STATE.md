@@ -4,7 +4,7 @@ Status: Active
 Last updated: 2026-09-15
 Owner: Chief Architect (Lead Architect)
 
-**Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 (all work streams)
+**Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 for the work streams; **L3 for PR #12** (roadmap requirement changes — delta review 2, Part D)
 **Design authority:** `llm/specs/2026-09-10-research-hub-design.md`
 **Brief:** `llm/plans/2026-09-10-research-hub-orchestration-brief.md`
 
@@ -15,11 +15,11 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. DOMAIN AMENDMENT IN PROGRESS** (issue #10, PR #12 back to
-draft). At Checkpoint 2 the owner moved the hub off the apex (ADR-0006): `jason.cusati.us`
-is canonical, `research.cusati.us` redirects to it, and `cusati.us` + `www` are reserved
-for a family site. PR #12 is being amended, then a delta review, then back to
-**Checkpoint 2**. **Do not apply `infra/` until the amendment lands.**
+**Phase 1 — Foundation. CHECKPOINT 2 — STOPPED** (issue #10, PR #12 ready once CI is
+green on the commit that records this). The ADR-0006 domain amendment is implemented and
+reviewed: `jason.cusati.us` canonical, `research.cusati.us` redirecting, the `cusati.us`
+apex, `www` and mail records untouched. PR #12 is declared **L3**. **No Phase 2 work, and
+no OpenClaw page build, starts without the owner's explicit go.**
 
 ## Done
 
@@ -135,15 +135,24 @@ for a family site. PR #12 is being amended, then a delta review, then back to
 - [x] **Owner request:** public OpenClaw Email homepage and privacy policy at
       `https://jason.cusati.us/openclaw-email/` and `/openclaw-email/privacy/` — issue #13,
       a separate PR after #12.
+- [x] **ADR-0006 amendment implemented:** roadmap `132389c`, site `1229d31`, infra `8c14ce8`
+      (canonical `jason.cusati.us`; `research.cusati.us` redirect custom domain; per-host DNS
+      outputs; Terraform rejects the apex and `www`; DNS steps never change apex, `www`, MX or
+      TXT). CI green on `8c14ce8`.
+- [x] **Correction (process), `20e9f41`:** that commit held only the ADR-0006 file although its
+      message described the whole change set. The edit script aborted on a wrong anchor, and
+      the chain committed and pushed despite a failing governance check (`ci` run 34992910006,
+      adr-index). `46136e5` landed the missing edits. Rule adopted since: the commit chain
+      refuses to commit unless the governance checks report 4 of 4.
+- [x] **Chief Reviewer delta review 2** (verdict **Comment**): ADR-0006 conforms; no regression;
+      platform claims verified (redirect 301, certificate for a redirect domain, CNAME-only TLS
+      failure, cross-variable validation). Persisted to `handoffs/chief-reviewer-phase-1-delta-2.md`.
+      Required before ready: B1 PR body, B2 declare L3 — done. Notes B3 (this correction record),
+      B4 (STATE), B5 (memory bank Q1 + ADR range), B7 (ADR-0006 cross-reference) — done.
 
 ## In flight
 
-- **Infra** — canonical domain `jason.cusati.us`; `research.cusati.us` redirect domain;
-  per-domain DNS and state outputs; DNS steps that never touch the apex, `www`, MX or TXT.
-- **Site** — default `SITE_URL` `https://jason.cusati.us`; tests and docs.
-- **Chief Product Officer** — roadmap host wording and the redirect acceptance criterion.
-- **Lead Architect** — verifying the OpenClaw privacy-policy statements against Google's
-  and Anthropic's published policies.
+Nothing.
 
 ## Blocked
 
@@ -173,10 +182,20 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-1. Verify and commit the domain amendment per scope; CI green.
-2. Delta review of the amendment (Chief Reviewer); PR #12 back to ready (now L3: roadmap
-   requirement text changes). **Checkpoint 2 — STOP.**
-3. OpenClaw pages (issue #13) on their own branch after the amendment.
+Owner, at Checkpoint 2 (the Checkpoint 2 report on PR #12; infra handoff §Manual steps):
+
+1. Review PR #12 (L3) and rule on §Decisions for the owner at Checkpoint 2.
+2. Create the GCP project, link billing (Blaze), apply Terraform from a clean checkout of the
+   reviewed PR head (expect **19** resources to add), and record the applied SHA here.
+3. Add DNS records for `jason.cusati.us` and `research.cusati.us` only; set the Actions
+   variables; merge PR #12.
+4. Approve or amend the OpenClaw page wording on issue #13.
+5. Merge PR #11; file the Incident A1 purge request.
+
+Lead Architect, after an explicit go: verify `jason.cusati.us` serves the site, `research.`
+301-redirects (including whether the path is preserved), Pages still serves, and the apex
+MX/TXT are unchanged; record the applied SHA; close issue #10; memory-bank sync; roadmap
+bookkeeping; then the OpenClaw pages (issue #13).
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -245,7 +264,7 @@ Phase 1's `firebase.json` carries no gate rewrites.
 
 | # | Decision | Where |
 |---|---|---|
-| Q1 | Domain `cusati.us` | ADR-0001; issue #7 |
+| Q1 | Domain `cusati.us`, **amended by ADR-0006:** hub at `jason.cusati.us` (canonical), `research.cusati.us` 301-redirects, `cusati.us` + `www` reserved for a family site | ADR-0001, ADR-0006; issues #7, #10 |
 | Q2 | New GCP project, intended id `cusati-hub`, personal account | ADR-0001 |
 | Q5 | **Proposed:** Astro app moves under `site/`; `gate/`, `contract/`, `infra/` at root. Merging PR #9 accepts it. | ADR-0001 |
 | — | Ownership chain on personal accounts, not institutional — survives graduation | Design doc §1; ADR-0001 |
@@ -357,6 +376,9 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C16** — Canonical URL form, design-token policy, self-hosted fonts, the
   host-agnostic build interface, the redirect-map lifecycle, test-data policy, and
   deploy activation by repository variables (review Part F).
+- **C17** — Redirect-domain duplicate check compares raw strings, so a case or trailing-dot
+  variant of the same hostname passes validation and plans a second resource (delta review 2,
+  B6; fails loudly at plan review, no apex or mail risk). Tracked for a follow-up.
 
 ## Constraints discovered (bind later contracts)
 
@@ -436,7 +458,7 @@ what `terraform apply` creates.
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
    `djjay0131.github.io/website/`, `base: '/website/'`. Moving to `site/` and
-   to `/` on `cusati.us` shifts every link, asset and sitemap entry; inbound
+   to `/` on `jason.cusati.us` shifts every link, asset and sitemap entry; inbound
    `/website/...` links break. `main` already carries more than the smoke-test
    routes: PR #8 moved research under `/research/soa-agentic-se/**` and added
    `astro.config.mjs` redirects whose targets hardcode `/website/`. Site work owes

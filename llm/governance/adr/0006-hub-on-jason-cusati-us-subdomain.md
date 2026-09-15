@@ -103,6 +103,8 @@ and HTTPS would fail on a certificate mismatch.
 ## Related Documents
 
 - `llm/governance/adr/0001-promote-website-to-hub-on-firebase-hosting.md` Decision 2
+- `llm/governance/adr/0004-private-area-cloud-run-gate-behind-hosting.md` — the `__session`
+  constraint behind Decision 4 and the cookie-collision risk
 - `llm/specs/2026-09-10-research-hub-design.md` §10 Q1
 - `llm/sprints/2026-09-hub/STATE.md`
 
