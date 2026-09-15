@@ -29,6 +29,9 @@ repository layout (§10 Q5) for this ADR to propose.
 2. **Hosting moves from GitHub Pages to Firebase Hosting** on `cusati.us`, in
    a new GCP project owned by the personal account. Every link in the
    ownership chain — GitHub, GCP project, billing, domain — is personal.
+   *Amended 2026-09-15 by ADR-0006:* the hub binds `jason.cusati.us` (canonical) and
+   `research.cusati.us` (301 redirect); `cusati.us` and `www` are reserved for a family
+   site.
 3. **Layout (Q5): the Astro application moves under `site/`.** `gate/`,
    `contract/`, `infra/`, `firebase.json` and `.github/workflows/` sit at the
    repository root beside it, with the `llm/` control plane, and `docs/` as
@@ -144,4 +147,4 @@ None.
 
 ## Superseded By
 
-None.
+Decision 2 (the domain only) is amended by ADR-0006.

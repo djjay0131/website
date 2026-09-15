@@ -10,6 +10,11 @@ every element of `llm/governance/project-operating-system.md` §Agent Assignment
 Contract. `<canon checkout>` is the path declared in
 `llm/governance/governance-delta.md` §Canon Location.
 
+**AMENDED 2026-09-15 (ADR-0006):** wherever this contract names `cusati.us` as the hub's
+domain, read `jason.cusati.us` (canonical). `research.cusati.us` is connected to the same
+Hosting site as a custom domain that 301-redirects to it. The apex `cusati.us` and `www`
+are reserved for a family site and are never bound or changed by hub work.
+
 ```text
 ROLE: You are the Infrastructure Implementation Engineer (Specialist 2) for sprint
   2026-09-hub, Phase 1 — Foundation (issue #10), working in djjay0131/website on

@@ -25,7 +25,8 @@ Phase 1 — Foundation (issue #10) only.
   `npm run build`.
 - `npm run build` writes the static site to `site/dist-public/`.
 - Environment inputs, both optional:
-  - `SITE_URL` — absolute origin, no trailing slash. Default `https://cusati.us`.
+  - `SITE_URL` — absolute origin, no trailing slash. Default `https://jason.cusati.us`
+    (amended 2026-09-15 by ADR-0006; previously `https://cusati.us`).
   - `SITE_BASE` — path base. Default `/`.
 - The GitHub Pages build sets `SITE_URL=https://djjay0131.github.io` and
   `SITE_BASE=/website/`. The Firebase Hosting build uses the defaults.

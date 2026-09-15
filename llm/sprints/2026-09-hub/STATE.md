@@ -15,9 +15,11 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. CHECKPOINT 2 — STOPPED.** PR #12 is marked ready for the
-owner's review once CI is green on the commit that records this. **No Phase 2 work
-starts without the owner's explicit go.**
+**Phase 1 — Foundation. DOMAIN AMENDMENT IN PROGRESS** (issue #10, PR #12 back to
+draft). At Checkpoint 2 the owner moved the hub off the apex (ADR-0006): `jason.cusati.us`
+is canonical, `research.cusati.us` redirects to it, and `cusati.us` + `www` are reserved
+for a family site. PR #12 is being amended, then a delta review, then back to
+**Checkpoint 2**. **Do not apply `infra/` until the amendment lands.**
 
 ## Done
 
@@ -126,10 +128,22 @@ starts without the owner's explicit go.**
       and local override-file checks; credential-free locked-install job); B4 closed by
       the Lead Architect. Lead Architect checks: actionlint clean, terraform fmt +
       validate clean, `budget.tf` change comment-only.
+- [x] **Owner decision, Checkpoint 2 (2026-09-15):** Option B — `cusati.us` and `www` for
+      a family home page (outside hub scope); hub on a subdomain; both `jason.cusati.us`
+      and `research.cusati.us` reach it, `jason.` canonical, `research.` a 301 redirect.
+      Recorded as ADR-0006 (amends ADR-0001 Decision 2). PR #12 moved back to draft.
+- [x] **Owner request:** public OpenClaw Email homepage and privacy policy at
+      `https://jason.cusati.us/openclaw-email/` and `/openclaw-email/privacy/` — issue #13,
+      a separate PR after #12.
 
 ## In flight
 
-Nothing.
+- **Infra** — canonical domain `jason.cusati.us`; `research.cusati.us` redirect domain;
+  per-domain DNS and state outputs; DNS steps that never touch the apex, `www`, MX or TXT.
+- **Site** — default `SITE_URL` `https://jason.cusati.us`; tests and docs.
+- **Chief Product Officer** — roadmap host wording and the redirect acceptance criterion.
+- **Lead Architect** — verifying the OpenClaw privacy-policy statements against Google's
+  and Anthropic's published policies.
 
 ## Blocked
 
@@ -159,18 +173,10 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-Owner, at Checkpoint 2 (details in the Checkpoint 2 report on PR #12 and the infra
-handoff's manual steps):
-
-1. Review PR #12; rule on §Decisions for the owner at Checkpoint 2.
-2. Create the GCP project, link billing (Blaze), and apply Terraform from a clean
-   checkout of the reviewed PR head, recording the applied SHA here.
-3. Add the DNS records, set the Actions variables, merge PR #12.
-4. Merge PR #11; file the Incident A1 purge request.
-
-Lead Architect, after an explicit go: verify `cusati.us` serves the site and Pages still
-does; record the applied SHA and the result here; close issue #10; memory-bank sync
-(issue #10, F9); roadmap Phase 1 bookkeeping.
+1. Verify and commit the domain amendment per scope; CI green.
+2. Delta review of the amendment (Chief Reviewer); PR #12 back to ready (now L3: roadmap
+   requirement text changes). **Checkpoint 2 — STOP.**
+3. OpenClaw pages (issue #13) on their own branch after the amendment.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -306,6 +312,13 @@ Phase 1's `firebase.json` carries no gate rewrites.
   and dossier palette. The specialist never saw that palette (it lives in the
   private tarball outside the repo). D2 is amended with the colour values only,
   and the tokens are re-worked.
+- **A17** — OpenClaw privacy-policy wording: the owner chose "not shared with, sold to, or
+  stored by any third party", after being told Anthropic may retain API inputs and
+  outputs briefly under its data-retention policy. The owner's decision, used as given
+  (issue #13).
+- **A18** — Dated records (review reports, Phase 0 contracts and handoffs) keep their
+  `cusati.us` references; canon forbids rewriting where things were. Current-facing docs,
+  code and the infra contract move to `jason.cusati.us`.
 
 ## ADR candidates
 
@@ -449,6 +462,11 @@ what `terraform apply` creates.
 11. **The tracker and dossier themselves likely fail AA** where they set ink-3 text on
     paper or brass text on brass-soft (the same pairings the site had to adjust).
     They live in `phd-milestones`; address when it becomes a satellite (Phase 3).
+12. **Mail on `cusati.us`.** The domain carries Google Workspace MX records. Hub DNS work
+    adds records for `jason.` and `research.` only; the apex, `www`, MX and TXT records are
+    never changed (ADR-0006).
+13. **Cookie collision with a future family site** setting `__session` on
+    `Domain=cusati.us` (ADR-0006).
 
 ## Follow-ups
 
