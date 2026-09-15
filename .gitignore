@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .astro/
-/data/
-public/pdfs/
-public/photo_jason_1.jpeg
+.firebase/
+/site/data/
+/site/dist-public/
+/site/dist-private/
+site/public/pdfs/
+site/public/photo_jason_1.jpeg
