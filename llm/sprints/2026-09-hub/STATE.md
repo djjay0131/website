@@ -15,9 +15,11 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. IN REVIEW** (issue #10, draft PR #12). Implementation,
-verification and reconciliation are complete, including the palette re-work (A16).
-The Chief Reviewer reviews PR #12 next. Next stop: **Checkpoint 2**.
+**Phase 1 — Foundation. RECONCILING THE REVIEW** (issue #10, draft PR #12). The
+Chief Reviewer returned **Request Changes**: one must-fix (F1, the budget guardrail's
+documented protection and rollback step) and should-fix findings. Every finding is
+accepted and routed to its document owner (§Phase 1 review dispositions). Next stop:
+**Checkpoint 2**.
 
 ## Done
 
@@ -104,10 +106,14 @@ The Chief Reviewer reviews PR #12 next. Next stop: **Checkpoint 2**.
       #636a68 (carried-over ink-3 #6B7370 is 4.45:1 on paper) and caution #87620d
       (brass #8A6512 is 4.32:1 on brass-soft) — with the originals kept for non-text
       use. `npm test` 47 passed, 1 skipped; builds clean.
+- [x] **Chief Reviewer report** received (Request Changes: 1 must-fix, 7 should-fix,
+      6 notes; L2 confirmed) and persisted to `handoffs/chief-reviewer-phase-1.md`;
+      posted to PR #12. SEAM-7 added to the seams (F8).
 
 ## In flight
 
-- **Chief Reviewer** — PR #12 review and Terraform module-structure review.
+- **Infra** — review findings F1, F2, F3, F4, F5, F8 (build.yml half), F10, F11, F12.
+- **Site** — review finding F8 (smoke-route presence check, SEAM-7).
 
 ## Blocked
 
@@ -137,8 +143,9 @@ Nothing blocks Phase 0. Incident A1 carries an owner follow-up outside this repo
 
 ## Next
 
-1. Persist and post the Chief Reviewer's report; reconcile findings through owners.
-2. Bring the PR #12 body current; mark it ready. **Checkpoint 2 — STOP.**
+1. Verify the infra and site remediation against the findings; commit per scope.
+2. Lead Architect items: F6 (PR body), F14 (handoff status lines).
+3. Mark PR #12 ready. **Checkpoint 2 — STOP.**
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -295,12 +302,23 @@ Phase 1's `firebase.json` carries no gate rewrites.
   runbook (review R8; A1).
 - **C10** — Terraform state backend (local, git-ignored, in Phase 1; remote GCS
   backend proposed — it needs a bucket, which K1 keeps out of Phase 1).
-- **C11** — Deploy identity: `roles/firebasehosting.admin` vs a custom role with
-  the four permissions firebase-tools uses; `apiKeysViewer` omitted on source
-  evidence.
-- **C12** — WIF admission policy: repository id + owner id + name, main-only deploy
-  binding via `repository_id/ref`, `pull_request_target` refused.
+- **C11** — Deploy identity: `roles/firebasehosting.admin` plus
+  `roles/serviceusage.apiKeysViewer` is the narrowest supported grant. The
+  custom-role alternative is withdrawn: custom roles cannot control Firebase
+  Hosting resources (review F2, F3).
+- **C12** — WIF admission policy: repository id + owner id + name; main-only deploy
+  binding via `repository_id_ref`; `pull_request_target` refused. **Invariant:** the
+  binding keeps other providers out only while every provider in the pool maps
+  `repository_id_ref` from `repository_id + '/' + ref`. Phase 2 should prefer a
+  separate pool for satellites, which makes this structural (review F4).
 - **C13** — One source for the smoke-test route list.
+- **C14** — Budget guardrail enforcement: `prevent_destroy`, a CI presence check,
+  and apply provenance (review F1).
+- **C15** — CI supply-chain pinning: actions by SHA, CLI tools by lockfile, runtimes
+  by exact version (review F5, F10).
+- **C16** — Canonical URL form, design-token policy, self-hosted fonts, the
+  host-agnostic build interface, the redirect-map lifecycle, test-data policy, and
+  deploy activation by repository variables (review Part F).
 
 ## Constraints discovered (bind later contracts)
 
@@ -314,16 +332,41 @@ Phase 1's `firebase.json` carries no gate rewrites.
   `site/**`: `.gitignore`, `.vscode/`, root `package.json`/lockfile removal,
   `scripts/`. (ADR-0001)
 
+## Phase 1 review dispositions (Chief Reviewer, PR #12)
+
+All accepted. Owner of each fix in brackets.
+
+| # | Finding | Disposition |
+|---|---|---|
+| **F1** must-fix | `prevent_destroy` does not stop removal when the budget's block is deleted; rollback step 10 would delete the budget | Correct the texts; rewrite step 10 so no rollback removes `budget.tf`; add a CI presence check for the budget and its guard; record apply provenance (applied commit SHA in STATE) [infra] |
+| F2 | Deploy identity omits `roles/serviceusage.apiKeysViewer`, which Firebase documents for CLI deploys | Grant it (read-only; the project has no API keys) so the first deploy follows the documented path; the owner may reverse at Checkpoint 2 [infra] |
+| F3 | Custom-role tightening is unsupported for Hosting | Withdraw it; Hosting Admin (+ API Keys Viewer) is the narrowest supported grant [infra; C11 here] |
+| F4 | Shared-pool binding safety rests on an unrecorded mapping invariant | State the invariant in `wif.tf` and C12; recommend a separate satellite pool in the Phase 2 ADR [infra; C12 here] |
+| F5 | firebase-tools dependency tree resolved at deploy time with no lockfile | Commit a pinned `infra/deploy-tools` package with lockfile; deploy runs `npm ci` from it [infra] |
+| F6 | PR #12 body stale | Update after remediation [Lead Architect] |
+| F7 | AA-adjusted text colours and a status green not put to the owner | Added to the Checkpoint 2 decisions [Lead Architect] |
+| F8 | Test rewrite lost the pre-deploy check that smoke-test routes exist | SEAM-7: site provides `npm run check:smoke-routes`; `build.yml` runs it after each build [site + infra] |
+| F9 | Memory-bank sync deferral has no tracked end | Checklist item on issue #10 [Lead Architect] |
+| F10 | `check-latest` floats Node on the deploy path | Pin an exact version [infra] |
+| F11 | Major action-version bumps on the Pages path are undocumented | Document them; first post-merge run is their verification step [infra; PR body] |
+| F12 | Terraform-created default site's type unverified; import line unnecessary | Add a `DEFAULT_SITE` postcondition; drop the import line [infra] |
+| F13 | Budget creation needs Billing Account Administrator, not User | Reworded in the Checkpoint 2 decisions [Lead Architect] |
+| F14 | Handoff status lines stale | Update after remediation [Lead Architect] |
+
 ## Decisions for the owner at Checkpoint 2 (with recommended defaults)
 
 - **State backend** — keep local, git-ignored state for the first apply and back
   it up privately; adopt a GCS backend when Phase 2 introduces buckets. (C10)
-- **Deploy role** — keep `roles/firebasehosting.admin` for the first deploy;
-  tighten to a custom role once a real deploy has proved the permission set. (C11)
-- **`apiKeysViewer`** — leave it out; grant only if the first deploy reports a
-  missing `apikeys.*` permission (infra handoff manual step 9).
-- **Billing** — confirm you hold Billing Account Administrator or User on the
-  personal billing account (so budget emails reach you) and that it bills in USD.
+- **Deploy role** — `roles/firebasehosting.admin` plus `roles/serviceusage.apiKeysViewer`
+  (granted per review F2, read-only). Custom roles cannot control Firebase Hosting
+  resources, so there is no tighter supported grant (F3). Recommended: accept.
+- **Design tokens** — accept the AA-adjusted light-theme text colours (muted
+  `#636a68`, caution `#87620d`; the tracker originals kept for non-text use) and a
+  status green the tracker palette lacks. Recommended: accept, and the tracker
+  adopts the same values when it becomes a satellite (F7).
+- **Billing** — confirm you are **Billing Account Administrator** on the personal
+  billing account: it is needed to create the budget (Billing Account User is not
+  enough) and it receives the budget emails. Confirm the account bills in USD.
 - **`/phd/` in the redirect map** — leave it in: it is a public, empty, noindex
   shell.
 - **Two-hop legacy research redirects on Firebase** (301 to add the slash, then a

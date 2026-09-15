@@ -87,6 +87,19 @@ Phase 1 — Foundation (issue #10) only.
   regenerates and re-checks the map before serving it. The build-coverage test is
   opt-in (`REDIRECT_MAP_CHECK_BUILD=1`); CI does not gate on it in Phase 1.
 
+### SEAM-7 — Smoke-route presence (added after the Phase 1 review, finding F8)
+
+- **Owner:** site. **Consumer:** infra.
+- `site/scripts/site-routes.mjs` exports the smoke-test routes; it is their one
+  source.
+- From `site/`, `npm run check:smoke-routes` exits non-zero when any smoke route
+  has no file in `site/dist-public` — `<route>/index.html` for page routes, the
+  file itself for file routes such as `/pdfs/academic.pdf`. It needs no network
+  and no credentials, and prints each missing route.
+- `build.yml` runs it after each variant's build (GitHub Pages and Firebase
+  Hosting) and before any artifact upload, so a `cv` release that drops a smoke
+  route fails before deploy rather than after.
+
 ## Assumptions
 
 - GitHub Pages stays live and authoritative until Checkpoint 2 verifies Firebase
