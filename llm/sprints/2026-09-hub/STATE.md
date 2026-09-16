@@ -566,6 +566,23 @@ Phase 2, verified against primary sources before any implementation (ADR-0007, A
 - **`cv`'s default branch is `master`** and the repository is **public** — its WIF condition
   admits `refs/heads/master` (design doc §2 was wrong; corrected by ADR-0008).
 
+**File modes cannot be observed on this workstation (2026-09-16).** The repository lives on
+`/mnt/c`, a DrvFs mount that reports every file as `0777`. A script committed `100644`
+therefore runs perfectly locally and fails on a Linux runner with
+`Permission denied`, exit 126. This cost a red CI in Phase 2: `site/scripts/sync-content.sh`
+was committed non-executable and `fetch-data.sh` invokes it directly, so `build` and
+`build-firebase` both died in ~11 seconds — after the specialist had run the script locally,
+repeatedly, and could not have caught it. No amount of local testing can.
+
+Binding on later contracts, Phase 3's `gate/` especially, which adds shell scripts and a
+Dockerfile:
+
+- Set the bit explicitly with `git update-index --chmod=+x`, and verify with
+  `git ls-files -s` — not with `ls -l`, which lies on this mount.
+- Prefer `bash script.sh` over `./script.sh` in CI where the caller is ours, but note that a
+  script documented for humans as `scripts/foo.sh` must still carry the bit.
+- Audited repo-wide on 2026-09-16: every tracked `*.sh` is now `100755`.
+
 ## Phase 1 review dispositions (Chief Reviewer, PR #12)
 
 All accepted. Owner of each fix in brackets.
@@ -765,6 +782,12 @@ From the Phase 2 `cv` stream (2026-09-16):
   here; worth an issue in `cv`.
 - **Checkpoint 3 ordering changed:** merge `cv`'s `fix/bibtexparser-pin` PR **first**, or
   `cv`'s CI stays red and the publish job cannot run at all.
+- **A guard for the executable bit.** Nothing in the repo checks it, and the one defect that
+  reached CI in Phase 2 was exactly this. A cheap check — assert every tracked `*.sh`, and
+  every tracked file beginning `#!`, is mode `100755` — would have caught it before push. It
+  belongs alongside `budget-guard`, which exists for the same reason: an invariant whose
+  breakage is invisible where it is authored. Deferred out of Phase 2 because `build.yml`
+  was the site stream's file and the Chief Reviewer is mid-review.
 
 ## Standing constraints
 
