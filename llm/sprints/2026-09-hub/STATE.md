@@ -765,6 +765,44 @@ not `storage.objects.create`.
 **Still outstanding at Checkpoint 3:** revoking the PAT
 itself (owner-only); and the merges — `cv` #14, then hub #17, then `cv` #13.
 
+## Post-merge defect: the hub could not build on an empty bucket (issue #19)
+
+Merging PR #17 turned `main` red. `build` and `build-firebase` failed on `ee81929`;
+`notify-failure` opened #18. **No deploy ran** — all four deploy/smoke jobs skipped — so the
+live site was never affected and kept serving `22c419a`.
+
+**Cause.** Checkpoint 3 set `GCP_CONTENT_BUCKET`, so `check` correctly chose the bucket path
+on `main`. The bucket is empty, because `cv` #13 (the thing that publishes) is not merged. The
+sync handled that gracefully and exited 0 — `no objects under sources/ -- nothing to sync` —
+and everything downstream then failed on the empty tree. Reproduced locally: `npm test` → 8
+failures, `npm run build` → exit 1, ENOENT in `getStaticPaths` for `/cv/[variant]`.
+
+**Two defects, and I own both.**
+
+1. **I dispositioned the Chief Reviewer's N1 wrongly.** N1 said `npm test` is not hermetic on
+   a fresh clone; I recorded "CI is unaffected; a contributor sharp edge." That held only
+   while `fetch-data.sh` ran before `npm test` and populated the tree. The moment `main`
+   switched to the bucket path, N1 became a CI failure. The reviewer named the defect
+   precisely and I misjudged its blast radius.
+2. **The build defect was broader and nobody raised it.** The hub could not build at all while
+   a claimed `data` source had published nothing. My `fetch-data.sh` fallback covered
+   pull-request builds and the pre-apply window, but not the window between enabling the
+   bucket and the first publish.
+
+**Fix, on `fix/content-bootstrap`.** A fourth fallback condition in `check`: when the bucket is
+reachable but its fingerprint is `empty` — a state `sync-content.sh` already models
+deliberately — fall back to the release path. This does **not** weaken the rule that a source
+which *has* published and then lost its manifest fails the build; `empty` means no objects at
+all, while a vanished manifest leaves objects behind and still fails. Verified by executing the
+step across all three input cases. Plus loud skip-guards on the two live-data test files,
+preserving A15's intent (they assert against real published data, so a fixture would make them
+assert nothing). Verified both ways: with content, 102 passed / 1 skipped, unchanged; with an
+empty tree, 94 passed / 9 skipped and **zero failures**, where it was 8 failures before.
+
+**Note on sequencing.** Merging `cv` #13 also clears the red, by publishing and filling the
+bucket — and it should be merged. But that treats the symptom: an empty or withdrawn source
+would break the build again.
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at

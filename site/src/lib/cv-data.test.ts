@@ -23,6 +23,21 @@ const FIXTURE_VARIANTS = path.join(FIXTURE_DIR, "variants");
 const CONTENT_DIR = path.resolve(CV_CONTENT_DIR);
 const VARIANTS_DIR = path.resolve(CV_VARIANTS_DIR);
 
+// The synced tree is gitignored and is absent until a sync has run: on a fresh
+// clone, and in CI before the content bucket or the cv release has populated it.
+// These structural checks assert against REAL published data (STATE A15), so
+// pointing them at the committed fixture would make them assert nothing real.
+// They skip instead — loudly, because a silent skip would hide a genuine sync
+// failure and trade one invisible defect for another.
+const SYNCED = fs.existsSync(CONTENT_DIR) && fs.existsSync(VARIANTS_DIR);
+if (!SYNCED) {
+  console.warn(
+    `[cv-data.test] SKIPPING the synced-CV structural checks: no content at ${CONTENT_DIR}. ` +
+      "Run `npm run content:fixture` for the committed fixture, or `npm run data:fetch` for the " +
+      "real cv release. The fixture-based assertions below still run.",
+  );
+}
+
 describe("loadContentPool", () => {
   it("loads and indexes every section of the fixture", () => {
     const pool = loadContentPool(FIXTURE_CONTENT);
@@ -158,7 +173,7 @@ describe("loadVariantSummaries", () => {
 // sync-local-data.sh). These checks hold for any well-formed cv publish: they
 // never pin counts, ids or names, so a new publish cannot fail CI's `npm test`
 // step on content alone.
-describe("synced CV data (structure only)", () => {
+describe.skipIf(!SYNCED)("synced CV data (structure only)", () => {
   it("loads a content pool with a name and contact email", () => {
     const pool = loadContentPool(CONTENT_DIR);
     expect(pool.meta.name).toBeTruthy();

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
 import path from "node:path";
 import { parseBib, parseBibFlat } from "./bib";
 import { CV_BIB_PATH } from "./hub-content.mjs";
@@ -6,7 +7,18 @@ import { CV_BIB_PATH } from "./hub-content.mjs";
 // Synced from the content bucket by scripts/sync-content.sh (Phase 2, SEAM-5).
 const BIB_PATH = path.resolve(CV_BIB_PATH);
 
-describe("parseBib", () => {
+// Every assertion here parses the REAL published bibliography, so it cannot run
+// against a fixture without ceasing to test anything. Absent until a sync has
+// run; skip loudly rather than fail (issue #19).
+const HAS_BIB = fs.existsSync(BIB_PATH);
+if (!HAS_BIB) {
+  console.warn(
+    `[bib.test] SKIPPING: no bibliography at ${BIB_PATH}. ` +
+      "Run `npm run content:fixture` or `npm run data:fetch` to exercise these.",
+  );
+}
+
+describe.skipIf(!HAS_BIB)("parseBib", () => {
   it("parses real own-bib.bib into grouped entries", () => {
     const groups = parseBib(BIB_PATH);
     const all = [...groups.articles, ...groups.proceedings, ...groups.books, ...groups.other];
