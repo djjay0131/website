@@ -146,7 +146,7 @@ explicit go.
 - [x] `/cv/academic` and `/papers/` on `jason.cusati.us` return bodies of at least 500 bytes (the existing smoke check)
 - [x] The built `site/dist-public` has no link, asset reference or redirect target under `/website/`, including the hardcoded `/website/research/soa-agentic-se/agentic-harnesses*` targets in the existing Astro `redirects`
 - [x] `djjay0131.github.io/website/` still serves the site, since Pages is retired only in Phase 6 (ADR-0001)
-- [ ] The CV on `jason.cusati.us` matches the latest `cv` release, and the hourly fingerprint check reads the new host's build info
+- [x] The CV on `jason.cusati.us` matches the latest `cv` release, and the hourly fingerprint check reads the new host's build info
 - [x] `git log --follow` on a moved file under `site/src/` shows its history from before the move
 - [x] Every cloud resource Phase 1 uses is declared in `infra/`. After the owner's apply, `terraform plan` reports no changes (§12.5).
 - [x] The manual steps Terraform cannot perform are written down in the repository (§12.5)

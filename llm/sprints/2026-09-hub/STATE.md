@@ -188,14 +188,18 @@ owner's go.
   - `terraform apply -refresh-only`: 0 changes; `plan`: `No changes.`; state backed up privately.
   - GitHub Pages still serves; apex `cusati.us` MX, TXT, A, CAA and `www` unchanged.
 - [x] Phase 1 bookkeeping PR: roadmap checkboxes, this record, memory-bank sync (issue #10, F9).
+- [x] **Phase 1 fingerprint criterion verified:** scheduled run 35032163362 (2026-09-15T22:40:53Z)
+      logged "reading deployed build info from https://jason.cusati.us/build-info.json", compared
+      fingerprints and correctly skipped the rebuild. The roadmap box is ticked.
+- [x] **`budget-guard` made a required status check** on `main` (owner decision); delta and memory
+      bank updated.
+- [x] **Email and Privacy pages built** (#13) on `feat/email-privacy-pages`: the owner's wording
+      exactly, verified character for character against the contract; redirect map 48 → 50.
 
 ## In flight
 
-- **Email and Privacy pages** (issue #13, branch `feat/email-privacy-pages`): contract
-  `contracts/site-email-privacy-pages.md`; pages at `/email/` and `/privacy/` carrying the owner's
-  wording exactly.
-- **Background check:** the first scheduled `build-and-deploy` run to read `build-info.json` from
-  `https://jason.cusati.us` (roadmap Phase 1 fingerprint criterion).
+- **Email and Privacy pages PR** (#13): awaiting CI, then the Chief Reviewer
+  (`contracts/chief-reviewer-email-privacy-pages.md`), then the owner's merge.
 
 ## Blocked
 
@@ -409,7 +413,7 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C8** — What public-build islands may call at runtime (review R7; ADR-0003).
 - **C9** — Handling private content found in a public repository — incident
   runbook (review R8; A1).
-- **C10** — Terraform state backend (local, git-ignored, in Phase 1; remote GCS
+- **C10** — Terraform state backend (local, git-ignored, in Phase 1; remote GCS **Owner 2026-09-15: local for Phase 1; revisit in Phase 2.**
   backend proposed — it needs a bucket, which K1 keeps out of Phase 1).
 - **C11** — Deploy identity: `roles/firebasehosting.admin` plus
   `roles/serviceusage.apiKeysViewer` is the narrowest supported grant. The
@@ -491,37 +495,19 @@ working snapshot lived in temporary storage.
 - `jason.cusati.us`, `research.cusati.us`: no records
 - NS: `ns65.domaincontrol.com.`, `ns66.domaincontrol.com.`
 
-## Decisions for the owner at Checkpoint 2 (with recommended defaults)
+## Checkpoint 2 decisions — resolved (owner, 2026-09-15)
 
-- **State backend** — keep local, git-ignored state for the first apply and back
-  it up privately; adopt a GCS backend when Phase 2 introduces buckets. (C10)
-- **Deploy role** — `roles/firebasehosting.admin` plus `roles/serviceusage.apiKeysViewer`
-  (granted per review F2, read-only). Custom roles cannot control Firebase Hosting
-  resources, so there is no tighter supported grant (F3). Recommended: accept.
-- **Design tokens** — accept the AA-adjusted light-theme text colours (muted
-  `#636a68`, caution `#87620d`; the tracker originals kept for non-text use) and a
-  status green the tracker palette lacks. Recommended: accept, and the tracker
-  adopts the same values when it becomes a satellite (F7).
-- **Billing** — *verified 2026-09-15:* the owner holds `roles/billing.admin` on the personal
-  billing account, which is open and bills in USD; the budget was created at apply.
-- **`/phd/` in the redirect map** — leave it in: it is a public, empty, noindex
-  shell.
-- **Two-hop legacy research redirects on Firebase** (301 to add the slash, then a
-  meta refresh) — accept for Phase 1; Phase 6 serves host-level redirects.
-- **Font payload** (~1.6 MB across 55 woff2 subsets; browsers fetch only what they
-  need) — subset to latin + latin-ext in a later phase.
-- **Make `budget-guard` a required status check on `main`** (alongside
-  `governance-checks`), so a PR that removes the budget cannot merge. Recommended:
-  yes. It is a branch-protection change, so it waits for your word.
-- **Deploy-tool install scripts and advisories** — `npm ci` for firebase-tools runs
-  package install scripts in the deploy job (before authentication) and reports 7
-  moderate advisories in its dependency tree. Recommended: accept for the first
-  deploy; evaluate `--ignore-scripts` after one real deploy (infra handoff
-  Recommendation 6).
-**Status after merge (2026-09-15):** PR #12 merged, so the L3 classification is settled. Billing
-admin and USD are verified. Still open: keep API Keys Viewer; accept the AA-adjusted tokens and
-status green; accept the deploy tools' install scripts and advisories; `budget-guard` as a
-required status check; remote state backend timing.
+| Decision | Owner's answer |
+|---|---|
+| `budget-guard` as a required status check on `main` | **Yes** — applied and verified; `main` now requires `governance-checks` and `budget-guard` |
+| `roles/serviceusage.apiKeysViewer` on `hub-deploy` | **Keep** |
+| AA-adjusted light-theme text colours (muted `#636a68`, caution `#87620d`) and the added status green | **Accept both**; tracker originals stay for non-text use |
+| Deploy tool's install scripts and 7 moderate advisories | **Accept for now**; revisit at the next firebase-tools update |
+| Terraform state backend | **Local for now**, git-ignored with a private backup; move to a bucket in Phase 2 (C10) |
+| `/phd/` in the redirect map | **Leave it in** |
+| Two-hop legacy research redirects | **Accept**; host-level redirects come in Phase 6 |
+| Font payload (55 woff2 subsets) | **Leave as is**; browsers fetch only what they need |
+| Billing role (verified, not a decision) | Owner holds `roles/billing.admin`; the account is open and bills in USD |
 
 ## Risks carried forward
 

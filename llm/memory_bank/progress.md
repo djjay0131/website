@@ -15,7 +15,8 @@ merged reality, not plans.
 - GitHub Pages (`djjay0131.github.io/website/`) still serves the same build until Phase 6.
 - Terraform in `infra/` declares every Phase 1 cloud resource; the owner's $5 budget alert
   is live and guarded in CI.
-- Governance adopted (agentic-governance v0.8); `main` requires `governance-checks`.
+- Governance adopted (agentic-governance v0.8); `main` requires `governance-checks` and
+  `budget-guard` (since 2026-09-15).
 - ADRs 0001–0006 Accepted; master roadmap in force.
 
 ## Pending merge
