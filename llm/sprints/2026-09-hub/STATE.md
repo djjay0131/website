@@ -217,9 +217,13 @@ Landed and committed:
 Running now — **do not relaunch either without first checking for its handoff in
 `handoffs/`:**
 
-- **`site`** — `site/**`, `.github/workflows/build.yml`, `.gitignore`, against
-  `contracts/site-phase-2.md`. Told mid-flight that `roles/storage.objectViewer` lacks
-  `storage.buckets.get`, so its sync must stay to object operations.
+- **`site` — DONE** (commit `9be8d98`). Collection mirroring the schema, CV repointed at the
+  synced payload, poll wiring, fixtures. Verified: the Pages build/deploy/smoke test all
+  survive per the owner's instruction, `repository_dispatch` gone, every action SHA-pinned,
+  bucket work gated on `vars.GCP_CONTENT_BUCKET`, no bucket-metadata call, `findDuplicateSlugs()`
+  implements the rule JSON Schema cannot express, mirror accepts `private`, tests 54 → 102, and
+  the CV renders **byte-identically** (SHA-256 per page, before and after). Handoff:
+  `handoffs/site-phase-2.md`.
 - **`satellite-cv` — DONE.** Committed and pushed to `cv` on branch `feat/publish-contract`.
   Verified: the "Notify website repo" step is deleted (0 hits for `WEBSITE_DISPATCH_PAT`,
   `WEBSITE_REPO`, `repository_dispatch` in `build-cv.yml`), publishing gated to
@@ -229,9 +233,14 @@ Running now — **do not relaunch either without first checking for its handoff 
   `bibtexparser<2` pin from Risk 15 (branch `fix/bibtexparser-pin`, commit `5ee7515`).
   **#14 must merge before #13**, or `cv`'s CI stays red and its publish job cannot run.
 
-Not started, and blocked by design: the **Chief Reviewer**
-(`contracts/chief-reviewer-phase-2.md`) reviews both repositories and runs only once both
-streams above have landed.
+**All four implementation streams have landed.** The **Chief Reviewer** is now IN FLIGHT
+(`contracts/chief-reviewer-phase-2.md`), reviewing hub PR #17 at head `9be8d98` and `cv` PR #13
+together. On restart: do not relaunch it if
+`handoffs/chief-reviewer-phase-2.md` already exists.
+
+Remaining after the review: act on its findings, persist it verbatim to
+`handoffs/chief-reviewer-phase-2.md` and post it to PR #17, take #17 out of draft, then the
+owner runs Checkpoint 3 in the order recorded under §Follow-ups.
 
 ## Blocked
 
