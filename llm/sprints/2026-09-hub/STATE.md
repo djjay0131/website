@@ -199,19 +199,34 @@ ADR-0008, both accepted on this branch, and runs four streams across two reposit
 
 ## In flight
 
-- **Phase 2 (#16), draft PR #17.** Landed on `feat/publishing-contract`: ADR-0007, ADR-0008,
-  design doc §2/§3/§4 amendments, roadmap, delta (artifacts slot `docs/` declared),
-  `docs/satellites.md`, all six bounded contracts, memory bank.
-- **Two specialist streams launched 2026-09-16 and running:**
-  - `contract` — `contract/**` (schema, examples, publish action, README) against
-    `contracts/contract-phase-2.md`.
-  - `infra` — `infra/**` (content bucket, custom role, `satellites` WIF pool, cv identity)
-    against `contracts/infra-phase-2.md`.
-  **On restart: do not relaunch these two without first checking whether `contract/` and
-  `infra/storage.tf` already exist and whether their handoffs are present in `handoffs/`.**
-- **Not yet launched, and blocked by design:** `site` needs `contract/manifest.schema.json`
-  to mirror (SEAM-1); `satellite-cv` needs both the schema and `contract/publish/action.yml`.
-  Both contracts tell the specialist to STOP if those are absent. The Chief Reviewer runs last.
+**Phase 2 (#16), draft PR #17, branch `feat/publishing-contract`.**
+
+Landed and committed:
+
+- Decisions: ADR-0007, ADR-0008, design doc §2/§3/§4 amendments, roadmap, delta (artifacts
+  slot `docs/` declared), `docs/satellites.md`, all six bounded contracts, memory bank.
+- **`contract` stream — DONE** (commit `0866222`). Schema, 12 invalid fixtures, dependency-free
+  validator, composite publish action, README. Verified by the Lead Architect: 54/54 tests on
+  re-run, no tracked file touched, every forbidden construct present only as a comment
+  explaining the prohibition. Handoff: `handoffs/contract-phase-2.md`.
+- **`infra` stream — DONE** (commit `7a2f238`). Content bucket, three-permission custom role,
+  `satellites` WIF pool, cv identity; 9 resources. Verified: UBLA true, prefix condition ends
+  in a slash, no `objects.list` grant anywhere, cv admitted at `refs/heads/master`,
+  `terraform fmt`/`validate` clean, `budget.tf` untouched. Handoff: `handoffs/infra-phase-2.md`.
+
+Running now — **do not relaunch either without first checking for its handoff in
+`handoffs/`:**
+
+- **`site`** — `site/**`, `.github/workflows/build.yml`, `.gitignore`, against
+  `contracts/site-phase-2.md`. Told mid-flight that `roles/storage.objectViewer` lacks
+  `storage.buckets.get`, so its sync must stay to object operations.
+- **`satellite-cv`** — the `cv` repository, in the worktree at
+  `<scratchpad>/cv-wt` on branch `feat/publish-contract`, against
+  `contracts/satellite-cv-phase-2.md`. Nothing is committed in `cv` yet.
+
+Not started, and blocked by design: the **Chief Reviewer**
+(`contracts/chief-reviewer-phase-2.md`) reviews both repositories and runs only once both
+streams above have landed.
 
 ## Blocked
 
