@@ -198,7 +198,6 @@ serves the site and records it in `STATE.md`.
 - [ ] Content bucket (§8, §11)
 - [ ] One service account and WIF provider entry per satellite, scoped by IAM condition to that satellite's prefix (§8)
 - [ ] The hub build syncs the content bucket before building; a scheduled hub workflow fingerprints the bucket and rebuilds when it differs from the deployed build (§3, §11; ADR-0007 — polling, not dispatch)
-- [ ] Section pages render from collections (brief §4) — **NOT DONE in Phase 2.** *(Unassigned across the four stream contracts; the Lead Architect's omission. It also conflicts with this phase's standing requirement that rendered output must not change, and with `cv` as the only satellite — publishing four PDFs and one `data` payload — there is nothing a collection-driven section page would show that the existing pages do not. Deferred for the owner's decision at Checkpoint 3; see STATE C26.)*
 - [ ] Satellite how-to for satellite owners, `docs/satellites.md` (brief §4)
 - [ ] `cv` formalized as satellite #1: a publish workflow and manifest, with items `visibility: public` and `section: cv` (§2, §11)
 - [ ] `format: data` added to the manifest's fixed set, with `schema_version`; the hub renders only the `(source, slug)` data items it claims and fails the build on any other (ADR-0008; design doc §4 amended)
@@ -355,6 +354,15 @@ None defined. The brief ends at Checkpoint 4 (brief §3).
 **Ships:** A self-updating projects section (design doc §11).
 
 ### Scope
+- [ ] Section pages render from collections (brief §4). *(Moved from Phase 2 on the owner's
+  decision, 2026-09-16, with the Chief Reviewer concurring. It was never assigned in a Phase 2
+  stream contract — the Lead Architect's omission — and it could not have landed there without
+  breaking that phase's requirement that rendered output not change. With `cv` the only
+  satellite, a collection-driven section page would have shown exactly what `/cv/` and
+  `/resumes/` already render first-party. Here it has a second and third satellite to render,
+  which is the first point it does something nothing else does. The collection and its
+  validation already exist and are exercised by the build; only the rendering is outstanding.
+  Closes STATE C26.)*
 
 - [ ] `agentic-kg` as satellite #3, with a public project page from its `docs/` (§2, §11)
 - [ ] `construction-ai-proposal` as satellite #4, with a public project page (§2, §11)

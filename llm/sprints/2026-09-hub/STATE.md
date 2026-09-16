@@ -521,7 +521,7 @@ Phase 1's `firebase.json` carries no gate rewrites.
   stay as their CV source. Options: a pool-level `principalSet`, or a second read-only service
   account. Once it exists, the fallback can be deleted as the seams originally intended. This
   is the single change that closes the largest remaining gap in the publishing design.
-- **C26** — "Section pages render from collections" (roadmap Phase 2, brief §4) was not
+- **C26 — CLOSED 2026-09-16** (owner moved it to Phase 5; roadmap updated). "Section pages render from collections" (roadmap Phase 2, brief §4) was not
   implemented, and was not assigned in any of the four stream contracts. That is the Lead
   Architect's omission. It also sits against this phase's requirement that rendered output must
   not change, and with `cv` as the only satellite there is nothing a collection-driven section
