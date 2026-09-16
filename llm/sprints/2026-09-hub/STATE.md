@@ -620,6 +620,25 @@ working snapshot lived in temporary storage.
   the commit SHA the request needs).
 - C17: normalise the redirect-domain duplicate check.
 
+From the Phase 2 infra stream (2026-09-16):
+
+- **`roles/storage.objectViewer` does not include `storage.buckets.get`.** It is enough to
+  list and download objects, but any hub code that reads *bucket metadata* will 403. The
+  infra stream implemented SEAM-4 as written rather than widening the grant. Verify at
+  Checkpoint 3, and keep the hub's sync to object operations only.
+- **A `satellite-role-guard` CI check is recommended**, mirroring `budget-guard`: assert the
+  custom role holds exactly its three permissions and that `uniform_bucket_level_access` is
+  `true`. These are the two invariants whose breakage is invisible — a missing UBLA makes
+  every prefix condition inapplicable, so the boundary fails **open** with no error anywhere.
+  `build.yml` belongs to the `site` stream this phase, so this lands at reconciliation or in
+  Phase 3.
+- **Terraform remote state (C10) is now unblocked.** The owner's Checkpoint 2 decision was to
+  move state to a bucket in Phase 2; Cloud Storage is enabled and this module now creates
+  buckets, removing the reason it was deferred. It is not in the roadmap's Phase 2 scope, so
+  it needs the owner's word rather than being absorbed silently.
+- **Custom role `deletion_policy = "PREVENT"`**: a destroyed custom role locks its ID for 7–37
+  days, which would block all publishing with no way to apply out of it.
+
 ## Standing constraints
 
 - Sub-agents: **no git or gh mutations.** They write files and report. The Lead

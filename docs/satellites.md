@@ -139,8 +139,17 @@ The action validates your manifest, then uploads `dist/` to
 because a recursive upload would require permission to list the whole bucket — which
 is exactly the permission satellites are not given.
 
-Set the five values as GitHub Actions **variables**, not secrets. None of them is
-secret, and treating them as secrets makes failures harder to read.
+Set these four as GitHub Actions **variables**, not secrets — `dist` and `source` are
+literals you write in the workflow, not variables:
+
+| Variable | What it is |
+|---|---|
+| `GCP_PROJECT_ID` | The hub's Google Cloud project id |
+| `GCP_WIF_PROVIDER` | Your repository's Workload Identity provider, in the hub's `satellites` pool |
+| `GCP_PUBLISH_SA` | Your repository's publishing service account |
+| `GCP_CONTENT_BUCKET` | The hub's content bucket name |
+
+None of them is secret, and treating them as secrets makes failures harder to read.
 
 ## When your content appears
 

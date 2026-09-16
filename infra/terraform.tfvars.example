@@ -15,3 +15,22 @@ billing_account = "000000-000000-000000"
 # github_repository_id       = "1212933399"
 # github_repository_owner_id = "5666389"
 # hosting_site_id            = null # null = the project ID
+
+# Phase 2. Both have working defaults; uncomment only to change.
+#
+# The content bucket. null = "<project_id>-content". Bucket names are globally
+# unique, so override this if the default stem is already taken.
+# content_bucket_name = null
+#
+# The satellites allowed to publish, keyed by SOURCE NAME. The key is the
+# manifest's "source", the bucket prefix sources/<key>/ and the IAM condition,
+# all at once. Adding a satellite is one entry. cv's default branch is master,
+# not main (ADR-0008).
+# satellites = {
+#   cv = {
+#     repository          = "djjay0131/cv"
+#     repository_id       = "1211056144"
+#     repository_owner_id = "5666389"
+#     default_branch      = "master"
+#   }
+# }
