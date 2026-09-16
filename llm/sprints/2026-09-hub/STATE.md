@@ -220,9 +220,11 @@ Running now — **do not relaunch either without first checking for its handoff 
 - **`site`** — `site/**`, `.github/workflows/build.yml`, `.gitignore`, against
   `contracts/site-phase-2.md`. Told mid-flight that `roles/storage.objectViewer` lacks
   `storage.buckets.get`, so its sync must stay to object operations.
-- **`satellite-cv`** — the `cv` repository, in the worktree at
-  `<scratchpad>/cv-wt` on branch `feat/publish-contract`, against
-  `contracts/satellite-cv-phase-2.md`. Nothing is committed in `cv` yet.
+- **`satellite-cv` — DONE.** Committed and pushed to `cv` on branch `feat/publish-contract`.
+  Verified: the "Notify website repo" step is deleted (0 hits for `WEBSITE_DISPATCH_PAT`,
+  `WEBSITE_REPO`, `repository_dispatch` in `build-cv.yml`), publishing gated to
+  `refs/heads/master` on non-PR events, the owner's own `cv` checkout untouched. Handoff:
+  `handoffs/satellite-cv-phase-2.md`.
 
 Not started, and blocked by design: the **Chief Reviewer**
 (`contracts/chief-reviewer-phase-2.md`) reviews both repositories and runs only once both
@@ -494,6 +496,14 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C23** — Retention and withdrawal semantics for published objects. An empty `items` array is
   the only way a satellite can retract content, since it cannot list and therefore cannot
   prune. This matters from Phase 3, when a withdrawn item may be private.
+- **C24** — `schema_version` convention, raised by the `cv` stream and binding on both
+  repositories. The schema permits `1.2.3`, which invites compatibility reasoning the hub's
+  exact-match check does not implement; the recommendation is integers only, incremented one
+  at a time, and **bump the hub first** — a version published before the hub understands it
+  takes the hub build down, whereas bumping early is merely loud. The rule is now written in
+  `docs/satellites.md`; tightening the schema pattern to match is deferred because the `site`
+  stream is mirroring the current pattern as this is written, and desyncing the two ends
+  mid-flight is exactly the failure SEAM-1 exists to prevent.
 
 ## Constraints discovered (bind later contracts)
 
@@ -636,6 +646,15 @@ working snapshot lived in temporary storage.
     github.com/settings/tokens — removing the secret alone leaves a valid token in the
     account. Raised rather than done, because revocation is account-level and deleting a
     secret is irreversible.
+15. **`cv`'s CI is red on a fresh install, and this blocks Checkpoint 3.** Confirmed
+    independently: `pyproject.toml` asks for `bibtexparser>=1.4.1` unbounded, PyPI's current
+    release is 2.0.1, and it removed the v1 API `tools/lint_bib.py` uses
+    (`bibtexparser.bparser`). A fresh `pip install -e ".[dev]"` gives 36 failed / 147 passed.
+    Every job in `build-cv.yml` depends on `tests`, so the publish job **can never run** and
+    the satellite path cannot be verified at Checkpoint 3. Entirely unrelated to Phase 2;
+    found while integrating it. Prepared as its own PR in `cv` (`fix/bibtexparser-pin`,
+    one line, no behaviour change) rather than buried in the publishing PR. Migrating to the
+    v2 API is a separate change and a separate issue.
 
 ## Follow-ups
 
@@ -678,6 +697,17 @@ From the Phase 2 infra stream (2026-09-16):
    outside `sources/cv/`, cannot list, can overwrite on republish).
 5. Merge the hub PR, then the `cv` PR. A `cv` push then publishes; the next hub poll
    deploys.
+
+From the Phase 2 `cv` stream (2026-09-16):
+
+- **`cv` has two divergent memory banks**, `memory-bank/` and `llm/memory_bank/`. The stream
+  updated both rather than pick a winner. Which one governs is `cv`'s question, not the hub's,
+  but it should be settled before `cv` adopts governance.
+- **`build-cv.yml` has 3 pre-existing `actionlint` findings** (lines 8, 54, 94), none in the
+  code Phase 2 added, and its existing actions are pinned by tag rather than SHA. Out of scope
+  here; worth an issue in `cv`.
+- **Checkpoint 3 ordering changed:** merge `cv`'s `fix/bibtexparser-pin` PR **first**, or
+  `cv`'s CI stays red and the publish job cannot run at all.
 
 ## Standing constraints
 
