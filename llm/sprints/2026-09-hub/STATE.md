@@ -765,6 +765,32 @@ not `storage.objects.create`.
 **Still outstanding at Checkpoint 3:** revoking the PAT
 itself (owner-only); and the merges — `cv` #14, then hub #17, then `cv` #13.
 
+## Test 4 — the end-to-end criterion, half proven (2026-09-16)
+
+The owner merged `cv` #14 then #13. Merging #13 pushed `cv` master, which ran the contract
+for the first time for real.
+
+**Satellite half: PASSED, on real infrastructure.** `cv` run 35135238409 completed `success`
+including `Publish to the research hub`. 19 objects landed under `sources/cv/`: four variant
+PDFs, the full `cv-data/` payload (8 content YAMLs, 4 variants, `own-bib.bib`, the photo) and
+`manifest.json`. The manifest declares the four `pdf` items plus `cv-data` as `format: data`,
+`schema_version` `"1"`, and **passes the hub's own validator** on both the schema and source
+checks. So: WIF auth from a satellite, manifest validation, and a per-file upload by an
+identity that cannot list — all exercised for real, not simulated.
+
+**Hub half: proven locally, not yet live.** Downloaded the published objects as owner, fed
+them through the hub's own `sync-content.sh --from`: 19 synced, the four PDFs and the photo
+staged into `public/`, `astro build` 35 pages, `check:smoke-routes` **7 of 7**, and `npm test`
+102 passed / 1 skipped — the structural block *ran*, so it asserted against genuinely
+published data rather than a fixture. The hub can consume exactly what `cv` published.
+
+**What is not done:** no hub deploy has served it. `main` is red at `ee81929` from the
+bootstrap defect (issue #19), so the live site still serves `22c419a`. Merging PR #20 pushes
+`main`, and that build will now find content. Checkpoint 3 is not passed until it does.
+
+**Also found while verifying:** `sync-content.sh` needs curl >= 7.76 and misreports an old
+curl as a bucket-listing failure (issue #21). CI is unaffected; it costs a contributor an hour.
+
 ## Post-merge defect: the hub could not build on an empty bucket (issue #19)
 
 Merging PR #17 turned `main` red. `build` and `build-firebase` failed on `ee81929`;
