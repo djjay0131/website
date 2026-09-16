@@ -1,0 +1,162 @@
+# Publishing to the research hub
+
+How a repository publishes content to <https://jason.cusati.us>.
+
+This is a derived view for satellite owners. The decisions it describes live in the
+control plane and win wherever this page disagrees with them:
+`llm/specs/2026-09-10-research-hub-design.md` §3–§4,
+`llm/governance/adr/0002-satellite-publishing-via-content-bucket-and-dispatch.md`,
+`llm/governance/adr/0007-hub-polls-content-bucket-no-satellite-github-credential.md`
+and `llm/governance/adr/0008-manifest-data-format-hub-renders-cv.md`.
+
+## The idea
+
+You build your content however you like. You publish a finished folder and a
+`manifest.json` describing what is in it. That is the whole interface.
+
+The hub owns the chrome, the navigation, the design system and the deploy. It never
+needs to know how you built your output.
+
+```
+your repo ──▶ build dist/ + manifest.json ──▶ GCS content bucket ──▶ hub polls, builds, deploys
+```
+
+## What you never need
+
+- **No GitHub token, and no access to the `website` repository.** Earlier drafts had
+  satellites fire a `repository_dispatch` at the hub. That needs a credential with
+  write access to `website`, which would defeat the point, so the hub polls the
+  bucket instead (ADR-0007). If someone asks you to add a PAT for the website repo,
+  that is a mistake — say no.
+- **No service-account key file.** Authentication is Workload Identity Federation:
+  your workflow exchanges its GitHub OIDC token for a short-lived credential at run
+  time. A JSON key anywhere is a review failure.
+- **No access to anything but your own prefix.** Your identity can write, replace and
+  read objects under `sources/<your-source>/` and nothing else. It deliberately
+  cannot *list* the bucket, so you cannot see what other sources have published.
+
+## Adding a satellite
+
+1. Ask the hub owner to add you. Someone with access to the hub's Terraform adds your
+   repository to `infra/` — a service account, a Workload Identity provider entry
+   admitting only your repository and your default branch, and a binding scoped to
+   your prefix. You will be given a `source` name and the values your workflow needs.
+2. Produce a `dist/` folder and a `manifest.json` in your build.
+3. Add the publish step to your workflow.
+
+## The manifest
+
+```json
+{
+  "source": "phd-milestones",
+  "published": "2026-09-10T14:02:11Z",
+  "items": [
+    {
+      "slug": "committee-dossier",
+      "title": "External Committee Dossier",
+      "section": "phd",
+      "format": "html",
+      "path": "committee/index.html",
+      "visibility": "private",
+      "date": "2026-08-31",
+      "summary": "Twelve vetted external committee candidates, ranked.",
+      "tags": ["committee", "phd"]
+    }
+  ]
+}
+```
+
+The schema is `contract/manifest.schema.json` in the hub repository, and it is
+enforced twice: the publish action validates your manifest before uploading, and the
+hub build validates it again. A manifest that fails either one does not publish.
+
+| Field | Rule |
+|---|---|
+| `source` | Your assigned source name. Must match the prefix you upload to. |
+| `published` | ISO 8601 timestamp. |
+| `slug` | Unique within your source. |
+| `title` | Shown in the hub's navigation and indexes. |
+| `section` | One of `research`, `projects`, `writing`, `cv`, `phd`. |
+| `format` | One of `md`, `mdx`, `html`, `pdf`, `bundle`, `data`. |
+| `path` | Relative to `dist/`. Must not escape it — no absolute paths, no `..`. |
+| `visibility` | `public` or `private`. |
+| `date` | ISO date. |
+| `summary`, `tags` | Optional. |
+
+### Formats
+
+| Format | You ship | The hub does |
+|---|---|---|
+| `md` / `mdx` | Markdown with frontmatter | Renders it in site chrome; indexes it for search |
+| `html` | A self-contained page or folder | Serves it verbatim at `/<section>/<source>/<slug>/` in a thin frame with a back link |
+| `pdf` | The file | Serves it, with a download card and an inline viewer |
+| `bundle` | A built app folder | Serves the folder as-is under the slug |
+| `data` | A structured payload, **not** a document | Renders it with hub code written specifically for your source |
+
+**`data` is a special case, and it is deliberately hard to use.** Every other format
+lets the hub stay ignorant of how you built your output. `data` does not: the hub
+must understand your payload's shape, which couples your repository to hub code. It
+exists because the CV is genuinely data — the hub renders four CV variants from the
+same YAML source (ADR-0008).
+
+If you want to publish a `data` item, the hub must first be taught to render your
+specific `(source, slug)` pair, and your item must carry a `schema_version` that the
+hub recognises. An unclaimed `data` item, or an unknown `schema_version`, **fails the
+hub build** rather than being ignored. Changing your payload's shape without bumping
+`schema_version` will produce a wrong page instead of an error, so bump it.
+
+Prefer any other format if one fits.
+
+### Private items
+
+`visibility: private` items never reach the public site. They go bucket → build →
+private bucket, and are served only behind the hub's sign-in gate. The hub build
+fails if a private item appears in public output.
+
+Private items are a Phase 3 capability. Until then, publish only `public` items.
+
+## The publish step
+
+```yaml
+permissions:
+  contents: read
+  id-token: write        # required: the OIDC token exchanged through WIF
+
+steps:
+  - uses: djjay0131/website/contract/publish@main
+    with:
+      dist: ./dist
+      source: your-source-name
+      project_id: ${{ vars.GCP_PROJECT_ID }}
+      workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+      service_account: ${{ vars.GCP_PUBLISH_SA }}
+      bucket: ${{ vars.GCP_CONTENT_BUCKET }}
+```
+
+The action validates your manifest, then uploads `dist/` to
+`gs://<bucket>/sources/<source>/`. It uploads file by file rather than recursively,
+because a recursive upload would require permission to list the whole bucket — which
+is exactly the permission satellites are not given.
+
+Set the five values as GitHub Actions **variables**, not secrets. None of them is
+secret, and treating them as secrets makes failures harder to read.
+
+## When your content appears
+
+The hub polls the bucket on a schedule. A publish appears at the next poll, not
+immediately. If you need it sooner, ask the hub owner to run the hub's build
+manually — that needs no credential of yours.
+
+## If a publish fails
+
+| Symptom | Likely cause |
+|---|---|
+| The action fails validating the manifest | A field is missing, or `section`/`format`/`visibility` is outside its fixed set. The error names the field. |
+| `403` on upload | Your identity is not bound to that prefix, or `source` does not match the prefix. Check `source` first. |
+| `403` on a *second* publish, having succeeded once | Your binding grants create but not delete. Replacing an object needs both. Ask the hub owner. |
+| A `404` or permission error mentioning `list` | Something in your workflow is trying to list the bucket. Satellites cannot. Use the publish action rather than `gcloud storage cp --recursive`. |
+| It published, but nothing changed on the site | Wait for the next poll. If it still has not appeared, the hub build may be failing — check the hub's Actions tab. |
+
+## Contact
+
+Open an issue on <https://github.com/djjay0131/website>.

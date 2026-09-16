@@ -3,6 +3,9 @@ dist/
 .astro/
 .firebase/
 /site/data/
+# Content synced from the GCS content bucket at build time (design doc §9,
+# ADR-0007). Published bytes live in the bucket, never in git.
+/site/src/content/sources/
 /site/dist-public/
 /site/dist-private/
 site/public/pdfs/

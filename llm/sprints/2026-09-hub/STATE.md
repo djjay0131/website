@@ -15,10 +15,11 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. COMPLETE** (Checkpoint 2 passed 2026-09-15; PR #14 merged, issue #10
-closed). The hub is live at `https://jason.cusati.us`. **In progress:** the Email and Privacy
-pages (issue #13), which the owner requested. **Phase 2 has not started** and waits for the
-owner's go.
+**Phase 2 — Publishing contract. IN PROGRESS** (issue #16, branch `feat/publishing-contract`,
+owner's go 2026-09-16). Phase 1 is complete and the hub is live at `https://jason.cusati.us`;
+the Email and Privacy pages merged (PR #15) and are live. Phase 2 starts with ADR-0007 and
+ADR-0008, both accepted on this branch, and runs four streams across two repositories
+(`website` and `cv`) against `contracts/phase-2-seams.md`.
 
 ## Done
 
@@ -198,8 +199,9 @@ owner's go.
 
 ## In flight
 
-- **Email and Privacy pages PR** (#13): awaiting CI, then the Chief Reviewer
-  (`contracts/chief-reviewer-email-privacy-pages.md`), then the owner's merge.
+- **Phase 2 (#16)**: ADR-0007, ADR-0008, design doc §2/§3/§4 amendments, roadmap and delta
+  updates committed to `feat/publishing-contract`. Specialist streams next, then the Chief
+  Reviewer, then Checkpoint 3.
 
 ## Blocked
 
@@ -231,18 +233,17 @@ request and accepts the residual exposure ("it's fine leave it"). No further act
 
 ## Next
 
-Owner:
+Lead Architect: write the four specialist contracts, launch the streams in dependency order
+(`contract` → `infra`/`site` → `satellite-cv`), reconcile, draft PR, Chief Reviewer.
 
-1. Review the page wording on PR #15 and merge it (agents do not merge). Merging deploys
-   `/email/` and `/privacy/`.
-2. Say go for Phase 2 when ready. Its first step is the ADR for option A (the hub polls the
-   content bucket; satellites hold no GitHub credential), which also closes C1/K13.
-3. Optional: whether "OpenClaw" may stay on the two pre-existing research pages, where it names
-   a third-party agent harness in the literature review; and whether to delete the merged remote
-   branches.
+Owner, at Checkpoint 3: apply Terraform, set `GCP_CONTENT_BUCKET`, merge the hub PR, then the
+`cv` PR; a `cv` push then publishes through the contract and the CV appears on
+`jason.cusati.us`.
 
-Lead Architect, after the merge: verify both pages live on `jason.cusati.us`; then, on the
-owner's go, open hub-002 with Phase 2 contracts written from the ADR.
+Still open from earlier phases: whether "OpenClaw" may stay on the two pre-existing research
+pages (it names a third-party harness in the literature review); whether to delete the merged
+remote branches `gov/establish-hub`, `feat/foundation`, `admin/phase-0-bookkeeping`,
+`feat/email-privacy-pages`.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -393,6 +394,15 @@ Phase 1's `firebase.json` carries no gate rewrites.
   enablement, the ADC quota project, the Terraform apply (under the review F1 provenance rule),
   the Actions variables and Hosting release retention. Still the owner's: DNS at the registrar
   (no registrar API credential), merges, and decisions.
+- **A20** — `cv` work happens in a git worktree on branch `feat/publish-contract`, created
+  from `origin/master`, so the owner's `cv` checkout (on `add-mit-to-all-variants`) is never
+  touched. The Lead Architect alone commits there, as in `website`.
+- **A21** — ADR-0008 amends design doc §4 rather than asking the owner. It is a decision, not
+  a §10 question, so per brief §0 it is taken conservatively and recorded as an ADR. It is
+  flagged for the owner at Checkpoint 3 because it weakens §3's independence property for one
+  named format, and the owner may prefer the `format: html` alternative despite its cost.
+- **A22** — The artifacts slot `docs/` is declared in this PR, which creates its first content
+  (`docs/satellites.md`), exactly as A1 said it would be.
 
 ## ADR candidates
 
@@ -441,6 +451,11 @@ Phase 1's `firebase.json` carries no gate rewrites.
   is authored in satellites; the hub renders it"). It also shares the root namespace with the
   Phase 2 `section` set (ADR-0002 Decision 4), so a future section named `email` would collide
   with a live OAuth homepage URL Google has on file (review B2).
+- **C1 — CLOSED 2026-09-16** by ADR-0007 (the publish-notification mechanism). Conflict K13
+  is closed with it.
+- **C19** — A second `data` source would make the hub carry a second first-party renderer.
+  ADR-0008 sets a high bar deliberately; revisit at Phase 5 when `agentic-kg` and
+  `construction-ai-proposal` arrive.
 
 ## Constraints discovered (bind later contracts)
 
@@ -453,6 +468,27 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **Phase 1 site scope must include** the files the `site/` move touches outside
   `site/**`: `.gitignore`, `.vscode/`, root `package.json`/lockfile removal,
   `scripts/`. (ADR-0001)
+Phase 2, verified against primary sources before any implementation (ADR-0007, ADR-0008):
+
+- **`storage.objects.list` cannot be prefix-restricted.** "Since the storage.objects.list
+  permission is granted at the bucket level, you cannot use the resource.name condition
+  attribute to restrict object listing access to a subset of objects in the bucket." A
+  satellite granted `list` could enumerate every other source's object names, including
+  Phase 3's private `phd-milestones`. Satellites get **no `list`**, ever.
+- **`gcloud storage cp --recursive` requires `storage.objects.list`** and is therefore
+  forbidden as the publish primitive — the one permission that cannot be granted.
+- **`roles/storage.objectCreator` cannot overwrite**; replacing an object needs
+  `storage.objects.create` **and** `storage.objects.delete`. `objectCreator` alone would
+  succeed on a satellite's first publish and fail on every republish.
+- **`google-github-actions/upload-cloud-storage` v3.0.0 makes no bucket `list` call** — it
+  globs locally (`src/util.ts`) and uploads per file (`src/client.ts`). This is a property of
+  its source, not a documented guarantee: any version bump must re-verify it.
+- **IAM Conditions require uniform bucket-level access**; the object-prefix form is
+  `resource.name.startsWith('projects/_/buckets/<bucket>/objects/<prefix>')`.
+- **Scheduled runs authenticate through the existing binding.** Scheduled workflows run on
+  the default branch, so the OIDC `ref` claim is `refs/heads/main`.
+- **`cv`'s default branch is `master`** and the repository is **public** — its WIF condition
+  admits `refs/heads/master` (design doc §2 was wrong; corrected by ADR-0008).
 
 ## Phase 1 review dispositions (Chief Reviewer, PR #12)
 

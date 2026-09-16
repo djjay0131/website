@@ -194,25 +194,31 @@ serves the site and records it in `STATE.md`.
 
 - [ ] `contract/manifest.schema.json`, exactly per design doc §4
 - [ ] The Astro content-collection schema in `site/src/content.config.ts` mirrors the JSON Schema field for field (§4)
-- [ ] Composite action `contract/publish/action.yml`: validate the manifest, upload to `gs://<content-bucket>/sources/<source>/` through WIF, then fire `repository_dispatch` `publish` (§4) *(Owner decision 2026-09-15: Phase 2 uses option A — the hub polls the content bucket and satellites hold no GitHub credential for `website`. The Phase 2 ADR settles the mechanism; treat every dispatch wording here as superseded by that ADR.)*
+- [ ] Composite action `contract/publish/action.yml`: validate the manifest, then upload to `gs://<content-bucket>/sources/<source>/` through WIF with `google-github-actions/upload-cloud-storage` pinned by SHA. It fires **no** `repository_dispatch` and the satellite holds no GitHub credential (§4; ADR-0007)
 - [ ] Content bucket (§8, §11)
 - [ ] One service account and WIF provider entry per satellite, scoped by IAM condition to that satellite's prefix (§8)
-- [ ] The hub build syncs the content bucket before building, and rebuilds on `repository_dispatch` `publish` (§3, §11) *(Owner decision 2026-09-15: Phase 2 uses option A — the hub polls the content bucket and satellites hold no GitHub credential for `website`. The Phase 2 ADR settles the mechanism; treat every dispatch wording here as superseded by that ADR.)*
+- [ ] The hub build syncs the content bucket before building; a scheduled hub workflow fingerprints the bucket and rebuilds when it differs from the deployed build (§3, §11; ADR-0007 — polling, not dispatch)
 - [ ] Section pages render from collections (brief §4)
 - [ ] Satellite how-to for satellite owners, `docs/satellites.md` (brief §4)
 - [ ] `cv` formalized as satellite #1: a publish workflow and manifest, with items `visibility: public` and `section: cv` (§2, §11)
+- [ ] `format: data` added to the manifest's fixed set, with `schema_version`; the hub renders only the `(source, slug)` data items it claims and fails the build on any other (ADR-0008; design doc §4 amended)
+- [ ] Per-satellite identity: a custom role of `storage.objects.create`/`.delete`/`.get` — **no `storage.objects.list`** — bound by IAM condition to `sources/<source>/`, in a `satellites` WIF pool separate from the hub's (ADR-0007)
+- [ ] `site/scripts/fetch-data.sh` and the `repository_dispatch: [cv-updated]` trigger removed; `cv`'s disabled "Notify website repo" step and its `WEBSITE_DISPATCH_PAT` deleted (ADR-0007)
+- [ ] The governance delta declares the artifacts directory `docs/`, whose first content (`docs/satellites.md`) lands in this phase (STATE A1)
 
 ### Acceptance criteria
 
 - [ ] The schema accepts the §4 example manifest. It rejects a manifest whose `section`, `format` or `visibility` falls outside the fixed sets, and one missing a required field.
 - [ ] A manifest the JSON Schema rejects also fails the hub build, so both ends validate (§4)
 - [ ] The publish action rejects a manifest whose `path` escapes `dist/` (ADR-0002)
-- [ ] A push to `cv`, with no commit to `website`, triggers a hub build through `repository_dispatch` `publish`, and the updated CV appears on `jason.cusati.us` *(Owner decision 2026-09-15: Phase 2 uses option A — the hub polls the content bucket and satellites hold no GitHub credential for `website`. The Phase 2 ADR settles the mechanism; treat every dispatch wording here as superseded by that ADR.)*
+- [ ] A push to `cv`, with no commit to `website` and no GitHub credential held by `cv`, publishes to the bucket; the next hub poll rebuilds and the updated CV appears on `jason.cusati.us` (ADR-0007)
 - [ ] Each `cv` URL that Phase 1 served still resolves, or the `satellite-cv` handoff lists every changed URL with its redirect (brief §4)
 - [ ] A recorded test shows the `cv` satellite identity cannot write outside `sources/cv/`: an attempt to write under another source's prefix is denied (§12.3)
+- [ ] A recorded test shows the `cv` satellite identity cannot **list** the bucket: `storage.objects.list` cannot be prefix-restricted, so granting it would expose every other source's object names (ADR-0007)
+- [ ] A republish of an unchanged `cv` succeeds: the identity can overwrite its own objects (`create` + `delete`), which `roles/storage.objectCreator` alone cannot do (ADR-0007)
 - [ ] The `cv` satellite's credentials give it no write access to the `website` repository (§12.3)
 - [ ] `cv` authenticates to Google Cloud through WIF only: no JSON key in the `cv` repository or its secrets (§12.2)
-- [ ] The credential satellites use for `repository_dispatch` is decided in an accepted ADR before implementation merges (ADR-0002) *(Owner decision 2026-09-15: Phase 2 uses option A — the hub polls the content bucket and satellites hold no GitHub credential for `website`. The Phase 2 ADR settles the mechanism; treat every dispatch wording here as superseded by that ADR.)*
+- [x] The mechanism by which a publish reaches the hub is decided in an accepted ADR before implementation merges (ADR-0002 → **ADR-0007**, accepted 2026-09-16: the hub polls; no satellite holds a GitHub credential for `website`)
 
 ### Not in this phase
 
@@ -224,7 +230,7 @@ serves the site and records it in `STATE.md`.
 ### Blocked on
 
 - Checkpoint 2
-- The dispatch-credential decision that ADR-0002 requires before Phase 2 implementation (STATE.md ADR candidate C1) *(Owner decision 2026-09-15: Phase 2 uses option A — the hub polls the content bucket and satellites hold no GitHub credential for `website`. The Phase 2 ADR settles the mechanism; treat every dispatch wording here as superseded by that ADR.)*
+- ~~The dispatch-credential decision ADR-0002 required (STATE K13 / ADR candidate C1)~~ — **resolved by ADR-0007 (2026-09-16)**
 
 ### Closing checkpoint
 
