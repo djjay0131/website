@@ -198,12 +198,13 @@ serves the site and records it in `STATE.md`.
 - [ ] Content bucket (§8, §11)
 - [ ] One service account and WIF provider entry per satellite, scoped by IAM condition to that satellite's prefix (§8)
 - [ ] The hub build syncs the content bucket before building; a scheduled hub workflow fingerprints the bucket and rebuilds when it differs from the deployed build (§3, §11; ADR-0007 — polling, not dispatch)
-- [ ] Section pages render from collections (brief §4)
+- [ ] Section pages render from collections (brief §4) — **NOT DONE in Phase 2.** *(Unassigned across the four stream contracts; the Lead Architect's omission. It also conflicts with this phase's standing requirement that rendered output must not change, and with `cv` as the only satellite — publishing four PDFs and one `data` payload — there is nothing a collection-driven section page would show that the existing pages do not. Deferred for the owner's decision at Checkpoint 3; see STATE C26.)*
 - [ ] Satellite how-to for satellite owners, `docs/satellites.md` (brief §4)
 - [ ] `cv` formalized as satellite #1: a publish workflow and manifest, with items `visibility: public` and `section: cv` (§2, §11)
 - [ ] `format: data` added to the manifest's fixed set, with `schema_version`; the hub renders only the `(source, slug)` data items it claims and fails the build on any other (ADR-0008; design doc §4 amended)
 - [ ] Per-satellite identity: a custom role of `storage.objects.create`/`.delete`/`.get` — **no `storage.objects.list`** — bound by IAM condition to `sources/<source>/`, in a `satellites` WIF pool separate from the hub's (ADR-0007)
-- [ ] `site/scripts/fetch-data.sh` and the `repository_dispatch: [cv-updated]` trigger removed; `cv`'s disabled "Notify website repo" step and its `WEBSITE_DISPATCH_PAT` deleted (ADR-0007)
+- [ ] The `repository_dispatch: [cv-updated]` trigger removed; `cv`'s disabled "Notify website repo" step and its `WEBSITE_DISPATCH_PAT` deleted (ADR-0007)
+- [ ] `site/scripts/fetch-data.sh` **retained as a fallback**, not deleted. *(Amended 2026-09-16: deleting it would break every pull-request build — the hub's WIF binding admits only `refs/heads/main`, so a PR cannot read the bucket — and would leave `main` with no CV source between merge and Checkpoint 3. Deletion waits on a PR-usable read grant, STATE C25.)*
 - [ ] The governance delta declares the artifacts directory `docs/`, whose first content (`docs/satellites.md`) lands in this phase (STATE A1)
 
 ### Acceptance criteria

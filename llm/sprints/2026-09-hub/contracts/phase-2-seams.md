@@ -132,8 +132,12 @@ Polling, not dispatch (ADR-0007). The `site` stream owns this in `build.yml`:
 - The poll job authenticates through WIF. Scheduled runs carry
   `ref: refs/heads/main`, so the existing `refs/heads/main` binding admits them; no
   new binding is needed.
-- `repository_dispatch: [cv-updated]` is **removed** from `build.yml`, and
-  `site/scripts/fetch-data.sh` is **deleted**.
+- `repository_dispatch: [cv-updated]` is **removed** from `build.yml`.
+- **Amended 2026-09-16:** `site/scripts/fetch-data.sh` is **retained as a fallback**, not
+  deleted. This seam originally required its deletion. That was wrong: the hub's deploy
+  binding admits only `refs/heads/main`, so a pull-request build cannot authenticate to read
+  the bucket, and deleting the script would break every PR build and leave `main` without a CV
+  source between merge and Checkpoint 3.
 - The hub's deploy identity gains read access to the content bucket
   (`roles/storage.objectViewer`, unconditioned — the hub owns the bucket).
 

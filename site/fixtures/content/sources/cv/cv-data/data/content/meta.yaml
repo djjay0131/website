@@ -1,0 +1,11 @@
+# FIXTURE. Invented. See site/fixtures/README.md.
+name: Fixture Person
+contact:
+  email: fixture@example.invalid
+  linkedin: fixture-person
+  github: fixture-person
+photo: photo_jason_1.jpeg
+include_photo: true
+name_variants:
+  - family: Person
+    given: Fixture

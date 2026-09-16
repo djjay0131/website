@@ -2,11 +2,19 @@ node_modules/
 dist/
 .astro/
 .firebase/
-/site/data/
 # Content synced from the GCS content bucket at build time (design doc §9,
 # ADR-0007). Published bytes live in the bucket, never in git.
 /site/src/content/sources/
+# Bucket-shaped staging trees the fallback producers build before handing them
+# to scripts/sync-content.sh --from (site/scripts/fetch-data.sh and
+# site/scripts/sync-local-data.sh). Derived; never committed.
+/site/.release-content/
+/site/.local-content/
+# Phase 1's CV data location, replaced by the synced tree above. Ignored so a
+# leftover local copy cannot be committed by accident.
+/site/data/
 /site/dist-public/
 /site/dist-private/
+# Staged from the synced payload on every build (site/scripts/stage-public-assets.mjs).
 site/public/pdfs/
 site/public/photo_jason_1.jpeg

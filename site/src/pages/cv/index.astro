@@ -1,9 +1,11 @@
 ---
 import SectionIndex from "../../layouts/SectionIndex.astro";
 import { loadVariantSummaries } from "../../lib/cv-data";
+import { CV_VARIANTS_DIR } from "../../lib/hub-content.mjs";
 import path from "node:path";
 
-const variants = loadVariantSummaries(path.resolve("data/variants"));
+// Synced from the content bucket (SEAM-5); the resolver is unchanged.
+const variants = loadVariantSummaries(path.resolve(CV_VARIANTS_DIR));
 const base = import.meta.env.BASE_URL;
 const items = variants.map((v) => ({
   title: v.label,

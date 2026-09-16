@@ -1,9 +1,12 @@
 ---
 import Base from "../layouts/Base.astro";
 import { loadContentPool } from "../lib/cv-data";
+import { CV_CONTENT_DIR } from "../lib/hub-content.mjs";
 import path from "node:path";
 
-const pool = loadContentPool(path.resolve("data/content"));
+// The CV payload now arrives from the content bucket through the publishing
+// contract (SEAM-5). Only where the files are read from changed.
+const pool = loadContentPool(path.resolve(CV_CONTENT_DIR));
 const meta = pool.meta;
 const summary = Object.values(pool.summaries)[0];
 const base = import.meta.env.BASE_URL;

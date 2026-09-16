@@ -1,0 +1,8 @@
+# FIXTURE. Invented.
+- id: fixture-one
+  name: Fixture Project One
+  summary: A fixture project, used only to prove the projects pages build.
+  github: https://github.com/example/fixture-one
+- id: fixture-two
+  name: Fixture Project Two
+  summary: A second fixture project, with no repository link.

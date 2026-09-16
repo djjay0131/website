@@ -9,6 +9,7 @@ import {
   listVariants,
   loadVariantSummaries,
 } from "./cv-data";
+import { CV_CONTENT_DIR, CV_VARIANTS_DIR } from "./hub-content.mjs";
 
 // Exact-value assertions run against a small committed fixture, so they do not
 // depend on which cv release scripts/fetch-data.sh fetched (SEAM-1).
@@ -16,10 +17,11 @@ const FIXTURE_DIR = path.resolve("src/lib/__fixtures__/cv");
 const FIXTURE_CONTENT = path.join(FIXTURE_DIR, "content");
 const FIXTURE_VARIANTS = path.join(FIXTURE_DIR, "variants");
 
-// The data the build renders (SEAM-2). Only structural assertions run on it.
-const DATA_DIR = path.resolve("data");
-const CONTENT_DIR = path.join(DATA_DIR, "content");
-const VARIANTS_DIR = path.join(DATA_DIR, "variants");
+// The data the build renders: the cv satellite's cv-data payload, synced from
+// the content bucket by scripts/sync-content.sh (Phase 2, SEAM-5). Only
+// structural assertions run on it.
+const CONTENT_DIR = path.resolve(CV_CONTENT_DIR);
+const VARIANTS_DIR = path.resolve(CV_VARIANTS_DIR);
 
 describe("loadContentPool", () => {
   it("loads and indexes every section of the fixture", () => {
@@ -152,10 +154,11 @@ describe("loadVariantSummaries", () => {
   });
 });
 
-// The data fetched by scripts/fetch-data.sh (or linked by sync-local-data.sh).
-// These checks hold for any well-formed cv release: they never pin counts, ids
-// or names, so a new release cannot fail CI's `npm test` step on content alone.
-describe("fetched CV data (structure only)", () => {
+// The payload synced by scripts/sync-content.sh (or linked by
+// sync-local-data.sh). These checks hold for any well-formed cv publish: they
+// never pin counts, ids or names, so a new publish cannot fail CI's `npm test`
+// step on content alone.
+describe("synced CV data (structure only)", () => {
   it("loads a content pool with a name and contact email", () => {
     const pool = loadContentPool(CONTENT_DIR);
     expect(pool.meta.name).toBeTruthy();

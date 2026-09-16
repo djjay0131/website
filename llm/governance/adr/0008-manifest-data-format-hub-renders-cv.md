@@ -140,7 +140,14 @@ hub design change a coordinated multi-repository release.
   the clean story.
 - A schema change in `cv` fails the hub build loudly instead of producing a subtly
   wrong CV page.
-- `fetch-data.sh`, the `cv`-specific release download, leaves the hub build.
+- `fetch-data.sh` is **retained as a fallback**, not removed. This ADR originally said the
+  `cv`-specific release download would leave the hub build; that was wrong, and the site
+  stream proved it. The hub's deploy binding admits only `refs/heads/main`, so a
+  **pull-request build has no credential to read the bucket** — making the bucket the sole
+  source would break every PR build, and would leave `main` with no CV source at all between
+  merge and Checkpoint 3. The script is now one of four producers of a single bucket-shaped
+  tree, so the fallback cannot rot into a second code path. It can be deleted once the hub has
+  a bucket read grant usable from a PR ref (STATE C25).
 
 ### Negative / Tradeoffs
 

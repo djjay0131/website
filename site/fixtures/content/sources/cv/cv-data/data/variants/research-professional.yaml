@@ -1,0 +1,20 @@
+# FIXTURE. Invented.
+variant: research-professional
+label: Research Professional
+description: Fixture research-professional variant. Not real content.
+sections:
+  - type: summary
+    content_id: industry
+  - type: employment
+    include:
+      - current-role
+  - type: education
+    include:
+      - doctorate
+  - type: skills
+    include:
+      - id: languages
+        items:
+          - Fixture Lang
+  - type: referee
+    content_id: available

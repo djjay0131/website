@@ -1,0 +1,52 @@
+{
+  "source": "cv",
+  "published": "2026-09-16T00:00:00Z",
+  "items": [
+    {
+      "slug": "academic",
+      "title": "Academic CV (fixture)",
+      "section": "cv",
+      "format": "pdf",
+      "path": "academic.pdf",
+      "visibility": "public",
+      "date": "2026-09-16"
+    },
+    {
+      "slug": "research-professional",
+      "title": "Research Professional CV (fixture)",
+      "section": "cv",
+      "format": "pdf",
+      "path": "research-professional.pdf",
+      "visibility": "public",
+      "date": "2026-09-16"
+    },
+    {
+      "slug": "anthropic-fellow",
+      "title": "Fellowship CV (fixture)",
+      "section": "cv",
+      "format": "pdf",
+      "path": "anthropic-fellow.pdf",
+      "visibility": "public",
+      "date": "2026-09-16"
+    },
+    {
+      "slug": "sde-long",
+      "title": "Software Engineering CV (fixture)",
+      "section": "cv",
+      "format": "pdf",
+      "path": "sde-long.pdf",
+      "visibility": "public",
+      "date": "2026-09-16"
+    },
+    {
+      "slug": "cv-data",
+      "title": "CV source data (fixture)",
+      "section": "cv",
+      "format": "data",
+      "path": "cv-data/",
+      "visibility": "public",
+      "date": "2026-09-16",
+      "schema_version": "1"
+    }
+  ]
+}

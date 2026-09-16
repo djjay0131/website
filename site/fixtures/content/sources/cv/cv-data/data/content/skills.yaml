@@ -1,0 +1,10 @@
+# FIXTURE. Invented.
+- id: languages
+  group: Languages
+  items:
+    - Fixture Lang
+    - Another Lang
+- id: tools
+  group: Tools
+  items:
+    - Fixture Tool

@@ -1,9 +1,11 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { parseBib } from "../../lib/bib";
+import { CV_BIB_PATH } from "../../lib/hub-content.mjs";
 import path from "node:path";
 
-const groups = parseBib(path.resolve("data/own-bib.bib"));
+// Synced from the content bucket (SEAM-5); the parser is unchanged.
+const groups = parseBib(path.resolve(CV_BIB_PATH));
 
 const sections = [
   { title: "Journal Articles", entries: groups.articles },

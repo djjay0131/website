@@ -50,31 +50,67 @@ a page. `astro.config.mjs` reads both variables through
 
 Node: see `engines` in `package.json` (CI uses Node 22).
 
-## CV data
+## Published content
 
-The CV, resumes, papers, projects and home page render data from the `cv`
-repository's `latest` release. None of it is committed: `data/`,
-`public/pdfs/` and `public/photo_jason_1.jpeg` are gitignored.
+The CV, resumes, papers, projects and home page render content that a
+**satellite repository published through the publishing contract**
+(`../contract/`, ADR-0002, ADR-0007, ADR-0008). None of it is committed:
+`src/content/sources/`, `public/pdfs/` and `public/photo_jason_1.jpeg` are
+gitignored, and so are the staging trees `.release-content/` and
+`.local-content/`.
 
-```sh
-GH_TOKEN=<token> ./scripts/fetch-data.sh    # or: npm run data:fetch
+```text
+gs://<bucket>/sources/<source>/manifest.json   the manifest: what this source publishes
+gs://<bucket>/sources/<source>/<path…>         exactly that source's dist/
+                    │
+                    ▼  scripts/sync-content.sh
+src/content/sources/<source>/…                 what the build reads
 ```
 
-`scripts/fetch-data.sh` is the one place that downloads CV data. It writes
-`data/content/`, `data/variants/` and `data/own-bib.bib` from `cv-data.zip`,
-every release PDF into `public/pdfs/`, and the photo into `public/`. It needs
-`gh` and `unzip`; `CV_REPO` and `CV_TAG` override the repository and tag. CI
-also writes `public/build-info.json` (the `cv` release fingerprint); the
-script does not.
+`src/content.config.ts` validates each `manifest.json` against a Zod mirror of
+`../contract/manifest.schema.json` and fails the build on anything the JSON
+Schema would reject, on a duplicate `slug`, and on a `format: data` item the hub
+does not claim. The claimed set — in Phase 2, exactly `("cv", "cv-data")` — is
+declared in `src/lib/hub-content.mjs`, which is also the one place that says
+where the synced payload lives.
 
-To work against a local `cv` checkout instead, with live reload:
+`scripts/stage-public-assets.mjs` then copies each published CV PDF to
+`public/pdfs/<slug>.pdf` and the photo to `public/photo_jason_1.jpeg`, so every
+URL Phase 1 served keeps resolving. The sync runs it automatically.
+
+### Getting content locally
+
+None of these needs a cloud credential.
 
 ```sh
-npm run dev:local                                   # links ../../cv, then astro dev
-CV_REPO_PATH=/path/to/cv npm run data:link          # link a checkout elsewhere
+npm run data:link                            # a local cv checkout at ../../cv
+CV_REPO_PATH=/path/to/cv npm run data:link   # a checkout elsewhere
+npm run dev:local                            # data:link, then astro dev (hot reload)
+npm run data:fetch                           # the cv GitHub release (needs gh, unzip)
+npm run content:fixture                      # the committed fixture: no cv, no network
 ```
 
-`scripts/sync-local-data.sh` replaces `data/` with symlinks into that checkout.
+All four produce the same bucket-shaped tree and the same manifest, so they
+exercise the same validation the bucket path does. `fixtures/` explains what the
+fixture is for and what it is not.
+
+### Reading the bucket
+
+```sh
+./scripts/sync-content.sh --bucket <name> --token <oauth-token>
+./scripts/sync-content.sh --fingerprint --bucket <name>   # the poll's fingerprint
+```
+
+The script makes exactly two kinds of call, `objects.list` and `objects.get`,
+and never reads bucket metadata: the hub's grant is
+`roles/storage.objectViewer`, which does not include `storage.buckets.get`. CI
+obtains the token through Workload Identity Federation; there is no key file
+anywhere. The fingerprint is a SHA-256 over the sorted listing of every object,
+so it changes when one is **deleted** as well as added or replaced — a withdrawn
+item must never leave the site looking unchanged.
+
+CI also writes `public/build-info.json` (`content_fingerprint`,
+`cv_fingerprint`, `content_source`); no script does.
 
 ## Local development
 
@@ -91,6 +127,8 @@ dev server from `site/`.
 
 ```text
 src/
+  content.config.ts        the Zod mirror of ../contract/manifest.schema.json
+  content/sources/         published content, synced from the bucket (gitignored)
   styles/tokens.css        design tokens: type, light and dark palettes
   layouts/Base.astro       document head, navigation, footer
   layouts/SectionIndex.astro   a section landing: title, lede, item list or empty state
@@ -98,7 +136,9 @@ src/
   pages/                   routes (research, projects, writing, cv, phd, papers, resumes)
   components/              research-track components
   lib/                     CV, bibliography and Markdown loaders
-scripts/                   data fetch, redirect map, contrast check
+  lib/hub-content.mjs      the claimed data items, and where the payload lives
+scripts/                   content sync, redirect map, contrast check
+fixtures/content/          a bucket-shaped tree for credential-free local work
 redirects/github-pages.json    redirect map from the GitHub Pages URLs
 ```
 

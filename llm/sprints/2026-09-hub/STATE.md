@@ -507,6 +507,22 @@ Phase 1's `firebase.json` carries no gate rewrites.
   `docs/satellites.md`; tightening the schema pattern to match is deferred because the `site`
   stream is mirroring the current pattern as this is written, and desyncing the two ends
   mid-flight is exactly the failure SEAM-1 exists to prevent.
+- **C25** — A bucket read grant usable from a pull-request ref. The hub's deploy binding admits
+  only `refs/heads/main`, so PR builds cannot read the content bucket and `fetch-data.sh` must
+  stay as their CV source. Options: a pool-level `principalSet`, or a second read-only service
+  account. Once it exists, the fallback can be deleted as the seams originally intended. This
+  is the single change that closes the largest remaining gap in the publishing design.
+- **C26** — "Section pages render from collections" (roadmap Phase 2, brief §4) was not
+  implemented, and was not assigned in any of the four stream contracts. That is the Lead
+  Architect's omission. It also sits against this phase's requirement that rendered output must
+  not change, and with `cv` as the only satellite there is nothing a collection-driven section
+  page would show that the existing first-party pages do not. Owner's decision at Checkpoint 3:
+  accept the deferral to Phase 5 when real satellites arrive, or hold Phase 2 open for it.
+- **C27** — A source whose entire bucket prefix vanishes is undetectable. Withdrawal is
+  expressible only as an empty `items` array, so a missing manifest is treated as a fault and
+  fails the build — but a wholly absent prefix looks like a source that never existed.
+  Detecting it needs a recorded expected-source set. Matters from Phase 3, when the missing
+  source may be the private one.
 
 ## Constraints discovered (bind later contracts)
 
