@@ -368,6 +368,32 @@ the Phase 2 handoff §ADR candidates.
 
 ## Checkpoint 3 — verifying the boundary
 
+**Do not use `gcloud storage` to test the satellite identity.** Verified at Checkpoint 3 on
+2026-09-16: `gcloud storage cp` requires `storage.objects.list` even for a single
+non-recursive file into the satellite's *own* prefix, and that permission is deliberately
+never granted. A `gcloud` test therefore fails on the **allowed** path too, which looks like
+a broken boundary and is not one. Test with the JSON API and an impersonated token, which
+exercises exactly the permissions the real publish path uses:
+
+```bash
+TOKEN="$(gcloud auth print-access-token --impersonate-service-account="$SA")"
+U=https://storage.googleapis.com
+
+# ALLOWED inside its own prefix: create, overwrite, read, delete -> 200 200 200 204
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: text/plain' --data-binary @/tmp/boundary.txt \
+  "$U/upload/storage/v1/b/$BUCKET/o?uploadType=media&name=sources%2Fcv%2F_probe.txt"
+
+# DENIED outside it, including sources/cv-other/ which proves the trailing slash -> 403
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: text/plain' --data-binary @/tmp/boundary.txt \
+  "$U/upload/storage/v1/b/$BUCKET/o?uploadType=media&name=sources%2Fcv-other%2F_probe.txt"
+
+# DENIED listing, even its own prefix -> 403
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
+  "$U/storage/v1/b/$BUCKET/o?prefix=sources%2Fcv%2F&maxResults=1"
+```
+
 **Prove there is no *other* grant** (Chief Reviewer S10). The checks above confirm the role
 and the bucket binding are right; these confirm nothing else reaches the satellite, which
 Terraform cannot show because it sees only what it declares:

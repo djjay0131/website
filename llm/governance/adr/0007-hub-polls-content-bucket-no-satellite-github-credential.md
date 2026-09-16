@@ -100,6 +100,17 @@ decision, and the credential boundary that makes it hold on the bucket side.
    must have storage.objects.list permission for the relevant bucket" — the one
    permission decision 4 cannot grant.
 
+   **Strengthened 2026-09-16, by measurement at Checkpoint 3.** `gcloud storage cp`
+   requires `storage.objects.list` **at all**, not only with `--recursive`. Copying a
+   single file into the satellite's *own* allowed prefix was refused with
+   `Permission 'storage.objects.list' denied on ... buckets/cusati-hub-content`. So no
+   `gcloud storage` command can serve as the publish primitive for an identity scoped
+   this way — the exclusion is broader than this decision first recorded, and it made
+   our own Checkpoint 3 runbook unrunnable until it was rewritten to use the JSON API.
+   The chosen primitive is unaffected: the same identity completed create, overwrite,
+   read and delete through the API, and was refused every write outside its prefix and
+   every list.
+
 7. **The poll job authenticates through WIF on the scheduled run.** Scheduled
    workflows "run on the latest commit on the default branch", so the OIDC `ref`
    claim is `refs/heads/main` and the existing `refs/heads/main` deploy binding

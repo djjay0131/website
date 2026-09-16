@@ -728,7 +728,41 @@ bucket exists and project-viewer access would be a real exposure. Recorded becau
 review's stated expectation and reality differ, and a future reader should not have to
 rediscover why.
 
-**Still outstanding at Checkpoint 3:** the three prefix-boundary proofs; revoking the PAT
+**Prefix-boundary proofs — RUN AND PASSED 2026-09-16.** The roadmap asks for a *recorded*
+test; this is it. Run by impersonating `publish-cv` under a temporary
+`serviceAccountTokenCreator` grant, authorised by the owner and **removed immediately
+afterwards** — verified removed: the account's only remaining binding is the WIF
+principalSet for `cv` `master`.
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| 0 | create **inside** `sources/cv/` (positive control) | 200 | **200** |
+| 1 | overwrite the same object — the case `objectCreator` alone fails | 200 | **200** |
+| 2 | read its own object back | 200 | **200** |
+| 3 | create in `sources/phd-milestones/` | 403 | **403** |
+| 4 | create at the bucket root | 403 | **403** |
+| 5 | create in `sources/cv-other/` — **the trailing-slash probe** | 403 | **403** |
+| 6 | list the bucket | 403 | **403** |
+| 7 | list its **own** prefix | 403 | **403** |
+| 8 | delete its own object | 204 | **204** |
+
+Check 5 proves the condition ends in a slash: a source whose name merely *starts with* `cv`
+is refused. Check 7 confirms the satellite cannot enumerate even its own prefix — intended,
+since `list` cannot be prefix-restricted, so the only safe grant is none. After check 8,
+`ls --all-versions` as the owner showed the noncurrent generations retained, which is the
+mitigation ADR-0007 relies on when it accepts that a satellite can delete its own objects.
+
+**A defect in our own runbook, found by running it.** The documented procedure used
+`gcloud storage cp` as the satellite and expected the in-prefix writes to succeed. They
+cannot: **`gcloud storage cp` requires `storage.objects.list` even for a single
+non-recursive file**, including into the satellite's own prefix. The first positive control
+failed for exactly that reason and read like a broken boundary. ADR-0007 decision 6 had
+recorded this only for `--recursive`; it is broader. `infra/README.md` is rewritten to the
+JSON-API form, which exercises the same permissions the real publish path uses. The
+documented expected error text was wrong too — denials name `storage.objects.get`/`list`,
+not `storage.objects.create`.
+
+**Still outstanding at Checkpoint 3:** revoking the PAT
 itself (owner-only); and the merges — `cv` #14, then hub #17, then `cv` #13.
 
 ## Risks carried forward
