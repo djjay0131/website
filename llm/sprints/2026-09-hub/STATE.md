@@ -686,6 +686,51 @@ are all human-reviewed and owner-merged.
 **Its closing point, unchanged from the interim report:** everything else concerns whether the
 boundary is correctly *designed*. The PAT is the one place where it is currently not *true*.
 
+## Checkpoint 3 execution record (2026-09-16)
+
+**Owner decisions taken:** ADR-0008 **approved**. "Section pages render from collections"
+**moved to Phase 5** (C26 closed). Deletion of the `cv` secret and variable **authorised**.
+
+**Apply provenance** (`infra/README.md` §Guardrails). Applied from a clean checkout of
+`feat/publishing-contract` at **`91b7a39`**, no override file tracked or untracked, plan
+reviewed before applying and applied from the saved plan file rather than re-planned:
+**9 to add, 0 to change, 0 to destroy** — confirmed, all nine addresses present in state
+afterwards. Nothing existing was modified, so Phase 1's resources and the budget are
+untouched.
+
+Created: `google_storage_bucket.content` (`cusati-hub-content`),
+`google_project_iam_custom_role.satellite_publisher`,
+`google_iam_workload_identity_pool.satellites`, the `github-cv` provider, the
+`publish-cv` service account, its `workloadIdentityUser` binding, the conditioned bucket
+binding, the hub's `objectViewer` grant, and `storage.googleapis.com`.
+
+**Verified against the live project, not the plan:**
+
+| Check | Result |
+|---|---|
+| `uniform_bucket_level_access` | **true** — so every prefix condition is genuinely in effect. This is the one that fails *open*; had it been false the boundary would have been inert with no error anywhere. |
+| `public_access_prevention` | `enforced` |
+| versioning / soft delete / lifecycle | enabled / 7 days / noncurrent rules present |
+| custom role permissions | exactly `storage.objects.create`, `.delete`, `.get` — **no `list`** |
+| project-level roles for `publish-cv` | **none** — this is the leg Terraform structurally cannot prove, since it sees only what it declares |
+| user-managed keys on `publish-cv` | **none** |
+
+**Finding — the bucket policy has more than the two bindings the Chief Reviewer predicted.**
+Alongside the two intended ones it carries `legacyBucketOwner`, `legacyObjectOwner`
+(`projectEditor`, `projectOwner`) and `legacyBucketReader`, `legacyObjectReader`
+(`projectViewer`). These are Cloud Storage's automatic defaults on bucket creation, not
+anything this module declares, and they are unaffected by uniform bucket-level access.
+They do **not** widen the satellite: `publish-cv` holds no project role at all, so it
+reaches nothing through them. What they do mean is that **any principal granted project
+Viewer on `cusati-hub` can read every object in the content bucket** — today only the
+owner. That is acceptable now and would need revisiting in Phase 3, when the private
+bucket exists and project-viewer access would be a real exposure. Recorded because the
+review's stated expectation and reality differ, and a future reader should not have to
+rediscover why.
+
+**Still outstanding at Checkpoint 3:** the three prefix-boundary proofs; revoking the PAT
+itself (owner-only); and the merges — `cv` #14, then hub #17, then `cv` #13.
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
@@ -721,7 +766,14 @@ boundary is correctly *designed*. The PAT is the one place where it is currently
     never changed (ADR-0006).
 13. **Cookie collision with a future family site** setting `__session` on
     `Domain=cusati.us` (ADR-0006).
-14. **`WEBSITE_DISPATCH_PAT` exists in `cv` today (verified 2026-09-16).** Not hypothetical:
+14. **PARTLY CLOSED 2026-09-16 — the repository half is done; the token is not.** On the
+    owner's authorisation the Lead Architect deleted the `cv` repository secret
+    `WEBSITE_DISPATCH_PAT` and the variable `WEBSITE_REPO`; `cv` now holds zero Actions
+    secrets and zero variables beyond the four publish variables. **The token itself may
+    still be valid in the owner's GitHub account and can only be revoked there**
+    (github.com/settings/tokens). Until it is, a credential with write access to the hub
+    exists, merely no longer stored in the satellite. Original finding:
+    **`WEBSITE_DISPATCH_PAT` existed in `cv` (verified 2026-09-16).** Not hypothetical:
     `gh api repos/djjay0131/cv/actions/secrets` returns it, created 2026-08-17, and the
     variable `WEBSITE_REPO = djjay0131/website` is set beside it. Per `build-cv.yml`'s own
     comment it is "a PAT with `repo` scope on the website repo" — a long-lived credential
