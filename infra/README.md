@@ -365,3 +365,25 @@ enabled and this module already creates buckets, so the Phase 1 blocker (issue
 to a bucket in Phase 2 (C10)". It is **not** done here because the Phase 2 scope
 in the roadmap does not include it. It needs a decision and its own change; see
 the Phase 2 handoff §ADR candidates.
+
+## Checkpoint 3 — verifying the boundary
+
+**Prove there is no *other* grant** (Chief Reviewer S10). The checks above confirm the role
+and the bucket binding are right; these confirm nothing else reaches the satellite, which
+Terraform cannot show because it sees only what it declares:
+
+```bash
+# Expect NO rows: the publishing identity must hold no project-level role at all.
+gcloud projects get-iam-policy "$PROJECT" \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:publish-cv@${PROJECT}.iam.gserviceaccount.com" \
+  --format="table(bindings.role)"
+
+# Expect EXACTLY two bindings: hub-deploy objectViewer (unconditioned), and
+# satellitePublisher conditioned to sources/cv/.
+gcloud storage buckets get-iam-policy "gs://${CONTENT_BUCKET}"
+
+# Expect NO user-managed keys.
+gcloud iam service-accounts keys list \
+  --iam-account="publish-cv@${PROJECT}.iam.gserviceaccount.com" --managed-by=user
+```

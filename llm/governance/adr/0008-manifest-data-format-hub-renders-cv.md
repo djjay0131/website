@@ -48,24 +48,30 @@ Private repo, public output — the proof case." `cv` is **public**
    `photo_jason_1.jpeg` — exactly today's `cv-data.zip` payload, unzipped under the
    satellite's prefix.
 
-3. **A `data` item is inert unless the hub claims it.** The hub declares the
+3. **A second `data` source requires its own ADR.** This is normative, not advisory. The
+   containment below bounds what a *claimed* payload can do; nothing but this rule bounds
+   how many couplings accumulate. Recorded here rather than only in a sprint file because a
+   sprint file will not survive to Phase 5, when `agentic-kg` and
+   `construction-ai-proposal` arrive and the question is actually asked.
+
+4. **A `data` item is inert unless the hub claims it.** The hub declares the
    `(source, slug)` pairs it can render — in Phase 2, exactly `("cv", "cv-data")`.
    A `data` item the hub does not claim **fails the build** rather than being
    ignored, so the contract cannot silently accumulate payloads nothing renders.
 
-4. **Every CV URL keeps its current shape and its current chrome.** `/cv/`,
+5. **Every CV URL keeps its current shape and its current chrome.** `/cv/`,
    `/cv/<variant>`, `/resumes/`, `/projects/`, `/projects/<slug>`, `/` and
    `/pdfs/<variant>.pdf` render first-party from the published payload. No CV URL
    changes, so the roadmap's URL-preservation criterion is met by construction
    rather than by a redirect map.
 
-5. **The coupling is named, versioned and bounded.** The `data` item carries a
+6. **The coupling is named, versioned and bounded.** The `data` item carries a
    `schema_version`, and the hub fails the build on a version it does not
    understand. `cv-data.ts` mirroring `cv/tools/resolver.py` is recorded as a known,
    accepted coupling between exactly one source and the hub — not a property of the
    contract.
 
-6. **§2 is corrected:** `cv` is a public repository whose default branch is
+7. **§2 is corrected:** `cv` is a public repository whose default branch is
    `master`. Its WIF provider condition admits `refs/heads/master`. The "private
    repo, public output" framing is removed; `phd-milestones` (Phase 3) is the first
    genuinely private satellite, and the first real test of that property.
@@ -140,6 +146,10 @@ become a library its satellites build against, which contradicts §3 and makes e
 hub design change a coordinated multi-repository release.
 
 ## Consequences
+
+*Consequences amended 2026-09-16, after the site stream demonstrated that removing
+`fetch-data.sh` would break every pull-request build. The original text is corrected in
+place rather than silently dropped; see the `fetch-data.sh` bullet below.*
 
 ### Positive
 

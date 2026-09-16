@@ -45,7 +45,6 @@ what a contributor needs to pick up work today.
   `cv` renders. The alternative preserving §3 completely is costed in the ADR.
 - Design doc §10 Q3, Q4, Q6.
 - Brief / design-doc / canon conflicts K1–K12 (`STATE.md`). K13 is closed by ADR-0007.
-- Brief / design-doc / canon conflicts K1–K13 (`STATE.md`).
 
 ## Governance adoption
 

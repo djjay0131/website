@@ -148,6 +148,18 @@ steps:
       bucket: ${{ vars.GCP_CONTENT_BUCKET }}
 ```
 
+### Why `@main` and not a pinned commit
+
+You call the action at `djjay0131/website/contract/publish@main`, a moving reference, from a
+job holding `id-token: write`. That is deliberate: it means contract fixes reach every
+satellite without a pull request in each one, which matters when the fix is a security fix.
+The trade is real and worth stating plainly — **any push to the hub's `main` immediately
+changes what runs inside your workflow.** It is acceptable here because the hub and its
+satellites have one owner; it would not be acceptable for a third-party action, and it is the
+one place where the hub holds power over a satellite's runtime. If that ever stops being
+true, the answer is a moving `v1` tag the hub advances deliberately, not a commit SHA that
+would freeze every satellite on a stale contract.
+
 The action validates your manifest, then uploads `dist/` to
 `gs://<bucket>/sources/<source>/`. It uploads file by file rather than recursively,
 because a recursive upload would require permission to list the whole bucket — which
