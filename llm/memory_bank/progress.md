@@ -18,6 +18,14 @@ merged reality, not plans.
 - Governance adopted (agentic-governance v0.8); `main` requires `governance-checks` and
   `budget-guard` (since 2026-09-15).
 - ADRs 0001–0008 Accepted; master roadmap in force.
+- The Phase 2 cloud foundation is **applied and verified live**: content bucket
+  `cusati-hub-content` with uniform bucket-level access, public access prevention enforced,
+  versioning and 7-day soft delete; a `satellitePublisher` custom role holding exactly
+  `storage.objects.create`, `.delete` and `.get`; a `satellites` Workload Identity pool
+  separate from the hub's; and `cv`'s keyless publishing identity. The prefix boundary is
+  **proven, not assumed** — the satellite could create, overwrite, read and delete inside
+  `sources/cv/` and was refused every write outside it and every list, including of its own
+  prefix (`STATE.md` §Checkpoint 3).
 - `/email/` and `/privacy/` are live, in the owner's supplied wording (PR #15).
 
 ## Pending merge
@@ -28,10 +36,12 @@ merged reality, not plans.
   `site/` (collection, CV repointed at the synced payload, poll wiring), and `cv` (PR #13,
   with PR #14 the `bibtexparser<2` pin that must merge first). Chief Reviewer verdict:
   **Comment, nothing blocking the merge**.
-- **Blocking Checkpoint 3, not the merge:** `WEBSITE_DISPATCH_PAT` is live in `cv` — a
-  long-lived token with write access to this repository, held by a satellite. Deleting the
-  workflow step did not remove it, and deleting the secret would not revoke the token. Both
-  halves are the owner's, and they come first.
+- **Still blocking Checkpoint 3, not the merge:** the `WEBSITE_DISPATCH_PAT` **token**.
+  Its `cv` repository secret and the `WEBSITE_REPO` variable were deleted on 2026-09-16, so
+  no satellite workflow can reach it — but a repository secret and the token are different
+  things, and the token itself can only be revoked in the owner's GitHub account. Until then
+  a credential with write access to this repository still exists; it is simply no longer
+  stored in the satellite.
 
 ## What is left
 

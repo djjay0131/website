@@ -9,16 +9,25 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
-- Sprint `2026-09-hub`: **Phase 2 — Publishing contract is in progress** (issue #16, draft
-  PR #17, branch `feat/publishing-contract`, owner's go 2026-09-16).
+- Sprint `2026-09-hub`: **Phase 2 — Publishing contract, at Checkpoint 3** (issue #16,
+  PR #17, branch `feat/publishing-contract`). Reviewed — Chief Reviewer verdict *Comment,
+  nothing blocking the merge*. All six required checks green.
 - Phase 1 — Foundation is complete. PR #12 merged 2026-09-15; Checkpoint 2 verified live the
   same day. The Email and Privacy pages merged (PR #15) and are live at `/email/` and
   `/privacy/`.
 - The hub is live at **https://jason.cusati.us** on Firebase Hosting, deployed from `main`
   through Workload Identity Federation; `https://research.cusati.us` 301-redirects to it
   (paths preserved). GitHub Pages still serves until Phase 6.
-- **Stop point:** Checkpoint 3. Agents do not merge; the owner applies Terraform, sets the
-  new Actions variables, merges the hub PR and then the `cv` PR.
+- **Checkpoint 3 is part done.** On the owner's authorisation the Lead Architect deleted
+  `cv`'s `WEBSITE_DISPATCH_PAT` secret and `WEBSITE_REPO` variable, applied `infra/` from a
+  clean checkout at `91b7a39` (9 added, 0 changed, 0 destroyed), set the Actions variables in
+  both repositories, and ran the prefix-boundary proofs — 9 of 9 as expected, under a
+  temporary impersonation grant that was removed and verified removed.
+  **Do not re-apply and do not re-delete: both are done.** Evidence: `STATE.md`
+  §Checkpoint 3 execution record.
+- **Stop point:** the rest of Checkpoint 3 is the owner's alone — revoke the PAT *token* at
+  github.com/settings/tokens (deleting the repository secret did not), then merge `cv` #14,
+  hub #17, `cv` #13, in that order. Agents do not merge.
 - Orchestration state: `llm/sprints/2026-09-hub/STATE.md`.
 
 ## Decisions on record
