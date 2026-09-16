@@ -224,7 +224,10 @@ Running now — **do not relaunch either without first checking for its handoff 
   Verified: the "Notify website repo" step is deleted (0 hits for `WEBSITE_DISPATCH_PAT`,
   `WEBSITE_REPO`, `repository_dispatch` in `build-cv.yml`), publishing gated to
   `refs/heads/master` on non-PR events, the owner's own `cv` checkout untouched. Handoff:
-  `handoffs/satellite-cv-phase-2.md`.
+  `handoffs/satellite-cv-phase-2.md`. **`cv` PR #13** is open for it (branch
+  `feat/publish-contract`, commit `d9b402d`), and **`cv` PR #14** carries the one-line
+  `bibtexparser<2` pin from Risk 15 (branch `fix/bibtexparser-pin`, commit `5ee7515`).
+  **#14 must merge before #13**, or `cv`'s CI stays red and its publish job cannot run.
 
 Not started, and blocked by design: the **Chief Reviewer**
 (`contracts/chief-reviewer-phase-2.md`) reviews both repositories and runs only once both
@@ -690,12 +693,15 @@ From the Phase 2 infra stream (2026-09-16):
 1. **Revoke `WEBSITE_DISPATCH_PAT`** (Risk 14) — delete the `cv` repository secret and the
    `WEBSITE_REPO` variable, then revoke the token at github.com/settings/tokens. Do this
    first: it closes a live credential, and it is independent of everything else here.
-2. `terraform apply` in `infra/` from a clean checkout of the reviewed head; record the SHA.
-3. Set `GCP_CONTENT_BUCKET` in `website`, and the four publish variables in `cv`
+2. Merge **`cv` PR #14** (`bibtexparser<2`). Until it lands, `cv`'s CI is red on a fresh
+   install and no job in `build-cv.yml` runs, so the satellite path cannot be exercised at
+   all (Risk 15).
+3. `terraform apply` in `infra/` from a clean checkout of the reviewed head; record the SHA.
+4. Set `GCP_CONTENT_BUCKET` in `website`, and the four publish variables in `cv`
    (`GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_PUBLISH_SA`, `GCP_CONTENT_BUCKET`).
-4. Run the three prefix-boundary proofs from `handoffs/infra-phase-2.md` (cannot write
+5. Run the three prefix-boundary proofs from `handoffs/infra-phase-2.md` (cannot write
    outside `sources/cv/`, cannot list, can overwrite on republish).
-5. Merge the hub PR, then the `cv` PR. A `cv` push then publishes; the next hub poll
+6. Merge the hub PR #17, then `cv` PR #13. A `cv` push then publishes; the next hub poll
    deploys.
 
 From the Phase 2 `cv` stream (2026-09-16):
