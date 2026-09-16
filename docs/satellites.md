@@ -43,6 +43,9 @@ your repo ──▶ build dist/ (manifest.json at its root) ──▶ GCS conten
    your prefix. You will be given a `source` name and the values your workflow needs.
 2. Produce a `dist/` folder whose **root contains `manifest.json`**, alongside the files
    that manifest describes. Every item's `path` is relative to that same `dist/`.
+   **Generate the manifest from your build, don't hand-maintain it** — if your outputs are
+   discovered dynamically (a variant list, a glob), a static file drifts out of step
+   silently. `cv` generates its manifest with a small tested tool and validates it in CI.
 3. Add the publish step to your workflow.
 
 ## The manifest
@@ -103,8 +106,19 @@ same YAML source (ADR-0008).
 If you want to publish a `data` item, the hub must first be taught to render your
 specific `(source, slug)` pair, and your item must carry a `schema_version` that the
 hub recognises. An unclaimed `data` item, or an unknown `schema_version`, **fails the
-hub build** rather than being ignored. Changing your payload's shape without bumping
-`schema_version` will produce a wrong page instead of an error, so bump it.
+hub build** rather than being ignored.
+
+**When to bump `schema_version`.** This rule binds both repositories, so it is written
+here rather than only in yours:
+
+- **Bump it** when the payload's *shape* changes: a key renamed, removed or re-typed, a
+  file moved, the directory layout changed.
+- **Do not bump it** for content changes, or for adding another instance of something
+  the shape already describes.
+- **Bump the hub first.** Teach the hub the new version, then publish it. A bump
+  published before the hub understands it takes the hub build down.
+- Forgetting to bump is silent and produces a wrong page; bumping unnecessarily is loud
+  and safe. When unsure, bump.
 
 Prefer any other format if one fits.
 

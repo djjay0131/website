@@ -179,7 +179,10 @@ declare `permissions:` of its own — permissions belong to the job — so this 
 cannot grant it for you. Without it, GitHub mints no OIDC token and the WIF
 exchange in step (d) fails.
 
-Set all five values as GitHub Actions **variables**, not secrets. None of them is
+Set these four as GitHub Actions **variables**, not secrets — `dist` and `source` are
+literals written in the workflow, not variables: `GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`,
+`GCP_PUBLISH_SA`, `GCP_CONTENT_BUCKET`. None of them is secret, and treating them as
+secrets makes failures harder to read.
 secret, and treating them as secrets only makes failures harder to read.
 
 The action needs `node` on `PATH`. GitHub-hosted runners provide it; on a
