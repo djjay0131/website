@@ -2,7 +2,7 @@
 
 Status: Draft
 Last updated: 2026-09-16
-Governance: agentic-governance v0.8
+Governance: agentic-governance v0.9
 
 This file localizes the canonical governance in
 [`agentic-governance`](https://github.com/djjay0131/agentic-governance) for
@@ -161,7 +161,8 @@ deploys something, and `contract/` is the interface satellites trust.
 
 ## Platform Enforcement Reality
 
-Verified against the GitHub API on 2026-09-14, not assumed.
+Verified against the GitHub API on 2026-09-14 and re-verified 2026-09-16, not
+assumed.
 
 - **Before adoption:** `main` had no branch protection
   (`gh api repos/djjay0131/website/branches/main/protection` returned 404
@@ -182,6 +183,16 @@ Verified against the GitHub API on 2026-09-14, not assumed.
   `budget-guard` job is a second required context, on the owner's decision, so a PR
   that removes the budget or its `prevent_destroy` guard cannot be merged. `build.yml`
   (build and unit tests) also runs on pull requests and is not required.
+- **`delete_branch_on_merge`: TRUE.** Verified 2026-09-16
+  (`gh api repos/djjay0131/website -q .delete_branch_on_merge` returned `true`).
+  The head branch of a merged pull request is deleted by the platform, so the PR
+  lifecycle's closing clause — "Branch deleted post-merge" — no longer depends on
+  whoever merges remembering `--delete-branch` (agentic-governance
+  `llm/governance/branch-protection.md` §Branch Cleanup). This is a **repository
+  setting, not branch protection**, so it is available on every plan and is
+  unaffected by the `enforce_admins` gap below: it applies to the owner's merges
+  too. It does not delete the branch of a PR closed unmerged, which canon keeps
+  deliberately — such a branch is the only copy of its work.
 - **Repository:** public, user-owned (no organization), single collaborator
   (`djjay0131`). Branch protection is available on this plan.
 - **Token/identity model:** all agent sessions authenticate as `djjay0131`
@@ -245,7 +256,7 @@ repository (principle 3), and nothing here depends on how a satellite builds.
 
 | Repo | Relationship | Phase |
 |---|---|---|
-| `agentic-governance` | Canon. Binding pin: CI at SHA `5689b69` (v0.8.3); the plugin auto-updates locally (§Canon Location). | — |
+| `agentic-governance` | Canon. Binding pin: CI at SHA `851a50a` (v0.9.0); the plugin auto-updates locally (§Canon Location). | — |
 | `cv` | Satellite #1, public items. **Public** repository, default branch `master` (design doc §2 corrected by ADR-0008 — it is not private). Consumed ad hoc via release download in `build.yml` through Phase 1; formalized under the manifest contract in Phase 2. `fetch-data.sh` is **retained** as the pull-request build's CV source — the hub's WIF binding admits only `refs/heads/main`, so a PR cannot read the bucket (ADR-0008 Consequences; STATE C25). | 2 |
 | `phd-milestones` | Satellite #2, private items: milestone tracker, committee dossier. To be created as a private repo from the handoff tarball. | 3 |
 | `agentic-kg` | Satellite #3, project page (public), optional private notes. | 5 |

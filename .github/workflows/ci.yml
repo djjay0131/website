@@ -33,8 +33,8 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           repository: djjay0131/agentic-governance
-          # agentic-governance v0.8.3.
-          ref: 5689b69fdf5e99ce58f7d3d2ca6d227fd7904d21
+          # agentic-governance v0.9.0.
+          ref: 851a50a0692d4409cbd255e3b3be111d863ae264
           path: governance-canon
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
