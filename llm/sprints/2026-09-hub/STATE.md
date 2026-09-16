@@ -199,9 +199,19 @@ ADR-0008, both accepted on this branch, and runs four streams across two reposit
 
 ## In flight
 
-- **Phase 2 (#16)**: ADR-0007, ADR-0008, design doc §2/§3/§4 amendments, roadmap and delta
-  updates committed to `feat/publishing-contract`. Specialist streams next, then the Chief
-  Reviewer, then Checkpoint 3.
+- **Phase 2 (#16), draft PR #17.** Landed on `feat/publishing-contract`: ADR-0007, ADR-0008,
+  design doc §2/§3/§4 amendments, roadmap, delta (artifacts slot `docs/` declared),
+  `docs/satellites.md`, all six bounded contracts, memory bank.
+- **Two specialist streams launched 2026-09-16 and running:**
+  - `contract` — `contract/**` (schema, examples, publish action, README) against
+    `contracts/contract-phase-2.md`.
+  - `infra` — `infra/**` (content bucket, custom role, `satellites` WIF pool, cv identity)
+    against `contracts/infra-phase-2.md`.
+  **On restart: do not relaunch these two without first checking whether `contract/` and
+  `infra/storage.tf` already exist and whether their handoffs are present in `handoffs/`.**
+- **Not yet launched, and blocked by design:** `site` needs `contract/manifest.schema.json`
+  to mirror (SEAM-1); `satellite-cv` needs both the schema and `contract/publish/action.yml`.
+  Both contracts tell the specialist to STOP if those are absent. The Chief Reviewer runs last.
 
 ## Blocked
 
