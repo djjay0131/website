@@ -684,6 +684,32 @@ working snapshot lived in temporary storage.
     one line, no behaviour change) rather than buried in the publishing PR. Migrating to the
     v2 API is a separate change and a separate issue.
 
+    **Correction, 2026-09-16 — I overstated this.** I wrote that the pin "restores green CI"
+    before the full run had finished. What is actually established, at commit `5ee7515`:
+    the pin **does** fix the `Python tests & lint` job, and the **push-event run
+    (35052550773) is fully green**, all four Compile jobs passing. But the
+    **pull_request-event run (35052617717) failed** — so PR #14 shows red. The cause is not
+    the pin and not Phase 2: `xelatex` **segfaulted**. latexmk reports the exit code divided
+    by 256, and `0.54296875 × 256 = 139 = 128 + 11 = SIGSEGV`. The "Missing character …
+    SimpleIcons.otf" lines in that log are a red herring: the **passing** run contains 22 of
+    them and still completes, and `settings.sty` and `cv-llt.tex` both document that hazard
+    and work around it deliberately. Failed jobs re-run to distinguish flake from a
+    deterministic crash; result pending.
+
+    **What this means for Checkpoint 3:** `cv`'s publish job runs only on
+    `push` to `master` (`if: github.ref == 'refs/heads/master' && github.event_name !=
+    'pull_request'`), and the push path is green with the pin. So publishing can work even
+    while the PR check is red — but the owner should not merge a red PR on my say-so, and the
+    crash needs to be understood first.
+16. **`cv`'s CI is not reproducible.** Every action in `build-cv.yml` floats on a tag —
+    `actions/checkout@v4`, `setup-python@v5`, `upload-artifact@v4`, `download-artifact@v4`,
+    `softprops/action-gh-release@v2`, and critically `xu-cheng/latex-action@v3`, which supplies
+    the whole TeXLive image. Two runs minutes apart on identical content can therefore build
+    against different toolchains, which is a plausible mechanism for the xelatex segfault in
+    Risk 15 hitting one run and not the other. The hub pins every action by commit SHA
+    (Phase 1 SEAM); `cv` does not. Worth an issue in `cv` regardless of how the segfault
+    resolves — it also means a retagged action can change that pipeline with no commit.
+
 ## Follow-ups
 
 - The tarball follow-up formerly here (delete it in Phase 3) is **withdrawn**: it
