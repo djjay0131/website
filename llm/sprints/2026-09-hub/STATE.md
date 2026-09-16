@@ -624,6 +624,18 @@ working snapshot lived in temporary storage.
     never changed (ADR-0006).
 13. **Cookie collision with a future family site** setting `__session` on
     `Domain=cusati.us` (ADR-0006).
+14. **`WEBSITE_DISPATCH_PAT` exists in `cv` today (verified 2026-09-16).** Not hypothetical:
+    `gh api repos/djjay0131/cv/actions/secrets` returns it, created 2026-08-17, and the
+    variable `WEBSITE_REPO = djjay0131/website` is set beside it. Per `build-cv.yml`'s own
+    comment it is "a PAT with `repo` scope on the website repo" — a long-lived credential
+    giving a satellite write access to the hub. This is the exact condition ADR-0007
+    forbids, principle 3 prohibits, and domain review question 2 asks about, and it is live
+    now. **Deleting the workflow step does not remove it**, and any future workflow in `cv`
+    could use it. Remediation has two halves, both the owner's: delete the repository secret
+    (and the `WEBSITE_REPO` variable), *and* revoke the token itself at
+    github.com/settings/tokens — removing the secret alone leaves a valid token in the
+    account. Raised rather than done, because revocation is account-level and deleting a
+    secret is irreversible.
 
 ## Follow-ups
 
@@ -653,6 +665,19 @@ From the Phase 2 infra stream (2026-09-16):
   it needs the owner's word rather than being absorbed silently.
 - **Custom role `deletion_policy = "PREVENT"`**: a destroyed custom role locks its ID for 7–37
   days, which would block all publishing with no way to apply out of it.
+
+**Checkpoint 3 owner actions (2026-09-16).** In order:
+
+1. **Revoke `WEBSITE_DISPATCH_PAT`** (Risk 14) — delete the `cv` repository secret and the
+   `WEBSITE_REPO` variable, then revoke the token at github.com/settings/tokens. Do this
+   first: it closes a live credential, and it is independent of everything else here.
+2. `terraform apply` in `infra/` from a clean checkout of the reviewed head; record the SHA.
+3. Set `GCP_CONTENT_BUCKET` in `website`, and the four publish variables in `cv`
+   (`GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_PUBLISH_SA`, `GCP_CONTENT_BUCKET`).
+4. Run the three prefix-boundary proofs from `handoffs/infra-phase-2.md` (cannot write
+   outside `sources/cv/`, cannot list, can overwrite on republish).
+5. Merge the hub PR, then the `cv` PR. A `cv` push then publishes; the next hub poll
+   deploys.
 
 ## Standing constraints
 
