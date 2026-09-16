@@ -22,9 +22,16 @@ merged reality, not plans.
 
 ## Pending merge
 
-- **PR #17 (draft)** — Phase 2, publishing contract. ADR-0007, ADR-0008, design doc §2/§3/§4
-  amendments and the sprint's bounded contracts are committed; the four implementation
-  streams are in flight.
+- **PR #17** — Phase 2, publishing contract. Out of draft, reviewed, all six required checks
+  green. All four implementation streams have landed: `contract/` (schema, validator, publish
+  action), `infra/` (content bucket, three-permission custom role, `satellites` WIF pool),
+  `site/` (collection, CV repointed at the synced payload, poll wiring), and `cv` (PR #13,
+  with PR #14 the `bibtexparser<2` pin that must merge first). Chief Reviewer verdict:
+  **Comment, nothing blocking the merge**.
+- **Blocking Checkpoint 3, not the merge:** `WEBSITE_DISPATCH_PAT` is live in `cv` — a
+  long-lived token with write access to this repository, held by a satellite. Deleting the
+  workflow step did not remove it, and deleting the secret would not revoke the token. Both
+  halves are the owner's, and they come first.
 
 ## What is left
 
