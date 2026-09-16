@@ -28,6 +28,10 @@
     "to": "/cv/sde-long/"
   },
   {
+    "from": "/website/email/",
+    "to": "/email/"
+  },
+  {
     "from": "/website/favicon.ico",
     "to": "/favicon.ico"
   },
@@ -62,6 +66,10 @@
   {
     "from": "/website/photo_jason_1.jpeg",
     "to": "/photo_jason_1.jpeg"
+  },
+  {
+    "from": "/website/privacy/",
+    "to": "/privacy/"
   },
   {
     "from": "/website/projects/",

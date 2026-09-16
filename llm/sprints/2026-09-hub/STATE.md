@@ -15,10 +15,10 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. COMPLETE. Checkpoint 2 passed (2026-09-15).** The hub is live at
-`https://jason.cusati.us` on Firebase Hosting; `https://research.cusati.us` redirects to it.
-**Stopped: no Phase 2 work, and no OpenClaw page build (#13), without the owner's explicit
-go.**
+**Phase 1 — Foundation. COMPLETE** (Checkpoint 2 passed 2026-09-15; PR #14 merged, issue #10
+closed). The hub is live at `https://jason.cusati.us`. **In progress:** the Email and Privacy
+pages (issue #13), which the owner requested. **Phase 2 has not started** and waits for the
+owner's go.
 
 ## Done
 
@@ -188,12 +188,18 @@ go.**
   - `terraform apply -refresh-only`: 0 changes; `plan`: `No changes.`; state backed up privately.
   - GitHub Pages still serves; apex `cusati.us` MX, TXT, A, CAA and `www` unchanged.
 - [x] Phase 1 bookkeeping PR: roadmap checkboxes, this record, memory-bank sync (issue #10, F9).
+- [x] **Phase 1 fingerprint criterion verified:** scheduled run 35032163362 (2026-09-15T22:40:53Z)
+      logged "reading deployed build info from https://jason.cusati.us/build-info.json", compared
+      fingerprints and correctly skipped the rebuild. The roadmap box is ticked.
+- [x] **`budget-guard` made a required status check** on `main` (owner decision); delta and memory
+      bank updated.
+- [x] **Email and Privacy pages built** (#13) on `feat/email-privacy-pages`: the owner's wording
+      exactly, verified character for character against the contract; redirect map 48 → 50.
 
 ## In flight
 
-- **Background check:** the next scheduled `build-and-deploy` run should read `build-info.json`
-  from `https://jason.cusati.us` (roadmap Phase 1 fingerprint criterion). GitHub runs the hourly
-  cron irregularly; the roadmap box stays unchecked until a scheduled run shows it.
+- **Email and Privacy pages PR** (#13): awaiting CI, then the Chief Reviewer
+  (`contracts/chief-reviewer-email-privacy-pages.md`), then the owner's merge.
 
 ## Blocked
 
@@ -220,21 +226,23 @@ Nothing. Phase 2 waits for the owner's go.
   committee material should be told.
 - **Prevention:** ADR candidate C9 (incident runbook); review recommendation 5 (a
   secret and large-binary scan in `ci.yml`).
+**Closed by owner decision (2026-09-15):** the owner chose not to file the GitHub Support purge
+request and accepts the residual exposure ("it's fine leave it"). No further action.
 
 ## Next
 
 Owner:
 
-1. **Go / no-go for Phase 2.** Before its contracts: decide the satellite → hub dispatch
-   credential (ADR-0002 conflict; STATE C1, K13) — the constraint proposed is that no
-   satellite holds any GitHub credential for `website`.
-2. Approve or amend the OpenClaw Email wording (#13).
-3. Remaining Checkpoint 2 decisions (§Decisions for the owner at Checkpoint 2), notably
-   whether `budget-guard` becomes a required status check.
-4. File the Incident A1 GitHub Support purge request.
+1. Review the page wording on PR #15 and merge it (agents do not merge). Merging deploys
+   `/email/` and `/privacy/`.
+2. Say go for Phase 2 when ready. Its first step is the ADR for option A (the hub polls the
+   content bucket; satellites hold no GitHub credential), which also closes C1/K13.
+3. Optional: whether "OpenClaw" may stay on the two pre-existing research pages, where it names
+   a third-party agent harness in the literature review; and whether to delete the merged remote
+   branches.
 
-Lead Architect, after the relevant go: OpenClaw pages (#13) on their own branch; hub-002
-(Phase 2) with contracts that encode the owner's dispatch-credential decision; C17 fix.
+Lead Architect, after the merge: verify both pages live on `jason.cusati.us`; then, on the
+owner's go, open hub-002 with Phase 2 contracts written from the ADR.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -309,6 +317,8 @@ Phase 1's `firebase.json` carries no gate rewrites.
 | — | Ownership chain on personal accounts, not institutional — survives graduation | Design doc §1; ADR-0001 |
 | — | Branch protection mirrors canon (enforce_admins off) — owner, 2026-09-14 | Delta §Platform Enforcement Reality |
 | — | Full label taxonomy + phase milestones — owner, 2026-09-14 | Delta §Milestone Labels |
+| — | **Phase 2 publish notification — option A:** the hub polls the content bucket on a schedule and rebuilds on change; satellites hold no GitHub credential for `website` (resolves the direction of C1/K13; the ADR is written at Phase 2 start) — owner, 2026-09-15 | STATE C1 |
+| — | **Email and Privacy pages** at `/email/` and `/privacy/`, titled "Email" and "Privacy", no "OpenClaw" name, owner's wording used as supplied — owner, 2026-09-15 | Issue #13 |
 
 ## Assumptions (conservative choices, not §10 questions)
 
@@ -389,6 +399,8 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C1** — Satellite → hub dispatch credential. `repository_dispatch` needs a
   GitHub-side credential; a GCP service account cannot hold it. A per-satellite
   PAT is a long-lived credential. Decide before Phase 2. (ADR-0002)
+  **Owner direction 2026-09-15: option A (hub polls the bucket); satellites hold no GitHub
+  credential.** Record as an ADR when Phase 2 starts.
 - **C2** — Leak-check matching rules and the derived outputs they cover
   (sitemap, RSS, search index, OG images). Decide in Phase 3. (ADR-0005)
 - **C3** — Branch naming convention for this repo vs canon (A3).
@@ -402,7 +414,7 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C8** — What public-build islands may call at runtime (review R7; ADR-0003).
 - **C9** — Handling private content found in a public repository — incident
   runbook (review R8; A1).
-- **C10** — Terraform state backend (local, git-ignored, in Phase 1; remote GCS
+- **C10** — Terraform state backend (local, git-ignored, in Phase 1; remote GCS **Owner 2026-09-15: local for Phase 1; revisit in Phase 2.**
   backend proposed — it needs a bucket, which K1 keeps out of Phase 1).
 - **C11** — Deploy identity: `roles/firebasehosting.admin` plus
   `roles/serviceusage.apiKeysViewer` is the narrowest supported grant. The
@@ -424,6 +436,11 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C17** — Redirect-domain duplicate check compares raw strings, so a case or trailing-dot
   variant of the same hostname passes validation and plans a second resource (delta review 2,
   B6; fails loudly at plan review, no apex or mail risk). Tracked for a follow-up.
+- **C18** — First-party pages on the hub: the hub now serves `/email/` and `/privacy/` for a
+  project unrelated to the research hub, which the delta's Mission does not anticipate ("content
+  is authored in satellites; the hub renders it"). It also shares the root namespace with the
+  Phase 2 `section` set (ADR-0002 Decision 4), so a future section named `email` would collide
+  with a live OAuth homepage URL Google has on file (review B2).
 
 ## Constraints discovered (bind later contracts)
 
@@ -484,37 +501,19 @@ working snapshot lived in temporary storage.
 - `jason.cusati.us`, `research.cusati.us`: no records
 - NS: `ns65.domaincontrol.com.`, `ns66.domaincontrol.com.`
 
-## Decisions for the owner at Checkpoint 2 (with recommended defaults)
+## Checkpoint 2 decisions — resolved (owner, 2026-09-15)
 
-- **State backend** — keep local, git-ignored state for the first apply and back
-  it up privately; adopt a GCS backend when Phase 2 introduces buckets. (C10)
-- **Deploy role** — `roles/firebasehosting.admin` plus `roles/serviceusage.apiKeysViewer`
-  (granted per review F2, read-only). Custom roles cannot control Firebase Hosting
-  resources, so there is no tighter supported grant (F3). Recommended: accept.
-- **Design tokens** — accept the AA-adjusted light-theme text colours (muted
-  `#636a68`, caution `#87620d`; the tracker originals kept for non-text use) and a
-  status green the tracker palette lacks. Recommended: accept, and the tracker
-  adopts the same values when it becomes a satellite (F7).
-- **Billing** — *verified 2026-09-15:* the owner holds `roles/billing.admin` on the personal
-  billing account, which is open and bills in USD; the budget was created at apply.
-- **`/phd/` in the redirect map** — leave it in: it is a public, empty, noindex
-  shell.
-- **Two-hop legacy research redirects on Firebase** (301 to add the slash, then a
-  meta refresh) — accept for Phase 1; Phase 6 serves host-level redirects.
-- **Font payload** (~1.6 MB across 55 woff2 subsets; browsers fetch only what they
-  need) — subset to latin + latin-ext in a later phase.
-- **Make `budget-guard` a required status check on `main`** (alongside
-  `governance-checks`), so a PR that removes the budget cannot merge. Recommended:
-  yes. It is a branch-protection change, so it waits for your word.
-- **Deploy-tool install scripts and advisories** — `npm ci` for firebase-tools runs
-  package install scripts in the deploy job (before authentication) and reports 7
-  moderate advisories in its dependency tree. Recommended: accept for the first
-  deploy; evaluate `--ignore-scripts` after one real deploy (infra handoff
-  Recommendation 6).
-**Status after merge (2026-09-15):** PR #12 merged, so the L3 classification is settled. Billing
-admin and USD are verified. Still open: keep API Keys Viewer; accept the AA-adjusted tokens and
-status green; accept the deploy tools' install scripts and advisories; `budget-guard` as a
-required status check; remote state backend timing.
+| Decision | Owner's answer |
+|---|---|
+| `budget-guard` as a required status check on `main` | **Yes** — applied and verified; `main` now requires `governance-checks` and `budget-guard` |
+| `roles/serviceusage.apiKeysViewer` on `hub-deploy` | **Keep** |
+| AA-adjusted light-theme text colours (muted `#636a68`, caution `#87620d`) and the added status green | **Accept both**; tracker originals stay for non-text use |
+| Deploy tool's install scripts and 7 moderate advisories | **Accept for now**; revisit at the next firebase-tools update |
+| Terraform state backend | **Local for now**, git-ignored with a private backup; move to a bucket in Phase 2 (C10) |
+| `/phd/` in the redirect map | **Leave it in** |
+| Two-hop legacy research redirects | **Accept**; host-level redirects come in Phase 6 |
+| Font payload (55 woff2 subsets) | **Leave as is**; browsers fetch only what they need |
+| Billing role (verified, not a decision) | Owner holds `roles/billing.admin`; the account is open and bills in USD |
 
 ## Risks carried forward
 

@@ -1,0 +1,11 @@
+---
+import Base from "../../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base title="Email">
+  <h1>Email</h1>
+  <p>A personal email-triage assistant run by Jason Cusati for his own Google accounts, not offered to the public.</p>
+  <p><a href={`${base}privacy/`}>Privacy</a></p>
+</Base>

@@ -176,7 +176,9 @@ Verified against the GitHub API on 2026-09-14, not assumed.
 - **Required status checks: enabled 2026-09-15.** The `ci.yml`
   `governance-checks` job is a required context on `main`, non-strict (a PR need
   not be rebased onto the newest `main` to merge), added after its first green run
-  on `main`. A PR whose governance checks fail cannot be merged. `build.yml`
+  on `main`. A PR whose governance checks fail cannot be merged. Since 2026-09-15, `build.yml`'s
+  `budget-guard` job is a second required context, on the owner's decision, so a PR
+  that removes the budget or its `prevent_destroy` guard cannot be merged. `build.yml`
   (build and unit tests) also runs on pull requests and is not required.
 - **Repository:** public, user-owned (no organization), single collaborator
   (`djjay0131`). Branch protection is available on this plan.

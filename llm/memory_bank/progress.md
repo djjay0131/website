@@ -15,7 +15,8 @@ merged reality, not plans.
 - GitHub Pages (`djjay0131.github.io/website/`) still serves the same build until Phase 6.
 - Terraform in `infra/` declares every Phase 1 cloud resource; the owner's $5 budget alert
   is live and guarded in CI.
-- Governance adopted (agentic-governance v0.8); `main` requires `governance-checks`.
+- Governance adopted (agentic-governance v0.8); `main` requires `governance-checks` and
+  `budget-guard` (since 2026-09-15).
 - ADRs 0001–0006 Accepted; master roadmap in force.
 
 ## Pending merge
@@ -25,7 +26,7 @@ None.
 ## What is left
 
 - Phases 2–6 of `llm/master-roadmap.md`, starting with Phase 2 on the owner's go.
-- OpenClaw Email pages (#13).
+- Email and Privacy pages at `/email/` and `/privacy/` (#13), in progress.
 
 ## Known issues
 
@@ -33,8 +34,8 @@ None.
   must settle it before Phase 2.
 - Brief and design-doc conflicts K1–K13 (`llm/sprints/2026-09-hub/STATE.md`).
 - Redirect-domain duplicate validation ignores case and trailing dots (STATE C17).
-- Incident A1 (`STATE.md`): the GitHub cached-view removal request is an outstanding owner
-  action.
+- Incident A1 (`STATE.md`): the owner closed the action and declined the GitHub purge request;
+  the residual exposure remains — the commit is still retrievable by SHA.
 
 ## Governance adoption
 
