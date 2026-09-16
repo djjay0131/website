@@ -246,7 +246,7 @@ repository (principle 3), and nothing here depends on how a satellite builds.
 | Repo | Relationship | Phase |
 |---|---|---|
 | `agentic-governance` | Canon. Binding pin: CI at SHA `5689b69` (v0.8.3); the plugin auto-updates locally (§Canon Location). | — |
-| `cv` | Satellite #1, public items. **Public** repository, default branch `master` (design doc §2 corrected by ADR-0008 — it is not private). Consumed ad hoc via release download in `build.yml` through Phase 1; formalized under the manifest contract in Phase 2, after which `fetch-data.sh` is removed. | 2 |
+| `cv` | Satellite #1, public items. **Public** repository, default branch `master` (design doc §2 corrected by ADR-0008 — it is not private). Consumed ad hoc via release download in `build.yml` through Phase 1; formalized under the manifest contract in Phase 2. `fetch-data.sh` is **retained** as the pull-request build's CV source — the hub's WIF binding admits only `refs/heads/main`, so a PR cannot read the bucket (ADR-0008 Consequences; STATE C25). | 2 |
 | `phd-milestones` | Satellite #2, private items: milestone tracker, committee dossier. To be created as a private repo from the handoff tarball. | 3 |
 | `agentic-kg` | Satellite #3, project page (public), optional private notes. | 5 |
 | `construction-ai-proposal` | Satellite #4, project page (public). | 5 |

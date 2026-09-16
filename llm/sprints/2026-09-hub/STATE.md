@@ -649,6 +649,51 @@ working snapshot lived in temporary storage.
 | Font payload (55 woff2 subsets) | **Leave as is**; browsers fetch only what they need |
 | Billing role (verified, not a decision) | Owner holds `roles/billing.admin`; the account is open and bills in USD |
 
+## Phase 2 review dispositions (Chief Reviewer, PR #17)
+
+**Verdict: Comment — nothing blocking.** Report:
+`handoffs/chief-reviewer-phase-2.md`, posted to PR #17.
+
+It verified rather than accepted. All six credential-boundary points checked from the
+Terraform and workflows, not from the ADRs: it enumerated every binding in the module (not
+just the custom role) to prove no satellite reaches `storage.objects.list` by any path,
+confirmed no authoritative `iam_binding`/`iam_policy` exists that could silently replace the
+conditioned grant, downloaded `upload-cloud-storage` at its pinned SHA to confirm the no-list
+property from source, and built a 33-case adversarial harness across both validator ends —
+**zero disagreements**.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `governance-delta.md` still said `fetch-data.sh` is removed | **Fixed.** The delta is the project-facts document; leaving it asserting a retracted plan was the worst of the three. |
+| 2 | Design doc §9 still annotated `build.yml` as `repository_dispatch` | **Fixed.** §3/§4 were amended for ADR-0007; §9 was missed. |
+| 3 | Design doc §11 phase table still said "dispatch rebuild" | **Fixed.** |
+| 4 | `contract/README.md` duplicated sentence from my five→four fix | **Fixed.** |
+| 5 | `handoffs/contract-phase-2.md` committed as **binary** — two literal NUL bytes at offsets 5437 and 5624, from pasted validator output quoting the `path` pattern | **Fixed**, both halves: bytes stripped, and the validator now escapes control characters when rendering a pattern into a message, so no future error can emit NUL into a log or a transcript. A control-plane record that cannot be diffed defeats the traceability this project runs on. |
+| 6 | No CI guard for the two invariants that fail **open** (`uniform_bucket_level_access`, the role's exact three permissions) | **Deferred to Phase 3.** The reviewer's argument is strong and matches precedent — `prevent_destroy` was judged insufficient for the budget, so `budget-guard` was added and made required. Same shape here. |
+| 7 | No CI guard on the executable bit | **Deferred to Phase 3**, with the classification caveat in §Constraints. |
+| 8 | `npm test` not hermetic on a fresh clone (8 failures before the fixture sync) | **Deferred.** CI is unaffected; it is a contributor sharp edge. |
+| 9 | ADR-0008 argued against and for `fetch-data.sh` in two sections | **Fixed.** Alternatives now distinguishes the rejected option (PDFs only, data left on the release path) from the retained fallback (same bucket-shaped tree, same sync, same validation). |
+| 10 | PR #17 unlabelled; L2-vs-L3 inconsistent with the PR #12 precedent | **Fixed and escalated to L3.** PR #12 was L3 for roadmap requirement changes and this PR changes acceptance criteria too. Canon: AI roles escalate up, never down — the owner may reclassify. |
+| 11 | "Section pages render from collections" should **move** to Phase 5, not sit in Phase 2 as NOT DONE | **Owner's call at Checkpoint 3.** The reviewer's point stands: an unchecked box with a paragraph attached reads as an unmet requirement indefinitely. |
+
+**Notes carried forward:** `cv` executes `contract/publish@main`, an unpinned first-party ref,
+in a job holding `contents: write` and `id-token: write` — defensible (SHA-pinning would make
+every contract change require a satellite commit) but undocumented; it wants a sentence in
+`docs/satellites.md` and consideration of a moving `v1` tag. The `satellites` pool invariant is
+structural only while every provider comes from the single `for_each`. The `ghp_…` string in
+`examples/invalid/unknown-top-level-field.json` is a deliberate fixture proving the schema
+rejects a smuggled dispatch credential — it will trip any future secret scanner and wants an
+allowlist entry.
+
+**Correction I supplied to the review:** it treats `cv`'s CI as unresolved, true when it began.
+Resolved since — a flake, not the `SimpleIcons.otf` error the log implies; the re-run of the
+identical commit is green on all four Compile jobs.
+
+**Its closing point, which is the one that matters:** everything else in the review concerns
+whether the boundary is correctly *designed*. `WEBSITE_DISPATCH_PAT` is the one place where it
+is currently not *true*. The phase should not be recorded as having established the credential
+boundary while the credential it exists to eliminate is still valid.
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at

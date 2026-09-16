@@ -123,6 +123,14 @@ keeps the hub holding `cv`-specific release knowledge (§3), and keeps a GitHub
 release in the publish path that Phase 3's private satellite cannot use. Phase 2's
 stated purpose is that the CV is published *through the contract*.
 
+**Not to be confused with the retained fallback** (see Consequences). What is rejected
+here is *bringing only the PDFs through the contract and leaving the CV data on the
+release path*. What is retained is a fallback that produces the same bucket-shaped tree
+and a full manifest, then hands it to the same sync — so validation, the claim check and
+asset staging run identically whichever transport supplied the payload. The contract is
+the interface in both cases; only the transport differs, and only until a pull-request
+build can read the bucket (STATE C25).
+
 ### Move CV rendering into `cv` as a satellite of the hub's design system
 
 Publish the hub's tokens and layouts as a package `cv` consumes.

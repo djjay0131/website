@@ -29,6 +29,12 @@ export const SCHEMA_PATH = fileURLToPath(
 );
 
 /** Keywords that carry no assertion. */
+
+// Patterns may contain literal control characters (the path pattern excludes
+// \\x00-\\x1f as a literal range). Printing one raw emits NUL into CI logs and into
+// any transcript pasted downstream, which turns a text file into a binary one.
+const showPattern = (p) => String(p).replace(/[\x00-\x1f]/g, (c) =>
+  '\\x' + c.charCodeAt(0).toString(16).padStart(2, '0'));
 const ANNOTATION_KEYWORDS = new Set([
   '$schema',
   '$id',
@@ -174,7 +180,7 @@ function validateNode(schema, value, pointer, root, errors) {
       errors.push({
         layer: 'json-schema',
         path: pointer,
-        message: `"${fieldName(pointer)}" does not match the required pattern ${schema.pattern} (got ${JSON.stringify(value)})`,
+        message: `"${fieldName(pointer)}" does not match the required pattern ${showPattern(schema.pattern)} (got ${JSON.stringify(value)})`,
       });
     }
     if (schema.minLength !== undefined && value.length < schema.minLength) {

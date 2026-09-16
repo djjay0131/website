@@ -183,7 +183,6 @@ Set these four as GitHub Actions **variables**, not secrets — `dist` and `sour
 literals written in the workflow, not variables: `GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`,
 `GCP_PUBLISH_SA`, `GCP_CONTENT_BUCKET`. None of them is secret, and treating them as
 secrets makes failures harder to read.
-secret, and treating them as secrets only makes failures harder to read.
 
 The action needs `node` on `PATH`. GitHub-hosted runners provide it; on a
 self-hosted runner, add `actions/setup-node` before this step.

@@ -270,7 +270,7 @@ website/
 ├── infra/                        # Terraform
 ├── firebase.json
 └── .github/workflows/
-    ├── build.yml                 # push + repository_dispatch: sync, build ×2, leak check, deploy
+    ├── build.yml                 # push + schedule poll: sync, build ×2, leak check, deploy
     └── gate.yml                  # gate/** change: test, build image, deploy Cloud Run
 ```
 
@@ -306,7 +306,7 @@ after `/governance:establish`:
 |---|---|---|
 | 0 | `/governance:establish` on `website`; delta; ADRs 1–5; this doc committed; roadmap | Governed repo, decisions on record |
 | 1 | Infra (Terraform + WIF + budget), Firebase project + Hosting + domain, Actions deploy, design tokens, section shells | Domain serves the site from Jason's cloud |
-| 2 | Contract schema, publish action, content bucket, dispatch rebuild; `cv` formalized as satellite #1 | CV published through the contract |
+| 2 | Contract schema, publish action, content bucket, poll-driven rebuild (ADR-0007); `cv` formalized as satellite #1 | CV published through the contract |
 | 3 | Gate service + tests, Identity Platform, Firestore, private bucket, two-output build + leak check, `/p/**` rewrite; `phd-milestones` as satellite #2; seed members | Tracker + dossier behind sign-in |
 | 4 | Share mint/list/revoke; Shares page (React island) | 14-day link to one document |
 | 5 | `agentic-kg`, `construction-ai-proposal` as satellites; project index | Self-updating projects section |
