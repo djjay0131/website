@@ -581,7 +581,12 @@ Dockerfile:
   `git ls-files -s` — not with `ls -l`, which lies on this mount.
 - Prefer `bash script.sh` over `./script.sh` in CI where the caller is ours, but note that a
   script documented for humans as `scripts/foo.sh` must still carry the bit.
-- Audited repo-wide on 2026-09-16: every tracked `*.sh` is now `100755`.
+- Audited repo-wide on 2026-09-16: every tracked `*.sh` is now `100755`, and
+  `sync-content.sh` was the only instance. Five `.mjs` files carry a shebang while committed
+  `100644`, which is **not** a defect: every one is reached through `import` or `node …`,
+  never executed directly. A naive grep for `./name.mjs` flags all of them, because an ES
+  module import looks identical to a shell invocation — so the guard below must classify by
+  how the file is *reached*, not by how its path is *spelled*, or it will be noise.
 
 ## Phase 1 review dispositions (Chief Reviewer, PR #12)
 
@@ -710,8 +715,11 @@ working snapshot lived in temporary storage.
     by 256, and `0.54296875 × 256 = 139 = 128 + 11 = SIGSEGV`. The "Missing character …
     SimpleIcons.otf" lines in that log are a red herring: the **passing** run contains 22 of
     them and still completes, and `settings.sty` and `cv-llt.tex` both document that hazard
-    and work around it deliberately. Failed jobs re-run to distinguish flake from a
-    deterministic crash; result pending.
+    and work around it deliberately. Failed jobs were re-run to distinguish flake from a
+    deterministic crash. **Verdict: flake.** Re-run of the identical commit, with no changes
+    of any kind, finished `success` with all four Compile jobs green — including the three
+    that had failed. So `cv` PR #14 is green, the pin does what it claims, and there is no
+    defect in `cv` to fix beyond the pin itself. The segfault is environmental.
 
     **What this means for Checkpoint 3:** `cv`'s publish job runs only on
     `push` to `master` (`if: github.ref == 'refs/heads/master' && github.event_name !=
