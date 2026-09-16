@@ -34,6 +34,8 @@ None.
   must settle it before Phase 2.
 - Brief and design-doc conflicts K1–K13 (`llm/sprints/2026-09-hub/STATE.md`).
 - Redirect-domain duplicate validation ignores case and trailing dots (STATE C17).
+- Incident A1 (`STATE.md`): the owner closed the action and declined the GitHub purge request;
+  the residual exposure remains — the commit is still retrievable by SHA.
 
 ## Governance adoption
 

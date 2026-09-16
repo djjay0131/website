@@ -233,15 +233,16 @@ request and accepts the residual exposure ("it's fine leave it"). No further act
 
 Owner:
 
-1. **Go / no-go for Phase 2.** Before its contracts: decide the satellite → hub dispatch
-   credential (ADR-0002 conflict; STATE C1, K13) — the constraint proposed is that no
-   satellite holds any GitHub credential for `website`.
-2. Approve or amend the OpenClaw Email wording (#13).
-3. Remaining Checkpoint 2 decisions (§Decisions for the owner at Checkpoint 2), notably
-   whether `budget-guard` becomes a required status check.
+1. Review the page wording on PR #15 and merge it (agents do not merge). Merging deploys
+   `/email/` and `/privacy/`.
+2. Say go for Phase 2 when ready. Its first step is the ADR for option A (the hub polls the
+   content bucket; satellites hold no GitHub credential), which also closes C1/K13.
+3. Optional: whether "OpenClaw" may stay on the two pre-existing research pages, where it names
+   a third-party agent harness in the literature review; and whether to delete the merged remote
+   branches.
 
-Lead Architect, after the relevant go: OpenClaw pages (#13) on their own branch; hub-002
-(Phase 2) with contracts that encode the owner's dispatch-credential decision; C17 fix.
+Lead Architect, after the merge: verify both pages live on `jason.cusati.us`; then, on the
+owner's go, open hub-002 with Phase 2 contracts written from the ADR.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -435,6 +436,11 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C17** — Redirect-domain duplicate check compares raw strings, so a case or trailing-dot
   variant of the same hostname passes validation and plans a second resource (delta review 2,
   B6; fails loudly at plan review, no apex or mail risk). Tracked for a follow-up.
+- **C18** — First-party pages on the hub: the hub now serves `/email/` and `/privacy/` for a
+  project unrelated to the research hub, which the delta's Mission does not anticipate ("content
+  is authored in satellites; the hub renders it"). It also shares the root namespace with the
+  Phase 2 `section` set (ADR-0002 Decision 4), so a future section named `email` would collide
+  with a live OAuth homepage URL Google has on file (review B2).
 
 ## Constraints discovered (bind later contracts)
 
