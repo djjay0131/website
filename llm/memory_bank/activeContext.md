@@ -1,7 +1,7 @@
 # Active Context
 
 Status: Draft
-Last updated: 2026-09-15
+Last updated: 2026-09-16
 Owner: Chief Architect
 
 What belongs here: the current focus, the current stop point, and next steps —
@@ -9,13 +9,25 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
-- Sprint `2026-09-hub`: **Phase 1 — Foundation is complete.** PR #12 merged 2026-09-15;
-  Checkpoint 2 verified live the same day.
+- Sprint `2026-09-hub`: **Phase 2 — Publishing contract, at Checkpoint 3** (issue #16,
+  PR #17, branch `feat/publishing-contract`). Reviewed — Chief Reviewer verdict *Comment,
+  nothing blocking the merge*. All six required checks green.
+- Phase 1 — Foundation is complete. PR #12 merged 2026-09-15; Checkpoint 2 verified live the
+  same day. The Email and Privacy pages merged (PR #15) and are live at `/email/` and
+  `/privacy/`.
 - The hub is live at **https://jason.cusati.us** on Firebase Hosting, deployed from `main`
   through Workload Identity Federation; `https://research.cusati.us` 301-redirects to it
   (paths preserved). GitHub Pages still serves until Phase 6.
-- **Stop point:** no Phase 2 work, and no further page work beyond #13, without the owner's
-  explicit go.
+- **Checkpoint 3 is part done.** On the owner's authorisation the Lead Architect deleted
+  `cv`'s `WEBSITE_DISPATCH_PAT` secret and `WEBSITE_REPO` variable, applied `infra/` from a
+  clean checkout at `91b7a39` (9 added, 0 changed, 0 destroyed), set the Actions variables in
+  both repositories, and ran the prefix-boundary proofs — 9 of 9 as expected, under a
+  temporary impersonation grant that was removed and verified removed.
+  **Do not re-apply and do not re-delete: both are done.** Evidence: `STATE.md`
+  §Checkpoint 3 execution record.
+- **Stop point:** the rest of Checkpoint 3 is the owner's alone — revoke the PAT *token* at
+  github.com/settings/tokens (deleting the repository secret did not), then merge `cv` #14,
+  hub #17, `cv` #13, in that order. Agents do not merge.
 - Orchestration state: `llm/sprints/2026-09-hub/STATE.md`.
 
 ## Decisions on record
@@ -27,16 +39,21 @@ what a contributor needs to pick up work today.
   created 2026-09-15, billing linked (Blaze).
 - Q5 — the Astro app moves under `site/`: proposed in ADR-0001, approved by
   merging PR #9.
-- ADRs 0001–0006: `llm/governance/adr/`.
+- ADRs 0001–0008: `llm/governance/adr/`. ADR-0007 settles how a publish reaches the hub —
+  the hub polls the content bucket and no satellite holds a GitHub credential for `website`,
+  closing the contradiction ADR-0002 left open. ADR-0008 adds the `data` format and corrects
+  design doc §2: `cv` is public, default branch `master`.
 - Roadmap: `llm/master-roadmap.md`.
 
 ## Open
 
 - Design doc §10 Q3, Q4, Q6.
-- Phase 2 publish notification decided: option A — the hub polls the content bucket;
-  satellites hold no GitHub credential (owner, 2026-09-15). ADR to be written at Phase 2 start.
-- Email and Privacy pages at `/email/` and `/privacy/` (#13): in progress, owner's wording as supplied.
-- Brief / design-doc / canon conflicts K1–K13 (`STATE.md`).
+- **ADR-0008 needs the owner's eye at Checkpoint 3.** It amends design doc §4 to add a `data`
+  format, knowingly weakening §3's "the hub never needs to know how a satellite built its
+  output" for that one format, because the CV is data the hub renders rather than a document
+  `cv` renders. The alternative preserving §3 completely is costed in the ADR.
+- Design doc §10 Q3, Q4, Q6.
+- Brief / design-doc / canon conflicts K1–K12 (`STATE.md`). K13 is closed by ADR-0007.
 
 ## Governance adoption
 

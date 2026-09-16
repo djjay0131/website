@@ -99,3 +99,102 @@ variable "hosting_site_id" {
   type        = string
   default     = null
 }
+
+# ---------------------------------------------------------------------------
+# Phase 2 (issue #16): the content bucket and the satellites that publish to it.
+# ---------------------------------------------------------------------------
+
+variable "content_bucket_name" {
+  description = "Name of the content bucket satellites publish to (SEAM-2). Null means <project_id>-content. Bucket names are globally unique across all of Cloud Storage, so this is a variable rather than a literal; override only if the default stem is already taken."
+  type        = string
+  default     = null
+
+  validation {
+    # Cloud Storage bucket naming: 3-63 characters, lowercase letters, digits,
+    # hyphens, underscores and dots, starting and ending alphanumeric. Names
+    # containing a dot have extra rules (domain verification), so they are
+    # rejected here rather than half-supported.
+    condition     = var.content_bucket_name == null || can(regex("^[a-z0-9][a-z0-9_-]{1,61}[a-z0-9]$", var.content_bucket_name))
+    error_message = "content_bucket_name must be 3-63 characters of lowercase letters, digits, hyphens or underscores, starting and ending with a letter or digit, and must not contain a dot."
+  }
+
+  validation {
+    condition     = var.content_bucket_name == null || !can(regex("^goog|google", coalesce(var.content_bucket_name, "x")))
+    error_message = "content_bucket_name must not begin with \"goog\" or contain \"google\": Cloud Storage reserves those names."
+  }
+}
+
+# The satellites that may publish, keyed by SOURCE NAME. The key is the same
+# string in three places: the manifest's "source" field, the bucket prefix
+# sources/<source>/, and the IAM condition bound to that prefix (SEAM-2,
+# SEAM-3). Adding a satellite in a later phase is one entry here.
+#
+# The two numeric IDs per satellite are public values read from the GitHub REST
+# API (GET /repos/<owner>/<name> -> .id and .owner.id). Google recommends
+# binding to them because a name can be re-registered by someone else after a
+# rename or deletion, while the numeric IDs cannot be reused (see wif.tf).
+#
+# default_branch is the ONLY ref whose runs may publish. For cv that is master,
+# not main: cv is a public repository whose default branch is master (ADR-0008
+# decision 6, correcting design doc §2).
+#
+# Phase 3 adds phd-milestones here and nowhere else (roadmap "Not in this
+# phase" keeps it out of Phase 2).
+variable "satellites" {
+  description = "Satellite repositories allowed to publish to the content bucket, keyed by source name. Each gets a keyless service account, its own WIF provider in the satellites pool, and a write grant restricted to gs://<content bucket>/sources/<key>/."
+  type = map(object({
+    repository          = string # owner/name, matched by the provider condition
+    repository_id       = string # immutable numeric repository ID
+    repository_owner_id = string # immutable numeric owner ID
+    default_branch      = string # the only branch whose runs may publish
+  }))
+
+  default = {
+    cv = {
+      repository          = "djjay0131/cv"
+      repository_id       = "1211056144"
+      repository_owner_id = "5666389"
+      default_branch      = "master"
+    }
+  }
+
+  validation {
+    # SEAM-2: <source> matches ^[a-z][a-z0-9-]{0,38}$ and equals the manifest's
+    # source. The bucket prefix and the IAM condition are built from this key.
+    condition     = alltrue([for source in keys(var.satellites) : can(regex("^[a-z][a-z0-9-]{0,38}$", source))])
+    error_message = "Each satellite key is a source name: a lowercase letter followed by up to 38 lowercase letters, digits or hyphens (SEAM-2)."
+  }
+
+  validation {
+    # The service account is named publish-<source>. A service account ID is
+    # 6-30 characters, so the source name may be at most 22.
+    condition     = alltrue([for source in keys(var.satellites) : length(source) <= 22])
+    error_message = "A satellite key must be at most 22 characters: the service account is named publish-<key> and a service account ID is limited to 30 characters."
+  }
+
+  validation {
+    # The WIF provider is named github-<source>. A provider ID is 4-32
+    # characters, so the source name may be at most 25 -- less binding than the
+    # service-account limit above, but checked so a rename cannot slip past.
+    condition     = alltrue([for source in keys(var.satellites) : length(source) <= 25])
+    error_message = "A satellite key must be at most 25 characters: the workload identity provider is named github-<key> and a provider ID is limited to 32 characters."
+  }
+
+  validation {
+    condition     = alltrue([for satellite in values(var.satellites) : can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", satellite.repository))])
+    error_message = "Each satellite's repository must be in owner/name form, for example djjay0131/cv."
+  }
+
+  validation {
+    condition     = alltrue([for satellite in values(var.satellites) : can(regex("^[0-9]+$", satellite.repository_id)) && can(regex("^[0-9]+$", satellite.repository_owner_id))])
+    error_message = "Each satellite's repository_id and repository_owner_id must be the numeric IDs from the GitHub API, not names."
+  }
+
+  validation {
+    # The branch name is interpolated into a principalSet member as
+    # refs/heads/<default_branch>. A leading refs/heads/, a wildcard or a space
+    # would silently produce a binding that admits nothing.
+    condition     = alltrue([for satellite in values(var.satellites) : can(regex("^[A-Za-z0-9._/-]+$", satellite.default_branch)) && !startswith(satellite.default_branch, "refs/")])
+    error_message = "Each satellite's default_branch is a bare branch name such as master or main: no refs/heads/ prefix, no wildcards and no spaces."
+  }
+}

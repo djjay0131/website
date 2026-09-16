@@ -23,10 +23,10 @@ entire interface (§4).
    (`contract/publish/action.yml`) validates the manifest against
    `contract/manifest.schema.json`, uploads to
    `gs://<content-bucket>/sources/<source>/` using Workload Identity
-   Federation, and fires `repository_dispatch` (`event_type: publish`) at the
-   hub (design doc §4). **The dispatch step is conditional:** as written it
-   contradicts Decision 2 (see Risks), and it is not built until a follow-up
-   ADR settles how a publish reaches the hub.
+   Federation. **Resolved by ADR-0007:** the dispatch step described here is
+   *not built*. As written it contradicted Decision 2 (see Risks); ADR-0007
+   settles how a publish reaches the hub — the hub polls the content bucket, and
+   no satellite holds any GitHub credential for `website`.
 2. Each satellite has its own service account, scoped by IAM conditions to its
    own bucket prefix. No satellite has write access to the hub repository.
 3. The hub build syncs the bucket, then builds. The manifest schema is mirrored
@@ -126,4 +126,7 @@ None.
 
 ## Superseded By
 
-None.
+None. **Completed by
+[ADR-0007](0007-hub-polls-content-bucket-no-satellite-github-credential.md)**,
+which settles the mechanism this ADR left conditional and closes the
+contradiction recorded in Risks. Decisions 2, 3 and 4 stand unchanged.

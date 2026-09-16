@@ -1,0 +1,14 @@
+{
+  "name": "hub-publishing-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The research hub's publishing contract: the manifest JSON Schema, its fixtures, the dependency-free validator used by contract/publish/action.yml, and the check that proves the schema accepts the example and rejects every invalid fixture. ajv is a devDependency only - it cross-checks the validator in the test suite and is never needed at publish time. Pinned exactly and locked by package-lock.json; bump through a reviewed lockfile change.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.18.0"
+  }
+}

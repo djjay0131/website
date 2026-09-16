@@ -1,0 +1,28 @@
+# FIXTURE. Invented.
+variant: academic
+label: Academic CV
+description: Fixture academic variant. Not real content.
+sections:
+  - type: summary
+    content_id: academic
+  - type: employment
+    include:
+      - current-role
+      - id: previous-role
+        collapse: true
+  - type: education
+    include:
+      - doctorate
+      - bachelors
+  - type: projects
+    include:
+      - fixture-one
+      - fixture-two
+  - type: publications
+  - type: skills
+    include:
+      - languages
+      - tools
+  - type: misc
+  - type: referee
+    content_id: available

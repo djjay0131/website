@@ -5,8 +5,6 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  repository_dispatch:
-    types: [cv-updated]
   schedule:
     - cron: "0 * * * *"
   workflow_dispatch:
@@ -14,7 +12,7 @@ on:
 # No workflow-wide grant. Each job asks for exactly what it uses.
 permissions: {}
 
-# Real deploys (push/schedule/dispatch) stay serialized under a single "pages"
+# Real deploys (push/schedule/manual) stay serialized under a single "pages"
 # group so they never race each other. PR validation builds get their own
 # per-branch group -- they never deploy, so they must not queue behind (or hold
 # up) the deploy lane, and a new push to a PR supersedes the run in flight.
@@ -30,40 +28,170 @@ concurrency:
 #     variable GCP_PROJECT_ID (with GCP_WIF_PROVIDER and GCP_DEPLOY_SA, the
 #     outputs of infra/). Until then the Firebase jobs are skipped.
 #
+# PHASE 2 (ADR-0007, ADR-0008; phase-2-seams.md SEAM-4, SEAM-5). The hub no
+# longer learns of a publish by being told: `repository_dispatch: [cv-updated]`
+# is GONE, because any credential able to fire it at this repository could also
+# write to it. Satellites publish to the content bucket and hold no GitHub
+# credential for `website`; the hub polls the bucket on the hourly schedule,
+# fingerprints it, and rebuilds when the fingerprint differs from the deployed
+# build. `workflow_dispatch` remains the owner's escape hatch for "publish this
+# now", and needs no satellite credential at all: a manual run always builds.
+#
+# WHERE THE CV DATA COMES FROM, per trigger. Every trigger has a source; no
+# build on any trigger produces a site without the CV, because GitHub Pages is
+# authoritative until Phase 6 and serves live CV links.
+#
+#   push / schedule / workflow_dispatch, once vars.GCP_CONTENT_BUCKET is set
+#       -> scripts/sync-content.sh --bucket : the content bucket. The contract
+#          path, and the only one after Checkpoint 3 on the deploy lane.
+#   pull_request
+#       -> scripts/fetch-data.sh : the cv GitHub release. A PR run carries
+#          refs/pull/<n>/merge and the deploy binding admits only
+#          refs/heads/main (infra/wif.tf), so it CANNOT authenticate to read the
+#          bucket. Without this fallback every PR would build a CV-less site and
+#          fail check:smoke-routes on /cv/academic.
+#   any trigger while vars.GCP_CONTENT_BUCKET is unset
+#       -> scripts/fetch-data.sh : covers the window between merging Phase 2 and
+#          the owner applying Terraform and setting the variable at Checkpoint 3.
+#
+# Both sources produce the SAME bucket-shaped tree under
+# site/src/content/sources/ and the same manifest, so everything downstream --
+# manifest validation in site/src/content.config.ts, the data-item claim check,
+# public-asset staging, the CV pages -- is identical either way. Only the
+# transport differs. The fallback is retired when the bucket path is proven;
+# see the Phase 2 site handoff.
+#
 # Actions are pinned by full commit SHA with the version in a comment, as in
 # ci.yml, so a retagged action cannot change this pipeline without a commit.
 
 jobs:
-  # This site has no CV content of its own -- it pulls it from the cv repo's
-  # "latest" release at build time. The hourly schedule exists to notice new
-  # releases, but almost every poll finds nothing new and rebuilds identical
-  # bytes. Fingerprint the release assets and compare against the fingerprint
-  # recorded in the currently deployed build; skip the pipeline when they match.
+  # The poll (ADR-0007 decision 1; SEAM-4). This site has no CV content of its
+  # own. The hourly schedule exists to notice a publish, but almost every poll
+  # finds nothing new and would rebuild identical bytes. Fingerprint the source
+  # and compare against the fingerprint recorded in the currently deployed
+  # build; skip the pipeline when they match.
   #
-  # Only scheduled polls are eligible to skip. Pushes, PRs, cv-updated
-  # dispatches, and manual runs always build -- they imply the inputs or the
-  # site code changed, which the fingerprint alone would not catch.
+  # HOW DELETIONS ARE COVERED. The bucket fingerprint is a SHA-256 over the
+  # sorted listing of EVERY object under sources/ -- one line per object,
+  # "<name> <generation> <size>" (scripts/sync-content.sh). Deleting an object
+  # removes its line, so the hash changes just as surely as adding or replacing
+  # one does. This is deliberate: a fingerprint built from "the newest object"
+  # or "the latest published timestamp" would NOT change when an item is
+  # withdrawn, and a withdrawn item that leaves the site looking unchanged is a
+  # defect (ADR-0007 Risks: "a fingerprint that misses deletions would leave
+  # withdrawn content on the site").
+  #
+  # Only scheduled polls are eligible to skip. Pushes, PRs and manual runs
+  # always build -- they imply the inputs or the site code changed, which the
+  # fingerprint alone would not catch, and workflow_dispatch is the owner's
+  # "publish now" escape hatch.
   check:
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: read # checkout, for scripts/sync-content.sh
+      id-token: write # the GitHub OIDC token exchanged through WIF (ADR-0007 decision 7)
     outputs:
       changed: ${{ steps.compare.outputs.changed }}
-      fingerprint: ${{ steps.compare.outputs.fingerprint }}
+      use_bucket: ${{ steps.mode.outputs.use_bucket }}
+      content_fingerprint: ${{ steps.compare.outputs.content_fingerprint }}
+      cv_fingerprint: ${{ steps.compare.outputs.cv_fingerprint }}
     steps:
-      - name: Compare cv release against the deployed build
-        id: compare
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      # One decision, made once and reused by every job below, so the poll and
+      # the builds can never disagree about where the content came from.
+      - name: Decide which CV data source this run uses
+        id: mode
+        env:
+          CONTENT_BUCKET: ${{ vars.GCP_CONTENT_BUCKET }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          GCP_DEPLOY_SA: ${{ vars.GCP_DEPLOY_SA }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          USE_BUCKET=true
+          REASON=""
+          if [ -z "${CONTENT_BUCKET}" ]; then
+            USE_BUCKET=false
+            REASON="vars.GCP_CONTENT_BUCKET is not set (Checkpoint 3 has not been run yet)"
+          elif [ -z "${GCP_PROJECT_ID}" ] || [ -z "${GCP_WIF_PROVIDER}" ] || [ -z "${GCP_DEPLOY_SA}" ]; then
+            USE_BUCKET=false
+            REASON="GCP_CONTENT_BUCKET is set but GCP_PROJECT_ID, GCP_WIF_PROVIDER or GCP_DEPLOY_SA is not (see infra/README.md)"
+          elif [ "${EVENT_NAME}" = "pull_request" ]; then
+            USE_BUCKET=false
+            REASON="a pull_request run carries refs/pull/<n>/merge, and the deploy binding admits only refs/heads/main (infra/wif.tf), so it cannot read the bucket"
+          fi
+          echo "use_bucket=${USE_BUCKET}" >> "$GITHUB_OUTPUT"
+          if [ "${USE_BUCKET}" = "true" ]; then
+            echo "::notice::CV data source: the content bucket (the Phase 2 contract path)."
+          else
+            echo "::notice::CV data source: the cv GitHub release (fallback) -- ${REASON}."
+          fi
+
+      # Writes an external_account credentials file and exports
+      # GOOGLE_APPLICATION_CREDENTIALS; token_format: access_token additionally
+      # mints the OAuth token the sync script uses directly. A scheduled run
+      # carries ref refs/heads/main, so the existing binding admits it and no
+      # new binding is needed (ADR-0007 decision 7).
+      - name: Authenticate to Google Cloud
+        id: auth
+        if: steps.mode.outputs.use_bucket == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          token_format: access_token
+
+      # Two object operations and nothing else: objects.list to enumerate, and
+      # (in the build jobs) objects.get to download. The hub's grant is
+      # roles/storage.objectViewer on the bucket, which does NOT include
+      # storage.buckets.get, so nothing here reads bucket metadata.
+      - name: Fingerprint the content bucket
+        id: bucket
+        if: steps.mode.outputs.use_bucket == 'true'
+        env:
+          GCS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          CONTENT_BUCKET: ${{ vars.GCP_CONTENT_BUCKET }}
+        run: |
+          FP="$(site/scripts/sync-content.sh --fingerprint --bucket "${CONTENT_BUCKET}")"
+          echo "content_fingerprint=${FP}" >> "$GITHUB_OUTPUT"
+          echo "content fingerprint: ${FP}"
+
+      - name: Fingerprint the cv release
+        id: release
+        if: steps.mode.outputs.use_bucket != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          FP=$(gh release view latest --repo djjay0131/cv --json assets \
+            --jq '[.assets[] | "\(.name):\(.updatedAt)"] | sort | join(",")')
+          echo "cv_fingerprint=${FP}" >> "$GITHUB_OUTPUT"
+          echo "cv release fingerprint: ${FP}"
+
+      - name: Compare against the deployed build
+        id: compare
+        env:
           EVENT_NAME: ${{ github.event_name }}
+          USE_BUCKET: ${{ steps.mode.outputs.use_bucket }}
+          CONTENT_FINGERPRINT: ${{ steps.bucket.outputs.content_fingerprint }}
+          CV_FINGERPRINT: ${{ steps.release.outputs.cv_fingerprint }}
           # SEAM-5: read the deployed build info from SITE_URL when the owner has
           # set it, else from GitHub Pages.
           SITE_URL: ${{ vars.SITE_URL }}
         run: |
-          FP=$(gh release view latest --repo djjay0131/cv --json assets \
-            --jq '[.assets[] | "\(.name):\(.updatedAt)"] | sort | join(",")')
-          echo "fingerprint=${FP}" >> "$GITHUB_OUTPUT"
-          echo "cv release fingerprint: ${FP}"
+          echo "content_fingerprint=${CONTENT_FINGERPRINT}" >> "$GITHUB_OUTPUT"
+          echo "cv_fingerprint=${CV_FINGERPRINT}" >> "$GITHUB_OUTPUT"
+
+          if [ "${USE_BUCKET}" = "true" ]; then
+            FIELD="content_fingerprint"
+            CURRENT="${CONTENT_FINGERPRINT}"
+          else
+            FIELD="cv_fingerprint"
+            CURRENT="${CV_FINGERPRINT}"
+          fi
 
           if [ "${EVENT_NAME}" != "schedule" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -77,13 +205,16 @@ jobs:
 
           # A missing or unreadable build-info.json (first run after this
           # lands, or a failed deploy) falls through to "changed" and builds.
+          # So does a deployed build recorded against the OTHER source: after
+          # Checkpoint 3 the first scheduled poll finds no content_fingerprint
+          # and rebuilds once, which is correct.
           DEPLOYED=$(curl -sfL "${DEPLOYED_SITE}/build-info.json" \
-            | jq -r '.cv_fingerprint // ""' 2>/dev/null || true)
-          echo "deployed fingerprint: ${DEPLOYED:-<none>}"
+            | jq -r ".${FIELD} // \"\"" 2>/dev/null || true)
+          echo "deployed ${FIELD}: ${DEPLOYED:-<none>}"
 
-          if [ -n "${DEPLOYED}" ] && [ "${DEPLOYED}" = "${FP}" ]; then
+          if [ -n "${DEPLOYED}" ] && [ "${DEPLOYED}" = "${CURRENT}" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::cv release unchanged since the deployed build; skipping build and deploy."
+            echo "::notice::published content unchanged since the deployed build; skipping build and deploy."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
@@ -154,6 +285,85 @@ jobs:
             *) echo "::error file=${FILE}::budget check could not run (perl exit ${RC})."; exit 1 ;;
           esac
 
+      # Chief Reviewer S6. Every tracked *.sh beginning with a shebang must be
+      # committed executable. This repository is developed on a DrvFs mount that
+      # reports every file as 0777, so a 100644 script runs perfectly locally and
+      # fails on the runner with exit 126 -- which is exactly how sync-content.sh
+      # broke this workflow. The rule asks how a file declares itself, not how its
+      # path is spelled, so it has no false-positive class: a spelling-based scan
+      # produced twelve false hits against one real defect, and a noisy guard gets
+      # switched off.
+      - name: Check every shebang script is committed executable
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'PY'
+          import subprocess, sys
+          out = subprocess.run(["git", "ls-tree", "-r", "HEAD"],
+                               capture_output=True, text=True, check=True).stdout
+          bad = []
+          for line in out.splitlines():
+              meta, path = line.split("\t", 1)
+              mode = meta.split()[0]
+              if not path.endswith(".sh"):
+                  continue
+              try:
+                  with open(path, "rb") as fh:
+                      if fh.read(2) != b"#!":
+                          continue
+              except OSError:
+                  continue
+              if mode != "100755":
+                  bad.append((mode, path))
+          for mode, path in bad:
+              print(f"::error file={path}::{path} begins with a shebang but is committed "
+                    f"{mode}. Invoking it directly fails on Linux with exit 126. "
+                    f"Fix: git update-index --chmod=+x {path}")
+          if bad:
+              sys.exit(1)
+          print("OK: every shebang-bearing *.sh is committed 100755.")
+          PY
+
+      # Chief Reviewer S5, and the infra stream's own recommendation. These are the
+      # two invariants that fail OPEN rather than loudly:
+      #   - without uniform bucket-level access an IAM condition does not apply at
+      #     all, so every satellite's prefix binding silently widens to the whole
+      #     bucket, with nothing anywhere looking different;
+      #   - storage.objects.list cannot be restricted by prefix, so a satellite
+      #     granted it could enumerate every other source's object names -- in
+      #     Phase 3, the private ones.
+      # Neither produces an error, which is why they are asserted here rather than
+      # trusted to review. Same reasoning as the budget check above.
+      - name: Check the satellite boundary invariants are declared
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'PY'
+          import re, sys
+          fail = False
+
+          storage = re.sub(r"#[^\n]*", "", open("infra/storage.tf", encoding="utf-8").read())
+          if not re.search(r"\buniform_bucket_level_access\s*=\s*true\b", storage):
+              print("::error file=infra/storage.tf::google_storage_bucket.content must set "
+                    "uniform_bucket_level_access = true. Without it no IAM condition applies, "
+                    "and every satellite prefix binding covers the whole bucket "
+                    "(ADR-0007 decision 8).")
+              fail = True
+
+          role = re.sub(r"#[^\n]*", "", open("infra/satellite-role.tf", encoding="utf-8").read())
+          block = re.search(r"permissions\s*=\s*\[(.*?)\]", role, re.S)
+          perms = sorted(re.findall(r'"([^"]+)"', block.group(1))) if block else []
+          want = ["storage.objects.create", "storage.objects.delete", "storage.objects.get"]
+          if perms != want:
+              print(f"::error file=infra/satellite-role.tf::satellite_publisher must grant "
+                    f"exactly {want} -- got {perms}. storage.objects.list in particular cannot "
+                    f"be restricted to a prefix (ADR-0007 decision 4).")
+              fail = True
+
+          if fail:
+              sys.exit(1)
+          print("OK: UBLA declared, and the satellite role holds exactly its three permissions.")
+          PY
+
+
   # Exercises firebase-deploy's locked install without any credential (delta
   # review B3). firebase-deploy is skipped on pull requests and dormant until
   # the GitHub Actions variables are set, so otherwise its install step would
@@ -198,6 +408,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      id-token: write # the GitHub OIDC token exchanged through WIF to read the bucket
     defaults:
       run:
         working-directory: site
@@ -214,8 +425,31 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      # SEAM-2: the one place that downloads the CV data and PDFs.
-      - name: Fetch CV data and PDF
+      # Checkout comes first: auth writes its credentials file into the
+      # workspace, and a later checkout would delete it.
+      - name: Authenticate to Google Cloud
+        id: auth
+        if: needs.check.outputs.use_bucket == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          token_format: access_token
+
+      # SEAM-2/SEAM-4: the one place that reads the content bucket.
+      - name: Sync published content from the content bucket
+        if: needs.check.outputs.use_bucket == 'true'
+        env:
+          GCS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          CONTENT_BUCKET: ${{ vars.GCP_CONTENT_BUCKET }}
+        run: bash scripts/sync-content.sh --bucket "${CONTENT_BUCKET}"
+
+      # Fallback source. Produces the same tree and the same manifest; see the
+      # header. Never runs once the bucket is configured and the run can
+      # authenticate.
+      - name: Fetch the CV payload from the cv release
+        if: needs.check.outputs.use_bucket != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/fetch-data.sh
@@ -225,13 +459,17 @@ jobs:
       # scheduled poll compares against. jq handles the quoting.
       - name: Record build info
         env:
-          CV_FINGERPRINT: ${{ needs.check.outputs.fingerprint }}
+          CONTENT_FINGERPRINT: ${{ needs.check.outputs.content_fingerprint }}
+          CV_FINGERPRINT: ${{ needs.check.outputs.cv_fingerprint }}
+          CONTENT_SOURCE: ${{ needs.check.outputs.use_bucket == 'true' && 'bucket' || 'cv-release' }}
         run: |
           jq -n \
+            --arg content "${CONTENT_FINGERPRINT}" \
             --arg fp "${CV_FINGERPRINT}" \
+            --arg src "${CONTENT_SOURCE}" \
             --arg sha "${GITHUB_SHA}" \
             --arg run "${GITHUB_RUN_ID}" \
-            '{cv_fingerprint: $fp, built_from_sha: $sha, run_id: $run}' \
+            '{content_fingerprint: $content, cv_fingerprint: $fp, content_source: $src, built_from_sha: $sha, run_id: $run}' \
             > public/build-info.json
           cat public/build-info.json
 
@@ -250,7 +488,6 @@ jobs:
       # SEAM-7: fail before the upload (and so before deploy) when a smoke-test
       # route has no file in site/dist-public.
       - name: Check smoke-test routes exist (GitHub Pages variant)
-        working-directory: site
         run: npm run check:smoke-routes
 
       - name: Upload Pages artifact
@@ -262,8 +499,8 @@ jobs:
   # separate job (SEAM-5), so nothing here is a new failure point for the Pages
   # path (SEAM-4). It runs on pull requests, which validate both variants and
   # upload nothing, and on the deploy path only once the owner has set
-  # vars.GCP_PROJECT_ID. Until then an unconfigured push, dispatch or schedule
-  # runs exactly the jobs it ran before this workflow gained Firebase.
+  # vars.GCP_PROJECT_ID. Until then an unconfigured push or schedule runs
+  # exactly the jobs it ran before this workflow gained Firebase.
   build-firebase:
     needs: check
     if: >-
@@ -272,6 +509,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      id-token: write # the GitHub OIDC token exchanged through WIF to read the bucket
     defaults:
       run:
         working-directory: site
@@ -288,23 +526,45 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      # SEAM-2: the one place that downloads the CV data and PDFs.
-      - name: Fetch CV data and PDF
+      - name: Authenticate to Google Cloud
+        id: auth
+        if: needs.check.outputs.use_bucket == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          token_format: access_token
+
+      # SEAM-2/SEAM-4: the one place that reads the content bucket.
+      - name: Sync published content from the content bucket
+        if: needs.check.outputs.use_bucket == 'true'
+        env:
+          GCS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          CONTENT_BUCKET: ${{ vars.GCP_CONTENT_BUCKET }}
+        run: bash scripts/sync-content.sh --bucket "${CONTENT_BUCKET}"
+
+      - name: Fetch the CV payload from the cv release
+        if: needs.check.outputs.use_bucket != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/fetch-data.sh
 
-      # Same build-info.json as the Pages build: the fingerprint comes from the
+      # Same build-info.json as the Pages build: the fingerprints come from the
       # check job, the SHA and run id from this run.
       - name: Record build info
         env:
-          CV_FINGERPRINT: ${{ needs.check.outputs.fingerprint }}
+          CONTENT_FINGERPRINT: ${{ needs.check.outputs.content_fingerprint }}
+          CV_FINGERPRINT: ${{ needs.check.outputs.cv_fingerprint }}
+          CONTENT_SOURCE: ${{ needs.check.outputs.use_bucket == 'true' && 'bucket' || 'cv-release' }}
         run: |
           jq -n \
+            --arg content "${CONTENT_FINGERPRINT}" \
             --arg fp "${CV_FINGERPRINT}" \
+            --arg src "${CONTENT_SOURCE}" \
             --arg sha "${GITHUB_SHA}" \
             --arg run "${GITHUB_RUN_ID}" \
-            '{cv_fingerprint: $fp, built_from_sha: $sha, run_id: $run}' \
+            '{content_fingerprint: $content, cv_fingerprint: $fp, content_source: $src, built_from_sha: $sha, run_id: $run}' \
             > public/build-info.json
           cat public/build-info.json
 
@@ -319,7 +579,6 @@ jobs:
       # SEAM-7: fail before any upload when a smoke-test route has no file in
       # site/dist-public.
       - name: Check smoke-test routes exist (Firebase Hosting variant)
-        working-directory: site
         run: npm run check:smoke-routes
 
       # Only the deploy path consumes the artifact; a pull request stores none.
@@ -430,7 +689,7 @@ jobs:
       # WIF deploys (firebase/firebase-tools#10716, nodejs/node#63989; fixed in
       # 22.23.1). An exact pin avoids it without floating the deploy runtime:
       # the version changes only by a reviewed commit. (The build jobs keep
-      # node-version: 22; they hold no cloud credential.)
+      # node-version: 22; the token they hold reads one bucket and cannot write.)
       - name: Set up Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:

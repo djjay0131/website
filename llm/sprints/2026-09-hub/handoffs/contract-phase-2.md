@@ -1,0 +1,586 @@
+# Handoff: Publishing-Contract Implementation Engineer — Phase 2
+
+Status: Complete
+Last updated: 2026-09-16
+Owner: Publishing-Contract Implementation Engineer (Specialist 1)
+Contract: `llm/sprints/2026-09-hub/contracts/contract-phase-2.md`
+Branch: `feat/publishing-contract` · Issue #16
+
+## Summary
+
+`contract/` now holds the whole satellite interface: a strict JSON Schema for the
+manifest, the design doc §4 example and twelve invalid fixtures, a
+dependency-free validator, a runnable check proving the schema accepts the one
+and rejects the twelve, a composite publish action, and a reference README.
+
+The publish action validates in three steps — schema, path containment, source
+agreement — **before** it authenticates, so a malformed or malicious manifest is
+rejected before a credential is minted and before a single byte is uploaded. It
+then authenticates with `google-github-actions/auth` and uploads with
+`google-github-actions/upload-cloud-storage`, both pinned by full commit SHA.
+
+**No step requires `storage.objects.list`.** Nothing in the action lists, globs
+remotely, syncs, or enumerates the bucket. `gcloud storage cp --recursive` and
+`gsutil rsync` are absent, and the README records why they can never appear here.
+
+The action takes no GitHub token and fires no `repository_dispatch`. It declares
+no `permissions:` of its own — a composite action cannot — and the README states
+that the caller must grant `id-token: write`.
+
+### Files delivered
+
+| File | Deliverable |
+|---|---|
+| `contract/manifest.schema.json` | D1 |
+| `contract/examples/manifest.example.json` | D2 (design doc §4, verbatim) |
+| `contract/examples/invalid/manifest-missing-required-field.json` | D2 |
+| `contract/examples/invalid/item-missing-required-field.json` | D2 |
+| `contract/examples/invalid/section-out-of-set.json` | D2 |
+| `contract/examples/invalid/format-out-of-set.json` | D2 |
+| `contract/examples/invalid/visibility-out-of-set.json` | D2 |
+| `contract/examples/invalid/duplicate-slug.json` | D2 |
+| `contract/examples/invalid/path-escapes-dist-parent-segment.json` | D2 |
+| `contract/examples/invalid/path-escapes-dist-absolute.json` | D2 |
+| `contract/examples/invalid/data-item-without-schema-version.json` | D2 |
+| `contract/examples/invalid/schema-version-on-non-data-item.json` | D2 |
+| `contract/examples/invalid/unknown-top-level-field.json` | D2 |
+| `contract/examples/invalid/unknown-item-field.json` | D2 |
+| `contract/publish/action.yml` | D3 |
+| `contract/README.md` | D4 |
+| `contract/validate-manifest.mjs` | D3/D5 — the validator both the action and the hub call |
+| `contract/test/validate.test.mjs` | D5 |
+| `contract/package.json`, `contract/package-lock.json` | D5 — ajv 8.18.0, devDependency, locked |
+| `llm/sprints/2026-09-hub/handoffs/contract-phase-2.md` | D6 (this file) |
+
+Nothing outside `contract/**` and this handoff was created or edited.
+`contract/node_modules/` is covered by the root `.gitignore`'s `node_modules/`
+rule (`git check-ignore -v` → `.gitignore:1:node_modules/`).
+
+### How the pieces fit
+
+`manifest.schema.json` is strict, standard draft 2020-12 with **no custom
+keywords**, so any conformant validator enforces exactly what it says — which is
+what makes SEAM-1's "both ends validate against it" true rather than aspirational.
+
+`validate-manifest.mjs` has **no runtime dependencies**, deliberately. It runs
+inside a satellite's workflow, and forcing an `npm ci` into every publish would
+put a supply-chain step into repositories the hub does not control. It contains a
+small interpreter for exactly the JSON Schema keywords this schema uses, and it
+**throws** on any keyword it does not implement, so the schema can never quietly
+outgrow it. ajv is a devDependency used only by the test suite, which validates
+every fixture with **both** implementations and asserts they agree. That is what
+lets the action ship without ajv while still being bound by the schema.
+
+## Validation results
+
+All commands were run locally. **No command touched a cloud resource, and no
+credential was created or used.** No `git` or `gh` mutation was run.
+
+### D5 — the schema accepts the example and rejects every invalid fixture
+
+`cd contract && npm ci && npm test` → **54 tests, 54 pass, 0 fail.**
+
+```
+ℹ tests 54
+ℹ suites 0
+ℹ pass 54
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1697.513538
+```
+
+Accepted:
+
+```
+  examples/manifest.example.json: ACCEPTED by both validators
+```
+
+Rejected, with the actual error text per fixture (the layer that rejected it in
+parentheses):
+
+```
+  data-item-without-schema-version.json: REJECTED (json-schema)
+    items[0].schema_version: missing required field "schema_version" on items[0]
+  duplicate-slug.json: REJECTED (contract-rule)
+    items[1].slug: duplicate slug "committee-dossier" — items[0] already uses it, and slug must be unique within a manifest
+  format-out-of-set.json: REJECTED (json-schema)
+    items[0].format: "format" must be one of "md", "mdx", "html", "pdf", "bundle", "data" (got "docx")
+  item-missing-required-field.json: REJECTED (json-schema)
+    items[0].date: missing required field "date" on items[0]
+  manifest-missing-required-field.json: REJECTED (json-schema)
+    published: missing required field "published" on the manifest
+  path-escapes-dist-absolute.json: REJECTED (json-schema)
+    items[0].path: "path" does not match the required pattern ^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[^\\-]+$ (got "/etc/passwd")
+  path-escapes-dist-parent-segment.json: REJECTED (json-schema)
+    items[0].path: "path" does not match the required pattern ^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[^\\-]+$ (got "../../.git/config")
+  schema-version-on-non-data-item.json: REJECTED (json-schema)
+    items[0]: must not carry the field(s) "schema_version" — only a format: data item may (ADR-0008 decision 5)
+  section-out-of-set.json: REJECTED (json-schema)
+    items[0].section: "section" must be one of "research", "projects", "writing", "cv", "phd" (got "notes")
+  unknown-item-field.json: REJECTED (json-schema)
+    items[0].redirect_to: unknown field "redirect_to" on items[0] — the manifest schema declares no such field and additionalProperties is false
+  unknown-top-level-field.json: REJECTED (json-schema)
+    dispatch_token: unknown field "dispatch_token" on the manifest — the manifest schema declares no such field and additionalProperties is false
+  visibility-out-of-set.json: REJECTED (json-schema)
+    items[0].visibility: "visibility" must be one of "public", "private" (got "secret")
+```
+
+Path containment, unit-tested against a real directory tree (SEAM-7):
+
+```
+  absolute path: items[0].path: path "/etc/passwd" is absolute; path is relative to dist/ and must not escape it
+  parent segment: items[0].path: path "../outside/secrets.txt" contains a ".." segment; path is relative to dist/ and must not escape it
+  symlink escape: items[0].path: path "escape.html" resolves outside dist/ (a symlink leads to /tmp/hub-contract-NBq2Wn/outside/secrets.txt); path must stay inside dist/
+  source mismatch: source: the manifest's "source" is "phd-milestones" but the action was called with source: "cv"; they must be identical, because the upload prefix comes from the input
+```
+
+A path inside `dist/` and a symlink that stays inside `dist/` are both accepted;
+a path that does not exist under `dist/` is rejected.
+
+### End-to-end simulation of the action's steps (a), (b), (c)
+
+Run with `ACTION_PATH` set exactly as `github.action_path` would be
+(`contract/publish`), against a fixture `dist/` tree:
+
+```
+########## HAPPY PATH: steps (a) (b) (c) as action.yml runs them ##########
+Manifest check "schema" passed (dist/manifest.json).
+  -> exit=0
+Manifest check "paths" passed (dist/manifest.json).
+  -> exit=0
+Manifest check "source" passed (dist/manifest.json).
+  -> exit=0
+
+########## STEP (b) rejects a symlink that leaves dist/ ##########
+Manifest check "schema" passed (dist/manifest.json).
+  schema -> exit=0
+
+Manifest check "paths" FAILED with 1 error(s):
+  items[0].path: path "escape.html" resolves outside dist/ (a symlink leads to /tmp/.../sat/outside/secrets.txt); path must stay inside dist/
+
+The manifest was rejected before anything was uploaded. See contract/README.md.
+  paths  -> exit=1
+
+########## STEP (c) rejects a source that does not match the input ##########
+
+Manifest check "source" FAILED with 1 error(s):
+  source: the manifest's "source" is "phd-milestones" but the action was called with source: "cv"; they must be identical, because the upload prefix comes from the input
+
+The manifest was rejected before anything was uploaded. See contract/README.md.
+  -> exit=1
+
+########## A missing manifest.json is rejected ##########
+
+No manifest at dist/manifest.json. A satellite publishes a finished dist/ whose root contains manifest.json. See contract/README.md.
+  -> exit=1
+```
+
+Note the second block: a symlink escape passes the **schema** check and is caught
+by the **path** check. That is exactly why step (b) exists — the schema's pattern
+sees text, only the filesystem knows where a symlink points.
+
+### actionlint
+
+`actionlint` 1.7.12 (via `docker run --rm -v "$PWD:/repo" -w /repo
+rhysd/actionlint:latest -color`) **cannot lint a composite action metadata file**.
+It parses every file it is given as a *workflow*, so the run on
+`contract/publish/action.yml` reports only that the file is not a workflow:
+
+```
+contract/publish/action.yml:27:1: "jobs" section is missing in workflow [syntax-check]
+contract/publish/action.yml:27:1: "on" section is missing in workflow [syntax-check]
+contract/publish/action.yml:28:1: unexpected key "description" for "workflow" section. expected one of "concurrency", "defaults", "env", "jobs", "name", "on", "permissions", "run-name" [syntax-check]
+contract/publish/action.yml:32:1: unexpected key "author" for "workflow" section. ...
+contract/publish/action.yml:34:1: unexpected key "branding" for "workflow" section. ...
+contract/publish/action.yml:38:1: unexpected key "inputs" for "workflow" section. ...
+contract/publish/action.yml:67:1: unexpected key "runs" for "workflow" section. ...
+exit=1
+```
+
+Every one of those seven messages says "this is an action, not a workflow". The
+tool was working: the same actionlint run against the repository's real workflows
+exits 0.
+
+So the action's **steps** were linted for real, by generating a synthetic
+reusable workflow *from the action file itself* (parsing `action.yml` and lifting
+`runs.steps` verbatim into a `workflow_call` job) and linting that, shellcheck
+included:
+
+```
+synthetic workflow generated from the real action.yml steps: 5 steps
+=== actionlint (with shellcheck) on the synthetic workflow ===
+exit=0
+```
+
+Clean. The first pass of that harness produced one finding, which was an artifact
+of the harness and not of the action:
+
+```
+.github/workflows/publish-steps.yml:9:18: input "dist" of workflow_call event has the default value "./dist", but it is also required. if an input is marked as required, its default value will never be used [events]
+```
+
+`workflow_call` inputs forbid `required` with a `default`; **composite action
+inputs do not** — GitHub does not enforce `required` on action inputs, and a
+default there is used when the caller omits the input. `dist: './dist'` with
+`required: true` is correct for an action and matches how `docs/satellites.md`
+documents the call. The harness was regenerated without the `required` flag, and
+the steps then lint clean.
+
+### YAML and JSON parses
+
+`contract/publish/action.yml` parses, and its shape is what the contract
+specifies:
+
+```
+YAML parse: OK
+name: Publish to the research hub
+inputs: dist, source, project_id, workload_identity_provider, service_account, bucket
+runs.using: composite
+permissions key present: false
+ step 1 "Validate the manifest against the hub schema" shell bash
+ step 2 "Verify every item path stays inside dist/" shell bash
+ step 3 "Verify the manifest source matches the declared source" shell bash
+ step 4 "Authenticate to Google Cloud through Workload Identity Federation" uses google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+ step 5 "Upload dist/ to the content bucket" uses google-github-actions/upload-cloud-storage@6397bd7208e18d13ba2619ee21b9873edc94427a
+destination: ${{ inputs.bucket }}/sources/${{ inputs.source }}
+parent/gzip/gcloudignore: false false false
+```
+
+Every `.json` under `contract/` (excluding `node_modules/`) parses:
+
+```
+OK   contract/examples/invalid/data-item-without-schema-version.json
+OK   contract/examples/invalid/duplicate-slug.json
+OK   contract/examples/invalid/format-out-of-set.json
+OK   contract/examples/invalid/item-missing-required-field.json
+OK   contract/examples/invalid/manifest-missing-required-field.json
+OK   contract/examples/invalid/path-escapes-dist-absolute.json
+OK   contract/examples/invalid/path-escapes-dist-parent-segment.json
+OK   contract/examples/invalid/schema-version-on-non-data-item.json
+OK   contract/examples/invalid/section-out-of-set.json
+OK   contract/examples/invalid/unknown-item-field.json
+OK   contract/examples/invalid/unknown-top-level-field.json
+OK   contract/examples/invalid/visibility-out-of-set.json
+OK   contract/examples/manifest.example.json
+OK   contract/manifest.schema.json
+OK   contract/package-lock.json
+OK   contract/package.json
+```
+
+### Pin verification (read-only, public GitHub API)
+
+Both SHAs in the contract were verified to be the tags they claim:
+
+- `google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093` →
+  `refs/tags/v3`, `refs/tags/v3.0.0`
+- `google-github-actions/upload-cloud-storage@6397bd7208e18d13ba2619ee21b9873edc94427a`
+  → `refs/tags/v3`, `refs/tags/v3.0.0`; commit message `Release: v3.0.0 (#399)`
+
+ADR-0007's `list`-free property was **re-verified at the pinned SHA**, not taken
+on trust: `src/main.ts`, `src/client.ts` and `src/util.ts` contain no `getFiles`
+call. `src/util.ts` imports `fast-glob` (local expansion) and `src/client.ts`
+uploads per file with `storageBucket.upload(source, uploadOpts)`. The README
+carries the exact re-verification command for the next bump.
+
+### Governance checks
+
+`node <canon>/plugin/scripts/governance-checks.mjs --layout` →
+`4 of 4 checks passed, 0 failed` (`governance-links`, `adr-index`, `adr-status`,
+`layout`).
+
+## Acceptance criteria in scope
+
+| Criterion (roadmap §phase-2-contract) | Status | Evidence |
+|---|---|---|
+| The schema accepts the §4 example manifest | **Met** | `the design doc §4 example manifest is accepted` passes under both ajv and the interpreter |
+| It rejects a manifest whose `section` is outside the fixed set | **Met** | `section-out-of-set.json` → `"section" must be one of …(got "notes")` |
+| It rejects a manifest whose `format` is outside the fixed set | **Met** | `format-out-of-set.json` → `"format" must be one of …(got "docx")` |
+| It rejects a manifest whose `visibility` is outside the fixed set | **Met** | `visibility-out-of-set.json` → `"visibility" must be one of …(got "secret")` |
+| It rejects a manifest missing a required field | **Met** | both `manifest-missing-required-field.json` and `item-missing-required-field.json` |
+| The publish action rejects a manifest whose `path` escapes `dist/` | **Met** | schema pattern rejects `..` and absolute; step (b) additionally rejects a symlink that leaves `dist/`, proven end to end above |
+| A manifest the JSON Schema rejects also fails the hub build | **Met on this side** | the fixtures are shared (SEAM-1); the hub-side half is the `site` stream's D7 |
+
+Definition of Done (canon §Implementation Work): approved issue (#16) and design
+authority (design doc §4, ADR-0002/0007/0008, roadmap) — yes; validation steps
+included and passing — yes; documentation updated (`contract/README.md`) — yes;
+data/security/privacy impacts documented — yes, in the README's permissions
+section and in Risks below. "Code reviewed through PR" and "memory bank updated"
+are the Lead Architect's and Chief Reviewer's to close.
+
+## Assumptions
+
+- **A-C1 — `manifest.json` lives at the root of `dist/`.** The action takes one
+  `dist` input and no manifest input, so it must have a single rule for where to
+  look. Putting the manifest at the `dist/` root also makes SEAM-2 come out right
+  with one upload: with `parent: false` the manifest lands at
+  `sources/<source>/manifest.json` and every item at `sources/<source>/<path>`,
+  exactly as SEAM-2 fixes them. `docs/satellites.md` does not state this; see
+  *Seam defects* below.
+- **A-C2 — ajv is an explicit devDependency at `contract/` level**, pinned to
+  `8.18.0` (the version already resolved in `site/node_modules`) and locked by a
+  committed `contract/package-lock.json`, following the `infra/deploy-tools`
+  precedent from Phase 1 review finding F5. It is **never** needed at publish
+  time and is never installed in a satellite's workflow.
+- **A-C3 — `schema_version` is a string** matching `^[0-9]+(\.[0-9]+){0,2}$`
+  (e.g. `"1"`). ADR-0008 fixes that the field exists and that the hub fails on a
+  value it does not understand, but not its type. As the sole author of the
+  interface I chose one. **This binds the `satellite-cv` and `site` streams**:
+  `cv` should emit `"schema_version": "1"` for `cv-data`, and the hub should claim
+  that value. Flagged prominently because the `satellite-cv` contract had not been
+  written when this was decided.
+- **A-C4 — `slug` is constrained to `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 64.** The
+  design doc says only "unique within source". A slug becomes a URL segment, and
+  an unconstrained one is a path-injection surface (`../`, `/`, an empty string).
+  Every slug in play — the §4 example's `committee-dossier`, and SEAM-5's
+  `academic`, `research-professional`, `anthropic-fellow`, `sde-long`, `cv-data` —
+  matches. The `site` stream must mirror this narrowing.
+- **A-C5 — an item's `path` must exist in `dist/`.** Step (b) cannot resolve a
+  symlink without resolving the path, and a manifest naming a file that is not
+  there would publish a broken reference. Non-existence is therefore an error.
+- **A-C6 — an empty `items` array is valid.** See open question (b).
+- **A-C7 — no manifest-level version field was added.** SEAM-1 fixes the required
+  top-level set at `source`, `published`, `items` and the optional item set at
+  `summary`, `tags`. Adding a field, even an optional one, would widen a binding
+  seam unilaterally. See open question (a) — it is a recommendation and an ADR
+  candidate, not a change made here.
+- **A-C8 — three upload options are set away from their defaults** (`parent:
+  false`, `gzip: false`, `process_gcloudignore: false`) and `predefinedAcl` is
+  deliberately left unset. Each is justified in a comment in `action.yml` and in
+  the README. `parent: false` is load-bearing for SEAM-2; the default would insert
+  a spurious `dist/` path segment.
+- **A-C9 — `node` is on `PATH` on the runner.** True on GitHub-hosted runners. The
+  README tells a self-hosted user to add `actions/setup-node` first.
+
+## Recommendations
+
+1. **The `site` stream must enforce slug uniqueness in its Zod mirror.** JSON
+   Schema draft 2020-12 cannot express "unique by property", so a conformant
+   validator *accepts* `duplicate-slug.json`. The test suite asserts that ajv does,
+   so nobody rediscovers it by accident. `validate-manifest.mjs` exports
+   `validateManifestShape()`, which enforces schema + uniqueness together — the
+   `site` stream can import it directly (it has no dependencies) rather than
+   reimplement the rule.
+2. **The `site` stream should import the fixtures, not copy them** —
+   `contract/examples/manifest.example.json` and
+   `contract/examples/invalid/*.json` (SEAM-1). Note that the §4 example is a
+   `visibility: private`, `section: phd` item: the *schema* must accept it in
+   Phase 2 even though private items are a Phase 3 capability. Rejecting `private`
+   at the schema layer would break the shared fixture.
+3. **`satellite-cv` should emit `manifest.json` at the root of `dist/`** and
+   `"schema_version": "1"` on the `cv-data` item (A-C1, A-C3).
+4. **Add one line to `docs/satellites.md` saying where `manifest.json` goes.**
+   Not mine to edit (SEAM-6). See *Seam defects*.
+5. **Wire `cd contract && npm ci && npm test` into CI.** `.github/workflows/**` is
+   the `site` stream's this phase and `ci.yml` is nobody's, so this is the Lead
+   Architect's call on placement. Without it, the schema and its fixtures are only
+   checked by hand.
+6. **Satellites must grant `id-token: write` on the calling job.** A composite
+   action cannot grant it. This is stated in `contract/README.md` and already in
+   `docs/satellites.md`.
+7. **Never bump `upload-cloud-storage` without re-running the `getFiles` check**
+   in `contract/README.md` §Bumping the pinned action SHAs. This is the single
+   assumption the whole permission model rests on, and its own README documents no
+   permission requirements at all.
+
+## Alternatives considered
+
+- **Run ajv inside the publish action** (`npm ci --prefix` the action path on
+  every publish). Rejected: it pushes a network install and a supply-chain step
+  into every satellite's workflow, on runners the hub does not control, for a
+  validation that a 300-line dependency-free interpreter does exactly as well.
+  The contract's own wording — "add it as an explicit **devDependency**" —
+  anticipated this split.
+- **Two validators, one for the action and one for the tests.** Rejected: silent
+  drift is the obvious failure mode. The chosen design has one validator and
+  cross-checks it against ajv on every fixture, so drift is a test failure.
+- **`uniqueItemProperties` from `ajv-keywords`** to express slug uniqueness in the
+  schema file. Rejected, and this is the most important rejection here: it is a
+  non-standard keyword, so every conformant validator — including any future
+  mirror, and any satellite owner's own tooling — would **silently ignore** it and
+  believe it had validated the manifest. A rule that is invisible to half its
+  enforcers is worse than a rule that is documented as external. The schema stays
+  pure draft 2020-12.
+- **`"format": "date-time"` / `"date"` instead of `pattern`.** Rejected: ajv
+  ignores or rejects unknown formats without `ajv-formats`, and a mirror may treat
+  `format` as an annotation rather than an assertion. A `pattern` asserts in every
+  validator with no extra dependency.
+- **One combined validation step** in the action instead of three. Rejected: three
+  named steps make the Actions log say which rule failed before anyone opens the
+  output, and they make the "validate before authenticate" ordering visible in the
+  UI rather than buried in a script.
+- **`gcloud storage cp --recursive` / `gsutil rsync`.** Forbidden by ADR-0007
+  decision 6 and SEAM-3; recursive copy requires `storage.objects.list`, the one
+  permission that cannot be prefix-restricted. Not used, not referenced except to
+  say why it cannot be.
+- **Post-upload verification of the object set.** Considered and found
+  impossible — see ADR candidates.
+
+## Risks
+
+1. **`upload-cloud-storage` could begin listing on a future version.** ADR-0007
+   records this; the mitigation is the SHA pin plus the re-verification procedure
+   now written into `contract/README.md`. Re-verified clean at the pinned SHA.
+2. **The dependency-free interpreter could diverge from the schema.** Mitigated
+   twice: it throws on any keyword it does not implement (so a schema change
+   cannot silently under-validate), and the test suite asserts ajv/interpreter
+   agreement on every fixture. Residual: a keyword both implement but interpret
+   differently. The fixture set is the guard.
+3. **Withdrawn bytes are never pruned from the bucket.** A satellite cannot list,
+   so the action cannot know what to delete. The manifest, not the object set, is
+   the authority on what a source publishes. This is correct and intended, but it
+   means a `visibility: private` item removed from a manifest in Phase 3 leaves
+   its bytes in the bucket until someone with `list` removes them. Worth an
+   explicit retention decision before Phase 3, not Phase 2 work.
+4. **`schema_version`'s type was chosen here, not by an ADR** (A-C3). If
+   `satellite-cv` or `site` wants an integer, it must be settled before either
+   ships, not after.
+5. **`actionlint` cannot gate `action.yml`.** Any CI job that "runs actionlint on
+   the contract action" would either fail permanently or pass vacuously. The
+   synthetic-workflow technique used here is reproducible but is not something to
+   hide inside CI without a comment explaining it.
+6. **The action depends on `node` and on `github.action_path`'s sibling
+   directory.** GitHub checks out the whole repository for a subdirectory action,
+   so `${GITHUB_ACTION_PATH}/../validate-manifest.mjs` resolves; this was
+   simulated locally but can only be confirmed for real at Checkpoint 3.
+
+## Open questions
+
+### (a) Does the manifest need a version field of its own, separate from a `data` item's `schema_version`?
+
+**Yes — eventually, and it must be introduced accept-first. Do not add it in
+Phase 2.**
+
+`schema_version` versions *one payload's shape* for one `(source, slug)` pair. It
+says nothing about the manifest itself: the fixed sets, the required fields, the
+path rules. Those will change — ADR-0008 changed them three weeks after the design
+doc was written, by adding `data` to a set the doc called fixed.
+
+The reason it matters more here than in a typical contract is
+`additionalProperties: false`. That is the right choice, and it makes evolution
+strictly ordered: a satellite **cannot** start sending a new field before the hub
+accepts it, because the hub would reject the manifest outright. So any version
+field must be introduced in two releases:
+
+1. The hub accepts an **optional** `manifest_version`, ignoring its value.
+2. Once every satellite emits it, the hub requires it.
+
+Adding it as required in one step would break every existing satellite; adding it
+today would widen SEAM-1's binding field list unilaterally, which a specialist
+must not do (A-C7). Hence: recommend, do not implement.
+
+Until then the de facto version is the `@main` ref satellites pin the action to,
+which is not a version at all — it is "whatever the hub has now". That is
+tolerable with two satellites and one repository owner, and it stops being
+tolerable at Phase 5's four. **Recommendation:** record the question as an ADR now
+(see ADR candidates), add optional `manifest_version` in Phase 3 alongside
+`phd-milestones` — the first publish that is not the owner's own proof case — and
+require it in Phase 5.
+
+### (b) How should a satellite publishing zero items behave — withdrawal of all its content, or an error?
+
+**Withdrawal. It is valid, and the schema accepts it** (`minItems` is deliberately
+absent; there is a test for it).
+
+Three reasons:
+
+1. **It is the only way to withdraw anything at all.** A satellite cannot list and
+   cannot prune, so its bytes are not what the hub renders — the manifest is. If
+   `items: []` were an error, a satellite could never retract content; it could
+   only ask the hub owner to do it by hand. That is worse for exactly the case
+   where speed matters: a private item published by mistake.
+2. **Treating it as an error makes the dangerous case the easy one.** A satellite
+   whose build produced nothing would have to be "fixed" by publishing something,
+   or by not publishing — and *not publishing* leaves stale content live. Silence
+   and withdrawal would then mean the same thing on the bucket but different
+   things on the site.
+3. **The unsafe case is a different one, and belongs to the hub.** The real hazard
+   is not an empty `items` array — it is a source whose manifest **disappears**,
+   which is indistinguishable from a sync failure. That is the `site` stream's
+   open question (b), and the answers should line up: an empty `items` array is a
+   deliberate, valid withdrawal; a **missing** manifest for a previously published
+   source should fail the hub build, because a publisher that means to withdraw
+   everything has a way to say so.
+
+One caveat for whoever builds the section pages: a `source` with zero items must
+render as an empty section, not as a 404 and not as a crash.
+
+## Seam defects and defects in files I do not own — reported, not fixed
+
+1. **`docs/satellites.md` does not say where `manifest.json` goes** (Lead
+   Architect's file, SEAM-6). It says "Produce a `dist/` folder and a
+   `manifest.json` in your build" and the design doc says "a finished `dist/`
+   plus a `manifest.json`" — both readable as "beside `dist/`". The action has one
+   `dist` input and no manifest input, so it cannot support both. Decided:
+   **`<dist>/manifest.json`** (A-C1). Suggested wording for the "Adding a
+   satellite" list, step 2: *"Produce a `dist/` folder whose root contains
+   `manifest.json`."*
+2. **SEAM-1 and contract D1 both state slug uniqueness as a schema property; JSON
+   Schema cannot express it.** SEAM-1 says "`slug` is unique within a `source`"
+   among the rules the schema fixes, and D1 says "`slug` unique within the
+   manifest". Draft 2020-12 has no "unique by property" keyword — `uniqueItems`
+   compares whole items only — and adding a non-standard keyword would be
+   invisible to the mirror that has to enforce the same rule. Implemented as a
+   named contract rule beside the schema, enforced by
+   `validate-manifest.mjs`, documented in `contract/README.md` and in the schema's
+   own `description`, and pinned by a test that asserts ajv accepts the duplicate.
+   **SEAM-1 should be amended to say who enforces it**, otherwise the `site`
+   stream may mirror the schema faithfully and still not catch a duplicate slug.
+3. **The seams do not fix `schema_version`'s type** (A-C3). SEAM-1 says a `data`
+   item "additionally requires `schema_version`"; ADR-0008 decision 5 says the
+   hub fails on a value it does not understand. Neither says whether it is a
+   string or a number. Chosen here as a string; `satellite-cv` and `site` must
+   agree.
+4. **Not a defect, but worth stating:** the §4 example that both ends must accept
+   is a `visibility: private`, `section: phd` item — Phase 3 content used as the
+   Phase 2 fixture. The schema must keep accepting `private` now even though no
+   private item may be *published* until Phase 3.
+
+Nothing in the design, the seams or the ADRs required a credential, a GitHub
+token, a `repository_dispatch`, a key file, or `storage.objects.list`. There was
+no point at which the upload appeared to need listing, so there was nothing to
+stop and escalate.
+
+## Related docs
+
+- `llm/sprints/2026-09-hub/contracts/contract-phase-2.md` — this contract
+- `llm/sprints/2026-09-hub/contracts/phase-2-seams.md` — SEAM-1, SEAM-2, SEAM-3,
+  SEAM-6, SEAM-7
+- `llm/governance/adr/0002-satellite-publishing-via-content-bucket-and-dispatch.md`
+  — the path-escape rule
+- `llm/governance/adr/0007-hub-polls-content-bucket-no-satellite-github-credential.md`
+  — decisions 4 and 6, and the Risks section
+- `llm/governance/adr/0008-manifest-data-format-hub-renders-cv.md` — `data` and
+  `schema_version`
+- `llm/specs/2026-09-10-research-hub-design.md` §3, §4 (as amended), §9, §12
+- `llm/master-roadmap.md` §phase-2-contract
+- `docs/satellites.md` — the satellite owner's how-to (not edited; see Seam
+  defects)
+- `contract/README.md` — the reference this handoff does not repeat
+
+## ADR candidates
+
+- **C20 — Manifest versioning.** Whether the manifest carries a version of its
+  own, and the accept-then-require migration that `additionalProperties: false`
+  forces. Recommendation and reasoning in open question (a). Decide before Phase 3
+  adds the second satellite.
+- **C21 — The publish action cannot verify what it uploaded.** Verifying the
+  uploaded object set means listing the prefix, and `storage.objects.list` cannot
+  be restricted to a prefix, so a satellite can never hold it (ADR-0007 decision
+  4). **The consequence is therefore permanent, and should be recorded as a
+  decision rather than discovered later:** a publish is confirmed only by the
+  absence of an upload error, per-object; a partial upload (some files written,
+  then a failure) leaves the prefix in a mixed state that the satellite cannot
+  detect or repair, and no satellite can ever prune a withdrawn object. The
+  compensating controls are that the manifest, not the object set, is the
+  authority on what exists, and that bucket versioning makes overwrites
+  recoverable. If end-to-end confirmation is ever needed, it has to come from the
+  hub side, which does hold `list`.
+- **C22 — Lexical constraints on `slug` and `path`.** The hub composes URLs and
+  filesystem paths from satellite-supplied strings. The constraints chosen here
+  (A-C4, and the `path` pattern) are narrowings the design doc does not state and
+  that every mirror must copy. Worth recording so they are not "simplified" away.
+- **C23 — Retention and withdrawal semantics for published objects.** Follows from
+  C21 and open question (b): who deletes a withdrawn object's bytes, and when.
+  Matters materially from Phase 3, when a withdrawn item may be private.

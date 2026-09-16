@@ -1,0 +1,19 @@
+# FIXTURE. Invented.
+variant: sde-long
+label: Software Engineering
+description: Fixture software-engineering variant. Not real content.
+sections:
+  - type: summary
+    content_id: industry
+  - type: employment
+    include:
+      - current-role
+      - previous-role
+  - type: education
+    include:
+      - bachelors
+  - type: skills
+    include:
+      - languages
+      - tools
+  - type: misc

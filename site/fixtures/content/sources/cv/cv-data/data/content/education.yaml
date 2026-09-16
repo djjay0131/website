@@ -1,0 +1,11 @@
+# FIXTURE. Invented.
+- id: doctorate
+  dates: 2023 - Present
+  degree: PhD, Fixture Studies
+  institution: Fixture University
+  location: Nowhere, ZZ
+- id: bachelors
+  dates: 2014 - 2018
+  degree: BS, Fixture Studies
+  institution: Fixture College
+  location: Nowhere, ZZ

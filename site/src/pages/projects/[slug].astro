@@ -2,10 +2,12 @@
 import ItemPage from "../../layouts/ItemPage.astro";
 import { loadContentPool } from "../../lib/cv-data";
 import { mdToHtml } from "../../lib/md";
+import { CV_CONTENT_DIR } from "../../lib/hub-content.mjs";
 import path from "node:path";
 
+// Synced from the content bucket (SEAM-5); the resolver is unchanged.
 export function getStaticPaths() {
-  const pool = loadContentPool(path.resolve("data/content"));
+  const pool = loadContentPool(path.resolve(CV_CONTENT_DIR));
   return Object.values(pool.projects).map((p) => ({
     params: { slug: p.id },
     props: { project: p },

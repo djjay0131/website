@@ -1,0 +1,16 @@
+{
+  "source": "phd-milestones",
+  "items": [
+    {
+      "slug": "committee-dossier",
+      "title": "External Committee Dossier",
+      "section": "phd",
+      "format": "html",
+      "path": "committee/index.html",
+      "visibility": "private",
+      "date": "2026-08-31",
+      "summary": "Twelve vetted external committee candidates, ranked.",
+      "tags": ["committee", "phd"]
+    }
+  ]
+}

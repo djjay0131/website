@@ -3,16 +3,18 @@ import Base from "../../layouts/Base.astro";
 import { loadCV, listVariants } from "../../lib/cv-data";
 import { parseBib } from "../../lib/bib";
 import { mdToHtml } from "../../lib/md";
+import { CV_BIB_PATH, CV_DATA_ROOT, CV_VARIANTS_DIR } from "../../lib/hub-content.mjs";
 import path from "node:path";
 
+// Synced from the content bucket (SEAM-5); the resolver is unchanged.
 export function getStaticPaths() {
-  const variants = listVariants(path.resolve("data/variants"));
+  const variants = listVariants(path.resolve(CV_VARIANTS_DIR));
   return variants.map((v) => ({ params: { variant: v } }));
 }
 
 const { variant } = Astro.params;
-const cv = loadCV(path.resolve("data"), variant!);
-const papers = parseBib(path.resolve("data/own-bib.bib"));
+const cv = loadCV(path.resolve(CV_DATA_ROOT), variant!);
+const papers = parseBib(path.resolve(CV_BIB_PATH));
 const pubSections = [
   { title: "Journal Articles", entries: papers.articles },
   { title: "Conference Proceedings", entries: papers.proceedings },

@@ -1,7 +1,7 @@
 # Research Hub — Orchestration State
 
 Status: Active
-Last updated: 2026-09-15
+Last updated: 2026-09-16
 Owner: Chief Architect (Lead Architect)
 
 **Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 for the work streams; **L3 for PR #12** (roadmap requirement changes — delta review 2, Part D)
@@ -15,10 +15,11 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 1 — Foundation. COMPLETE** (Checkpoint 2 passed 2026-09-15; PR #14 merged, issue #10
-closed). The hub is live at `https://jason.cusati.us`. **In progress:** the Email and Privacy
-pages (issue #13), which the owner requested. **Phase 2 has not started** and waits for the
-owner's go.
+**Phase 2 — Publishing contract. IN PROGRESS** (issue #16, branch `feat/publishing-contract`,
+owner's go 2026-09-16). Phase 1 is complete and the hub is live at `https://jason.cusati.us`;
+the Email and Privacy pages merged (PR #15) and are live. Phase 2 starts with ADR-0007 and
+ADR-0008, both accepted on this branch, and runs four streams across two repositories
+(`website` and `cv`) against `contracts/phase-2-seams.md`.
 
 ## Done
 
@@ -198,8 +199,48 @@ owner's go.
 
 ## In flight
 
-- **Email and Privacy pages PR** (#13): awaiting CI, then the Chief Reviewer
-  (`contracts/chief-reviewer-email-privacy-pages.md`), then the owner's merge.
+**Phase 2 (#16), draft PR #17, branch `feat/publishing-contract`.**
+
+Landed and committed:
+
+- Decisions: ADR-0007, ADR-0008, design doc §2/§3/§4 amendments, roadmap, delta (artifacts
+  slot `docs/` declared), `docs/satellites.md`, all six bounded contracts, memory bank.
+- **`contract` stream — DONE** (commit `0866222`). Schema, 12 invalid fixtures, dependency-free
+  validator, composite publish action, README. Verified by the Lead Architect: 54/54 tests on
+  re-run, no tracked file touched, every forbidden construct present only as a comment
+  explaining the prohibition. Handoff: `handoffs/contract-phase-2.md`.
+- **`infra` stream — DONE** (commit `7a2f238`). Content bucket, three-permission custom role,
+  `satellites` WIF pool, cv identity; 9 resources. Verified: UBLA true, prefix condition ends
+  in a slash, no `objects.list` grant anywhere, cv admitted at `refs/heads/master`,
+  `terraform fmt`/`validate` clean, `budget.tf` untouched. Handoff: `handoffs/infra-phase-2.md`.
+
+Running now — **do not relaunch either without first checking for its handoff in
+`handoffs/`:**
+
+- **`site` — DONE** (commit `9be8d98`). Collection mirroring the schema, CV repointed at the
+  synced payload, poll wiring, fixtures. Verified: the Pages build/deploy/smoke test all
+  survive per the owner's instruction, `repository_dispatch` gone, every action SHA-pinned,
+  bucket work gated on `vars.GCP_CONTENT_BUCKET`, no bucket-metadata call, `findDuplicateSlugs()`
+  implements the rule JSON Schema cannot express, mirror accepts `private`, tests 54 → 102, and
+  the CV renders **byte-identically** (SHA-256 per page, before and after). Handoff:
+  `handoffs/site-phase-2.md`.
+- **`satellite-cv` — DONE.** Committed and pushed to `cv` on branch `feat/publish-contract`.
+  Verified: the "Notify website repo" step is deleted (0 hits for `WEBSITE_DISPATCH_PAT`,
+  `WEBSITE_REPO`, `repository_dispatch` in `build-cv.yml`), publishing gated to
+  `refs/heads/master` on non-PR events, the owner's own `cv` checkout untouched. Handoff:
+  `handoffs/satellite-cv-phase-2.md`. **`cv` PR #13** is open for it (branch
+  `feat/publish-contract`, commit `d9b402d`), and **`cv` PR #14** carries the one-line
+  `bibtexparser<2` pin from Risk 15 (branch `fix/bibtexparser-pin`, commit `5ee7515`).
+  **#14 must merge before #13**, or `cv`'s CI stays red and its publish job cannot run.
+
+**All four implementation streams have landed.** The **Chief Reviewer** is now IN FLIGHT
+(`contracts/chief-reviewer-phase-2.md`), reviewing hub PR #17 at head `9be8d98` and `cv` PR #13
+together. On restart: do not relaunch it if
+`handoffs/chief-reviewer-phase-2.md` already exists.
+
+Remaining after the review: act on its findings, persist it verbatim to
+`handoffs/chief-reviewer-phase-2.md` and post it to PR #17, take #17 out of draft, then the
+owner runs Checkpoint 3 in the order recorded under §Follow-ups.
 
 ## Blocked
 
@@ -231,18 +272,17 @@ request and accepts the residual exposure ("it's fine leave it"). No further act
 
 ## Next
 
-Owner:
+Lead Architect: write the four specialist contracts, launch the streams in dependency order
+(`contract` → `infra`/`site` → `satellite-cv`), reconcile, draft PR, Chief Reviewer.
 
-1. Review the page wording on PR #15 and merge it (agents do not merge). Merging deploys
-   `/email/` and `/privacy/`.
-2. Say go for Phase 2 when ready. Its first step is the ADR for option A (the hub polls the
-   content bucket; satellites hold no GitHub credential), which also closes C1/K13.
-3. Optional: whether "OpenClaw" may stay on the two pre-existing research pages, where it names
-   a third-party agent harness in the literature review; and whether to delete the merged remote
-   branches.
+Owner, at Checkpoint 3: apply Terraform, set `GCP_CONTENT_BUCKET`, merge the hub PR, then the
+`cv` PR; a `cv` push then publishes through the contract and the CV appears on
+`jason.cusati.us`.
 
-Lead Architect, after the merge: verify both pages live on `jason.cusati.us`; then, on the
-owner's go, open hub-002 with Phase 2 contracts written from the ADR.
+Still open from earlier phases: whether "OpenClaw" may stay on the two pre-existing research
+pages (it names a third-party harness in the literature review); whether to delete the merged
+remote branches `gov/establish-hub`, `feat/foundation`, `admin/phase-0-bookkeeping`,
+`feat/email-privacy-pages`.
 
 ## Brief / design-doc / canon conflicts (owner decides at Checkpoint 1)
 
@@ -393,6 +433,15 @@ Phase 1's `firebase.json` carries no gate rewrites.
   enablement, the ADC quota project, the Terraform apply (under the review F1 provenance rule),
   the Actions variables and Hosting release retention. Still the owner's: DNS at the registrar
   (no registrar API credential), merges, and decisions.
+- **A20** — `cv` work happens in a git worktree on branch `feat/publish-contract`, created
+  from `origin/master`, so the owner's `cv` checkout (on `add-mit-to-all-variants`) is never
+  touched. The Lead Architect alone commits there, as in `website`.
+- **A21** — ADR-0008 amends design doc §4 rather than asking the owner. It is a decision, not
+  a §10 question, so per brief §0 it is taken conservatively and recorded as an ADR. It is
+  flagged for the owner at Checkpoint 3 because it weakens §3's independence property for one
+  named format, and the owner may prefer the `format: html` alternative despite its cost.
+- **A22** — The artifacts slot `docs/` is declared in this PR, which creates its first content
+  (`docs/satellites.md`), exactly as A1 said it would be.
 
 ## ADR candidates
 
@@ -441,6 +490,48 @@ Phase 1's `firebase.json` carries no gate rewrites.
   is authored in satellites; the hub renders it"). It also shares the root namespace with the
   Phase 2 `section` set (ADR-0002 Decision 4), so a future section named `email` would collide
   with a live OAuth homepage URL Google has on file (review B2).
+- **C1 — CLOSED 2026-09-16** by ADR-0007 (the publish-notification mechanism). Conflict K13
+  is closed with it.
+- **C19** — A second `data` source would make the hub carry a second first-party renderer.
+  ADR-0008 sets a high bar deliberately; revisit at Phase 5 when `agentic-kg` and
+  `construction-ai-proposal` arrive.
+- **C20** — Manifest versioning. `schema_version` versions one payload; the *contract itself*
+  also changes (ADR-0008 altered the "fixed" format set three weeks after the design doc). With
+  `additionalProperties: false`, a satellite cannot send a field before the hub accepts it, so
+  a `manifest_version` must land optional first and become required later. Recommended: ADR
+  now, optional in Phase 3, required in Phase 5.
+- **C21** — The publish action cannot verify what it uploaded, because verifying means listing
+  and satellites are denied `list` (ADR-0007). The consequence is permanent: a partial upload
+  leaves a mixed state no satellite can detect or prune.
+- **C22** — Lexical constraints on `slug` and `path`. `slug` becomes a URL segment, so the
+  contract stream constrained it to `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 64.
+- **C23** — Retention and withdrawal semantics for published objects. An empty `items` array is
+  the only way a satellite can retract content, since it cannot list and therefore cannot
+  prune. This matters from Phase 3, when a withdrawn item may be private.
+- **C24** — `schema_version` convention, raised by the `cv` stream and binding on both
+  repositories. The schema permits `1.2.3`, which invites compatibility reasoning the hub's
+  exact-match check does not implement; the recommendation is integers only, incremented one
+  at a time, and **bump the hub first** — a version published before the hub understands it
+  takes the hub build down, whereas bumping early is merely loud. The rule is now written in
+  `docs/satellites.md`; tightening the schema pattern to match is deferred because the `site`
+  stream is mirroring the current pattern as this is written, and desyncing the two ends
+  mid-flight is exactly the failure SEAM-1 exists to prevent.
+- **C25** — A bucket read grant usable from a pull-request ref. The hub's deploy binding admits
+  only `refs/heads/main`, so PR builds cannot read the content bucket and `fetch-data.sh` must
+  stay as their CV source. Options: a pool-level `principalSet`, or a second read-only service
+  account. Once it exists, the fallback can be deleted as the seams originally intended. This
+  is the single change that closes the largest remaining gap in the publishing design.
+- **C26 — CLOSED 2026-09-16** (owner moved it to Phase 5; roadmap updated). "Section pages render from collections" (roadmap Phase 2, brief §4) was not
+  implemented, and was not assigned in any of the four stream contracts. That is the Lead
+  Architect's omission. It also sits against this phase's requirement that rendered output must
+  not change, and with `cv` as the only satellite there is nothing a collection-driven section
+  page would show that the existing first-party pages do not. Owner's decision at Checkpoint 3:
+  accept the deferral to Phase 5 when real satellites arrive, or hold Phase 2 open for it.
+- **C27** — A source whose entire bucket prefix vanishes is undetectable. Withdrawal is
+  expressible only as an empty `items` array, so a missing manifest is treated as a fault and
+  fails the build — but a wholly absent prefix looks like a source that never existed.
+  Detecting it needs a recorded expected-source set. Matters from Phase 3, when the missing
+  source may be the private one.
 
 ## Constraints discovered (bind later contracts)
 
@@ -453,6 +544,49 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **Phase 1 site scope must include** the files the `site/` move touches outside
   `site/**`: `.gitignore`, `.vscode/`, root `package.json`/lockfile removal,
   `scripts/`. (ADR-0001)
+Phase 2, verified against primary sources before any implementation (ADR-0007, ADR-0008):
+
+- **`storage.objects.list` cannot be prefix-restricted.** "Since the storage.objects.list
+  permission is granted at the bucket level, you cannot use the resource.name condition
+  attribute to restrict object listing access to a subset of objects in the bucket." A
+  satellite granted `list` could enumerate every other source's object names, including
+  Phase 3's private `phd-milestones`. Satellites get **no `list`**, ever.
+- **`gcloud storage cp --recursive` requires `storage.objects.list`** and is therefore
+  forbidden as the publish primitive — the one permission that cannot be granted.
+- **`roles/storage.objectCreator` cannot overwrite**; replacing an object needs
+  `storage.objects.create` **and** `storage.objects.delete`. `objectCreator` alone would
+  succeed on a satellite's first publish and fail on every republish.
+- **`google-github-actions/upload-cloud-storage` v3.0.0 makes no bucket `list` call** — it
+  globs locally (`src/util.ts`) and uploads per file (`src/client.ts`). This is a property of
+  its source, not a documented guarantee: any version bump must re-verify it.
+- **IAM Conditions require uniform bucket-level access**; the object-prefix form is
+  `resource.name.startsWith('projects/_/buckets/<bucket>/objects/<prefix>')`.
+- **Scheduled runs authenticate through the existing binding.** Scheduled workflows run on
+  the default branch, so the OIDC `ref` claim is `refs/heads/main`.
+- **`cv`'s default branch is `master`** and the repository is **public** — its WIF condition
+  admits `refs/heads/master` (design doc §2 was wrong; corrected by ADR-0008).
+
+**File modes cannot be observed on this workstation (2026-09-16).** The repository lives on
+`/mnt/c`, a DrvFs mount that reports every file as `0777`. A script committed `100644`
+therefore runs perfectly locally and fails on a Linux runner with
+`Permission denied`, exit 126. This cost a red CI in Phase 2: `site/scripts/sync-content.sh`
+was committed non-executable and `fetch-data.sh` invokes it directly, so `build` and
+`build-firebase` both died in ~11 seconds — after the specialist had run the script locally,
+repeatedly, and could not have caught it. No amount of local testing can.
+
+Binding on later contracts, Phase 3's `gate/` especially, which adds shell scripts and a
+Dockerfile:
+
+- Set the bit explicitly with `git update-index --chmod=+x`, and verify with
+  `git ls-files -s` — not with `ls -l`, which lies on this mount.
+- Prefer `bash script.sh` over `./script.sh` in CI where the caller is ours, but note that a
+  script documented for humans as `scripts/foo.sh` must still carry the bit.
+- Audited repo-wide on 2026-09-16: every tracked `*.sh` is now `100755`, and
+  `sync-content.sh` was the only instance. Five `.mjs` files carry a shebang while committed
+  `100644`, which is **not** a defect: every one is reached through `import` or `node …`,
+  never executed directly. A naive grep for `./name.mjs` flags all of them, because an ES
+  module import looks identical to a shell invocation — so the guard below must classify by
+  how the file is *reached*, not by how its path is *spelled*, or it will be noise.
 
 ## Phase 1 review dispositions (Chief Reviewer, PR #12)
 
@@ -515,6 +649,122 @@ working snapshot lived in temporary storage.
 | Font payload (55 woff2 subsets) | **Leave as is**; browsers fetch only what they need |
 | Billing role (verified, not a decision) | Owner holds `roles/billing.admin`; the account is open and bills in USD |
 
+## Phase 2 review dispositions (Chief Reviewer, PR #17)
+
+**Verdict: Comment — nothing blocking the merge.** One item blocks **Checkpoint 3**:
+the live `WEBSITE_DISPATCH_PAT`. Final report: `handoffs/chief-reviewer-phase-2.md`,
+posted to PR #17. (An earlier interim report was posted before the `cv` CI question was
+resolved; the final one supersedes it.)
+
+It verified rather than accepted: enumerated every binding in the module rather than reading
+the custom role alone, confirmed no authoritative `iam_binding`/`iam_policy` exists that could
+replace the conditioned grant, read `upload-cloud-storage` at its pinned SHA to confirm the
+no-list property from source, and ran **33 adversarial manifests through both validator ends
+— zero disagreements**. It also ran `cv`'s real generator against the hub's real schema.
+
+| Finding | Disposition |
+|---|---|
+| **B1** live `WEBSITE_DISPATCH_PAT` in `cv` | **Owner, first at Checkpoint 3.** Blocks the phase's central claim, not the merge. Both halves: delete the secret *and* revoke the token. |
+| **S1–S4** delta, design doc §9/§11, README debris, binary handoff | **Fixed** (commit `72b9188`), before the final report landed. |
+| **S5** satellite-role guard | **Fixed.** Steps added to the existing `budget-guard` job — deliberately not a new job, because `budget-guard` is already a *required* status check and a new one would sit unenforced until branch protection changed. Verified green before wiring. |
+| **S6** executable-bit guard | **Fixed**, using the reviewer's rule rather than mine: a shebang-bearing `*.sh` must be `100755`. Spelling-independent, so no false-positive class. 3 files, 0 violations. |
+| **S7** draft + labels | **Done.** |
+| **S8** normative second-`data`-source rule; `manifest_version` | Rule **made normative in ADR-0008**. `manifest_version` (C20) is a **Phase 3 ADR**. |
+| **S9** withdrawal-semantics ADR | **Phase 3**, before a private satellite exists. |
+| **S10** no-other-grant Checkpoint 3 checks | **Fixed** in `infra/README.md`. |
+| **S11** `cv`'s stale spec | **Fixed** in `cv` — superseded banner, body left unedited. |
+| **N4, N5, N7** | **Fixed.** ADR-0008 amendment dated; STATE/activeContext tidied; the `@main` floating-ref decision now stated in `docs/satellites.md`. |
+| **N1, N2, N3, N6, N8** | Recorded, no action this phase. |
+
+**Recorded disagreement — governance level.** The final report says **L2** is correct
+(highest level touched; ADRs are L1, implementation L2). The interim report asked whether the
+PR #12 precedent makes it **L3**, since this PR changes roadmap acceptance criteria. I had
+already escalated to L3. Canon is explicit that AI roles may escalate up and **never** down,
+so L3 stands; the owner may reclassify to L2. Nothing operational turns on it — L1, L2 and L3
+are all human-reviewed and owner-merged.
+
+**Its closing point, unchanged from the interim report:** everything else concerns whether the
+boundary is correctly *designed*. The PAT is the one place where it is currently not *true*.
+
+## Checkpoint 3 execution record (2026-09-16)
+
+**Owner decisions taken:** ADR-0008 **approved**. "Section pages render from collections"
+**moved to Phase 5** (C26 closed). Deletion of the `cv` secret and variable **authorised**.
+
+**Apply provenance** (`infra/README.md` §Guardrails). Applied from a clean checkout of
+`feat/publishing-contract` at **`91b7a39`**, no override file tracked or untracked, plan
+reviewed before applying and applied from the saved plan file rather than re-planned:
+**9 to add, 0 to change, 0 to destroy** — confirmed, all nine addresses present in state
+afterwards. Nothing existing was modified, so Phase 1's resources and the budget are
+untouched.
+
+Created: `google_storage_bucket.content` (`cusati-hub-content`),
+`google_project_iam_custom_role.satellite_publisher`,
+`google_iam_workload_identity_pool.satellites`, the `github-cv` provider, the
+`publish-cv` service account, its `workloadIdentityUser` binding, the conditioned bucket
+binding, the hub's `objectViewer` grant, and `storage.googleapis.com`.
+
+**Verified against the live project, not the plan:**
+
+| Check | Result |
+|---|---|
+| `uniform_bucket_level_access` | **true** — so every prefix condition is genuinely in effect. This is the one that fails *open*; had it been false the boundary would have been inert with no error anywhere. |
+| `public_access_prevention` | `enforced` |
+| versioning / soft delete / lifecycle | enabled / 7 days / noncurrent rules present |
+| custom role permissions | exactly `storage.objects.create`, `.delete`, `.get` — **no `list`** |
+| project-level roles for `publish-cv` | **none** — this is the leg Terraform structurally cannot prove, since it sees only what it declares |
+| user-managed keys on `publish-cv` | **none** |
+
+**Finding — the bucket policy has more than the two bindings the Chief Reviewer predicted.**
+Alongside the two intended ones it carries `legacyBucketOwner`, `legacyObjectOwner`
+(`projectEditor`, `projectOwner`) and `legacyBucketReader`, `legacyObjectReader`
+(`projectViewer`). These are Cloud Storage's automatic defaults on bucket creation, not
+anything this module declares, and they are unaffected by uniform bucket-level access.
+They do **not** widen the satellite: `publish-cv` holds no project role at all, so it
+reaches nothing through them. What they do mean is that **any principal granted project
+Viewer on `cusati-hub` can read every object in the content bucket** — today only the
+owner. That is acceptable now and would need revisiting in Phase 3, when the private
+bucket exists and project-viewer access would be a real exposure. Recorded because the
+review's stated expectation and reality differ, and a future reader should not have to
+rediscover why.
+
+**Prefix-boundary proofs — RUN AND PASSED 2026-09-16.** The roadmap asks for a *recorded*
+test; this is it. Run by impersonating `publish-cv` under a temporary
+`serviceAccountTokenCreator` grant, authorised by the owner and **removed immediately
+afterwards** — verified removed: the account's only remaining binding is the WIF
+principalSet for `cv` `master`.
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| 0 | create **inside** `sources/cv/` (positive control) | 200 | **200** |
+| 1 | overwrite the same object — the case `objectCreator` alone fails | 200 | **200** |
+| 2 | read its own object back | 200 | **200** |
+| 3 | create in `sources/phd-milestones/` | 403 | **403** |
+| 4 | create at the bucket root | 403 | **403** |
+| 5 | create in `sources/cv-other/` — **the trailing-slash probe** | 403 | **403** |
+| 6 | list the bucket | 403 | **403** |
+| 7 | list its **own** prefix | 403 | **403** |
+| 8 | delete its own object | 204 | **204** |
+
+Check 5 proves the condition ends in a slash: a source whose name merely *starts with* `cv`
+is refused. Check 7 confirms the satellite cannot enumerate even its own prefix — intended,
+since `list` cannot be prefix-restricted, so the only safe grant is none. After check 8,
+`ls --all-versions` as the owner showed the noncurrent generations retained, which is the
+mitigation ADR-0007 relies on when it accepts that a satellite can delete its own objects.
+
+**A defect in our own runbook, found by running it.** The documented procedure used
+`gcloud storage cp` as the satellite and expected the in-prefix writes to succeed. They
+cannot: **`gcloud storage cp` requires `storage.objects.list` even for a single
+non-recursive file**, including into the satellite's own prefix. The first positive control
+failed for exactly that reason and read like a broken boundary. ADR-0007 decision 6 had
+recorded this only for `--recursive`; it is broader. `infra/README.md` is rewritten to the
+JSON-API form, which exercises the same permissions the real publish path uses. The
+documented expected error text was wrong too — denials name `storage.objects.get`/`list`,
+not `storage.objects.create`.
+
+**Still outstanding at Checkpoint 3:** revoking the PAT
+itself (owner-only); and the merges — `cv` #14, then hub #17, then `cv` #13.
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
@@ -550,6 +800,63 @@ working snapshot lived in temporary storage.
     never changed (ADR-0006).
 13. **Cookie collision with a future family site** setting `__session` on
     `Domain=cusati.us` (ADR-0006).
+14. **PARTLY CLOSED 2026-09-16 — the repository half is done; the token is not.** On the
+    owner's authorisation the Lead Architect deleted the `cv` repository secret
+    `WEBSITE_DISPATCH_PAT` and the variable `WEBSITE_REPO`; `cv` now holds zero Actions
+    secrets and zero variables beyond the four publish variables. **The token itself may
+    still be valid in the owner's GitHub account and can only be revoked there**
+    (github.com/settings/tokens). Until it is, a credential with write access to the hub
+    exists, merely no longer stored in the satellite. Original finding:
+    **`WEBSITE_DISPATCH_PAT` existed in `cv` (verified 2026-09-16).** Not hypothetical:
+    `gh api repos/djjay0131/cv/actions/secrets` returns it, created 2026-08-17, and the
+    variable `WEBSITE_REPO = djjay0131/website` is set beside it. Per `build-cv.yml`'s own
+    comment it is "a PAT with `repo` scope on the website repo" — a long-lived credential
+    giving a satellite write access to the hub. This is the exact condition ADR-0007
+    forbids, principle 3 prohibits, and domain review question 2 asks about, and it is live
+    now. **Deleting the workflow step does not remove it**, and any future workflow in `cv`
+    could use it. Remediation has two halves, both the owner's: delete the repository secret
+    (and the `WEBSITE_REPO` variable), *and* revoke the token itself at
+    github.com/settings/tokens — removing the secret alone leaves a valid token in the
+    account. Raised rather than done, because revocation is account-level and deleting a
+    secret is irreversible.
+15. **`cv`'s CI is red on a fresh install, and this blocks Checkpoint 3.** Confirmed
+    independently: `pyproject.toml` asks for `bibtexparser>=1.4.1` unbounded, PyPI's current
+    release is 2.0.1, and it removed the v1 API `tools/lint_bib.py` uses
+    (`bibtexparser.bparser`). A fresh `pip install -e ".[dev]"` gives 36 failed / 147 passed.
+    Every job in `build-cv.yml` depends on `tests`, so the publish job **can never run** and
+    the satellite path cannot be verified at Checkpoint 3. Entirely unrelated to Phase 2;
+    found while integrating it. Prepared as its own PR in `cv` (`fix/bibtexparser-pin`,
+    one line, no behaviour change) rather than buried in the publishing PR. Migrating to the
+    v2 API is a separate change and a separate issue.
+
+    **Correction, 2026-09-16 — I overstated this.** I wrote that the pin "restores green CI"
+    before the full run had finished. What is actually established, at commit `5ee7515`:
+    the pin **does** fix the `Python tests & lint` job, and the **push-event run
+    (35052550773) is fully green**, all four Compile jobs passing. But the
+    **pull_request-event run (35052617717) failed** — so PR #14 shows red. The cause is not
+    the pin and not Phase 2: `xelatex` **segfaulted**. latexmk reports the exit code divided
+    by 256, and `0.54296875 × 256 = 139 = 128 + 11 = SIGSEGV`. The "Missing character …
+    SimpleIcons.otf" lines in that log are a red herring: the **passing** run contains 22 of
+    them and still completes, and `settings.sty` and `cv-llt.tex` both document that hazard
+    and work around it deliberately. Failed jobs were re-run to distinguish flake from a
+    deterministic crash. **Verdict: flake.** Re-run of the identical commit, with no changes
+    of any kind, finished `success` with all four Compile jobs green — including the three
+    that had failed. So `cv` PR #14 is green, the pin does what it claims, and there is no
+    defect in `cv` to fix beyond the pin itself. The segfault is environmental.
+
+    **What this means for Checkpoint 3:** `cv`'s publish job runs only on
+    `push` to `master` (`if: github.ref == 'refs/heads/master' && github.event_name !=
+    'pull_request'`), and the push path is green with the pin. So publishing can work even
+    while the PR check is red — but the owner should not merge a red PR on my say-so, and the
+    crash needs to be understood first.
+16. **`cv`'s CI is not reproducible.** Every action in `build-cv.yml` floats on a tag —
+    `actions/checkout@v4`, `setup-python@v5`, `upload-artifact@v4`, `download-artifact@v4`,
+    `softprops/action-gh-release@v2`, and critically `xu-cheng/latex-action@v3`, which supplies
+    the whole TeXLive image. Two runs minutes apart on identical content can therefore build
+    against different toolchains, which is a plausible mechanism for the xelatex segfault in
+    Risk 15 hitting one run and not the other. The hub pins every action by commit SHA
+    (Phase 1 SEAM); `cv` does not. Worth an issue in `cv` regardless of how the segfault
+    resolves — it also means a retagged action can change that pipeline with no commit.
 
 ## Follow-ups
 
@@ -560,6 +867,58 @@ working snapshot lived in temporary storage.
 - Keep the local `handoff/research-hub` branch until the Incident A1 purge is confirmed (it holds
   the commit SHA the request needs).
 - C17: normalise the redirect-domain duplicate check.
+
+From the Phase 2 infra stream (2026-09-16):
+
+- **`roles/storage.objectViewer` does not include `storage.buckets.get`.** It is enough to
+  list and download objects, but any hub code that reads *bucket metadata* will 403. The
+  infra stream implemented SEAM-4 as written rather than widening the grant. Verify at
+  Checkpoint 3, and keep the hub's sync to object operations only.
+- **A `satellite-role-guard` CI check is recommended**, mirroring `budget-guard`: assert the
+  custom role holds exactly its three permissions and that `uniform_bucket_level_access` is
+  `true`. These are the two invariants whose breakage is invisible — a missing UBLA makes
+  every prefix condition inapplicable, so the boundary fails **open** with no error anywhere.
+  `build.yml` belongs to the `site` stream this phase, so this lands at reconciliation or in
+  Phase 3.
+- **Terraform remote state (C10) is now unblocked.** The owner's Checkpoint 2 decision was to
+  move state to a bucket in Phase 2; Cloud Storage is enabled and this module now creates
+  buckets, removing the reason it was deferred. It is not in the roadmap's Phase 2 scope, so
+  it needs the owner's word rather than being absorbed silently.
+- **Custom role `deletion_policy = "PREVENT"`**: a destroyed custom role locks its ID for 7–37
+  days, which would block all publishing with no way to apply out of it.
+
+**Checkpoint 3 owner actions (2026-09-16).** In order:
+
+1. **Revoke `WEBSITE_DISPATCH_PAT`** (Risk 14) — delete the `cv` repository secret and the
+   `WEBSITE_REPO` variable, then revoke the token at github.com/settings/tokens. Do this
+   first: it closes a live credential, and it is independent of everything else here.
+2. Merge **`cv` PR #14** (`bibtexparser<2`). Until it lands, `cv`'s CI is red on a fresh
+   install and no job in `build-cv.yml` runs, so the satellite path cannot be exercised at
+   all (Risk 15).
+3. `terraform apply` in `infra/` from a clean checkout of the reviewed head; record the SHA.
+4. Set `GCP_CONTENT_BUCKET` in `website`, and the four publish variables in `cv`
+   (`GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_PUBLISH_SA`, `GCP_CONTENT_BUCKET`).
+5. Run the three prefix-boundary proofs from `handoffs/infra-phase-2.md` (cannot write
+   outside `sources/cv/`, cannot list, can overwrite on republish).
+6. Merge the hub PR #17, then `cv` PR #13. A `cv` push then publishes; the next hub poll
+   deploys.
+
+From the Phase 2 `cv` stream (2026-09-16):
+
+- **`cv` has two divergent memory banks**, `memory-bank/` and `llm/memory_bank/`. The stream
+  updated both rather than pick a winner. Which one governs is `cv`'s question, not the hub's,
+  but it should be settled before `cv` adopts governance.
+- **`build-cv.yml` has 3 pre-existing `actionlint` findings** (lines 8, 54, 94), none in the
+  code Phase 2 added, and its existing actions are pinned by tag rather than SHA. Out of scope
+  here; worth an issue in `cv`.
+- **Checkpoint 3 ordering changed:** merge `cv`'s `fix/bibtexparser-pin` PR **first**, or
+  `cv`'s CI stays red and the publish job cannot run at all.
+- **A guard for the executable bit.** Nothing in the repo checks it, and the one defect that
+  reached CI in Phase 2 was exactly this. A cheap check — assert every tracked `*.sh`, and
+  every tracked file beginning `#!`, is mode `100755` — would have caught it before push. It
+  belongs alongside `budget-guard`, which exists for the same reason: an invariant whose
+  breakage is invisible where it is authored. Deferred out of Phase 2 because `build.yml`
+  was the site stream's file and the Chief Reviewer is mid-review.
 
 ## Standing constraints
 

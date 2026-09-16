@@ -14,6 +14,8 @@
     "data:link": "./scripts/sync-local-data.sh",
     "test": "vitest run",
     "test:watch": "vitest",
+    "content:sync": "./scripts/sync-content.sh",
+    "content:fixture": "./scripts/sync-content.sh --from fixtures/content",
     "data:fetch": "./scripts/fetch-data.sh",
     "redirects:generate": "node scripts/generate-redirect-map.mjs",
     "redirects:check": "node scripts/generate-redirect-map.mjs --check",

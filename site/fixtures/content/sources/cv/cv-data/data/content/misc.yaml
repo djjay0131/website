@@ -1,0 +1,8 @@
+# FIXTURE. Invented.
+awards:
+  - id: fixture-award
+    dates: 2024
+    text: Fixture Award for Fixtures.
+certifications:
+  - id: fixture-cert
+    text: Fixture Certification.

@@ -1,0 +1,159 @@
+# The research hub's publishing contract, as a composite action.
+#
+# A satellite calls this as:
+#
+#   permissions:
+#     contents: read
+#     id-token: write          # required by the caller; see contract/README.md
+#   steps:
+#     - uses: djjay0131/website/contract/publish@main
+#       with:
+#         dist: ./dist
+#         source: your-source-name
+#         project_id: ${{ vars.GCP_PROJECT_ID }}
+#         workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+#         service_account: ${{ vars.GCP_PUBLISH_SA }}
+#         bucket: ${{ vars.GCP_CONTENT_BUCKET }}
+#
+# A composite action cannot declare `permissions:` of its own - permissions are
+# a property of the calling job - so the caller must grant `id-token: write`.
+# The action takes NO GitHub token and fires NO repository_dispatch: the hub
+# polls the bucket instead, because any credential able to dispatch at `website`
+# could also write to it (ADR-0007 decisions 1 and 2).
+#
+# Every validation step runs BEFORE authentication, so a malformed or malicious
+# manifest is rejected before a credential is minted and before a single byte is
+# uploaded.
+name: 'Publish to the research hub'
+description: >-
+  Validate a manifest against the hub's publishing contract and upload a
+  finished dist/ to the hub's content bucket through Workload Identity
+  Federation. No GitHub token, no service-account key, no bucket listing.
+author: 'djjay0131'
+
+branding:
+  icon: 'upload-cloud'
+  color: 'blue'
+
+inputs:
+  dist:
+    description: >-
+      Path to the finished output folder. Its root must contain manifest.json,
+      and every item path in that manifest is relative to this folder.
+    required: true
+    default: './dist'
+  source:
+    description: >-
+      Your assigned source name. It must equal the manifest's "source" field and
+      it is the literal bucket prefix you publish under (sources/<source>/).
+    required: true
+  project_id:
+    description: 'Google Cloud project id of the hub.'
+    required: true
+  workload_identity_provider:
+    description: >-
+      Full identifier of the Workload Identity provider issued to your
+      repository, in the hub's `satellites` pool.
+    required: true
+  service_account:
+    description: 'Email address of your repository''s publishing service account.'
+    required: true
+  bucket:
+    description: >-
+      Name of the hub's content bucket, without the gs:// scheme and without a
+      prefix. The action appends sources/<source>/ itself.
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    # (a) Schema validation. Fails naming the offending field and item.
+    #
+    # The validator has no runtime dependencies on purpose: it must not force an
+    # `npm ci` into a satellite's workflow on every publish. Node is present on
+    # GitHub-hosted runners; on a self-hosted runner, add actions/setup-node
+    # before this step.
+    - name: 'Validate the manifest against the hub schema'
+      shell: bash
+      env:
+        INPUT_DIST: ${{ inputs.dist }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        node "${ACTION_PATH}/../validate-manifest.mjs" \
+          --dist "${INPUT_DIST}" \
+          --check schema
+
+    # (b) Path containment (ADR-0002). Rejects absolute paths, ".." segments,
+    # paths that do not exist, and anything that leaves dist/ through a symlink.
+    # This is the check the JSON Schema cannot do: only the filesystem knows
+    # where a symlink points.
+    - name: 'Verify every item path stays inside dist/'
+      shell: bash
+      env:
+        INPUT_DIST: ${{ inputs.dist }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        node "${ACTION_PATH}/../validate-manifest.mjs" \
+          --dist "${INPUT_DIST}" \
+          --check paths
+
+    # (c) The manifest's source must equal the source input, because the upload
+    # prefix below is built from the input. A mismatch would otherwise publish
+    # one source's content under a prefix its manifest does not describe - or,
+    # far more often, fail with an opaque 403 (SEAM-2).
+    - name: 'Verify the manifest source matches the declared source'
+      shell: bash
+      env:
+        INPUT_DIST: ${{ inputs.dist }}
+        INPUT_SOURCE: ${{ inputs.source }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        node "${ACTION_PATH}/../validate-manifest.mjs" \
+          --dist "${INPUT_DIST}" \
+          --source "${INPUT_SOURCE}" \
+          --check source
+
+    # (d) Workload Identity Federation. The satellite's only credential, minted
+    # at run time and gone when the job ends (ADR-0007 decision 3; design doc
+    # §12.2). A JSON key here would be a review failure.
+    - name: 'Authenticate to Google Cloud through Workload Identity Federation'
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+      with:
+        project_id: ${{ inputs.project_id }}
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}
+
+    # (e) Upload to gs://<bucket>/sources/<source>/.
+    #
+    # This action expands the file list LOCALLY with fast-glob (src/util.ts
+    # expandGlob) and calls storageBucket.upload() once per file (src/client.ts).
+    # It makes no getFiles() call, so it needs no storage.objects.list - the one
+    # permission a satellite must never hold, because it cannot be restricted to
+    # a prefix and would let one satellite enumerate every other source's
+    # objects (ADR-0007 decisions 4 and 6; SEAM-3). `gcloud storage cp
+    # --recursive` and `gsutil rsync` are forbidden here for exactly that reason.
+    # Re-verify this property on any version bump: see contract/README.md.
+    #
+    # parent: false          - upload dist/'s CONTENTS, so files land at
+    #                          sources/<source>/<path>, exactly as the manifest
+    #                          describes and SEAM-2 fixes. With the default
+    #                          (true) everything would land under a spurious
+    #                          sources/<source>/dist/ segment.
+    # gzip: false            - store the published bytes unchanged. The hub
+    #                          fingerprints and re-serves them; content-encoding
+    #                          games here would only obscure that.
+    # process_gcloudignore:  - false: dist/ is published exactly as built. A
+    #                          stray .gcloudignore in the satellite repo must not
+    #                          silently drop a file the manifest promises.
+    # predefinedAcl          - deliberately unset: the content bucket enforces
+    #                          uniform bucket-level access (ADR-0007 decision 8),
+    #                          which rejects per-object ACLs.
+    - name: 'Upload dist/ to the content bucket'
+      uses: google-github-actions/upload-cloud-storage@6397bd7208e18d13ba2619ee21b9873edc94427a # v3.0.0
+      with:
+        project_id: ${{ inputs.project_id }}
+        path: ${{ inputs.dist }}
+        destination: ${{ inputs.bucket }}/sources/${{ inputs.source }}
+        parent: 'false'
+        gzip: 'false'
+        process_gcloudignore: 'false'

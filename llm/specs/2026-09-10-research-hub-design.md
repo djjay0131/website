@@ -31,7 +31,7 @@ is authored. Content is authored in satellites; the hub renders it.
 | Repo | Owner | Role in this design | Notes |
 |---|---|---|---|
 | `website` | Jason | **Becomes the hub.** Already Astro; already consumes `cv`. Moves from GitHub Pages to Firebase Hosting. | Do not start a new hub repo. Evolve this one. |
-| `cv` | Jason (private) | Satellite #1 (public items). Already integrated ad hoc; formalize under the manifest contract. | Private repo, public output — the proof case. |
+| `cv` | Jason (public) | Satellite #1 (public items). Already integrated ad hoc; formalize under the manifest contract. | **Corrected 2026-09-16 (ADR-0008):** `cv` is a *public* repository and its default branch is `master`. The earlier "private repo, public output" framing was wrong; `phd-milestones` (Phase 3) is the first genuinely private satellite. |
 | `phd-milestones` | Jason (to create) | Satellite #2 (private items): milestone tracker, committee dossier, VT policy. | Source tarball is committed on the handoff branch at `llm/plans/handoff/phd-milestones.tar.gz`; create the private GitHub repo from it, then delete the tarball from `website`. |
 | `agentic-kg` | Jason | Satellite #3: project page (public) from its `docs/`; optional private research notes. Already has `llm/` + `docs/` layout. | The agentic knowledge-graph research project. |
 | `construction-ai-proposal` | Jason | Satellite #4: project page (public). | Later phase. |
@@ -49,7 +49,7 @@ manifests; it never needs to know how a satellite built its output.
 
 ```
 satellite repo ──publish dist/ + manifest──▶ GCS content bucket
-                                                   │ repository_dispatch
+                                                   │ hub polls (ADR-0007)
                                                    ▼
                                    hub (website) GitHub Actions
                                    sync bucket → astro build
@@ -64,8 +64,10 @@ Browser ──▶ Firebase Hosting ──rewrite /p/** /s/**──▶ Cloud Run 
 Properties this guarantees:
 
 - A satellite never has write access to the hub. It uploads to a bucket
-  prefix it is scoped to (Workload Identity Federation, per-repo) and
-  fires a dispatch event.
+  prefix it is scoped to (Workload Identity Federation, per-repo) and holds
+  **no GitHub credential at all**: the hub notices the publish by polling the
+  bucket (ADR-0007). Firing a dispatch would have required a token with
+  Contents: write on `website`, contradicting this very property.
 - Private content never enters a repository that could become public.
   Path is bucket → build → private bucket. The hub build **fails** if any
   item with `visibility: private` appears in `public/`.
@@ -101,9 +103,10 @@ is mirrored as the Astro content-collection schema in
 
 Fields: `slug` (unique within source), `title`, `section` (from a fixed
 set declared in the hub: `research`, `projects`, `writing`, `cv`, `phd`),
-`format` ∈ {`md`, `mdx`, `html`, `pdf`, `bundle`}, `path` (relative to
-dist/), `visibility` ∈ {`public`, `private`}, `date` (ISO), optional
-`summary`, `tags`.
+`format` ∈ {`md`, `mdx`, `html`, `pdf`, `bundle`, `data`}, `path` (relative
+to dist/), `visibility` ∈ {`public`, `private`}, `date` (ISO), optional
+`summary`, `tags`. `data` was added 2026-09-16 by ADR-0008; a `data` item also
+carries `schema_version`.
 
 | Format | Satellite ships | Hub does |
 |---|---|---|
@@ -111,6 +114,7 @@ dist/), `visibility` ∈ {`public`, `private`}, `date` (ISO), optional
 | html | Self-contained page/folder | Serves verbatim at `/<section>/<source>/<slug>/`, thin frame with back link |
 | pdf | The file | Serves verbatim; download card + inline viewer |
 | bundle | Built app folder | Serves folder as-is under slug |
+| data | A structured payload, not a document | Renders it with **first-party hub code**. Unlike every row above, the hub must understand the payload's shape, so it renders only `(source, slug)` pairs it explicitly claims and fails the build on any other `data` item, or on an unknown `schema_version` (ADR-0008) |
 
 Satellite integration is one workflow step, using a reusable composite
 action published from the hub:
@@ -123,9 +127,12 @@ action published from the hub:
 ```
 
 The action: validates manifest against schema → uploads to
-`gs://<content-bucket>/sources/<source>/` (WIF auth, no keys) → fires
-`repository_dispatch` `{event_type: "publish", client_payload: {source}}`
-at the hub.
+`gs://<content-bucket>/sources/<source>/` (WIF auth, no keys). It does **not**
+notify the hub: per ADR-0007 the hub polls the bucket, because any credential
+able to fire `repository_dispatch` at `website` would also be able to write to
+it. The satellite therefore holds no GitHub credential, and its GCP identity
+carries no `storage.objects.list` — that permission cannot be restricted to a
+prefix, so granting it would let one satellite enumerate every other source.
 
 ## 5. Frontend
 
@@ -263,7 +270,7 @@ website/
 ├── infra/                        # Terraform
 ├── firebase.json
 └── .github/workflows/
-    ├── build.yml                 # push + repository_dispatch: sync, build ×2, leak check, deploy
+    ├── build.yml                 # push + schedule poll: sync, build ×2, leak check, deploy
     └── gate.yml                  # gate/** change: test, build image, deploy Cloud Run
 ```
 
@@ -299,7 +306,7 @@ after `/governance:establish`:
 |---|---|---|
 | 0 | `/governance:establish` on `website`; delta; ADRs 1–5; this doc committed; roadmap | Governed repo, decisions on record |
 | 1 | Infra (Terraform + WIF + budget), Firebase project + Hosting + domain, Actions deploy, design tokens, section shells | Domain serves the site from Jason's cloud |
-| 2 | Contract schema, publish action, content bucket, dispatch rebuild; `cv` formalized as satellite #1 | CV published through the contract |
+| 2 | Contract schema, publish action, content bucket, poll-driven rebuild (ADR-0007); `cv` formalized as satellite #1 | CV published through the contract |
 | 3 | Gate service + tests, Identity Platform, Firestore, private bucket, two-output build + leak check, `/p/**` rewrite; `phd-milestones` as satellite #2; seed members | Tracker + dossier behind sign-in |
 | 4 | Share mint/list/revoke; Shares page (React island) | 14-day link to one document |
 | 5 | `agentic-kg`, `construction-ai-proposal` as satellites; project index | Self-updating projects section |

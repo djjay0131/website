@@ -1,0 +1,19 @@
+# FIXTURE. Invented.
+- id: current-role
+  dates: 2022 - Present
+  company: Fixture Laboratory
+  location: Nowhere, ZZ
+  title: Fixture Researcher
+  bullets:
+    - id: current-a
+      text: First fixture bullet, with **markdown** to exercise the renderer.
+    - id: current-b
+      text: Second fixture bullet.
+- id: previous-role
+  dates: 2018 - 2022
+  company: Fixture Works
+  location: Nowhere, ZZ
+  title: Fixture Engineer
+  bullets:
+    - id: previous-a
+      text: A fixture bullet from the earlier role.

@@ -1,7 +1,7 @@
 # Governance Delta: website (Research Hub)
 
 Status: Draft
-Last updated: 2026-09-15
+Last updated: 2026-09-16
 Governance: agentic-governance v0.8
 
 This file localizes the canonical governance in
@@ -66,18 +66,20 @@ hardcodes a path.
 - Sprints directory: `llm/sprints/`
 - Plans directory: `llm/plans/`
 - Memory-bank path: `llm/memory_bank/`
+- Artifacts directory: `docs/`
 
 Slots deliberately not declared. There is no repo-local constitution: the
 canonical executive charters apply unchanged. There is no feature catalog:
-scope is tracked by the roadmap and the design-authority document. The
-artifacts directory is not declared **yet**. The design document places the
-data plane at `docs/` (satellite how-to, published views), but no data-plane
-content exists today, and `--layout` fails any declared path that does not
-exist. It is declared in the same PR that creates its first content, planned
-for Phase 2 with the satellite how-to. Until then the checker's data-plane
-scan still runs against its canonical default `docs/`, so control-plane
-content placed there fails the check today, and `CLAUDE.md` already names
-`docs/` as the data plane.
+scope is tracked by the roadmap and the design-authority document.
+
+The artifacts directory `docs/` is declared **as of Phase 2 (2026-09-16)**,
+in the same PR that creates its first content — `docs/satellites.md`, the
+satellite how-to — exactly as the earlier deferral said it would be. It was
+left undeclared until now because `--layout` fails a declared path that does
+not exist. It holds the data plane only: the satellite how-to and derived
+views. `CLAUDE.md` already named `docs/` as the data plane, and the checker's
+data-plane scan already ran against it by default, so control-plane content
+placed there failed the check even while the slot was undeclared.
 
 Paths outside the slot table, intentionally: the current Astro application
 (`src/`, `public/`, `scripts/`, `astro.config.mjs`, `package.json`), which
@@ -244,7 +246,7 @@ repository (principle 3), and nothing here depends on how a satellite builds.
 | Repo | Relationship | Phase |
 |---|---|---|
 | `agentic-governance` | Canon. Binding pin: CI at SHA `5689b69` (v0.8.3); the plugin auto-updates locally (§Canon Location). | — |
-| `cv` | Satellite #1, public items. Private repo, public output. Today consumed ad hoc via release download in `build.yml`; formalized under the manifest contract. | 2 |
+| `cv` | Satellite #1, public items. **Public** repository, default branch `master` (design doc §2 corrected by ADR-0008 — it is not private). Consumed ad hoc via release download in `build.yml` through Phase 1; formalized under the manifest contract in Phase 2. `fetch-data.sh` is **retained** as the pull-request build's CV source — the hub's WIF binding admits only `refs/heads/main`, so a PR cannot read the bucket (ADR-0008 Consequences; STATE C25). | 2 |
 | `phd-milestones` | Satellite #2, private items: milestone tracker, committee dossier. To be created as a private repo from the handoff tarball. | 3 |
 | `agentic-kg` | Satellite #3, project page (public), optional private notes. | 5 |
 | `construction-ai-proposal` | Satellite #4, project page (public). | 5 |

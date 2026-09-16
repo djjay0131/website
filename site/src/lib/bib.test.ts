@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { parseBib, parseBibFlat } from "./bib";
+import { CV_BIB_PATH } from "./hub-content.mjs";
 
-const BIB_PATH = path.resolve("data/own-bib.bib");
+// Synced from the content bucket by scripts/sync-content.sh (Phase 2, SEAM-5).
+const BIB_PATH = path.resolve(CV_BIB_PATH);
 
 describe("parseBib", () => {
   it("parses real own-bib.bib into grouped entries", () => {
