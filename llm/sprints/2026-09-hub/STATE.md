@@ -466,6 +466,19 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C19** — A second `data` source would make the hub carry a second first-party renderer.
   ADR-0008 sets a high bar deliberately; revisit at Phase 5 when `agentic-kg` and
   `construction-ai-proposal` arrive.
+- **C20** — Manifest versioning. `schema_version` versions one payload; the *contract itself*
+  also changes (ADR-0008 altered the "fixed" format set three weeks after the design doc). With
+  `additionalProperties: false`, a satellite cannot send a field before the hub accepts it, so
+  a `manifest_version` must land optional first and become required later. Recommended: ADR
+  now, optional in Phase 3, required in Phase 5.
+- **C21** — The publish action cannot verify what it uploaded, because verifying means listing
+  and satellites are denied `list` (ADR-0007). The consequence is permanent: a partial upload
+  leaves a mixed state no satellite can detect or prune.
+- **C22** — Lexical constraints on `slug` and `path`. `slug` becomes a URL segment, so the
+  contract stream constrained it to `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 64.
+- **C23** — Retention and withdrawal semantics for published objects. An empty `items` array is
+  the only way a satellite can retract content, since it cannot list and therefore cannot
+  prune. This matters from Phase 3, when a withdrawn item may be private.
 
 ## Constraints discovered (bind later contracts)
 

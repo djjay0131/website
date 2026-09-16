@@ -18,7 +18,7 @@ The hub owns the chrome, the navigation, the design system and the deploy. It ne
 needs to know how you built your output.
 
 ```
-your repo ──▶ build dist/ + manifest.json ──▶ GCS content bucket ──▶ hub polls, builds, deploys
+your repo ──▶ build dist/ (manifest.json at its root) ──▶ GCS content bucket ──▶ hub polls, builds, deploys
 ```
 
 ## What you never need
@@ -41,7 +41,8 @@ your repo ──▶ build dist/ + manifest.json ──▶ GCS content bucket ─
    repository to `infra/` — a service account, a Workload Identity provider entry
    admitting only your repository and your default branch, and a binding scoped to
    your prefix. You will be given a `source` name and the values your workflow needs.
-2. Produce a `dist/` folder and a `manifest.json` in your build.
+2. Produce a `dist/` folder whose **root contains `manifest.json`**, alongside the files
+   that manifest describes. Every item's `path` is relative to that same `dist/`.
 3. Add the publish step to your workflow.
 
 ## The manifest
@@ -151,7 +152,9 @@ manually — that needs no credential of yours.
 
 | Symptom | Likely cause |
 |---|---|
-| The action fails validating the manifest | A field is missing, or `section`/`format`/`visibility` is outside its fixed set. The error names the field. |
+| The action fails validating the manifest | A field is missing, or `section`/`format`/`visibility` is outside its fixed set. The error names the field and the item. |
+| `manifest.json not found` | It must sit at the **root of `dist/`**, not beside it. |
+| Two items share a `slug` | Slugs must be unique within your manifest. JSON Schema cannot express that, so the publish action checks it separately — the error names both items. |
 | `403` on upload | Your identity is not bound to that prefix, or `source` does not match the prefix. Check `source` first. |
 | `403` on a *second* publish, having succeeded once | Your binding grants create but not delete. Replacing an object needs both. Ask the hub owner. |
 | A `404` or permission error mentioning `list` | Something in your workflow is trying to list the bucket. Satellites cannot. Use the publish action rather than `gcloud storage cp --recursive`. |

@@ -48,11 +48,29 @@ visibility ∈ { public, private }
 
 Required per item: `slug`, `title`, `section`, `format`, `path`, `visibility`,
 `date`. Optional: `summary`, `tags`. Required on the manifest: `source`,
-`published`, `items`. A `data` item additionally requires `schema_version`.
+`published`, `items`. A `data` item — and **only** a `data` item — additionally
+carries `schema_version`, a **string** matching `^[0-9]+(\.[0-9]+){0,2}$`
+(`cv-data` uses `"1"`).
 
-`slug` is unique within a `source`. `path` is relative to `dist/` and **must not
-escape it** — the publish action rejects a manifest whose `path` contains a `..`
-segment, is absolute, or resolves outside `dist/` (ADR-0002).
+`manifest.json` sits at the **root of `dist/`**, and every `path` is relative to
+that same `dist/`.
+
+**Amended 2026-09-16, on the contract stream's finding.** SEAM-1 previously stated
+slug uniqueness as a property of the schema. **JSON Schema draft 2020-12 cannot
+express it** — there is no "unique by property" keyword, and a non-standard one
+would be silently ignored by conformant validators, including the site's mirror.
+So enforcement is split, and each end must implement its half deliberately:
+
+| Rule | Enforced by |
+|---|---|
+| Field presence, types, fixed sets, no unknown fields | the JSON Schema — **both** ends, from `contract/manifest.schema.json` |
+| `slug` unique within a manifest | **named code beside the schema**, at both ends. A conformant validator *accepts* a duplicate slug; the `site` stream must implement this check explicitly rather than assume its Zod mirror covers it |
+| `path` does not escape `dist/` — no absolute path, no `..` segment | the schema's `path` pattern, **and** the publish action's own filesystem check, which additionally catches a **symlink** leading outside `dist/` that the pattern cannot see (ADR-0002) |
+| manifest `source` equals the `source` input | the publish action |
+
+The §4 shared fixture is a `private`/`phd` item, so the site's mirror must
+**accept** `visibility: private` in Phase 2 even though nothing private is
+published until Phase 3. Accepting it is not publishing it.
 
 ## SEAM-2 — Bucket layout
 

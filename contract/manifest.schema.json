@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/djjay0131/website/main/contract/manifest.schema.json",
+  "title": "Research hub publishing manifest",
+  "description": "The entire interface between a satellite repository and the research hub. A satellite publishes a finished dist/ folder and this manifest describing what is in it (design doc section 4, as amended by ADR-0008; ADR-0002). The hub reads the manifest; it never needs to know how the satellite built its output. This file is the single definition of a manifest: site/src/content.config.ts mirrors it field for field and both ends validate against it (phase-2-seams SEAM-1). Two contract rules cannot be expressed in JSON Schema and are enforced by contract/validate-manifest.mjs alongside this file: slug uniqueness within a manifest, and the filesystem resolution of every path inside dist/ (symlinks included). Any validator of this schema must enforce those two rules separately.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source",
+    "published",
+    "items"
+  ],
+  "properties": {
+    "source": {
+      "description": "The satellite's assigned source name. It is the literal bucket prefix the satellite publishes under (gs://<bucket>/sources/<source>/), IAM conditions match it as a literal string, and the publish action rejects a manifest whose source does not equal the source input (SEAM-2, SEAM-3).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,38}$"
+    },
+    "published": {
+      "description": "ISO 8601 timestamp of this publish, in UTC (Z) or with an explicit numeric offset. Example: 2026-09-10T14:02:11Z.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "items": {
+      "description": "Everything this source publishes. The manifest is the authority on what exists: an item removed from this array is withdrawn, whether or not its bytes remain in the bucket (a satellite cannot list, and therefore cannot prune). An empty array withdraws every item of this source.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "$defs": {
+    "item": {
+      "description": "One published item.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slug",
+        "title",
+        "section",
+        "format",
+        "path",
+        "visibility",
+        "date"
+      ],
+      "properties": {
+        "slug": {
+          "description": "URL segment for this item, unique within the manifest. Uniqueness is a contract rule that JSON Schema cannot express; contract/validate-manifest.mjs enforces it and every mirror of this schema must do the same.",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "maxLength": 64
+        },
+        "title": {
+          "description": "Shown in the hub's navigation and indexes.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "section": {
+          "description": "The hub section this item belongs to. Fixed set declared by the hub (design doc section 4).",
+          "type": "string",
+          "enum": [
+            "research",
+            "projects",
+            "writing",
+            "cv",
+            "phd"
+          ]
+        },
+        "format": {
+          "description": "How the hub treats the payload. md/mdx: markdown with frontmatter, rendered in site chrome. html: a self-contained page or folder, served verbatim in a thin frame. pdf: the file, served with a download card. bundle: a built app folder, served as-is. data: a structured payload the hub renders with first-party code, added by ADR-0008 - it requires schema_version, and the hub fails the build on a (source, slug) pair it does not claim.",
+          "type": "string",
+          "enum": [
+            "md",
+            "mdx",
+            "html",
+            "pdf",
+            "bundle",
+            "data"
+          ]
+        },
+        "path": {
+          "description": "Location of the payload relative to dist/. It must not escape dist/: no absolute path, no '..' segment, no backslash and no control character. The pattern here is a first line of defence only - the publish action additionally resolves the path on disk and rejects anything that leaves dist/ through a symlink (ADR-0002).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\u0000-\\u001f]+$"
+        },
+        "visibility": {
+          "description": "public items reach the public site. private items never do: they go bucket -> build -> private bucket and are served only behind the hub's sign-in gate. private is a Phase 3 capability; until then publish only public items.",
+          "type": "string",
+          "enum": [
+            "public",
+            "private"
+          ]
+        },
+        "date": {
+          "description": "ISO calendar date (YYYY-MM-DD) for this item.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "summary": {
+          "description": "Optional one-line description shown in indexes.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "tags": {
+          "description": "Optional tags.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "maxLength": 32
+          }
+        },
+        "schema_version": {
+          "description": "Required on a format: data item and forbidden on every other format (ADR-0008 decision 5). It versions the shape of the payload, which the hub parses with first-party code. The hub fails the build on a value it does not understand, so bump it whenever the payload's shape changes.",
+          "type": "string",
+          "pattern": "^[0-9]+(?:\\.[0-9]+){0,2}$"
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "ADR-0008 decision 5: a data item carries schema_version; no other format may carry one.",
+          "if": {
+            "required": [
+              "format"
+            ],
+            "properties": {
+              "format": {
+                "const": "data"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "schema_version"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "schema_version"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
