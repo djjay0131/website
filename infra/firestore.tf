@@ -127,6 +127,23 @@ resource "google_firebaserules_ruleset" "firestore_deny_all" {
     }
   }
 
+  # THE API NEVER RETURNS source.language, so every plan reads
+  # `+ language = "FIREBASE_RULES"` as newly added -- and a ruleset is immutable,
+  # so any diff REPLACES it and drags the release with it. The effect was that
+  # every apply destroyed and recreated the deny-all ruleset and its release,
+  # briefly leaving the rules that protect members/{email} unreleased. That
+  # collection holds real email addresses, and Security Rules are the only thing
+  # standing between it and any signed-in stranger with a browser console: the
+  # gate's Admin SDK bypasses them, so nothing else covers it. Seen three times
+  # during Checkpoint 4 (issue #30).
+  #
+  # Ignoring the one field the API does not report makes an UNCHANGED ruleset
+  # stable. A real change to the rules CONTENT still forces replacement, which is
+  # correct and must stay true -- verify that if this block is ever touched.
+  lifecycle {
+    ignore_changes = [source[0].language]
+  }
+
   depends_on = [google_project_service.phase3]
 }
 
