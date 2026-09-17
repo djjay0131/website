@@ -1029,6 +1029,27 @@ The reviewer had no `gh`. These are the checks it named as UNVERIFIABLE, run and
   branch-protection change and is on the Checkpoint 4 list (S-4).
 
 
+## Phase 3 — implementation complete, handed to Checkpoint 4 (2026-09-17)
+
+PR #25 is **out of draft** at `d8a2465`, with every check green: `governance-checks`,
+`budget-guard`, `contract-tests`, `build`, `build-firebase`, `check`, `deploy-tools`,
+`gate/test` and `leak-check-self-test`. Every deploy job is correctly skipped — nothing in
+Phase 3 has touched a cloud resource, by design.
+
+**Agents do not merge.** The PR stops here for the owner.
+
+What Phase 3 proved locally, and what it did not:
+
+- **Proved.** The leak check catches content-only leaks with no matching path (verified by
+  hand and now on every CI run via `leak-check-self-test`); the public build's router is
+  never shown private pages; the gate refuses signed-out and non-member callers on both
+  transports across 204 tests; the destructive sync refuses on an empty or unvalidated build
+  and deletes exactly a withdrawn item's objects.
+- **Not proved, and cannot be until Checkpoint 4.** Every cloud resource. The private sync's
+  bucket driver has never executed. The gate has never started. No satellite has published.
+  The private area's links do not work yet (issue #27).
+
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
