@@ -563,6 +563,16 @@ Phase 1's `firebase.json` carries no gate rewrites.
 
 ## Constraints discovered (bind later contracts)
 
+- **"Dependency-free X" does not imply "dependency-free X's tests."** `contract/`'s
+  validator is deliberately dependency-free — `contract/publish/action.yml` runs it with
+  nothing installed. Its *test suite* imports `ajv` to cross-check the hand-written
+  validator against a real JSON Schema implementation. Wiring the suite into CI without
+  `npm ci` passed locally (where `node_modules` already existed) and failed on the runner's
+  clean checkout with `ERR_MODULE_NOT_FOUND`. Any job added for a tree that was previously
+  untested in CI must be proven against an **empty** checkout, not the working tree — move
+  `node_modules` aside and run it. This is the same class as the exit-126 defect and the
+  non-hermetic tests, and it was introduced by the Lead Architect while fixing S-5.
+
 - **A cross-stream environment variable is a contract, and nothing checks it.** Two streams
   can each be green while disagreeing about the name of a variable one sets and the other
   reads; neither runs the other's code. Any future phase that splits a producer and a
@@ -970,6 +980,13 @@ full report is persisted verbatim at `handoffs/chief-reviewer-phase-3.md` and po
 
 **Audit findings.**
 
+- **A-1 stale branches — RESOLVED as a non-finding, 2026-09-17.** The remote carries only
+  `main`, `feat/private-area`, `fellowship-sprint-notebook` and `fix/derive-education-assertion`.
+  `admin/phase-2-closeout` and `fix/content-bootstrap` were deleted at merge:
+  `delete_branch_on_merge` is `true` and worked. The reviewer was reading **stale local
+  remote-tracking refs**, which it could not have known, because pruning them is a git
+  mutation its contract forbade. Pruned. `handoff/research-hub` still must never be deleted.
+  Original finding, for the record:
 - **A-1 stale branches — report only, no deletion recommended.** `handoff/research-hub` must
   **never** be recommended for deletion: it was never pushed, it is the only copy of its
   commit, and it holds the SHA an Incident A1 purge would need. That `admin/phase-2-closeout`
@@ -992,6 +1009,24 @@ must be recorded **deferred**, not ticked), N-12/N-13 (no sign-out, no rate limi
 `POST /session` — both belong to Phase 4 scope now, while the reasoning is fresh), N-14 (C30),
 N-15 (H-4 closed for the material that mattered). N-2, N-6, N-9, N-10 and N-16 were stale
 records and are now corrected.
+
+
+## Audit items the Chief Reviewer could not verify, closed by the Lead Architect (2026-09-17)
+
+The reviewer had no `gh`. These are the checks it named as UNVERIFIABLE, run and closed:
+
+- **Check 4 — governance level.** #25 declares **L3** in its body (the row names the L1 and
+  L2 components it mixes) and carries the `gov-L3` label, alongside `implementation`,
+  `priority-high`, `security-privacy` and `phase-3-private-area`. The reviewer's judgement
+  that L3 is right matches the actual declaration. PASS.
+- **Check 7 — platform surface.** `delete_branch_on_merge: true`. Required contexts on
+  `main` are exactly `governance-checks` and `budget-guard`; `strict: false`,
+  `enforce_admins: false` — which is what the delta's §Platform Enforcement Reality already
+  records honestly. All four `gov-L0..L3` labels exist, as do all seven phase labels (42
+  labels total). PASS.
+- **Consequence worth acting on:** neither `contract-tests` nor `leak-check-self-test` is a
+  required context, so both run without gating a merge. Promoting them is a one-time
+  branch-protection change and is on the Checkpoint 4 list (S-4).
 
 
 ## Risks carried forward
