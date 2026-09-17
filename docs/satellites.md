@@ -145,6 +145,23 @@ here rather than only in yours:
 
 Prefer any other format if one fits.
 
+### Withdrawing something you published
+
+Remove the item from your manifest. The hub renders from the manifest, so an item that is no
+longer listed stops being served — even though its bytes are still in the bucket. Publishing a
+manifest with an empty `items` array withdraws everything, and that is a legitimate operation,
+not an error: it is the only retraction you can express, since you cannot list your own prefix.
+
+**Withdrawal does not delete your bytes.** The hub never deletes from the content bucket — it
+is your storage, not the hub's. So if the material is genuinely sensitive, removing it from the
+manifest is not enough: **delete the object yourself** as well. Your publishing identity can,
+within your own prefix.
+
+One thing to know: do **not** simply delete your `manifest.json` to withdraw. A missing manifest
+is treated as a fault and fails the hub's build, because it is indistinguishable from a
+truncated sync or a half-finished upload — and treating it as "withdraw everything" would turn
+a transient failure into silent deletion.
+
 ### Private items
 
 `visibility: private` items never reach the public site. They go bucket → build →

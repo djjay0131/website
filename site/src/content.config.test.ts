@@ -14,7 +14,15 @@ import {
   manifestSchema,
   validateManifest,
 } from "./content.config";
-import { CLAIMED_DATA_ITEMS } from "./lib/hub-content.mjs";
+import {
+  CLAIMED_DATA_ITEMS,
+  DEFAULT_MANIFEST_VERSION,
+  EXPECTED_SOURCES,
+  KNOWN_MANIFEST_VERSIONS,
+  findMissingExpectedSources,
+  isKnownManifestVersion,
+  manifestVersionOf,
+} from "./lib/hub-content.mjs";
 
 // The contract stream's own artefacts. SEAM-1 requires both ends to validate
 // THESE fixtures; inventing parallel ones would let the two ends drift.
@@ -63,6 +71,19 @@ describe("the Zod collection mirrors contract/manifest.schema.json", () => {
     expect(PATTERNS.date).toBe(item.properties.date.pattern);
     expect(PATTERNS.tag).toBe(item.properties.tags.items.pattern);
     expect(PATTERNS.schema_version).toBe(item.properties.schema_version.pattern);
+    // ADR-0009. Mirrored from the schema's own string, like every other pattern,
+    // so a change on the contract side fails this build rather than drifting.
+    expect(PATTERNS.manifest_version).toBe(schema.properties.manifest_version.pattern);
+  });
+
+  it("mirrors manifest_version as a DISTINCT pattern from schema_version", () => {
+    // They look similar and mean different things. manifest_version is integers
+    // only, because the hub matches it exactly against a known list; a dotted
+    // form would invite compatibility reasoning nothing implements (ADR-0009).
+    expect(PATTERNS.manifest_version).toBe("^[0-9]+$");
+    expect(PATTERNS.manifest_version).not.toBe(PATTERNS.schema_version);
+    expect(new RegExp(PATTERNS.manifest_version).test("1")).toBe(true);
+    expect(new RegExp(PATTERNS.manifest_version).test("1.2")).toBe(false);
   });
 
   it("carries the same lengths and counts", () => {
@@ -87,6 +108,11 @@ describe("the Zod collection mirrors contract/manifest.schema.json", () => {
     // Every declared item property is mirrored, and no extra one is invented.
     const mirrored = Object.keys(manifestSchema.shape.items.element.def.shape ?? {});
     expect(mirrored.sort()).toEqual(Object.keys(item.properties).sort());
+    // And the same at the ROOT, which is where manifest_version lives. Without
+    // this, a new top-level field could land in the schema and be silently
+    // rejected here as "unknown" rather than mirrored.
+    const mirroredRoot = Object.keys(manifestSchema.def.shape ?? {});
+    expect(mirroredRoot.sort()).toEqual(Object.keys(schema.properties).sort());
   });
 });
 
@@ -110,6 +136,112 @@ describe("the shared contract fixtures", () => {
 
   it.each(invalidFixtures)("rejects contract/examples/invalid/%s", (name) => {
     expect(() => check(readJson(path.join(INVALID_DIR, name)))).toThrow(HubContentError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// manifest_version — the ENVELOPE version (ADR-0009)
+// ---------------------------------------------------------------------------
+describe("manifest_version is accepted, defaulted and vetted", () => {
+  const manifest = (over: Record<string, unknown> = {}) => ({
+    source: "phd-milestones",
+    published: "2026-09-17T00:00:00Z",
+    items: [],
+    ...over,
+  });
+
+  it("is OPTIONAL, exactly as in the schema (decision 1)", () => {
+    expect(schema.required).not.toContain("manifest_version");
+    expect(() => check(manifest())).not.toThrow();
+  });
+
+  it("ABSENT MEANS \"1\" (decision 2), so every pre-ADR-0009 manifest stays valid", () => {
+    expect(DEFAULT_MANIFEST_VERSION).toBe("1");
+    expect(manifestVersionOf({})).toBe("1");
+    expect(manifestVersionOf({ manifest_version: undefined })).toBe("1");
+    expect(manifestVersionOf({ manifest_version: "1" })).toBe("1");
+    // The contract's own example carries no manifest_version and must still pass.
+    expect(readJson(EXAMPLE_PATH).manifest_version).toBeUndefined();
+    expect(() => check(readJson(EXAMPLE_PATH))).not.toThrow();
+  });
+
+  it("accepts a known version explicitly declared", () => {
+    expect(KNOWN_MANIFEST_VERSIONS).toEqual(["1"]);
+    expect(isKnownManifestVersion("1")).toBe(true);
+    expect(() => check(manifest({ manifest_version: "1" }))).not.toThrow();
+  });
+
+  it("FAILS THE BUILD on a version the hub does not know (decision 3)", () => {
+    // The same shape as the existing schema_version check, because it is the
+    // same kind of mistake: reading a document written to rules you have never
+    // seen and assuming they are the rules you know.
+    expect(isKnownManifestVersion("2")).toBe(false);
+    expect(() => check(manifest({ manifest_version: "2" }))).toThrow(HubContentError);
+    expect(() => check(manifest({ manifest_version: "2" }))).toThrow(
+      /manifest_version: "2" is not an envelope version this hub understands/,
+    );
+  });
+
+  it("rejects a DOTTED version for the right reason — the pattern, not strictness", () => {
+    // Before this change the Zod mirror rejected contract/examples/invalid/
+    // manifest-version-not-an-integer.json because manifest_version was an
+    // UNKNOWN FIELD, which is an accident that would have disappeared the moment
+    // the field was mirrored. Now it must be rejected by the pattern itself.
+    const dotted = readJson(path.join(INVALID_DIR, "manifest-version-not-an-integer.json"));
+    expect(dotted.manifest_version).toBe("1.2");
+    const parsed = manifestSchema.safeParse(dotted);
+    expect(parsed.success).toBe(false);
+    expect(JSON.stringify(parsed.error?.issues)).toMatch(/manifest_version/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The expected-source set (ADR-0010 decision 4, closing C27)
+// ---------------------------------------------------------------------------
+describe("a declared source whose prefix has entirely vanished is a fault", () => {
+  it("declares both satellites, with phd-milestones not yet required", () => {
+    expect(EXPECTED_SOURCES.map((e) => e.source)).toEqual(["cv", "phd-milestones"]);
+    expect(EXPECTED_SOURCES.find((e) => e.source === "cv")?.required).toBe(true);
+    // Not yet: it cannot publish until Checkpoint 4, and a guard that fails
+    // every build until then would simply be deleted. Flipped at Checkpoint 4.
+    expect(EXPECTED_SOURCES.find((e) => e.source === "phd-milestones")?.required).toBe(false);
+  });
+
+  it("reports a required source whose prefix is absent", () => {
+    const problems = findMissingExpectedSources([]);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/"cv" has no prefix at all/);
+    expect(problems[0]).toMatch(/FAULT, not a withdrawal/);
+  });
+
+  it("says nothing when every required source is present", () => {
+    expect(findMissingExpectedSources(["cv"])).toEqual([]);
+    expect(findMissingExpectedSources(["cv", "phd-milestones"])).toEqual([]);
+  });
+
+  it("does NOT confuse a vanished prefix with a withdrawal (decision 2 vs 4)", () => {
+    // Withdrawing everything still means publishing a manifest with an empty
+    // items array. That is legitimate and must keep passing.
+    const root = writeTree({
+      "cv/manifest.json": JSON.stringify({
+        source: "cv",
+        published: "2026-09-16T09:15:00Z",
+        items: [],
+      }),
+    });
+    expect(() => loadSources(root)).not.toThrow();
+    expect(loadSources(root)[0].manifest.items).toEqual([]);
+  });
+
+  it("FAILS loadSources when a required source's whole prefix is gone", () => {
+    const root = writeTree({
+      "phd-milestones/manifest.json": JSON.stringify({
+        source: "phd-milestones",
+        published: "2026-09-17T00:00:00Z",
+        items: [],
+      }),
+    });
+    expect(() => loadSources(root)).toThrow(/expected published sources are missing/);
   });
 });
 

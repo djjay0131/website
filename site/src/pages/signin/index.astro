@@ -1,0 +1,274 @@
+---
+// THE SIGN-IN PAGE (site-phase-3 contract D6; design doc §6 responsibility 1;
+// ADR-0004 decision 2).
+//
+// THIS IS A PUBLIC PAGE, and it is the only public page this phase adds. It must
+// therefore name NO private item and reveal NOTHING about what exists behind it:
+// no titles, no slugs, no counts, not even "2 documents". It says only that
+// there is a members' area and offers two ways to sign in. Everything it could
+// leak, it does not know: it reads no collection and imports nothing from
+// src/private/ (asserted by scripts/private-structure.test.ts).
+//
+// It obtains a Firebase ID token in the browser and POSTs it to the gate at
+// POST /session as {"idToken": "..."}. That request body is the entire interface
+// between this page and the gate (SEAM-2); the gate owns /session, mints the
+// session cookie, and -- crucially -- that cookie MUST be named __session,
+// because Firebase Hosting strips every other cookie on a Cloud Run rewrite
+// (ADR-0004). This page never sets, reads or names a cookie: it hands over a
+// token and follows the redirect. Doing otherwise is how a sign-in works when
+// tested directly and fails through Hosting.
+//
+// A non-member who signs in successfully gets the gate's "not shared with you"
+// response. That is a correct outcome, not an error, and it is rendered plainly
+// here -- no retry loop, no "access denied" alarm, and no hint that there was
+// something to be denied.
+//
+// >>> NOT YET WIRED: /session is not routed to the gate in this PR. Hosting
+// >>> rejects a configuration naming a Cloud Run service that does not exist
+// >>> (issue #10 K2), and `hub-gate` is not deployed, so firebase.json carries no
+// >>> /session or /p/** rewrite yet (SEAM-6). They land in a follow-up after the
+// >>> gate is deployed at Checkpoint 4. Until then this page renders its
+// >>> "not configured yet" state and posts nothing.
+import Base from "../../layouts/Base.astro";
+
+// Firebase Web config is PUBLIC client configuration, not a credential -- but it
+// does not exist until Identity Platform is created at Checkpoint 4, so it is
+// read from the build environment and NOT invented here. With it unset the page
+// renders a plain unconfigured state and ships no dead sign-in button.
+const firebaseConfig = {
+  apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY ?? "",
+  authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN ?? "",
+  projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID ?? "",
+};
+const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId);
+---
+
+<Base
+  title="Sign in"
+  description="Sign in to the members' area."
+  noindex
+>
+  <h1>Sign in</h1>
+  <p class="lede">
+    Some material here is shared with named people. Sign in to see anything that
+    has been shared with you.
+  </p>
+
+  {configured ? (
+    <div class="signin">
+      <button id="google" type="button" class="btn btn-primary">Continue with Google</button>
+
+      <form id="email-form" class="email-form">
+        <label for="email">Or get a sign-in link by email</label>
+        <div class="email-row">
+          <input id="email" name="email" type="email" autocomplete="email" required
+                 placeholder="you@example.edu" />
+          <button type="submit" class="btn btn-secondary">Send link</button>
+        </div>
+      </form>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </div>
+  ) : (
+    <div class="empty-state" role="status">
+      <p class="empty-title">Sign-in is not available yet</p>
+      <p>
+        The members' area is still being set up. There is nothing to sign in to
+        at the moment.
+      </p>
+    </div>
+  )}
+
+  <script is:inline define:vars={{ firebaseConfig, configured }}>
+    window.__HUB_FIREBASE__ = { firebaseConfig, configured };
+  </script>
+
+  <script>
+    // Bundled from the `firebase` npm package, not fetched from a CDN: this site
+    // self-hosts everything it loads (see Base.astro), and a sign-in page is the
+    // last place to introduce a third-party origin. Astro code-splits per page,
+    // so only /signin/ pays for this.
+    const boot = (window as any).__HUB_FIREBASE__;
+    if (boot?.configured) {
+      const { initializeApp } = await import("firebase/app");
+      const {
+        getAuth,
+        GoogleAuthProvider,
+        signInWithPopup,
+        sendSignInLinkToEmail,
+        isSignInWithEmailLink,
+        signInWithEmailLink,
+      } = await import("firebase/auth");
+
+      const statusEl = document.getElementById("status")!;
+      const say = (message: string) => {
+        statusEl.textContent = message;
+      };
+
+      const app = initializeApp(boot.firebaseConfig);
+      const auth = getAuth(app);
+
+      // Hand the ID token to the gate. This is the whole interface (SEAM-2): the
+      // gate verifies it, mints the __session cookie and answers. A non-member
+      // gets the gate's "not shared with you" response, which is a correct
+      // answer and is shown as plainly as any other.
+      async function exchange(idToken: string) {
+        say("Signing you in…");
+        let response: Response;
+        try {
+          response = await fetch("/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken }),
+            credentials: "same-origin",
+          });
+        } catch {
+          say("Could not reach the sign-in service. Please try again.");
+          return;
+        }
+        if (response.ok) {
+          window.location.assign("/p/");
+          return;
+        }
+        if (response.status === 403) {
+          // Deliberately the gate's own wording, and deliberately not alarming:
+          // it names nothing and implies nothing about what exists.
+          say("You're signed in, but nothing here has been shared with you.");
+          return;
+        }
+        say("Sign-in did not complete. Please try again.");
+      }
+
+      document.getElementById("google")?.addEventListener("click", async () => {
+        try {
+          const credential = await signInWithPopup(auth, new GoogleAuthProvider());
+          await exchange(await credential.user.getIdToken());
+        } catch {
+          say("Sign-in was cancelled or did not complete.");
+        }
+      });
+
+      const EMAIL_KEY = "hub:signInEmail";
+
+      document.getElementById("email-form")?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const email = (document.getElementById("email") as HTMLInputElement).value.trim();
+        if (!email) return;
+        try {
+          await sendSignInLinkToEmail(auth, email, {
+            url: `${window.location.origin}/signin/`,
+            handleCodeInApp: true,
+          });
+          window.localStorage.setItem(EMAIL_KEY, email);
+          say("Check your email for a sign-in link.");
+        } catch {
+          say("Could not send a sign-in link. Please check the address and try again.");
+        }
+      });
+
+      // Returning from an email link.
+      if (isSignInWithEmailLink(auth, window.location.href)) {
+        const stored = window.localStorage.getItem(EMAIL_KEY)
+          ?? window.prompt("Confirm your email address to finish signing in")
+          ?? "";
+        if (stored) {
+          try {
+            const credential = await signInWithEmailLink(auth, stored, window.location.href);
+            window.localStorage.removeItem(EMAIL_KEY);
+            await exchange(await credential.user.getIdToken());
+          } catch {
+            say("That sign-in link has expired or has already been used.");
+          }
+        }
+      }
+    }
+  </script>
+</Base>
+
+<style>
+  .lede {
+    font-size: 1.05rem;
+    color: var(--color-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .signin {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 28rem;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+
+  .btn-primary {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-color: var(--color-border);
+  }
+
+  .email-form label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--color-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .email-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .email-row input {
+    flex: 1;
+    min-width: 12rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+  }
+
+  .status:empty {
+    display: none;
+  }
+
+  .status {
+    font-size: 0.9rem;
+    color: var(--color-muted);
+  }
+
+  .empty-state {
+    padding: 1.5rem;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-muted);
+    max-width: 28rem;
+  }
+
+  .empty-title {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 0.25rem;
+  }
+</style>

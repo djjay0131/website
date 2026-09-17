@@ -32,7 +32,15 @@ import { defineCollection } from "astro/content/config";
 import { z } from "astro/zod";
 import fs from "node:fs";
 import path from "node:path";
-import { CLAIMED_DATA_ITEMS, SOURCES_DIR, claimFor } from "./lib/hub-content.mjs";
+import {
+  CLAIMED_DATA_ITEMS,
+  KNOWN_MANIFEST_VERSIONS,
+  SOURCES_DIR,
+  claimFor,
+  findMissingExpectedSources,
+  isKnownManifestVersion,
+  manifestVersionOf,
+} from "./lib/hub-content.mjs";
 
 // --- Fixed sets (schema `enum`; SEAM-1) -------------------------------------
 
@@ -54,6 +62,10 @@ export const PATTERNS = {
   date: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
   tag: "^[a-z0-9]+(?:-[a-z0-9]+)*$",
   schema_version: "^[0-9]+(?:\\.[0-9]+){0,2}$",
+  // ADR-0009. Note it is NOT the same pattern as schema_version: integers only,
+  // no dotted form, because the hub matches it exactly against a known list and
+  // a dotted version invites compatibility reasoning nothing implements.
+  manifest_version: "^[0-9]+$",
 } as const;
 
 // --- Lengths and counts (schema minLength/maxLength/maxItems) ---------------
@@ -118,9 +130,18 @@ export const itemSchema = z
     }
   });
 
-/** The whole manifest — the schema's root object. */
+/**
+ * The whole manifest — the schema's root object.
+ *
+ * `manifest_version` is OPTIONAL here and in the schema (ADR-0009 decision 1),
+ * and absent means "1" (decision 2), so every manifest published before ADR-0009
+ * stays valid unchanged. The pattern is mirrored character for character, and
+ * whether the VALUE is one this hub understands is a separate question answered
+ * in validateManifest() — the schema's job is the shape, not the vocabulary.
+ */
 export const manifestSchema = z.strictObject({
   source: z.string().regex(re(PATTERNS.source)),
+  manifest_version: z.string().regex(re(PATTERNS.manifest_version)).optional(),
   published: z.string().regex(re(PATTERNS.published)),
   items: z.array(itemSchema),
 });
@@ -223,6 +244,23 @@ export function validateManifest(raw: unknown, expectedSource: string): Manifest
 
   const problems: string[] = [];
 
+  // ADR-0009 decision 3: an envelope version this hub does not know FAILS THE
+  // BUILD, exactly as an unknown schema_version does (ADR-0008 decision 5). The
+  // two checks are deliberately the same shape, because they are the same kind
+  // of mistake: reading a document written to rules you have never seen and
+  // assuming they are the rules you know.
+  const envelope = manifestVersionOf(manifest);
+  if (!isKnownManifestVersion(envelope)) {
+    problems.push(
+      `  manifest_version: ${JSON.stringify(envelope)} is not an envelope version this hub ` +
+        `understands. Known: ${KNOWN_MANIFEST_VERSIONS.map((v) => JSON.stringify(v)).join(", ")}. ` +
+        `manifest_version versions the manifest ENVELOPE — the field set, the fixed enums, the ` +
+        `rules every source obeys — and is bumped by the hub when the contract changes, not by a ` +
+        `satellite (ADR-0009). An absent manifest_version means "1". Teach the hub this version ` +
+        `before a satellite publishes it.`,
+    );
+  }
+
   if (manifest.source !== expectedSource) {
     problems.push(
       `  source: the manifest says ${JSON.stringify(manifest.source)} but it was published under the prefix ` +
@@ -288,6 +326,23 @@ export function loadSources(sourcesDir: string): LoadedSource[] {
     }
     loaded.push({ source, manifest: validateManifest(raw, source) });
   }
+
+  // ADR-0010 decision 4, closing C27. A source whose entire prefix has vanished
+  // is otherwise invisible: the loop above simply finds no directory and reports
+  // nothing wrong. That is benign for `cv` and is not benign for the private
+  // source, whose silent disappearance would empty the private area while every
+  // check reported success.
+  //
+  // This is deliberately NOT the same thing as an empty `items` array, which is
+  // a legitimate withdrawal (decision 2) and is accepted. Withdrawing everything
+  // still means publishing a manifest.
+  const missing = findMissingExpectedSources(loaded.map((l) => l.source));
+  if (missing.length > 0) {
+    throw new HubContentError(
+      `expected published sources are missing from the synced tree:\n${missing.map((m) => `  ${m}`).join("\n")}`,
+    );
+  }
+
   return loaded;
 }
 

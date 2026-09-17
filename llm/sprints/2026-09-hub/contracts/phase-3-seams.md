@@ -108,6 +108,14 @@ phd-milestones ──publish──▶ gs://<content-bucket>/sources/phd-mileston
 - A deliberate failing run is an acceptance criterion: the check must be *shown* failing when a
   private slug appears under `dist-public`.
 
+- **Filenames in `dist-private` must match the gate's path allowlist.** The gate validates
+  `/p/{path}` with an allowlist — each segment `[A-Za-z0-9._-]` — and refuses anything else
+  with a 404 *before* touching the bucket. So a private file whose name contains a space, `~`,
+  `+`, `@`, `%`, `:`, parentheses or a non-ASCII character syncs perfectly, leaves the build
+  green, and then 404s for a signed-in member with no error anywhere. The private build fails
+  on a violating segment. *(Added 2026-09-17: this was the gate stream's SD-7, undocumented in
+  every contract, seam and ADR until it was found.)*
+
 ## SEAM-5 — Withdrawal is destructive on the private side (ADR-0010)
 
 - The private sync **deletes destination objects the current build did not produce**. A

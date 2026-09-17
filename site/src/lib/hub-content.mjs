@@ -86,10 +86,125 @@ export const CV_PHOTO_PATH = `${CV_DATA_DIR}/photo_jason_1.jpeg`;
 export const PUBLIC_PDF_DIR = "public/pdfs";
 export const PUBLIC_PHOTO_PATH = "public/photo_jason_1.jpeg";
 
-/** The path under public/ a published item is served from, or null to leave it alone. */
+/**
+ * The path under public/ a published item is served from, or null to leave it
+ * alone.
+ *
+ * THE VISIBILITY GUARD IS FIRST AND IS NOT REDUNDANT. Everything staged here
+ * lands in site/public/, which Astro copies verbatim into dist-public and which
+ * is therefore the public internet. Before Phase 3 a private item could not
+ * reach this function's non-null branch, but only as a side effect of the
+ * `source === "cv"` test -- the code never actually asked about visibility. That
+ * made the safety of this function depend on a fact about which satellites
+ * exist, which stopped being true the moment `phd-milestones` was added. The
+ * check below asks the question directly, so the guarantee survives the next
+ * satellite and the next format (ADR-0005; design doc §12.1).
+ */
 export function publicAssetPathFor(item, source) {
+  if (item?.visibility !== "public") return null;
   if (source === CV_SOURCE && item.format === "pdf" && item.section === "cv") {
     return `${PUBLIC_PDF_DIR}/${item.slug}.pdf`;
   }
   return null;
+}
+
+// --- The manifest envelope version (ADR-0009) -------------------------------
+//
+// `manifest_version` versions the ENVELOPE -- the field set, the fixed enums,
+// the rules every source obeys. It is distinct from an item's `schema_version`,
+// which versions one `data` payload's internal shape (ADR-0008 decision 5). The
+// two answer different questions and are bumped by different people; the table
+// is in contract/README.md and docs/satellites.md.
+//
+// It is OPTIONAL today and ABSENT MEANS "1" (ADR-0009 decision 2), so every
+// manifest published before ADR-0009 stays valid unchanged. It becomes required
+// in Phase 5 (decision 4).
+
+/** What an absent `manifest_version` means (ADR-0009 decision 2). */
+export const DEFAULT_MANIFEST_VERSION = "1";
+
+/**
+ * Envelope versions this hub understands.
+ *
+ * A value outside this list FAILS THE BUILD (ADR-0009 decision 3), exactly as an
+ * unrecognised `schema_version` does. Silent tolerance of an unknown envelope
+ * version is how a contract stops meaning anything: the hub would be reading a
+ * manifest written to rules it has never seen and guessing that they match.
+ *
+ * Add a version here only together with the code that understands it.
+ */
+export const KNOWN_MANIFEST_VERSIONS = ["1"];
+
+/** The envelope version of a manifest, applying the "absent means 1" default. */
+export function manifestVersionOf(manifest) {
+  const declared = manifest?.manifest_version;
+  return typeof declared === "string" && declared !== "" ? declared : DEFAULT_MANIFEST_VERSION;
+}
+
+/** True when this hub understands the manifest's envelope version. */
+export function isKnownManifestVersion(version) {
+  return KNOWN_MANIFEST_VERSIONS.includes(version);
+}
+
+// --- The expected sources (ADR-0010 decision 4, closing C27) -----------------
+//
+// A source whose entire bucket prefix has VANISHED is otherwise
+// indistinguishable from a source that never existed: `loadSources()` simply
+// finds no directory and reports nothing wrong. That is benign for `cv` and is
+// not benign for `phd-milestones`, whose absence would silently empty the
+// private area (C27).
+//
+// So the hub declares which sources it expects, here, beside CLAIMED_DATA_ITEMS.
+//
+// WHY `required` IS A FIELD AND NOT AN ASSUMPTION. ADR-0010 decision 4 says a
+// declared source whose prefix is entirely absent fails the build. Taken
+// literally at the moment this lands, that would fail EVERY build immediately:
+// `phd-milestones` has not published yet and cannot until Checkpoint 4, and the
+// pull-request and fallback content paths only ever produce `cv`. A guard that
+// fails every build from the day it lands is removed within a day, which is the
+// opposite of what decision 4 is for. So each entry carries the phase from which
+// its absence is a fault, and `phd-milestones` starts declared-but-not-required.
+//
+// >>> CHECKPOINT 4 ACTION: once phd-milestones has published successfully, flip
+// >>> its `required` to true. Until then its absence is expected, and after then
+// >>> its absence is exactly the fault ADR-0010 decision 4 exists to catch.
+export const EXPECTED_SOURCES = [
+  {
+    source: "cv",
+    required: true,
+    since: "Phase 2",
+    note: "Satellite #1. Publishes the CV variants and the cv-data payload.",
+  },
+  {
+    source: "phd-milestones",
+    required: false,
+    since: "Checkpoint 4",
+    note:
+      "Satellite #2, the private one (SEAM-7). Declared now so the set is complete and " +
+      "reviewable; not yet required, because it cannot publish until Checkpoint 4 and a " +
+      "guard that fails every build in the meantime would simply be deleted. Flip to " +
+      "required: true once it has published (ADR-0010 decision 4).",
+  },
+];
+
+/**
+ * Declared sources that are REQUIRED but whose prefix is entirely absent.
+ *
+ * @param {readonly string[]} presentSources source names found under the synced tree
+ * @param {{ expected?: readonly {source: string, required: boolean, since: string}[] }} [options]
+ * @returns {string[]} human-readable problems, empty when every required source is present
+ */
+export function findMissingExpectedSources(presentSources, options = {}) {
+  const expected = options.expected ?? EXPECTED_SOURCES;
+  const present = new Set(presentSources);
+  return expected
+    .filter((entry) => entry.required && !present.has(entry.source))
+    .map(
+      (entry) =>
+        `the expected source "${entry.source}" has no prefix at all under the synced tree. ` +
+        `The hub has expected it since ${entry.since}, so its complete absence is a FAULT, not a ` +
+        `withdrawal: a source that withdrew everything still publishes a manifest with an empty ` +
+        `items array (ADR-0010 decisions 2 and 4). Either the sync did not complete, or the ` +
+        `prefix was deleted. Found: ${[...present].sort().join(", ") || "(no sources at all)"}.`,
+    );
 }

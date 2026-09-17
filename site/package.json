@@ -20,7 +20,12 @@
     "redirects:generate": "node scripts/generate-redirect-map.mjs",
     "redirects:check": "node scripts/generate-redirect-map.mjs --check",
     "contrast": "node scripts/contrast.mjs",
-    "check:smoke-routes": "node scripts/check-smoke-routes.mjs"
+    "check:smoke-routes": "node scripts/check-smoke-routes.mjs",
+    "build:public": "HUB_OUTPUT=public astro build",
+    "build:private": "HUB_OUTPUT=private astro build",
+    "check:no-private-in-public": "node scripts/check-no-private-in-public.mjs",
+    "demo:leak-check": "node scripts/demo-leak-check.mjs",
+    "sync:private": "node scripts/sync-private.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.8",
@@ -32,6 +37,7 @@
     "@fontsource/spectral": "^5.3.0",
     "@types/js-yaml": "^4.0.9",
     "astro": "^6.1.7",
+    "firebase": "^12.19.0",
     "js-yaml": "^4.1.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.4"

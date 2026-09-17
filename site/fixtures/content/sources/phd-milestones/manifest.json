@@ -1,0 +1,29 @@
+{
+  "source": "phd-milestones",
+  "manifest_version": "1",
+  "published": "2026-09-17T00:00:00Z",
+  "items": [
+    {
+      "slug": "milestones",
+      "title": "Programme Milestone Tracker (fixture)",
+      "section": "phd",
+      "format": "html",
+      "path": "site/index.html",
+      "visibility": "private",
+      "date": "2026-09-17",
+      "summary": "Invented fixture standing in for the private milestone tracker.",
+      "tags": ["phd"]
+    },
+    {
+      "slug": "committee-dossier",
+      "title": "Committee Dossier (fixture)",
+      "section": "phd",
+      "format": "html",
+      "path": "site/committee.html",
+      "visibility": "private",
+      "date": "2026-09-17",
+      "summary": "Invented fixture standing in for the private committee dossier.",
+      "tags": ["phd", "committee"]
+    }
+  ]
+}

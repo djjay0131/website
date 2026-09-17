@@ -563,6 +563,12 @@ Phase 1's `firebase.json` carries no gate rewrites.
 
 ## Constraints discovered (bind later contracts)
 
+- **A cross-stream environment variable is a contract, and nothing checks it.** Two streams
+  can each be green while disagreeing about the name of a variable one sets and the other
+  reads; neither runs the other's code. Any future phase that splits a producer and a
+  consumer across streams must name the exact variable in the seam, not in prose. Phase 3
+  cost one such defect (the gate's `GATE_PRIVATE_BUCKET`).
+
 - **Gate session cookie must be named `__session`** — Firebase Hosting strips
   every other cookie on Cloud Run rewrites. Phase 3 gate contract. (ADR-0004)
 - **Gate invoker is `allUsers`** — every check must hold on direct `*.run.app`
@@ -883,6 +889,41 @@ otherwise on a specific PR.
 bootstrap defect, closed by PR #20). **Left open:** #21 — `sync-content.sh` needs curl >= 7.76
 and misreports an old curl as a bucket-listing failure. CI is unaffected; it costs a
 contributor an hour on a first local sync.
+
+## Phase 3 integration findings (Lead Architect, 2026-09-17)
+
+All four streams reported green. These are the defects that existed **between** them —
+none discoverable by a stream validating its own scope, which is the point.
+
+- **The gate could not have started.** `infra/gate.tf` rendered the Cloud Run env var as
+  `PRIVATE_BUCKET`; `gate/app/config.py:71` reads `GATE_PRIVATE_BUCKET` and line 73 raises
+  `ValueError` when it is empty. Nothing in `gate/` reads the bare name, no gate test pins
+  it, and `gate.yml`'s deploy sets no env at all (only `--image`), so nothing would have
+  masked it. The revision would have failed its health check at Checkpoint 4 with a message
+  pointing at the gate, not at infra. **Fixed in `infra/gate.tf`** — every other gate
+  variable already carries the `GATE_` prefix, so infra was the deviant, not the gate.
+  `terraform fmt -check` and `validate` pass after the change.
+
+- **The leak check is inert in CI, and was going to stay that way.** It runs on every
+  deploy but exits 0 while printing that it proved nothing, because no private item is
+  published until Checkpoint 4. The deliberate failing demonstration existed and ran
+  nowhere. **Added the `leak-check-self-test` job** to `build.yml`: it publishes the
+  committed fixture, builds, and asserts the check *fails* on an injected slug. It runs in
+  its own job because `content:fixture` rewrites `site/src/content`, and doing that inside
+  `build` or `build-firebase` would put fixture content into the artifact those jobs upload
+  to the live site. It gates nothing; promoting it to a required check is a Checkpoint 4
+  decision for the owner.
+
+- **`vars.GCP_PRIVATE_BUCKET` was a false alarm.** The site stream flagged it as a name it
+  had invented and could not find in infra. `infra/outputs.tf` exports exactly that name in
+  `gate_github_actions_variables`. The two streams agreed by coincidence rather than by
+  contract, which is worth noting even though the outcome was correct.
+
+- **The leak check was verified failing, by hand.** 9 leaks on the injected build, exit 1 —
+  and five of them are content-only hits in `index.html` with no matching path (qualified-id,
+  slug, route, source, title). That is the class a path-only check misses, and it is the
+  disagreement ADR-0005 settled against the brief's §4 on reasoning alone. It now has
+  evidence.
 
 ## Risks carried forward
 

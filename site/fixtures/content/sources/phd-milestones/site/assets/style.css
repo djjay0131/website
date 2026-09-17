@@ -1,0 +1,19 @@
+/* Invented fixture stylesheet. It exists so the fixture exercises the
+   "format: html page that loads a sibling asset" shape SEAM-7 describes and the
+   satellite-phd contract's open question (a) raises. */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 2rem auto;
+  max-width: 40rem;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid #ccc;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}

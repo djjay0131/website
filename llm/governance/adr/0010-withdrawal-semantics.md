@@ -48,6 +48,16 @@ for it before Phase 3, "when the withdrawn item may be private".
    indistinguishable from a source that never existed — C27, which is benign for `cv` and
    is not benign for `phd-milestones`.
 
+   **Amended 2026-09-17, on the site stream's finding.** Taken literally this fails *every*
+   build during bootstrap: a source must be declared before it can publish, and
+   `phd-milestones` cannot publish until Checkpoint 4. So each declaration carries a
+   **`required` flag**. `required: true` means absence fails the build — the protection this
+   decision exists for. `required: false` means the source is known but not yet expected, and
+   is the only correct state between declaring a satellite and its first successful publish.
+   Flipping a source to `required: true` after that first publish is a checkpoint action, not
+   an optional tidy-up: left at `false`, a vanished prefix goes undetected, which is exactly
+   C27. This is the same bootstrap shape as issue #19.
+
 5. **Withdrawal must remove the artifact from the private output, not merely from the
    index.** The private sync deletes destination objects that the current build did not
    produce, so a withdrawn private item stops being readable by the gate rather than
@@ -125,7 +135,9 @@ which is where the actual risk is. Worth revisiting if withdrawal ever needs an 
 - **Withdrawn bytes remain in the content bucket**, readable by the hub's identity, until
   the satellite deletes them. Withdrawal removes the item from the site, not from storage.
   For genuinely sensitive material the satellite must delete the object as well, and that
-  is on the satellite owner — stated in `docs/satellites.md` rather than assumed.
+  is on the satellite owner — stated in `docs/satellites.md` rather than assumed. *(That
+  statement was missing from the page when this ADR claimed it; added 2026-09-17 after the
+  site stream noticed the ADR asserting documentation that did not exist.)*
 - The expected-source set is another declaration to keep current; a source added to the
   bucket but not to that list is invisible, and one removed from the bucket but left in the
   list fails the build until someone edits it.

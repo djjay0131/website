@@ -208,8 +208,13 @@ resource "google_cloud_run_v2_service" "gate" {
         cpu_idle = true
       }
 
+      # GATE_-prefixed, and that prefix is load-bearing. app/config.py reads
+      # GATE_PRIVATE_BUCKET and raises ValueError when it is empty, so a bare
+      # PRIVATE_BUCKET here makes the container fail at startup -- the revision
+      # never becomes healthy, and nothing in either stream's tests catches it
+      # because neither runs the other's code. Found at integration, 2026-09-17.
       env {
-        name  = "PRIVATE_BUCKET"
+        name  = "GATE_PRIVATE_BUCKET"
         value = google_storage_bucket.private.name
       }
 
