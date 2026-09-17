@@ -198,48 +198,38 @@ private material touches the system.
 
 ## In flight
 
-**Phase 2 (#16), draft PR #17, branch `feat/publishing-contract`.**
+**Phase 3 (#24), draft PR #25, branch `feat/private-area`.** Governance wave committed and
+pushed as `9888daa`, CI green on all six required checks: ADR-0009, ADR-0010, the ADR index,
+`phase-3-seams.md`, five bounded contracts, `manifest_version` in the schema with its
+rejection fixture, and the two-version documentation in `contract/README.md` and
+`docs/satellites.md`.
 
-Landed and committed:
+**`djjay0131/phd-milestones` exists — do not create it again.** Private, created 2026-09-17
+from the Incident A1 seed blob in the Lead Architect's local object store (the remote handoff
+branch is long deleted). Default branch `main` at `24afd9d`, the seed's single commit
+preserved. Working checkout at `/mnt/c/code/phd-milestones`, already on branch
+`feat/publish-contract`. For the WIF entry: `repository_id=1373915518`,
+`owner_id=5666389`, `default_branch=main` — note `cv` is `master`, which is why that field is
+per satellite.
 
-- Decisions: ADR-0007, ADR-0008, design doc §2/§3/§4 amendments, roadmap, delta (artifacts
-  slot `docs/` declared), `docs/satellites.md`, all six bounded contracts, memory bank.
-- **`contract` stream — DONE** (commit `0866222`). Schema, 12 invalid fixtures, dependency-free
-  validator, composite publish action, README. Verified by the Lead Architect: 54/54 tests on
-  re-run, no tracked file touched, every forbidden construct present only as a comment
-  explaining the prohibition. Handoff: `handoffs/contract-phase-2.md`.
-- **`infra` stream — DONE** (commit `7a2f238`). Content bucket, three-permission custom role,
-  `satellites` WIF pool, cv identity; 9 resources. Verified: UBLA true, prefix condition ends
-  in a slash, no `objects.list` grant anywhere, cv admitted at `refs/heads/master`,
-  `terraform fmt`/`validate` clean, `budget.tf` untouched. Handoff: `handoffs/infra-phase-2.md`.
+**All four specialist streams launched 2026-09-17 and running:**
 
-Running now — **do not relaunch either without first checking for its handoff in
-`handoffs/`:**
+- **`gate`** — `gate/**` and `.github/workflows/gate.yml`, against `contracts/gate-phase-3.md`.
+- **`infra`** — `infra/**`, against `contracts/infra-phase-3.md`. Must resolve the conflict in
+  its open question (a): the roadmap's bucket IAM test forbids any reader of the private
+  bucket other than the gate, but ADR-0010's destructive sync needs the hub's identity to list
+  and delete there.
+- **`site`** — `site/**` and `.github/workflows/build.yml`, against `contracts/site-phase-3.md`.
+- **`satellite-phd`** — the private `phd-milestones` checkout, against
+  `contracts/satellite-phd-phase-3.md`.
 
-- **`site` — DONE** (commit `9be8d98`). Collection mirroring the schema, CV repointed at the
-  synced payload, poll wiring, fixtures. Verified: the Pages build/deploy/smoke test all
-  survive per the owner's instruction, `repository_dispatch` gone, every action SHA-pinned,
-  bucket work gated on `vars.GCP_CONTENT_BUCKET`, no bucket-metadata call, `findDuplicateSlugs()`
-  implements the rule JSON Schema cannot express, mirror accepts `private`, tests 54 → 102, and
-  the CV renders **byte-identically** (SHA-256 per page, before and after). Handoff:
-  `handoffs/site-phase-2.md`.
-- **`satellite-cv` — DONE.** Committed and pushed to `cv` on branch `feat/publish-contract`.
-  Verified: the "Notify website repo" step is deleted (0 hits for `WEBSITE_DISPATCH_PAT`,
-  `WEBSITE_REPO`, `repository_dispatch` in `build-cv.yml`), publishing gated to
-  `refs/heads/master` on non-PR events, the owner's own `cv` checkout untouched. Handoff:
-  `handoffs/satellite-cv-phase-2.md`. **`cv` PR #13** is open for it (branch
-  `feat/publish-contract`, commit `d9b402d`), and **`cv` PR #14** carries the one-line
-  `bibtexparser<2` pin from Risk 15 (branch `fix/bibtexparser-pin`, commit `5ee7515`).
-  **#14 must merge before #13**, or `cv`'s CI stays red and its publish job cannot run.
+**On restart: do not relaunch any of these without first checking for its handoff in
+`handoffs/` and whether its files already exist.** Relaunching over a stream's own work is the
+failure this record exists to prevent.
 
-**All four implementation streams have landed.** The **Chief Reviewer** is now IN FLIGHT
-(`contracts/chief-reviewer-phase-2.md`), reviewing hub PR #17 at head `9be8d98` and `cv` PR #13
-together. On restart: do not relaunch it if
-`handoffs/chief-reviewer-phase-2.md` already exists.
-
-Remaining after the review: act on its findings, persist it verbatim to
-`handoffs/chief-reviewer-phase-2.md` and post it to PR #17, take #17 out of draft, then the
-owner runs Checkpoint 3 in the order recorded under §Follow-ups.
+Not yet started: the **Chief Reviewer** (`contracts/chief-reviewer-phase-3.md`), which also
+carries this phase's **Governance Audit across Phases 0-3** against canon **v0.9.0** — whose
+`audit` skill gained the stale-branch check. It runs only once all four streams have landed.
 
 ## Blocked
 
@@ -1027,6 +1017,22 @@ From the Phase 2 `cv` stream (2026-09-16):
   belongs alongside `budget-guard`, which exists for the same reason: an invariant whose
   breakage is invisible where it is authored. Deferred out of Phase 2 because `build.yml`
   was the site stream's file and the Chief Reviewer is mid-review.
+
+Opened during Phase 3 (2026-09-17):
+
+- **Issue #26 — `contract/`'s test suite never runs in CI.** Found while adding
+  `manifest_version`: I ran the suite locally (57/57), then went looking for the CI job that
+  would confirm it and there isn't one. `build`/`build-firebase` run `npm test` with
+  `working-directory: site`; `deploy-tools` installs firebase-tools; nothing invokes
+  `contract/`'s `node --test`. So the schema, the dependency-free validator the publish action
+  actually runs, the 13 rejection fixtures and the fixture-coverage guard are verified only by
+  hand. Same shape as the exit-126 defect and the non-hermetic tests: passes locally,
+  unguarded on the runner. Not fixed now because `build.yml` belongs to the in-flight `site`
+  stream; lands at reconciliation or as its own PR.
+- **`firebase.json` rewrites are deliberately absent from this PR** and are a Checkpoint 4
+  sequencing item. Hosting rejects a configuration naming a Cloud Run service that does not
+  exist, so merging with `/p/**` and `/session` rewrites would break the **public** site's
+  deploy, not merely the private area. They land once `hub-gate` is live.
 
 ## Standing constraints
 
