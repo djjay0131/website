@@ -1033,6 +1033,22 @@ Opened during Phase 3 (2026-09-17):
   sequencing item. Hosting rejects a configuration naming a Cloud Run service that does not
   exist, so merging with `/p/**` and `/session` rewrites would break the **public** site's
   deploy, not merely the private area. They land once `hub-gate` is live.
+- **The shared example fixture still names the real private item, and it is load-bearing.**
+  The `satellite-phd` stream found (H-4) that the public worked example used
+  `phd-milestones` / `committee-dossier` / "Twelve vetted external committee candidates,
+  ranked." The two **prose** files are fixed — `docs/satellites.md` and `contract/README.md`
+  now use a neutral placeholder. `contract/examples/manifest.example.json` is **not** fixed,
+  deliberately: it is asserted as the design doc §4 example verbatim
+  (`validate.test.mjs:95`), its `source` value is asserted at `:293`, the site suite reads it
+  too, and **eleven** invalid fixtures are derived from it and carry the same slug. Changing
+  it cascades across 11 fixtures and two test files, breaks a stated seam property, and
+  collides with the in-flight `site` stream which also reads them.
+
+  This is **propagation, not a new leak**: the identifiers and that summary have been public
+  in design doc §4 since 2026-09-10, and the Chief Reviewer flagged §4's example at Phase 0
+  (finding A1). The question for the owner and the reviewer is whether §4 itself, and the
+  fixture derived from it, should be re-worded — which is a design-authority change, not a
+  tidy-up, and should not be made mid-phase by an agent.
 
 ## Standing constraints
 

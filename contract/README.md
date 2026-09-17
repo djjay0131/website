@@ -64,19 +64,20 @@ it (SEAM-2).
 
 ```json
 {
-  "source": "phd-milestones",
+  "source": "example-notes",
+  "manifest_version": "1",
   "published": "2026-09-10T14:02:11Z",
   "items": [
     {
-      "slug": "committee-dossier",
-      "title": "External Committee Dossier",
+      "slug": "quarterly-review",
+      "title": "Quarterly Review",
       "section": "phd",
       "format": "html",
-      "path": "committee/index.html",
+      "path": "review/index.html",
       "visibility": "private",
       "date": "2026-08-31",
-      "summary": "Twelve vetted external committee candidates, ranked.",
-      "tags": ["committee", "phd"]
+      "summary": "A placeholder item. Private, so it never reaches the public site.",
+      "tags": ["example"]
     }
   ]
 }
