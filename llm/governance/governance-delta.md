@@ -142,6 +142,11 @@ allow llm/governance/adr/[0-9][0-9][0-9][0-9]-*.md status-line-only
 allow llm/master-roadmap.md checkbox-only
 allow llm/** link-target-only
 allow docs/** link-target-only
+# VESTIGIAL, DELIBERATELY RETAINED (2026-09-17 audit, finding A-2). ADR-0001 moved
+# the Astro application under site/, so these three root trees no longer exist. The
+# live trees are site/src/**, site/scripts/**, site/public/** and infra/scripts/**,
+# all covered below. They are kept so that recreating any of these paths at the root
+# is denied by default rather than silently unlisted.
 deny src/**
 deny scripts/**
 deny public/**
@@ -153,6 +158,15 @@ deny firebase.json
 deny .github/**
 deny llm/governance/governance-delta.md
 deny llm/governance/adr/0000-template.md
+# Governance-bearing root files, which were covered by no rule at all until the
+# 2026-09-17 audit. CLAUDE.md carries the two-plane routing rule and the
+# output-location override; .gitignore is what keeps site/dist-public,
+# site/dist-private and the synced content tree out of git, so a change to it
+# interacts directly with ADR-0005 and ADR-0010.
+deny CLAUDE.md
+deny AGENTS.md
+deny CONTRIBUTING.md
+deny .gitignore
 ```
 
 The application, infrastructure and contract trees are denied beyond the

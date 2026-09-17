@@ -925,6 +925,75 @@ none discoverable by a stream validating its own scope, which is the point.
   disagreement ADR-0005 settled against the brief's §4 on reasoning alone. It now has
   evidence.
 
+## Phase 3 review dispositions (Chief Reviewer, PR #25)
+
+Verdict **Request changes**; governance audit **DRIFTING**, no blocking audit finding. The
+full report is persisted verbatim at `handoffs/chief-reviewer-phase-3.md` and posted to #25.
+
+**Blocking — both fixed.**
+
+- **B-1 — design doc §6 still said the gate SA was the bucket's only reader.** Accepted and
+  fixed. §6 requirement 3 carries a dated amendment citing ADR-0010 decision 5 and SEAM-1,
+  and ADR-0010's Related Documents now declares the amendment, as ADR-0008 did for §2/§4. The
+  reviewer's reasoning is the point: every downstream artifact was amended and the one
+  artifact that outranks them was left contradicted, so a Phase 4 contributor "restoring" the
+  stated invariant would silently disable withdrawal.
+- **B-2 — the two-`srcDir` structure was an undocumented deviation from §5 requirement 4.**
+  Accepted and fixed: **ADR-0011** records it, naming the filter alternative and why it was
+  rejected, and the module-graph path a filter could never close.
+
+**Should-fix.**
+
+- **S-1 — nothing in the private output links to anything the gate can serve. NOT fixed
+  here, deliberately; tracked as its own issue.** Verified independently: five distinct
+  targets resolve outside `/p/` (the stylesheet, both `_payload` iframes, both item routes).
+  The fix belongs in the follow-up PR that adds the rewrites, because setting Astro's `base`
+  to `/p/` interacts with where files are emitted and therefore with the object names the
+  sync uploads and the gate resolves — and that cannot be tested against a gate that does
+  not exist yet. The guard the reviewer asks for (no link in `dist-private` resolving outside
+  `/p/`) would fail today, so it lands with the fix rather than before it.
+- **S-2 — the bucket IAM test ran nowhere while three documents said it ran on every push.**
+  Fixed: `check_private_bucket_config.py` is now a step in `budget-guard`, which is already a
+  required check on `main`, so it binds immediately. The three claims now name the job.
+- **S-3 — the sign-in page and the gate disagreed, producing the redirect loop SEAM-3
+  forbids.** Fixed, and it was slightly worse than reported: the gate returns **200** with
+  `{"status":"not_a_member"}`, so `response.ok` was *true* and a non-member took the success
+  branch; the `403` branch was unreachable. The page now branches on the body. SEAM-2 gains
+  the `/session` response contract.
+- **S-4 — `leak-check-self-test` gates nothing.** Owner action at Checkpoint 4: promoting it
+  to a required context is a branch-protection change, not a repository edit.
+- **S-5 — `contract/`'s suite ran nowhere in the PR that edits the schema (issue #26).**
+  Fixed: a `contract-tests` job in `ci.yml`.
+- **S-6 — the memory bank stated things that were false about merged reality.** Fixed:
+  PR #17 is no longer "pending merge", canon is v0.9.0 in all three files, and the ADR range
+  is 0001–0011.
+
+**Audit findings.**
+
+- **A-1 stale branches — report only, no deletion recommended.** `handoff/research-hub` must
+  **never** be recommended for deletion: it was never pushed, it is the only copy of its
+  commit, and it holds the SHA an Incident A1 purge would need. That `admin/phase-2-closeout`
+  and `fix/content-bootstrap` survive after merge is worth checking against
+  `delete_branch_on_merge`; three older branches need a PR query the reviewer could not run.
+- **A-2 L0 allowlist drift.** Fixed: the three vestigial root denies are annotated and
+  retained (so recreating those paths is denied by default rather than unlisted), and
+  `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` and `.gitignore` — covered by no rule at all —
+  are now denied.
+- **A-3 memory bank.** Fixed as S-6.
+
+**Notes accepted without change**, each recorded rather than actioned: N-1 (`firebaseauth.admin`
+is the widest grant in the phase and must not survive Checkpoint 4 quietly), N-3 (the deny-all
+Firestore ruleset stays), N-4 (`format: html` in the public output stays unexpanded pending its
+own ADR — the reviewer agrees and would have argued for it), N-5 (the deletion ceiling's
+denominator is inflated by ~70 public assets, so it is weaker than 34% suggests), N-7 (commit in
+`phd-milestones` with `core.fileMode=false`), N-8 (H-5, webfonts from a public CDN on private
+pages — an owner decision), N-11 (roadmap criterion 7 is half-unsatisfiable until Phase 4 and
+must be recorded **deferred**, not ticked), N-12/N-13 (no sign-out, no rate limit on
+`POST /session` — both belong to Phase 4 scope now, while the reasoning is fresh), N-14 (C30),
+N-15 (H-4 closed for the material that mattered). N-2, N-6, N-9, N-10 and N-16 were stale
+records and are now corrected.
+
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
@@ -1019,6 +1088,28 @@ none discoverable by a stream validating its own scope, which is the point.
     resolves — it also means a retagged action can change that pipeline with no commit.
 
 ## Follow-ups
+
+- **The private area's links resolve outside `/p/` — the members' area is unreachable as
+  built.** Roadmap criterion 1 fails at Checkpoint 4 unless this lands with the rewrites.
+  Fix, both halves required: set the private build's base so Astro emits `/p/_astro/…`, and
+  prefix `routeFor()` and `payloadUrlFor()` in `site/src-private/lib/private-content.mjs`,
+  which build raw strings Astro's base does not touch. Update the two assertions in
+  `private-content.test.ts` that currently pin the broken values, and add the guard: no link
+  in `dist-private` may resolve outside `/p/`. Chief Reviewer S-1, and the single thing the
+  report says to look at before merging.
+- **Checkpoint 4 owner actions**, beyond the apply itself: flip `phd-milestones` to
+  `required: true` in `EXPECTED_SOURCES` after its first successful publish (until then C27
+  is not closed for the only source it was written for); promote `leak-check-self-test` to a
+  required status check (S-4); narrow `roles/firebaseauth.admin` (N-1); confirm
+  `phd-milestones` is private on GitHub — the Chief Reviewer could not, and if it is public
+  the entire boundary argument is moot; and run the prefix-boundary test's reverse leg **as
+  `cv`**, the direction where a defect would let a public satellite reach private source
+  material.
+- **Prove the private sync's bucket driver on its first run, in this order** (Chief Reviewer,
+  Part C): after the first successful `private-sync`, confirm the dry run's delete list is
+  empty against an empty bucket; then withdraw one item deliberately and confirm the next dry
+  run names exactly that item's objects and no others **before** the apply step runs. Cheap
+  while the bucket is nearly empty; do not skip to trusting it on a full one.
 
 - The tarball follow-up formerly here (delete it in Phase 3) is **withdrawn**: it
   is now immediate — see Blocked, A1.

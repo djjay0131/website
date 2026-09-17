@@ -11,7 +11,7 @@ Design authority: `llm/specs/2026-09-10-research-hub-design.md` (§1 Mission).
 
 ## Governance adoption
 
-- 2026-09-14: adopted agentic-governance **v0.8** (canon `VERSION` 0.8.3) via
+- 2026-09-14: adopted agentic-governance **v0.9** (canon `VERSION` 0.9.0) via
   `/governance:establish` — issue #7, branch `gov/establish-hub`.
 - Governance delta: `llm/governance/governance-delta.md`.
 - Steward merge authority: INACTIVE.

@@ -15,9 +15,9 @@ merged reality, not plans.
 - GitHub Pages (`djjay0131.github.io/website/`) still serves the same build until Phase 6.
 - Terraform in `infra/` declares every Phase 1 cloud resource; the owner's $5 budget alert
   is live and guarded in CI.
-- Governance adopted (agentic-governance v0.8); `main` requires `governance-checks` and
+- Governance adopted (agentic-governance v0.9, canon `VERSION` 0.9.0); `main` requires `governance-checks` and
   `budget-guard` (since 2026-09-15).
-- ADRs 0001–0008 Accepted; master roadmap in force.
+- ADRs 0001–0011 Accepted; master roadmap in force.
 - **The CV is published through the contract.** `cv` pushes to its own `master`, its publish
   job uploads to `gs://cusati-hub-content/sources/cv/` over Workload Identity Federation
   holding no GitHub credential for this repository, and the hub polls that bucket, builds and
@@ -32,25 +32,22 @@ merged reality, not plans.
   prefix (`STATE.md` §Checkpoint 3).
 - `/email/` and `/privacy/` are live, in the owner's supplied wording (PR #15).
 
-## Pending merge
+## In review
 
-- **PR #17** — Phase 2, publishing contract. Out of draft, reviewed, all six required checks
-  green. All four implementation streams have landed: `contract/` (schema, validator, publish
-  action), `infra/` (content bucket, three-permission custom role, `satellites` WIF pool),
-  `site/` (collection, CV repointed at the synced payload, poll wiring), and `cv` (PR #13,
-  with PR #14 the `bibtexparser<2` pin that must merge first). Chief Reviewer verdict:
-  **Comment, nothing blocking the merge**.
-- **Still blocking Checkpoint 3, not the merge:** the `WEBSITE_DISPATCH_PAT` **token**.
-  Its `cv` repository secret and the `WEBSITE_REPO` variable were deleted on 2026-09-16, so
-  no satellite workflow can reach it — but a repository secret and the token are different
-  things, and the token itself can only be revoked in the owner's GitHub account. Until then
-  a credential with write access to this repository still exists; it is simply no longer
-  stored in the satellite.
+- **PR #25** — Phase 3, the private area (issue #24, branch `feat/private-area`). All four
+  streams landed: `gate/` (the FastAPI Cloud Run gate), `infra/` (private bucket, gate
+  identity, Cloud Run, Artifact Registry, Identity Platform, Firestore), `site/` (the
+  two-output build, the leak check, the sign-in page, the destructive private sync) and the
+  `phd-milestones` satellite. Chief Reviewer verdict: **Request changes** — two documentary
+  findings (B-1, B-2), both since fixed; nothing in Parts A–C blocking. Governance audit:
+  **DRIFTING**, no blocking finding.
+- Nothing in Phase 3 has touched a cloud resource. Every live verification is Checkpoint 4.
 
 ## What is left
 
-- Phase 2 implementation: `contract/`, `infra/`, `site/` and the `cv` publish workflow,
-  then Checkpoint 3.
+- **Checkpoint 4**: the first `terraform apply` for Phase 3, the gate's first deploy, the
+  `firebase.json` rewrites (which cannot land before the Cloud Run service exists), the
+  satellite's first publish, and the first real run of the private sync's bucket driver.
 - Phases 3–6 of `llm/master-roadmap.md`.
 
 ## Known issues
@@ -67,5 +64,5 @@ merged reality, not plans.
 
 ## Governance adoption
 
-- 2026-09-14: adopted agentic-governance v0.8 — issue #7. Delta:
+- 2026-09-14: adopted agentic-governance v0.9 (canon 0.9.0; pin moved by PR #22) — issue #7. Delta:
   `llm/governance/governance-delta.md`.

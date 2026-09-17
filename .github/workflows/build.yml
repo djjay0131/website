@@ -359,6 +359,24 @@ jobs:
       #     Phase 3, the private ones.
       # Neither produces an error, which is why they are asserted here rather than
       # trusted to review. Same reasoning as the budget check above.
+      # Design doc §12.1 is a non-negotiable: "No private content in public
+      # output. Build-time check, bucket IAM test, both on every deploy." The
+      # build-time check runs above; this is the bucket half, and until now it ran
+      # NOWHERE while three documents claimed it ran on every push.
+      #
+      # It lives in budget-guard on purpose. budget-guard is already a required
+      # status check on main, so the assertion binds from the moment it lands
+      # rather than waiting on a branch-protection change.
+      #
+      # Credential-free: it reads the Terraform, not the live policy. It asserts
+      # uniform bucket-level access, enforced public access prevention, no
+      # anonymous principal, and EXACTLY two bindings -- the gate with
+      # storage.objects.get, and the hub's sync with create/delete/get/list
+      # (SEAM-1, ADR-0010 decision 5). The live half needs credentials and is a
+      # Checkpoint 4 procedure (infra/README.md).
+      - name: Check the private bucket's declared IAM (design doc 12.1)
+        run: python3 infra/scripts/check_private_bucket_config.py
+
       - name: Check the satellite boundary invariants are declared
         if: ${{ !cancelled() }}
         run: |

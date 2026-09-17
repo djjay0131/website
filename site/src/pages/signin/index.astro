@@ -126,14 +126,29 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
           say("Could not reach the sign-in service. Please try again.");
           return;
         }
-        if (response.ok) {
-          window.location.assign("/p/");
-          return;
+        // BRANCH ON THE BODY, NOT THE STATUS. The gate answers a verified
+        // non-member with HTTP *200* and {"status":"not_a_member"}, setting no
+        // cookie (gate/app/main.py:188). So response.ok is TRUE for a refusal:
+        // keying the redirect off response.ok sent a non-member to /p/ with no
+        // session, where the gate served "Sign in" linking back here -- the
+        // redirect loop SEAM-3 explicitly forbids. A `response.status === 403`
+        // branch was unreachable, because the gate never returns 403.
+        // The owner's own identity (djjay0131@gmail.com) is NOT on the allowlist,
+        // so the owner is the most likely person to walk this path at Checkpoint 4.
+        let body = null;
+        try {
+          body = await response.json();
+        } catch {
+          body = null;
         }
-        if (response.status === 403) {
+        if (body?.status === "not_a_member") {
           // Deliberately the gate's own wording, and deliberately not alarming:
           // it names nothing and implies nothing about what exists.
           say("You're signed in, but nothing here has been shared with you.");
+          return;
+        }
+        if (response.ok && body?.status === "ok") {
+          window.location.assign("/p/");
           return;
         }
         say("Sign-in did not complete. Please try again.");

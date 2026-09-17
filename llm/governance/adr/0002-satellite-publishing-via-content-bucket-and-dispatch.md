@@ -126,7 +126,11 @@ None.
 
 ## Superseded By
 
-None. **Completed by
+Partially — **ADR-0007** replaces this ADR's *dispatch* mechanism with polling, and removes
+the satellite's GitHub credential entirely. The content-bucket decision this ADR makes still
+stands and is still in force; only the notification half is superseded. Recorded 2026-09-17
+after the Phase 3 governance audit found a reader of this ADR would be told the system does
+something it no longer does. **Completed by
 [ADR-0007](0007-hub-polls-content-bucket-no-satellite-github-credential.md)**,
 which settles the mechanism this ADR left conditional and closes the
 contradiction recorded in Risks. Decisions 2, 3 and 4 stand unchanged.

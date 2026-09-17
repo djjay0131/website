@@ -1,7 +1,15 @@
 # Offline content fixture
 
 A tree shaped exactly like the content bucket (`sources/<source>/…`, SEAM-2),
-holding **invented** content for one source, `cv`.
+holding **invented** content for two sources: `cv` (public) and `phd-milestones` (two
+**private** items).
+
+The `phd-milestones` entries exist so the leak check can be exercised against private
+content that does not exist in the bucket yet — `npm run demo:leak-check` needs a private
+slug to inject, and `leak-check-self-test` in CI runs exactly that on every push. Their
+prose is invented and their titles are marked `(fixture)`, but their **slugs and source
+name are the real ones**, deliberately: a guard proves nothing unless it is exercised
+against the needle values it will really search for.
 
 ```sh
 ./scripts/sync-content.sh --from fixtures/content

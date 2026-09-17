@@ -175,6 +175,11 @@ which is where the actual risk is. Worth revisiting if withdrawal ever needs an 
 - `llm/governance/adr/0005-two-output-build-with-leak-check.md`
 - `llm/governance/adr/0004-private-area-cloud-run-gate-behind-hosting.md`
 - `llm/specs/2026-09-10-research-hub-design.md` §3, §4, §12.1
+- `llm/specs/2026-09-10-research-hub-design.md` **§6 requirement 3 — amended by this
+  ADR's decision 5.** It read "Gate service account is the bucket's only reader"; the
+  destructive sync makes that unimplementable, so the private bucket carries exactly two
+  principals. Recorded here because an ADR that amends design authority in substance must
+  say so, as ADR-0008 did for §2 and §4.
 - `llm/sprints/2026-09-hub/STATE.md` — C23, C27; Chief Reviewer S9
 
 ## Related Issues / PRs

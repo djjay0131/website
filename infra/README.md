@@ -361,7 +361,10 @@ Phase 3 adds a third and a fourth.
    The gate is asked for a path and serves that path; it never enumerates.
 
 Both are asserted on every push, with no credentials, by
-`python3 infra/scripts/check_private_bucket_config.py`.
+`python3 infra/scripts/check_private_bucket_config.py`, which runs as a step in the
+`budget-guard` job of `.github/workflows/build.yml` — already a required status check on
+`main`, so the assertion binds immediately rather than waiting on a branch-protection
+change. (Wired 2026-09-17: until then this sentence was false and the check ran nowhere.)
 
 ### Who may touch the private bucket
 
@@ -737,7 +740,7 @@ so a `gcloud` test fails on the allowed path too and looks like a broken
 boundary that is not one (verified at Checkpoint 3). The exact commands are in
 the handoff §Checkpoint 4, test 2.
 
-### The credential-free half, which runs on every push
+### The credential-free half, which runs on every push (in `budget-guard`)
 
 ```sh
 python3 infra/scripts/check_private_bucket_config.py

@@ -172,8 +172,22 @@ Four responsibilities; keep it small enough to read in one sitting.
    added_at, note}`. Non-member sign-ins get a "not shared with you" page.
    Members with `role: owner` may manage members and shares.
 3. **Serve.** `GET /p/{path:path}` → check session → stream from private
-   bucket. Gate service account is the bucket's only reader. Correct
-   `Content-Type`, `Cache-Control: private, no-store`.
+   bucket. Correct `Content-Type`, `Cache-Control: private, no-store`.
+
+   **Amended 2026-09-17 by ADR-0010 decision 5.** This requirement read "Gate
+   service account is the bucket's only reader." That is no longer true and must
+   not be restored. Making withdrawal real means the hub's deploy identity prunes
+   `dist-private` destructively, and pruning requires `list` — which is a read. The
+   bucket therefore carries **exactly two principals**: the gate's runtime service
+   account with `storage.objects.get` only (never `objectViewer`, which carries
+   `objects.list`, and in this bucket the object names are themselves private
+   material), and `hub-deploy` with `create`, `delete`, `get`, `list` on this bucket
+   alone. Enforcing a single reader would silently disable withdrawal: a withdrawn
+   dossier would stay served at its old path while the system reported success. The
+   equality — exactly these two, in exactly these roles — is also strictly more
+   testable than "no reader other than X", and is what
+   `infra/scripts/check_private_bucket_config.py` asserts. See SEAM-1 in
+   `llm/sprints/2026-09-hub/contracts/phase-3-seams.md` and roadmap criterion 10.
 4. **Share links.** `POST /share {slug, expires_in_days}` (owner only)
    mints a random token, stores `{slug, exp, created_by, revoked}` in
    Firestore `shares/{token}`. `GET /s/{token}/{path:path}` serves that one

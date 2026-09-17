@@ -224,6 +224,11 @@ and no share minting. Write becomes necessary in Phase 4 for `shares/{token}`.
 Grant read now. **Infra's delivered `gate.tf` grants `roles/datastore.user`**,
 which is read *and* write over the whole database — see SD-3.
 
+> **CLOSED 2026-09-17 by the Lead Architect.** `infra/gate.tf:114` now grants
+> `roles/datastore.viewer`. `gate/app/` contains no Firestore write of any kind —
+> `app/members.py:65` is the only call site and it is a `.get()`. The Chief Reviewer
+> confirmed this independently (N-2). Do not re-raise SD-3.
+
 **On grant 3 — the one I could not pin down alone, now resolved by cross-check.**
 The predefined fallback is `roles/firebaseauth.admin`, which works but is
 **considerably broader than needed: it can create and delete users.** I could not

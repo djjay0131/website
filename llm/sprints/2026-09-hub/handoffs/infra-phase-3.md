@@ -1,6 +1,6 @@
 # Handoff: Infrastructure Implementation Engineer — Phase 3
 
-Status: Draft (the Lead Architect sets the final status)
+Status: Delivered (set by the Lead Architect 2026-09-17)
 Sprint: 2026-09-hub · Phase 3 — Private area (issue #24)
 Branch: `feat/private-area`
 Contract: `llm/sprints/2026-09-hub/contracts/infra-phase-3.md`
@@ -77,7 +77,13 @@ Nothing outside `infra/**` and this handoff was created or edited. `gate/**`,
 this handoff) are untouched by this stream, as is the `cv` and `phd-milestones`
 repository.
 
-### One thing the Lead Architect must do before committing
+### One thing the Lead Architect must do before committing — **DONE 2026-09-17**
+
+> Resolved. `infra/scripts/check-private-bucket-iam.sh` is committed `100755`; verified with
+> `git ls-files -s`, which is the only reliable check on `/mnt/c` (DrvFs reports every file
+> as `0777`, so `ls -l` lies). The Chief Reviewer confirmed it independently (N-10). The
+> instruction below is kept for the record; do not re-run it.
+
 
 `infra/scripts/check-private-bucket-iam.sh` begins with a shebang, and CI's
 `budget-guard` job fails any tracked `*.sh` with a shebang that is not committed

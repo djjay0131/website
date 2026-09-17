@@ -315,7 +315,9 @@ provable.
 2. **ADR-0010 decision 4 is unimplementable as literally written** (see §Recommendations 1).
    Requiring `phd-milestones` immediately would fail every build from the day it lands.
    Resolved with a `required` flag; the ADR text may want a sentence.
-3. **`docs/satellites.md` does not state ADR-0010's satellite-owner obligation** — that
+3. **[RESOLVED 2026-09-17 — the text is now present at `docs/satellites.md` §Withdrawing
+   something you published; the Lead Architect added it on this finding. Do not re-raise.]**
+   **`docs/satellites.md` does not state ADR-0010's satellite-owner obligation** — that
    withdrawal removes an item from the site but not from the content bucket, and genuinely
    sensitive material must also be deleted by the satellite. ADR-0010's Consequences says it
    is "stated in `docs/satellites.md` rather than assumed"; it is not there. `docs/` is not

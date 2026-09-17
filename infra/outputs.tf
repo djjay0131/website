@@ -219,6 +219,6 @@ output "gate_github_actions_variables" {
 }
 
 output "private_bucket_iam_check_command" {
-  description = "The live half of the roadmap's bucket IAM test (§12.1), ready to paste. The credential-free half runs on every push: python3 infra/scripts/check_private_bucket_config.py."
+  description = "The live half of the roadmap's bucket IAM test (§12.1), ready to paste. The credential-free half runs on every push in the budget-guard job (a required check): python3 infra/scripts/check_private_bucket_config.py."
   value       = "PROJECT=${var.project_id} BUCKET=${google_storage_bucket.private.name} GATE_SA=${google_service_account.hub_gate.email} HUB_SA=${google_service_account.hub_deploy.email} bash infra/scripts/check-private-bucket-iam.sh"
 }
