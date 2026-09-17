@@ -63,6 +63,16 @@ resource "google_identity_platform_config" "hub" {
     # allow_duplicate_emails is left at its default (false), so one email is one
     # account. With an allowlist keyed on the email, two accounts sharing an
     # address would mean two identities matching one allowlist entry.
+
+    # Declared explicitly because the API RETURNS this block whether or not the
+    # configuration asks for it, and an undeclared block reads to Terraform as
+    # "remove it" -- so every apply updated this resource in place for no reason
+    # (issue #30). Phone sign-in stays OFF: the allowlist is keyed on email
+    # addresses, and a phone identity could never match an entry in it.
+    phone_number {
+      enabled            = false
+      test_phone_numbers = {}
+    }
   }
 
   # AUTHORIZED DOMAINS -- the Checkpoint 4 trap this line exists to prevent.
