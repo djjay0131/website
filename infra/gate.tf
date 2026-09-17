@@ -262,6 +262,30 @@ resource "google_cloud_run_v2_service_iam_member" "gate_invoker_all_users" {
   member   = "allUsers"
 }
 
+# Firebase Hosting must be able to READ this service to deploy a rewrite that names
+# it. When it writes a Hosting version whose config contains a `run` rewrite, it
+# resolves the service as the DEPLOYING identity -- hub-deploy -- and a missing
+# run.services.get fails the whole deploy, including the public site, with a 403
+# naming namespaces/<project number>/services/hub-gate. Checkpoint 4 hit exactly
+# that: firebase-deploy was the only failing job, /p/ stayed 404, and the sign-in
+# page stayed unconfigured, while everything else went green.
+#
+# Scoped to THIS SERVICE rather than roles/run.viewer at project level. Hosting
+# needs to read one service; a project-level grant would let the deploy identity
+# enumerate and read every Cloud Run service the project ever runs, which is a
+# wider blast radius than the problem warrants (deploy.tf states the same rule for
+# every other grant this identity holds).
+#
+# It is a READ role: run.viewer cannot deploy, update or invoke. Invocation is
+# allUsers by design (ADR-0004), and deployment belongs to gate-deploy.
+resource "google_cloud_run_v2_service_iam_member" "hub_deploy_run_viewer" {
+  project  = var.project_id
+  location = google_cloud_run_v2_service.gate.location
+  name     = google_cloud_run_v2_service.gate.name
+  role     = "roles/run.viewer"
+  member   = google_service_account.hub_deploy.member
+}
+
 # ---------------------------------------------------------------------------
 # THE GATE'S DEPLOY IDENTITY (what .github/workflows/gate.yml authenticates as).
 #
