@@ -40,7 +40,7 @@ const { title, nav = [] } = Astro.props;
     <header class="private-header">
       <p class="badge">Private · shared with you</p>
       <nav aria-label="Private navigation">
-        <a href="/p/" class="brand">Members' area</a>
+        <a href={import.meta.env.BASE_URL} class="brand">Members' area</a>
         {nav.length > 0 && (
           <ul>
             {nav.map((entry) => (

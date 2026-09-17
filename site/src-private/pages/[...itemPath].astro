@@ -21,15 +21,16 @@ export async function getStaticPaths() {
 }
 
 const { item, all } = Astro.props;
+const base = import.meta.env.BASE_URL;
 const nav = all
   .slice()
   .sort((a, b) => (a.title < b.title ? -1 : 1))
-  .map((i) => ({ href: routeFor(i), label: i.title }));
-const payload = payloadUrlFor(item);
+  .map((i) => ({ href: routeFor(i, base), label: i.title }));
+const payload = payloadUrlFor(item, base);
 ---
 
 <PrivateBase title={item.title} nav={nav}>
-  <p class="crumbs"><a href="/p/">← Members' area</a></p>
+  <p class="crumbs"><a href={base}>← Members' area</a></p>
   <h1>{item.title}</h1>
   <p class="meta">
     <time datetime={item.date}>{item.date}</time> · {item.source} · {item.format}

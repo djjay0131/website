@@ -22,8 +22,9 @@
     "contrast": "node scripts/contrast.mjs",
     "check:smoke-routes": "node scripts/check-smoke-routes.mjs",
     "build:public": "HUB_OUTPUT=public astro build",
-    "build:private": "HUB_OUTPUT=private astro build",
+    "build:private": "HUB_OUTPUT=private SITE_BASE=/p/ astro build",
     "check:no-private-in-public": "node scripts/check-no-private-in-public.mjs",
+    "check:private-links": "node scripts/check-private-links.mjs",
     "demo:leak-check": "node scripts/demo-leak-check.mjs",
     "sync:private": "node scripts/sync-private.mjs"
   },

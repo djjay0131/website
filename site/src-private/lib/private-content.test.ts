@@ -36,6 +36,18 @@ describe("where a private item is served", () => {
   it("serves its payload under the payload root, keeping the satellite's own layout", () => {
     expect(payloadUrlFor(MILESTONES)).toBe(`/${PAYLOAD_ROOT}/phd-milestones/site/index.html`);
   });
+
+  // ISSUE #27. These build RAW strings, so Astro's `base` never reaches them. The
+  // private build passes import.meta.env.BASE_URL, which is /p/ -- the path the gate
+  // serves under and strips to form the object name. Before this, every route and
+  // payload URL pointed at the PUBLIC origin and 404'd for a signed-in member, while
+  // the build, the sync and the gate were each individually correct.
+  it("prefixes the gate's base, which is what the private build passes", () => {
+    expect(routeFor(MILESTONES, "/p/")).toBe("/p/phd/phd-milestones/milestones/");
+    expect(payloadUrlFor(MILESTONES, "/p/")).toBe(
+      `/p/${PAYLOAD_ROOT}/phd-milestones/site/index.html`,
+    );
+  });
 });
 
 describe("staging an html item takes its DIRECTORY, not just its file", () => {

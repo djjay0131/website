@@ -14,7 +14,10 @@ const items = (await getCollection("sources", ({ data }) => data.visibility === 
   .map((entry) => entry.data)
   .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug < b.slug ? -1 : 1));
 
-const nav = items.map((item) => ({ href: routeFor(item), label: item.title }));
+// Astro sets BASE_URL from the same `base` that produced the asset URLs, so the
+// raw routes these functions build can never drift from them (issue #27).
+const base = import.meta.env.BASE_URL;
+const nav = items.map((item) => ({ href: routeFor(item, base), label: item.title }));
 ---
 
 <PrivateBase title="Members' area" nav={nav}>
@@ -24,7 +27,7 @@ const nav = items.map((item) => ({ href: routeFor(item), label: item.title }));
     <ul class="items">
       {items.map((item) => (
         <li>
-          <h2><a href={routeFor(item)}>{item.title}</a></h2>
+          <h2><a href={routeFor(item, base)}>{item.title}</a></h2>
           <p class="meta">
             <time datetime={item.date}>{item.date}</time> · {item.source}
           </p>

@@ -1145,6 +1145,18 @@ What Phase 3 proved locally, and what it did not:
 
 ## Follow-ups
 
+- **A dev/staging site is needed, and Phase 3 proved why (owner, 2026-09-17).** The private
+  area cannot be looked at before it is deployed: the gate needs Cloud Run, Identity Platform
+  and a real session, so there is no way to review the members' area as a member without
+  either shipping it or hand-rolling a local mount. During this session the owner — working
+  over SSH, with no local browser — could not view a local preview at all, and the only
+  reviewable artifact was a text render. That is not a sustainable review loop for a feature
+  whose entire point is what a signed-in person sees. A dev site (its own project or its own
+  Hosting site + gate revision, with its own allowlist and fixture content) should be scoped
+  before Phase 4 adds shares, which multiplies the number of states that can only be seen
+  live. ADR candidate: whether dev is a separate GCP project or a second Hosting target in
+  the same project, and how its budget is bounded.
+
 - **The private area's links resolve outside `/p/` — the members' area is unreachable as
   built.** Roadmap criterion 1 fails at Checkpoint 4 unless this lands with the rewrites.
   Fix, both halves required: set the private build's base so Astro emits `/p/_astro/…`, and

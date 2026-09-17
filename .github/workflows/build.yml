@@ -701,6 +701,15 @@ jobs:
       - name: Build Astro (private output)
         run: npm run build:private
 
+      # ISSUE #27. The gate serves this output under /p/** and strips /p/ to form
+      # the object name, so a link that does not start with /p/ reaches the PUBLIC
+      # origin and 404s for a signed-in member -- with the build, the sync and the
+      # gate each individually correct and nothing erroring anywhere. It also checks
+      # each link points at a file that EXISTS, because uniformly prefixed but wrong
+      # is just as broken as unprefixed.
+      - name: Check every private link resolves under the gate's base
+        run: npm run check:private-links
+
       # SEAM-4 / ADR-0005: between build and deploy, on every deploy. Both
       # outputs now exist, so this is the moment the public one can be checked
       # against the full set of private items the private one rendered.
