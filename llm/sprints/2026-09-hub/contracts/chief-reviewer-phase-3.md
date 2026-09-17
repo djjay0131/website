@@ -90,6 +90,15 @@ E. GOVERNANCE, AND THE AUDIT ACROSS PHASES 0-3.
    owner's call, and a branch with no PR must never be recommended for deletion), memory-bank
    currency, and the L0 allowlist's accuracy. Report the audit as its own section.
 
+ENVIRONMENT:
+  - **`gh` is NOT on this machine's PATH.** The Lead Architect uses a Windows binary at
+    "/mnt/c/Program Files/GitHub CLI/gh.exe"; a bare `gh` fails. Every contract this sprint
+    told agents to run `gh issue view`, and the gate stream could not read its issue as a
+    result. Work from the repository: the roadmap, the seams, the ADRs and the design doc
+    carry everything. If you need issue or PR content, say so and the Lead Architect supplies it.
+  - `terraform` and `actionlint` are container-only (hashicorp/terraform:1.14.0,
+    rhysd/actionlint:latest). Python 3.12 is uv-managed; system python is 3.8.
+
 CONSTRAINTS:
   - You review; you do not implement. Propose changes; never make them.
   - Run NO git and NO gh mutations. Read-only git and gh are fine. Per STATE A8 the Lead

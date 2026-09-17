@@ -39,8 +39,23 @@ phd-milestones ──publish──▶ gs://<content-bucket>/sources/phd-mileston
                                     signed-in member
 ```
 
-- The **private bucket is the only place private rendered output lives.** It is never public,
-  never behind Hosting, and has exactly one reader: the gate's service account.
+- The **private bucket is the only place private rendered output lives.** It is never public
+  and never behind Hosting.
+- **Amended 2026-09-17.** This seam said the bucket "has exactly one reader: the gate's
+  service account." That is unimplementable alongside ADR-0010 decision 5, which makes the
+  hub's deploy identity sync `dist-private` *destructively* — pruning requires `list` and
+  `delete`, and `list` is a read. The clause predates ADR-0010 and never contemplated a sync
+  identity. The ADR stands; this seam changes. The bucket carries **exactly two principals**:
+
+  | Principal | Role | Why |
+  |---|---|---|
+  | the gate's runtime SA | `storage.objects.get` only | serves one object by name; never lists, because object names in this bucket are themselves private material |
+  | `hub-deploy` | `create`, `delete`, `get`, `list`, on this bucket only | produces these bytes, and must prune to make withdrawal real |
+
+  Denying `hub-deploy` here would protect nothing: it already reads the private *source* bytes
+  under `sources/phd-milestones/` to build them. "Exactly two principals with exactly these
+  roles" is also an equality assertion, which is strictly more testable than "no reader other
+  than X" — and it is what the check script actually implements.
 - `dist-public` **never contains a private item** — enforced by the leak check (SEAM-4), not
   by convention.
 - The content bucket holds private *source* bytes under `sources/phd-milestones/`. That is

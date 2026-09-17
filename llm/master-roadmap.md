@@ -275,7 +275,7 @@ that the CV appears.
 - [ ] A gate test asserts that no `/p/**` or `/s/**` response carries `public` or `s-maxage` in `Cache-Control` (ADR-0004)
 - [ ] The gate pytest suite passes in CI and covers session mint and verify, non-member rejection, and path-traversal rejection on `/p/` (§6)
 - [ ] The leak check runs on every deploy, and a deliberate test run shows it failing the build when a private slug appears in any path or file content under `site/dist-public` (§12.1)
-- [ ] The bucket IAM test runs on every deploy and fails if the private bucket grants public access or any reader other than the gate's service account. An anonymous request for a private object is refused (§12.1).
+- [ ] The bucket IAM test runs on every deploy and fails if the private bucket grants public access, or holds any binding other than exactly two: the gate's runtime identity with `storage.objects.get`, and `hub-deploy` with the four permissions a destructive sync needs. An anonymous request for a private object is refused (§12.1). *(Amended 2026-09-17: the original clause said "any reader other than the gate's service account", which ADR-0010 decision 5 makes unimplementable — a destructive sync must list and delete, and list is a read. The clause predates the ADR. Equality over two principals is also more testable than a negative. SEAM-1 carries the reasoning.)*
 - [ ] No page on the public site lists, links or names a private item, and private navigation exists only in the private build (ADR-0005)
 - [ ] The gate's service account can read only the private bucket and Firestore (brief §4; ADR-0004)
 - [ ] `phd-milestones` is private on GitHub, and a recorded test shows its publish identity cannot write outside `sources/phd-milestones/` (§12.3)

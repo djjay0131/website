@@ -548,6 +548,18 @@ Phase 1's `firebase.json` carries no gate rewrites.
   directory**. The contract should state that a file-valued `html` path serves its containing
   directory, and define what happens when two items share one. Not changed mid-phase: the
   `site` stream is reading the schema and the fixtures as this is written.
+- **C29** — The refusal shape. The gate answers **404 with a static body** for every refused
+  caller, never a redirect. Its reasoning is good and worth preserving: the natural redirect
+  implementation ("look up, redirect if found, 404 if not") is an existence oracle for private
+  slugs; a redirect also puts the private path into `?next=`, browser history, `Referer` and
+  logs, and adds an open-redirect surface. A uniform 404 carries no information. GitHub does
+  this for private repositories for the same reason.
+- **C30** — Session lifetime and revocation. The cookie lasts 14 days and membership is re-read
+  per request, so removal from the allowlist takes effect immediately — but every sub-asset of
+  a page triggers an Identity Toolkit lookup, which is a real cost and a real dependency.
+- **C31** — Whether member access should be logged at all, given the material. The gate keeps
+  object paths out of logs by default; whether *any* record of who read what should exist is a
+  privacy decision, not an engineering one.
 
 ## Constraints discovered (bind later contracts)
 
@@ -1068,6 +1080,49 @@ Opened during Phase 3 (2026-09-17):
   content, which this phase's contract forbids. It is a real privacy property of the private
   area and the owner should decide whether to self-host those fonts — the hub already
   self-hosts its own via @fontsource.
+
+Decisions and flags from the Phase 3 `infra` stream (2026-09-17):
+
+- **Open question (a) resolved in the ADR's favour.** The roadmap clause and SEAM-1 are
+  amended; ADR-0010 decision 5 stands. Recorded above.
+- **The stronger form, for the owner.** A dedicated `private-sync` identity would mean the
+  **public** site's deploy identity holds no private-bucket access at all. Not taken
+  unilaterally — it needs a second auth step in `build.yml`, which is the site stream's file.
+  It is the available tightening if the owner wants it.
+- **`projectViewer` can read every private object.** Cloud Storage's automatic legacy
+  bindings apply to the private bucket as they do to the content bucket. That was accepted at
+  Checkpoint 3 for public content; on a bucket holding the committee dossier it needs an
+  explicit owner decision. Today the only project Viewer is the owner.
+- **`roles/firebaseauth.admin` on the gate is wider than needed.** Session-cookie minting
+  requires `firebaseauth.users.createSession` and no narrower *predefined* role was
+  confirmable from a primary source in this environment. Tightening to a custom role is a
+  Checkpoint 4 command in the infra handoff.
+- **A deny-all Firestore ruleset was added beyond the contract's deliverables**, and it is
+  kept. Without it `members/{email}` — two real email addresses — is readable by any
+  signed-in stranger through the public sign-in page's Web SDK. Beyond-scope work, flagged
+  honestly by the stream rather than smuggled in.
+
+From the Phase 3 `gate` stream (2026-09-17):
+
+- **SD-3 — CLOSED by the Lead Architect.** The gate was granted `roles/datastore.user`
+  (read **and** write) on the reasoning that Phase 4 shares would need write. Verified instead:
+  `gate/app/` contains no Firestore write of any kind — the only call sites are the import, the
+  client, and one `.document(key).get()` per request. Narrowed to `roles/datastore.viewer`.
+  Granting write now for a capability a later phase might need is the wrong trade when the
+  privilege is write access to the allowlist itself.
+- **SD-4 — there is no way to sign out.** A 14-day `HttpOnly` session cookie with no in-band
+  clear: a member on a shared machine cannot end their own session. Not in any Phase 3
+  acceptance criterion, and not built. It belongs with the Phase 4 session work.
+- **SD-7 — `dist-private` filenames must match the gate's path allowlist** (`[A-Za-z0-9._-]`
+  per segment) or the file is unreachable: it syncs fine, the build is green, and a signed-in
+  member gets 404. Undocumented in the contract, the seams and ADR-0005. Sent to the `site`
+  stream mid-flight; it should fail the private build on a violating segment.
+- **A defect in my own contracts, across the whole sprint.** Ten contracts told agents to run
+  bare `gh` (`gh issue view 24`). **`gh` is not on this machine's PATH** — only a Windows
+  binary the Lead Architect invokes by full path. The gate stream could not read issue #24 and
+  said so. Everything it needed was in the repository, so nothing was lost, but the instruction
+  was wrong in every contract that carried it. Corrected in the reviewer contract; future
+  contracts must not assume `gh`.
 
 ## Standing constraints
 

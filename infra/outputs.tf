@@ -142,3 +142,83 @@ output "custom_domain_state" {
     }
   }
 }
+
+# ---------------------------------------------------------------------------
+# Phase 3 (issue #24): the private area.
+#
+# As in Phase 2, none of these values is secret and every one is set as a GitHub
+# Actions VARIABLE, never a secret. They are consumed by two different workflows
+# in THIS repository:
+#   - build.yml (site stream): GCP_PRIVATE_BUCKET, for the destructive sync of
+#     site/dist-private (ADR-0010 decision 5).
+#   - gate.yml (gate stream):  the Artifact Registry, Cloud Run and gate-deploy
+#     values.
+# ---------------------------------------------------------------------------
+
+output "private_bucket_name" {
+  description = "GCP_PRIVATE_BUCKET: the bucket the gate serves from and the hub syncs site/dist-private into (SEAM-1). Never public, never fronted by Hosting."
+  value       = google_storage_bucket.private.name
+}
+
+output "private_bucket_url" {
+  description = "The private bucket as a gs:// URL, for the manual verification steps in README.md."
+  value       = google_storage_bucket.private.url
+}
+
+output "gate_service_account_email" {
+  description = "The gate's RUNTIME identity: the only principal that reads a private object to serve it. Not a deploy identity."
+  value       = google_service_account.hub_gate.email
+}
+
+output "gate_deploy_service_account_email" {
+  description = "GCP_GATE_DEPLOY_SA: what .github/workflows/gate.yml authenticates as through WIF. Pushes the image and rolls out a revision; cannot read private content."
+  value       = google_service_account.gate_deploy.email
+}
+
+output "gate_service_name" {
+  description = "The Cloud Run service name. firebase.json's /p/** and /session rewrites must name exactly this (design doc §8); Hosting rejects a config naming a service that does not exist (issue #10 K2), so the rewrites land only after the gate is deployed (SEAM-6)."
+  value       = google_cloud_run_v2_service.gate.name
+}
+
+output "gate_service_uri" {
+  description = "The gate's direct *.run.app URL. Its invoker is allUsers deliberately (ADR-0004), so every authorisation check must hold on THIS URL as well as through Hosting -- which is a roadmap acceptance criterion, not a footnote."
+  value       = google_cloud_run_v2_service.gate.uri
+}
+
+output "gate_image_repository" {
+  description = "GCP_ARTIFACT_REGISTRY: the Docker repository path to push the gate image to, without a tag. Keeps the 5 most recent versions (roadmap R-A4)."
+  value       = "${google_artifact_registry_repository.gate.location}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.gate.repository_id}"
+}
+
+output "firestore_database" {
+  description = "The Firestore database holding members/{email}. Its location is PERMANENT and cannot be changed after creation."
+  value = {
+    name     = google_firestore_database.hub.name
+    location = google_firestore_database.hub.location_id
+    type     = google_firestore_database.hub.type
+  }
+}
+
+output "private_bucket_roles" {
+  description = "The two custom roles bound on the private bucket, for the Checkpoint 4 checks. The gate holds exactly storage.objects.get; the hub's deploy identity holds create/delete/get/list, which ADR-0010 decision 5 requires for a destructive sync. Read them back with: gcloud iam roles describe <role id> --project <project id>."
+  value = {
+    gate_reader = google_project_iam_custom_role.private_object_reader.name
+    hub_sync    = google_project_iam_custom_role.private_sync_writer.name
+  }
+}
+
+output "gate_github_actions_variables" {
+  description = "The Phase 3 variables to set on THIS repository (djjay0131/website), alongside the Phase 1 and 2 ones in github_actions_variables. GCP_WIF_PROVIDER is unchanged -- the gate workflow uses the hub's existing provider with a different service account."
+  value = {
+    GCP_PRIVATE_BUCKET    = google_storage_bucket.private.name
+    GCP_GATE_DEPLOY_SA    = google_service_account.gate_deploy.email
+    GCP_GATE_SERVICE      = google_cloud_run_v2_service.gate.name
+    GCP_GATE_REGION       = google_cloud_run_v2_service.gate.location
+    GCP_ARTIFACT_REGISTRY = "${google_artifact_registry_repository.gate.location}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.gate.repository_id}"
+  }
+}
+
+output "private_bucket_iam_check_command" {
+  description = "The live half of the roadmap's bucket IAM test (§12.1), ready to paste. The credential-free half runs on every push: python3 infra/scripts/check_private_bucket_config.py."
+  value       = "PROJECT=${var.project_id} BUCKET=${google_storage_bucket.private.name} GATE_SA=${google_service_account.hub_gate.email} HUB_SA=${google_service_account.hub_deploy.email} bash infra/scripts/check-private-bucket-iam.sh"
+}

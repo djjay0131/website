@@ -1,0 +1,22 @@
+# Python build and tool artefacts. The repository root .gitignore has no Python
+# entries (it predates this directory) and is owned by another stream, so the
+# gate carries its own: running the suite creates __pycache__/, .pytest_cache/
+# and .ruff_cache/ here, and none of them belongs in a commit.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local virtualenvs. The development instructions in README.md create .venv.
+.venv/
+venv/
+
+# Belt and braces. The gate holds no credential of any kind: it runs as its own
+# service account and reads tokens from the metadata server (design doc §12.2).
+# A key file appearing here would be a review failure, not a gitignore problem,
+# but it must never be committed by accident either.
+*-key.json
+service-account*.json

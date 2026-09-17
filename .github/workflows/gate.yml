@@ -1,0 +1,216 @@
+name: gate
+
+# The gate's own lane (design doc §9). Kept separate from build.yml on purpose:
+# build.yml deploys the public site, and a gate change must not be able to hold
+# up -- or ride along with -- a Hosting deploy.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gate/**"
+      - ".github/workflows/gate.yml"
+  pull_request:
+    paths:
+      - "gate/**"
+      - ".github/workflows/gate.yml"
+  workflow_dispatch:
+
+# No workflow-wide grant. Each job asks for exactly what it uses.
+permissions: {}
+
+# Deploys serialize; PR validation gets a per-branch group and is superseded by
+# a new push, the same shape build.yml uses.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('gate-pr-{0}', github.ref) || 'gate-deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Runs on every trigger, with no credentials of any kind: no id-token, no
+  # secrets, no cloud call. An unconfigured repository still gets the full
+  # suite.
+  test:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: gate
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      # The gate targets 3.12 (phase-3-seams.md SEAM-9). Exact minor, so the
+      # runtime changes only by a reviewed commit.
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      # Hash-pinned closure. --require-hashes refuses anything whose checksum
+      # is not in the lock file.
+      - name: Install the locked dependencies
+        run: python -m pip install --require-hashes --no-deps -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      - name: Run the gate test suite
+        run: pytest
+
+  # Build, push and deploy. Gated on vars.GCP_PROJECT_ID exactly as build.yml's
+  # Firebase jobs are (Phase 1 pattern), so an unconfigured repository still
+  # builds and tests without ever attempting a cloud call.
+  #
+  # SEAM-6: infra creates the Cloud Run service, Artifact Registry, the private
+  # bucket and the gate's identities BEFORE this job first runs. That is why the
+  # deploy step updates an existing service rather than creating one -- see its
+  # comment.
+  #
+  # The variables below are infra's Phase 3 outputs (infra/outputs.tf,
+  # gate_github_actions_variables). Note GCP_GATE_DEPLOY_SA, which is NOT the
+  # Phase 1 GCP_DEPLOY_SA: infra gives the gate its own deploy identity, holding
+  # artifactregistry.writer on one repository and run.developer on one service,
+  # and able to read no private content at all. GCP_WIF_PROVIDER is unchanged --
+  # the gate workflow runs in this repository and uses the hub's own provider
+  # with a different service account.
+  build-and-deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read # checkout, for the Dockerfile and the app
+      id-token: write # the GitHub OIDC token exchanged through WIF
+    env:
+      # ADR-0004 fixes both values; the variables exist so infra remains the one
+      # place they are declared, and the defaults keep this readable.
+      GATE_SERVICE: ${{ vars.GCP_GATE_SERVICE || 'hub-gate' }}
+      GATE_REGION: ${{ vars.GCP_GATE_REGION || 'us-east1' }}
+    steps:
+      - name: Check deploy configuration
+        env:
+          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          GCP_GATE_DEPLOY_SA: ${{ vars.GCP_GATE_DEPLOY_SA }}
+          GCP_ARTIFACT_REGISTRY: ${{ vars.GCP_ARTIFACT_REGISTRY }}
+        run: |
+          MISSING=0
+          for NAME in GCP_WIF_PROVIDER GCP_GATE_DEPLOY_SA GCP_ARTIFACT_REGISTRY; do
+            if [ -z "${!NAME}" ]; then
+              echo "::error::GCP_PROJECT_ID is set but the GitHub Actions variable ${NAME} is not (terraform output gate_github_actions_variables; see infra/README.md)."
+              MISSING=1
+            fi
+          done
+          exit "${MISSING}"
+
+      # Checkout before auth: auth writes its credentials file into the
+      # workspace, and a later checkout would delete it.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      # Workload Identity Federation only. GitHub's OIDC token is exchanged for
+      # a short-lived credential impersonating the gate deploy service account.
+      # There is no JSON key, no key file and no long-lived secret anywhere in
+      # this workflow (design doc §12.2). The binding admits only refs/heads/main
+      # of this repository (infra/gate.tf, gate_deploy_wif_main).
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_GATE_DEPLOY_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      # GCP_ARTIFACT_REGISTRY is the full repository path with no tag, e.g.
+      # us-east1-docker.pkg.dev/<project>/<repo>. Docker is configured for the
+      # host only, which is its first path segment.
+      - name: Configure Docker for Artifact Registry
+        env:
+          GCP_ARTIFACT_REGISTRY: ${{ vars.GCP_ARTIFACT_REGISTRY }}
+        run: gcloud auth configure-docker "${GCP_ARTIFACT_REGISTRY%%/*}" --quiet
+
+      - name: Build the gate image
+        env:
+          GCP_ARTIFACT_REGISTRY: ${{ vars.GCP_ARTIFACT_REGISTRY }}
+        run: |
+          IMAGE="${GCP_ARTIFACT_REGISTRY}/${GATE_SERVICE}:${GITHUB_SHA}"
+          echo "IMAGE=${IMAGE}" >> "${GITHUB_ENV}"
+          docker build --pull --tag "${IMAGE}" gate
+
+      - name: Push the gate image
+        run: docker push "${IMAGE}"
+
+      # Deploy by digest, not by tag: the revision then names exactly the bytes
+      # this run built, and a later retag cannot change what is running.
+      - name: Resolve the pushed digest
+        run: |
+          REPO_DIGEST="$(docker image inspect "${IMAGE}" --format '{{index .RepoDigests 0}}')"
+          if [ -z "${REPO_DIGEST}" ]; then
+            echo "::error::could not resolve the pushed image digest"
+            exit 1
+          fi
+          echo "IMAGE_DIGEST=${REPO_DIGEST}" >> "${GITHUB_ENV}"
+          echo "deploying ${REPO_DIGEST}"
+
+      # `services update`, not `run deploy`, and deliberately:
+      #   - it changes ONLY the image, so the runtime service account, env
+      #     block, scaling and ingress stay exactly as Terraform set them.
+      #     infra/gate.tf states the same division from its side: "Terraform
+      #     owns the service's identity, scaling, ingress, env vars and IAM;
+      #     gate.yml owns the image, and nothing else", and carries
+      #     ignore_changes on the image so an apply cannot roll a deploy back;
+      #   - it never creates a service, so it cannot silently invent one whose
+      #     IAM Terraform does not own. The invoker binding is `allUsers` by
+      #     design (ADR-0004) and is infra's to declare, not this workflow's --
+      #     no --allow-unauthenticated flag appears here for that reason, and
+      #     the deploy identity deliberately lacks run.admin, so it could not
+      #     change the invoker policy even if one were passed;
+      #   - if infra has not run yet it fails loudly, which is SEAM-6's
+      #     ordering made visible.
+      - name: Deploy the revision to Cloud Run
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          gcloud run services update "${GATE_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GATE_REGION}" \
+            --image "${IMAGE_DIGEST}" \
+            --quiet
+
+      # Confirms the revision serves, and that it does so to an anonymous
+      # caller on the direct *.run.app URL -- which is what `allUsers` means
+      # and what every authorisation test is written against.
+      - name: Smoke-test the new revision
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          URL="$(gcloud run services describe "${GATE_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GATE_REGION}" \
+            --format 'value(status.url)')"
+          if [ -z "${URL}" ]; then
+            echo "::error::could not resolve the ${GATE_SERVICE} service URL"
+            exit 1
+          fi
+
+          STATUS="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${URL}/healthz")"
+          if [ "${STATUS}" != "200" ]; then
+            echo "::error::${GATE_SERVICE} /healthz returned ${STATUS}"
+            exit 1
+          fi
+          echo "OK: /healthz returned 200"
+
+          # A signed-out request for a private path must not return content.
+          # This is the roadmap's direct-URL criterion, asserted on every
+          # deploy rather than only at Checkpoint 4.
+          PRIVATE_STATUS="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${URL}/p/index.html")"
+          if [ "${PRIVATE_STATUS}" = "200" ]; then
+            echo "::error::signed-out request to ${GATE_SERVICE} /p/ returned 200"
+            exit 1
+          fi
+          echo "OK: signed-out /p/ returned ${PRIVATE_STATUS}"
