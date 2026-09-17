@@ -28,8 +28,15 @@
 # Firebase Hosting resources" (firebase.google.com/docs/projects/iam/permissions).
 #
 # Deliberately NOT granted:
-# - roles/run.viewer: needed only for Hosting rewrites to Cloud Run, which Phase 1
-#   does not have (issue #10 K2).
+# - roles/run.viewer AT PROJECT LEVEL. Phase 3 added the Hosting rewrites this note
+#   said Phase 1 did not have, and deploying a config with a `run` rewrite requires
+#   run.services.get on the target service: Hosting resolves the service while
+#   writing the version, and without it the deploy fails with
+#   "HTTP Error: 403, Permission 'run.services.get' denied on resource
+#   namespaces/<project number>/services/hub-gate". That is exactly what happened
+#   at Checkpoint 4. The grant is therefore made, but SERVICE-SCOPED on hub-gate
+#   (see gate.tf), not project-wide: Hosting needs to read one service, not every
+#   service the project will ever run.
 # - roles/firebaseauth.admin: needed only for preview channels, which are not used.
 # - roles/serviceusage.serviceUsageConsumer: needed only when a request names a
 #   quota project; google-github-actions/auth v3.0.0 exports no
