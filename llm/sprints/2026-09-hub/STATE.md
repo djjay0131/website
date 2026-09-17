@@ -1050,6 +1050,49 @@ What Phase 3 proved locally, and what it did not:
   The private area's links do not work yet (issue #27).
 
 
+## Checkpoint 4 execution record (2026-09-17)
+
+Owner instruction: "just deploy, if I don't like it we'll fix it." Executed by the Lead
+Architect. `gcloud` required `CLOUDSDK_PYTHON` pointed at uv's CPython 3.12 (WSL's system
+Python is 3.8 and gcloud refuses it) -- worth knowing before the next checkpoint.
+
+- **`terraform apply`: 29 added, 0 changed, 0 destroyed.** One binding failed on the first
+  pass -- `privateSyncWriter` did not yet exist in the resource hierarchy when the bucket
+  binding was attempted, which is custom-role propagation, not a defect. A second apply
+  converged it.
+- **The config is NOT idempotent, and this is a real finding.** A third plan reports
+  `2 to add, 1 to change, 2 to destroy`: `google_firebaserules_ruleset.firestore_deny_all`
+  and its release are **replaced on every apply**, because the API does not return
+  `source.language` and the provider then sees `+ language = "FIREBASE_RULES"` as forcing
+  replacement. Every apply therefore briefly unreleases the deny-all ruleset protecting
+  `members/{email}` -- the protection the Chief Reviewer's N-3 exists for.
+  `google_identity_platform_config.hub` also updates in place every run, because the API
+  returns a `phone_number` block the config does not declare.
+- **The live bucket IAM test had never been run, and failed on its first run -- in the
+  CHECK, not the bucket.** It asked gcloud for `uniform_bucket_level_access.enabled` while
+  this gcloud returns the field flat, so the projection resolved empty, the tab-separated
+  values shifted by one, and UBLA was compared against public access prevention's value
+  (`'enforced'`). The bucket is correct: UBLA true, PAP enforced, versioning on, 7-day soft
+  delete, 30-day noncurrent rule. Fixed to parse JSON and tolerate both field shapes.
+- **`/healthz` is intercepted before it reaches the gate.** `gate.yml`'s smoke test fails
+  with `hub-gate /healthz returned 404`. The gate is healthy: revision 00002 is Ready with
+  100% traffic on the real digest, and running that exact digest locally returns
+  `{"status":"ok"}` on `/healthz`. The 404 body is **1568 bytes of Google's error page**
+  (`<html lang=en>`, unquoted) while the gate's own 404 is **329 bytes** (`<html lang="en">`),
+  and no `/healthz` request ever appears in the container log -- while `/session` returns 405
+  and `/healthz/` returns 307, both from the app. So the path is taken by Google's frontend
+  for this service. It does not affect `/p/**` or `/session`, which is what the private area
+  uses. The health route needs a different path, or the smoke test does.
+- **The satellite published for the first time**, successfully: `manifest.json`,
+  `site/index.html`, `site/committee.html` and `site/assets/style.css` are under
+  `sources/phd-milestones/`. Before that, `private-sync` correctly refused with **P5 --
+  "the build produced 0 private item(s)"** rather than deleting the private area, which is
+  ADR-0010 decision 2 versus a build defect being indistinguishable. That refusal was the
+  system working, not failing.
+- **`firebase.json` now carries the `/p/**` and `/session` rewrites**, which SEAM-6 allowed
+  only once the Cloud Run service existed. It does now.
+
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at

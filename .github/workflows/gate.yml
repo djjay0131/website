@@ -198,12 +198,12 @@ jobs:
             exit 1
           fi
 
-          STATUS="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${URL}/healthz")"
+          STATUS="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${URL}/_health")"
           if [ "${STATUS}" != "200" ]; then
-            echo "::error::${GATE_SERVICE} /healthz returned ${STATUS}"
+            echo "::error::${GATE_SERVICE} /_health returned ${STATUS}"
             exit 1
           fi
-          echo "OK: /healthz returned 200"
+          echo "OK: /_health returned 200"
 
           # A signed-out request for a private path must not return content.
           # This is the roadmap's direct-URL criterion, asserted on every

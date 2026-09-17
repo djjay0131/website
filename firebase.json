@@ -1,15 +1,40 @@
 {
   "hosting": {
     "public": "site/dist-public",
-    "ignore": ["firebase.json", "**/.*"],
+    "ignore": [
+      "firebase.json",
+      "**/.*"
+    ],
     "cleanUrls": false,
     "trailingSlash": true,
+    "rewrites": [
+      {
+        "source": "/p/**",
+        "run": {
+          "serviceId": "hub-gate",
+          "region": "us-east1"
+        }
+      },
+      {
+        "source": "/session",
+        "run": {
+          "serviceId": "hub-gate",
+          "region": "us-east1"
+        }
+      }
+    ],
     "headers": [
       {
         "source": "**",
         "headers": [
-          { "key": "X-Content-Type-Options", "value": "nosniff" },
-          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          }
         ]
       }
     ]

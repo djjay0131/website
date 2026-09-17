@@ -19,7 +19,7 @@ from app.members import normalise_email
 def test_no_share_routes_are_declared(deps):
     paths = {getattr(route, "path", "") for route in create_app(deps).routes}
 
-    assert paths == {"/session", "/p/{path:path}", "/healthz"}
+    assert paths == {"/session", "/p/{path:path}", "/_health"}
 
 
 @pytest.mark.parametrize(
@@ -49,7 +49,7 @@ def test_no_schema_document_is_published(client, transport):
 
 
 def test_healthz_reveals_nothing(client, transport):
-    response = client.get("/healthz", headers=request_headers(transport))
+    response = client.get("/_health", headers=request_headers(transport))
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
