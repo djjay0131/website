@@ -32,16 +32,17 @@ merged reality, not plans.
   prefix (`STATE.md` §Checkpoint 3).
 - `/email/` and `/privacy/` are live, in the owner's supplied wording (PR #15).
 
-## In review
+## Done, most recent first
 
-- **PR #25** — Phase 3, the private area (issue #24, branch `feat/private-area`). All four
-  streams landed: `gate/` (the FastAPI Cloud Run gate), `infra/` (private bucket, gate
-  identity, Cloud Run, Artifact Registry, Identity Platform, Firestore), `site/` (the
-  two-output build, the leak check, the sign-in page, the destructive private sync) and the
-  `phd-milestones` satellite. Chief Reviewer verdict: **Request changes** — two documentary
-  findings (B-1, B-2), both since fixed; nothing in Parts A–C blocking. Governance audit:
-  **DRIFTING**, no blocking finding.
-- Nothing in Phase 3 has touched a cloud resource. Every live verification is Checkpoint 4.
+- **Phase 3 — Private area**, merged as PR #25 and wired by PR #29. Two ADRs (0010, 0011),
+  a FastAPI gate on Cloud Run behind Hosting rewrites, a private bucket only the gate reads
+  and only the hub's deploy identity writes, a second build output, a destructive sync with
+  six preconditions, and `phd-milestones` as satellite #2.
+- **Checkpoint 4 executed 2026-09-17.** `terraform apply`: 29 added, 0 changed, 0 destroyed.
+  Both halves of design doc §12.1's bucket IAM criterion pass live for the first time —
+  configuration (uniform bucket-level access on, public access prevention enforced, exactly
+  two non-legacy bindings) and the anonymous probe (unauthenticated GET of a private object
+  refused with 401/403).
 
 ## What is left
 

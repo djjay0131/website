@@ -9,10 +9,21 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
-- Sprint `2026-09-hub`: **Phase 3 — Private area is IN REVIEW** (issue #24, PR #25, branch
-  `feat/private-area`). All four streams landed; the Chief Reviewer's verdict is *Request
-  changes* on two documentary findings, with nothing in Parts A–C blocking. Checkpoint 4 is
-  next and is where every cloud resource is first created.
+- Sprint `2026-09-hub`: **Phase 3 — Private area is MERGED and DEPLOYED** (issue #24,
+  PR #25, plus PR #29 for the Checkpoint 4 wiring). The Chief Reviewer's verdict was
+  *Request changes* on two documentary findings; both were fixed before merge.
+  **Checkpoint 4 has been executed**: 29 cloud resources created, the gate deployed to
+  Cloud Run, `phd-milestones` published for the first time, and 81 objects synced to the
+  private bucket with 0 deletions. The members' allowlist holds `djjay@vt.edu` (owner) and
+  `cbrown@vt.edu`, those two only.
+- **Sign in at `https://jason.cusati.us/signin/` using the "Send link" form as
+  `djjay@vt.edu`.** The Google button will fail until the OAuth provider is configured in
+  the console (issue #31), and the owner's Google identity `djjay0131@gmail.com` is not on
+  the allowlist in any case.
+- Open after Checkpoint 4: **#27** (private-area link base — fixed and merged, verified by
+  `check:private-links`), **#30** (`terraform apply` is not idempotent: the Firestore
+  deny-all ruleset is replaced every run, briefly unreleasing the rules that protect
+  `members/{email}`), **#31** (Google sign-in provider not configured).
 - Sprint `2026-09-hub`: **Phase 2 — Publishing contract is COMPLETE.** Checkpoint 3 passed
   2026-09-16/17; the hub serves the CV through the contract. (issue #16,
   PR #17, branch `feat/publishing-contract`). Reviewed — Chief Reviewer verdict *Comment,
