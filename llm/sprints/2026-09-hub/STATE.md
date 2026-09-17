@@ -1093,6 +1093,29 @@ Python is 3.8 and gcloud refuses it) -- worth knowing before the next checkpoint
   only once the Cloud Run service existed. It does now.
 
 
+## Sign-in: what works at Checkpoint 4, and what needs the console (2026-09-17)
+
+- **The Firebase Web app did not exist** until Checkpoint 4 — `webApps` returned zero — so
+  `/signin/` was deployed rendering its "not configured yet" state and posting nothing. The
+  page reads `PUBLIC_FIREBASE_API_KEY`, `PUBLIC_FIREBASE_AUTH_DOMAIN` and
+  `PUBLIC_FIREBASE_PROJECT_ID` from the build environment and deliberately invents nothing.
+  Created the web app, set the three values as repository **variables** (they are public
+  client configuration, not credentials — the key identifies the project to the browser and
+  appears in any deployed page using Firebase Auth), and wired them into both public build
+  steps. **Setting the variables alone would have done nothing:** `build.yml` did not
+  reference them, so the build never passed them to Astro.
+- **Email-link sign-in works; the Google button does not.** Identity Platform has email
+  enabled and `jason.cusati.us` in `authorizedDomains`, but `defaultSupportedIdpConfigs`
+  returns **zero providers**, so `signInWithPopup(GoogleAuthProvider)` will fail. Configuring
+  Google needs an OAuth client and consent screen, which is console work and cannot be done
+  non-interactively. **Owner action.** Until then the working route is the "Send link" form,
+  which is the right one anyway: the allowlist holds `djjay@vt.edu`, while the owner's Google
+  identity is `djjay0131@gmail.com` and would produce the "not shared with you" page (SEAM-3's
+  matching trap).
+- **The allowlist is seeded and verified**: `members/djjay@vt.edu` with `role: owner` and
+  `members/cbrown@vt.edu` with no role, both `added_by: djjay@vt.edu`. Those two only.
+
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
