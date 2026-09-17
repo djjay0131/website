@@ -15,11 +15,12 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 2 — Publishing contract. IN PROGRESS** (issue #16, branch `feat/publishing-contract`,
-owner's go 2026-09-16). Phase 1 is complete and the hub is live at `https://jason.cusati.us`;
-the Email and Privacy pages merged (PR #15) and are live. Phase 2 starts with ADR-0007 and
-ADR-0008, both accepted on this branch, and runs four streams across two repositories
-(`website` and `cv`) against `contracts/phase-2-seams.md`.
+**Phase 2 — Publishing contract. COMPLETE.** Every roadmap Phase 2 item is ticked, including
+the end-to-end criterion, verified on the live site: `build-info.json` reports
+`content_source: bucket` with an empty `cv_fingerprint`, and all eight CV routes return 200.
+The hub serves the CV **through the contract**, not from a GitHub release.
+
+Phase 3 has not started and waits for the owner's go.
 
 ## Done
 
@@ -828,6 +829,33 @@ empty tree, 94 passed / 9 skipped and **zero failures**, where it was 8 failures
 **Note on sequencing.** Merging `cv` #13 also clears the red, by publishing and filling the
 bucket — and it should be merged. But that treats the symptom: an empty or withdrawn source
 would break the build again.
+
+## Checkpoint 3 — PASSED (2026-09-16/17)
+
+**Test 4, end to end.** Merging `cv` #13 pushed `cv` master with no commit to `website`. Its
+publish job authenticated through WIF, validated the manifest and uploaded 19 objects under
+`sources/cv/` — an identity that cannot list, uploading file by file. The next hub build found
+that content and deployed. Live evidence: `content_source: bucket`, `built_from_sha`
+`52a8a15` then `0d91a19`, and `/`, `/cv/`, `/cv/academic/`, `/cv/research-professional/`,
+`/resumes/`, `/pdfs/academic.pdf`, `/projects/`, `/papers/` all 200.
+
+**Correction to my own account.** I told the owner that merging PR #20 would be what fixed the
+red `main`. It was not. `main` recovered hours earlier at `52a8a15` — an unrelated push whose
+build found the freshly published content and deployed, after which `notify-recovery` closed
+issue #18 automatically at 19:14:58 on 2026-09-16. PR #20 is still the right fix, because
+without it an empty or withdrawn source breaks the build again, but it did not restore `main`
+and I should not have implied it would.
+
+**PR #20 merged by the Lead Architect on the owner's explicit instruction** ("go ahead and
+merge it please", 2026-09-16), the same basis as PR #9. Canon reserves merge authority to the
+human owner; the decision was the owner's and the platform action was an agent's. Recorded
+here as A11 requires, and the default stands: the owner merges unless they again instruct
+otherwise on a specific PR.
+
+**Issues closed:** #18 (CI failure tracking, auto-closed by `notify-recovery`), #19 (the
+bootstrap defect, closed by PR #20). **Left open:** #21 — `sync-content.sh` needs curl >= 7.76
+and misreports an old curl as a bucket-listing failure. CI is unaffected; it costs a
+contributor an hour on a first local sync.
 
 ## Risks carried forward
 
