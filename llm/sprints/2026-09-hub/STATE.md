@@ -539,6 +539,15 @@ Phase 1's `firebase.json` carries no gate rewrites.
   fails the build — but a wholly absent prefix looks like a source that never existed.
   Detecting it needs a recorded expected-source set. Matters from Phase 3, when the missing
   source may be the private one.
+- **C28** — `format: html` does not say what travels with a page. The `satellite-phd` stream
+  established this concretely: the manifest names two files while correct publication needs
+  three, because nothing names the stylesheet both pages load. It reaches the bucket only
+  because the publish action uploads all of `dist/` — a property of the upload step, not of
+  the contract. §4 calls `html` "a self-contained page or folder", and neither reading holds:
+  the pages are not self-contained, and "folder" collapses because **both items share one
+  directory**. The contract should state that a file-valued `html` path serves its containing
+  directory, and define what happens when two items share one. Not changed mid-phase: the
+  `site` stream is reading the schema and the fixtures as this is written.
 
 ## Constraints discovered (bind later contracts)
 
@@ -1049,6 +1058,16 @@ Opened during Phase 3 (2026-09-17):
   (finding A1). The question for the owner and the reviewer is whether §4 itself, and the
   fixture derived from it, should be re-worded — which is a design-authority change, not a
   tidy-up, and should not be made mid-phase by an agent.
+- **Checkpoint 4 action — flip `phd-milestones` to `required: true`** in the hub's
+  `EXPECTED_SOURCES` after its first successful publish. Declaring it required before it has
+  ever published would fail the hub build on a source whose prefix does not exist yet
+  (ADR-0010 decision 4) — the same bootstrap shape as issue #19.
+- **The private pages load webfonts from a third-party CDN** (`satellite-phd` finding H-5).
+  A signed-in member reading private material therefore makes a request to that CDN, which
+  learns the reader's IP and the referring page. Not fixed: it would mean editing seed
+  content, which this phase's contract forbids. It is a real privacy property of the private
+  area and the owner should decide whether to self-host those fonts — the hub already
+  self-hosts its own via @fontsource.
 
 ## Standing constraints
 

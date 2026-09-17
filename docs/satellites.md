@@ -151,7 +151,17 @@ Prefer any other format if one fits.
 private bucket, and are served only behind the hub's sign-in gate. The hub build
 fails if a private item appears in public output.
 
-Private items are a Phase 3 capability. Until then, publish only `public` items.
+**Enforce your own visibility.** The hub runs a leak check that fails its build if a private
+item reaches the public output — but that is the hub's backstop, not your permission to be
+careless. Assert in your own build that items you intend to be private are marked `private`,
+so a mistake fails in your repository, at the moment you make it, rather than at the hub.
+`phd-milestones` does this in its generator's tests.
+
+**What travels with an `html` item.** A `format: html` page usually needs more than the one
+file its `path` names — a stylesheet, images, pages it links to. Everything under `dist/` is
+uploaded, so those files do reach the bucket, but nothing in the manifest names them. Make
+your build fail if a page references a local file that is not staged, rather than discovering
+it as an unstyled page later.
 
 ## The publish step
 
