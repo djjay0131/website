@@ -33,6 +33,9 @@ REQUIRED READING:
   7. ADRs 0004, 0005, 0009, 0010, and design doc §5, §6, §7, §12.
   8. llm/master-roadmap.md §phase-3-private-area — every acceptance criterion.
   9. Each Phase 3 handoff under llm/sprints/2026-09-hub/handoffs/.
+  10. The satellite's work is `djjay0131/phd-milestones` PR #1, branch `feat/publish-contract`,
+      checked out at /mnt/c/code/phd-milestones. The hub PR is #25. You cannot run `gh`; read
+      both from the working trees.
 
 YOUR REVIEW MUST COVER, in this order:
 
@@ -45,8 +48,19 @@ A. IS PRIVATE MATERIAL ACTUALLY PRIVATE?
       actually fails.
    2. No public page lists, links or names a private item, and private navigation cannot
       reach the public build by construction rather than by convention.
-   3. The private bucket has exactly one reader: the gate's service account. No public
-      access, uniform access on.
+   3. The private bucket carries **exactly two principals and no others**: the gate's runtime
+      identity with `storage.objects.get` only (never `objectViewer`, which carries
+      `objects.list` — object names in that bucket are themselves private material), and
+      `hub-deploy` with the four permissions a destructive sync needs, on that bucket only.
+      Public access prevented, uniform bucket-level access **on** — without UBLA every IAM
+      condition in the module is inert and the boundary fails OPEN with no error anywhere.
+
+      **Note, so you do not re-litigate a closed question.** This contract originally said
+      "exactly one reader: the gate's service account". The `infra` stream reported that as
+      unimplementable alongside ADR-0010 decision 5 — a destructive sync must `list`, and
+      `list` is a read — and the Lead Architect accepted it: SEAM-1 and the roadmap criterion
+      were amended, ADR-0010 stands. Your job is to judge whether that resolution is right,
+      not to rediscover the conflict.
    4. The gate refuses signed-out and non-member requests, **including on the direct
       *.run.app URL** — the invoker is allUsers (ADR-0004), so a check that only holds
       behind Hosting is not a check.

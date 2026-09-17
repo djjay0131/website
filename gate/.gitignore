@@ -4,6 +4,7 @@
 # and .ruff_cache/ here, and none of them belongs in a commit.
 __pycache__/
 *.py[cod]
+*.egg-info/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
