@@ -92,7 +92,7 @@ jobs:
       id-token: write # the GitHub OIDC token exchanged through WIF (ADR-0007 decision 7)
     outputs:
       changed: ${{ steps.compare.outputs.changed }}
-      use_bucket: ${{ steps.mode.outputs.use_bucket }}
+      use_bucket: ${{ steps.final.outputs.use_bucket }}
       content_fingerprint: ${{ steps.compare.outputs.content_fingerprint }}
       cv_fingerprint: ${{ steps.compare.outputs.cv_fingerprint }}
     steps:
@@ -160,9 +160,35 @@ jobs:
           echo "content_fingerprint=${FP}" >> "$GITHUB_OUTPUT"
           echo "content fingerprint: ${FP}"
 
+      # An empty bucket is a real state, not a fault: it is how the system looks
+      # before any satellite has ever published. sync-content.sh gives it the
+      # stable fingerprint "empty" for exactly this purpose.
+      #
+      # Falling back here is what keeps `main` buildable between the moment
+      # Checkpoint 3 sets GCP_CONTENT_BUCKET and the moment the first satellite
+      # publishes. Without it the hub syncs nothing, and every job downstream
+      # fails on a tree that was never populated (issue #19).
+      #
+      # This does NOT weaken the rule that a source which HAS published and then
+      # lost its manifest fails the build. Those are different states and stay
+      # distinguishable: "empty" means the bucket holds no objects at all, while
+      # a vanished manifest leaves objects behind and still fails in the sync.
+      - name: Fall back when the bucket holds no published content yet
+        id: final
+        env:
+          PROVISIONAL: ${{ steps.mode.outputs.use_bucket }}
+          CONTENT_FINGERPRINT: ${{ steps.bucket.outputs.content_fingerprint }}
+        run: |
+          USE_BUCKET="${PROVISIONAL}"
+          if [ "${PROVISIONAL}" = "true" ] && [ "${CONTENT_FINGERPRINT}" = "empty" ]; then
+            USE_BUCKET=false
+            echo "::notice::CV data source: the cv GitHub release (fallback) -- the content bucket is reachable but no satellite has published to it yet. This is the expected state until cv publishes for the first time."
+          fi
+          echo "use_bucket=${USE_BUCKET}" >> "$GITHUB_OUTPUT"
+
       - name: Fingerprint the cv release
         id: release
-        if: steps.mode.outputs.use_bucket != 'true'
+        if: steps.final.outputs.use_bucket != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -175,7 +201,7 @@ jobs:
         id: compare
         env:
           EVENT_NAME: ${{ github.event_name }}
-          USE_BUCKET: ${{ steps.mode.outputs.use_bucket }}
+          USE_BUCKET: ${{ steps.final.outputs.use_bucket }}
           CONTENT_FINGERPRINT: ${{ steps.bucket.outputs.content_fingerprint }}
           CV_FINGERPRINT: ${{ steps.release.outputs.cv_fingerprint }}
           # SEAM-5: read the deployed build info from SITE_URL when the owner has
