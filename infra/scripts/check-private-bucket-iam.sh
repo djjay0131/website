@@ -57,12 +57,27 @@ echo
 # object ACLs are live again and an object can be world-readable while the IAM
 # policy this script reads looks perfectly correct.
 # ---------------------------------------------------------------------------
-SETTINGS="$(gcloud storage buckets describe "gs://${BUCKET}" \
-  --project "${PROJECT}" \
-  --format="value(uniform_bucket_level_access.enabled,public_access_prevention)")"
+# Parsed from JSON, not from --format=value(...), and this is not a style choice.
+# The first real run of this script (Checkpoint 4) failed with
+#   "uniform_bucket_level_access is 'enforced', expected True"
+# because this gcloud returns the field FLAT as `uniform_bucket_level_access`,
+# while the projection asked for `uniform_bucket_level_access.enabled`. That
+# resolved to empty, so the two tab-separated values shifted by one and UBLA was
+# handed public_access_prevention's value. A safety check that reports the wrong
+# field is worse than no check: it fails a correct bucket, and the natural
+# response to a check that cries wolf is to stop running it.
+SETTINGS_JSON="$(gcloud storage buckets describe "gs://${BUCKET}" \
+  --project "${PROJECT}" --format=json)"
 
-UBLA="$(echo "${SETTINGS}" | awk '{print $1}')"
-PAP="$(echo "${SETTINGS}" | awk '{print $2}')"
+read -r UBLA PAP <<<"$(printf '%s' "${SETTINGS_JSON}" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+ubla = d.get('uniform_bucket_level_access')
+if isinstance(ubla, dict):          # older gcloud nests it
+    ubla = ubla.get('enabled')
+pap = d.get('public_access_prevention') or d.get('publicAccessPrevention')
+print(f'{ubla} {pap}')
+")"
 
 if [ "${UBLA}" = "True" ]; then
   pass "uniform_bucket_level_access is True -- object ACLs are disabled and IAM is the only access path"

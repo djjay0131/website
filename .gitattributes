@@ -1,0 +1,22 @@
+# Line endings are normalised to LF in the repository.
+#
+# WHY THIS FILE EXISTS. At Checkpoint 4 a commit picked up 96 files whose only
+# change was CRLF line endings -- no content difference at all, confirmed by
+# comparing md5sums with \r stripped. It broke the `adr-status` governance check,
+# which reads a status flip accompanied by other changed lines as "not L0", and it
+# would have made the pull request unreviewable. The working tree lives on /mnt/c
+# (a Windows filesystem) with core.autocrlf unset and no .gitattributes, so
+# nothing was normalising anything.
+#
+# `text=auto eol=lf` tells git to store text as LF and check it out as LF,
+# regardless of the platform or the editor that wrote it.
+* text=auto eol=lf
+
+# Binary: never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.ico binary
+*.woff binary
+*.woff2 binary

@@ -13,7 +13,7 @@ Phase 3 builds §6 responsibilities 1–3, and only those:
 |---|---|
 | `POST /session` | Verify a Firebase ID token, mint a 14-day session cookie |
 | `GET /p/{path}` | Verify the session, check the allowlist, stream the object |
-| `GET /healthz` | Deploy verification; reveals nothing |
+| `GET /_health` | Deploy verification; reveals nothing. **Not** `/healthz`: that path never reaches the container on Cloud Run (Google's frontend answers it), verified at Checkpoint 4. |
 
 Share links — §6 responsibility 4, `/s/**` and `/share/**` — are **Phase 4**.
 They are absent rather than stubbed, and `tests/test_scope.py` fails if a route

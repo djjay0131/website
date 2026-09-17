@@ -263,7 +263,13 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             headers=headers,
         )
 
-    @app.get("/healthz")
+    # NOT /healthz. That path never reaches this container on Cloud Run: Google's
+    # frontend answers it with its own 1568-byte error page, while the gate's own
+    # 404 is 329 bytes, and no such request ever appears in the container log.
+    # Verified at Checkpoint 4 -- /_health and /nope both reach the app, /healthz
+    # alone does not, and the same image returns {"status":"ok"} for /healthz when
+    # run locally. Renaming the route is the fix; the handler is unchanged.
+    @app.get("/_health")
     async def healthz() -> Response:
         # Deploy verification only. Says nothing about configuration, identity
         # or content, because it answers anyone.

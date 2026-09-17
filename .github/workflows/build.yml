@@ -596,10 +596,20 @@ jobs:
           SITE_BASE: /website/
         run: npm test
 
+      # PUBLIC_FIREBASE_* is the Firebase Web app's PUBLIC client configuration,
+      # not a credential -- it identifies the project to the browser and is visible
+      # in any deployed page that uses Firebase Auth. It is a repository VARIABLE
+      # for that reason, never a secret. With it unset, site/src/pages/signin
+      # renders a plain "not configured yet" state and ships no dead sign-in
+      # button, which is what the live page did until Checkpoint 4 created the web
+      # app.
       - name: Build Astro (GitHub Pages variant)
         env:
           SITE_URL: https://djjay0131.github.io
           SITE_BASE: /website/
+          PUBLIC_FIREBASE_API_KEY: ${{ vars.PUBLIC_FIREBASE_API_KEY }}
+          PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.PUBLIC_FIREBASE_PROJECT_ID }}
         run: npm run build
 
       # SEAM-7: fail before the upload (and so before deploy) when a smoke-test
@@ -702,6 +712,10 @@ jobs:
         run: npm test
 
       - name: Build Astro (Firebase Hosting variant)
+        env:
+          PUBLIC_FIREBASE_API_KEY: ${{ vars.PUBLIC_FIREBASE_API_KEY }}
+          PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.PUBLIC_FIREBASE_PROJECT_ID }}
         run: npm run build
 
       # SEAM-7: fail before any upload when a smoke-test route has no file in
