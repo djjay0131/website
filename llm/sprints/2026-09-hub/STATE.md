@@ -15,12 +15,10 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 2 — Publishing contract. COMPLETE.** Every roadmap Phase 2 item is ticked, including
-the end-to-end criterion, verified on the live site: `build-info.json` reports
-`content_source: bucket` with an empty `cv_fingerprint`, and all eight CV routes return 200.
-The hub serves the CV **through the contract**, not from a GitHub release.
-
-Phase 3 has not started and waits for the owner's go.
+**Phase 3 — Private area. IN PROGRESS** (issue #24, branch `feat/private-area`, owner's go
+2026-09-17). Phase 2 is complete and the hub serves the CV through the contract. Phase 3 puts
+the milestone tracker and committee dossier behind sign-in, and is the first phase where
+private material touches the system.
 
 ## Done
 
@@ -200,48 +198,38 @@ Phase 3 has not started and waits for the owner's go.
 
 ## In flight
 
-**Phase 2 (#16), draft PR #17, branch `feat/publishing-contract`.**
+**Phase 3 (#24), draft PR #25, branch `feat/private-area`.** Governance wave committed and
+pushed as `9888daa`, CI green on all six required checks: ADR-0009, ADR-0010, the ADR index,
+`phase-3-seams.md`, five bounded contracts, `manifest_version` in the schema with its
+rejection fixture, and the two-version documentation in `contract/README.md` and
+`docs/satellites.md`.
 
-Landed and committed:
+**`djjay0131/phd-milestones` exists — do not create it again.** Private, created 2026-09-17
+from the Incident A1 seed blob in the Lead Architect's local object store (the remote handoff
+branch is long deleted). Default branch `main` at `24afd9d`, the seed's single commit
+preserved. Working checkout at `/mnt/c/code/phd-milestones`, already on branch
+`feat/publish-contract`. For the WIF entry: `repository_id=1373915518`,
+`owner_id=5666389`, `default_branch=main` — note `cv` is `master`, which is why that field is
+per satellite.
 
-- Decisions: ADR-0007, ADR-0008, design doc §2/§3/§4 amendments, roadmap, delta (artifacts
-  slot `docs/` declared), `docs/satellites.md`, all six bounded contracts, memory bank.
-- **`contract` stream — DONE** (commit `0866222`). Schema, 12 invalid fixtures, dependency-free
-  validator, composite publish action, README. Verified by the Lead Architect: 54/54 tests on
-  re-run, no tracked file touched, every forbidden construct present only as a comment
-  explaining the prohibition. Handoff: `handoffs/contract-phase-2.md`.
-- **`infra` stream — DONE** (commit `7a2f238`). Content bucket, three-permission custom role,
-  `satellites` WIF pool, cv identity; 9 resources. Verified: UBLA true, prefix condition ends
-  in a slash, no `objects.list` grant anywhere, cv admitted at `refs/heads/master`,
-  `terraform fmt`/`validate` clean, `budget.tf` untouched. Handoff: `handoffs/infra-phase-2.md`.
+**All four specialist streams launched 2026-09-17 and running:**
 
-Running now — **do not relaunch either without first checking for its handoff in
-`handoffs/`:**
+- **`gate`** — `gate/**` and `.github/workflows/gate.yml`, against `contracts/gate-phase-3.md`.
+- **`infra`** — `infra/**`, against `contracts/infra-phase-3.md`. Must resolve the conflict in
+  its open question (a): the roadmap's bucket IAM test forbids any reader of the private
+  bucket other than the gate, but ADR-0010's destructive sync needs the hub's identity to list
+  and delete there.
+- **`site`** — `site/**` and `.github/workflows/build.yml`, against `contracts/site-phase-3.md`.
+- **`satellite-phd`** — the private `phd-milestones` checkout, against
+  `contracts/satellite-phd-phase-3.md`.
 
-- **`site` — DONE** (commit `9be8d98`). Collection mirroring the schema, CV repointed at the
-  synced payload, poll wiring, fixtures. Verified: the Pages build/deploy/smoke test all
-  survive per the owner's instruction, `repository_dispatch` gone, every action SHA-pinned,
-  bucket work gated on `vars.GCP_CONTENT_BUCKET`, no bucket-metadata call, `findDuplicateSlugs()`
-  implements the rule JSON Schema cannot express, mirror accepts `private`, tests 54 → 102, and
-  the CV renders **byte-identically** (SHA-256 per page, before and after). Handoff:
-  `handoffs/site-phase-2.md`.
-- **`satellite-cv` — DONE.** Committed and pushed to `cv` on branch `feat/publish-contract`.
-  Verified: the "Notify website repo" step is deleted (0 hits for `WEBSITE_DISPATCH_PAT`,
-  `WEBSITE_REPO`, `repository_dispatch` in `build-cv.yml`), publishing gated to
-  `refs/heads/master` on non-PR events, the owner's own `cv` checkout untouched. Handoff:
-  `handoffs/satellite-cv-phase-2.md`. **`cv` PR #13** is open for it (branch
-  `feat/publish-contract`, commit `d9b402d`), and **`cv` PR #14** carries the one-line
-  `bibtexparser<2` pin from Risk 15 (branch `fix/bibtexparser-pin`, commit `5ee7515`).
-  **#14 must merge before #13**, or `cv`'s CI stays red and its publish job cannot run.
+**On restart: do not relaunch any of these without first checking for its handoff in
+`handoffs/` and whether its files already exist.** Relaunching over a stream's own work is the
+failure this record exists to prevent.
 
-**All four implementation streams have landed.** The **Chief Reviewer** is now IN FLIGHT
-(`contracts/chief-reviewer-phase-2.md`), reviewing hub PR #17 at head `9be8d98` and `cv` PR #13
-together. On restart: do not relaunch it if
-`handoffs/chief-reviewer-phase-2.md` already exists.
-
-Remaining after the review: act on its findings, persist it verbatim to
-`handoffs/chief-reviewer-phase-2.md` and post it to PR #17, take #17 out of draft, then the
-owner runs Checkpoint 3 in the order recorded under §Follow-ups.
+Not yet started: the **Chief Reviewer** (`contracts/chief-reviewer-phase-3.md`), which also
+carries this phase's **Governance Audit across Phases 0-3** against canon **v0.9.0** — whose
+`audit` skill gained the stale-branch check. It runs only once all four streams have landed.
 
 ## Blocked
 
@@ -360,6 +348,13 @@ Phase 1's `firebase.json` carries no gate rewrites.
 | — | Full label taxonomy + phase milestones — owner, 2026-09-14 | Delta §Milestone Labels |
 | — | **Phase 2 publish notification — option A:** the hub polls the content bucket on a schedule and rebuilds on change; satellites hold no GitHub credential for `website` (resolves the direction of C1/K13; the ADR is written at Phase 2 start) — owner, 2026-09-15 | STATE C1 |
 | — | **Email and Privacy pages** at `/email/` and `/privacy/`, titled "Email" and "Privacy", no "OpenClaw" name, owner's wording used as supplied — owner, 2026-09-15 | Issue #13 |
+- **§10 Q4 — answered (owner, 2026-09-17).** Seed members: **`djjay@vt.edu`** with
+  `role: owner`, **`cbrown@vt.edu`** as member. Those two only. **The allowlist matches the
+  exact email in the Firebase ID token**, and the owner's gcloud/GitHub identity is
+  `djjay0131@gmail.com` — signing in with that account yields a token that will not match and
+  produces the "not shared with you" page, which is indistinguishable from a gate bug. Sign-in
+  must use the VT Google account or email-link to `djjay@vt.edu`. Recorded in the seed
+  script's output and in the Checkpoint 4 steps.
 
 ## Assumptions (conservative choices, not §10 questions)
 
@@ -443,6 +438,17 @@ Phase 1's `firebase.json` carries no gate rewrites.
   named format, and the owner may prefer the `format: html` alternative despite its cost.
 - **A22** — The artifacts slot `docs/` is declared in this PR, which creates its first content
   (`docs/satellites.md`), exactly as A1 said it would be.
+- **A23** — The `phd-milestones` seed's embedded git history (1 commit, 1 branch, no remotes,
+  tracked set identical to the working tree) is **preserved** rather than squashed, so
+  provenance survives. It adds no exposure beyond what Incident A1 already assessed.
+- **A24** — The seed carries a `.gitlab-ci.yml`, dead config in a GitHub-bound repository. The
+  brief says not to alter the tarball's content beyond adding the workflow and manifest, so it
+  is **left in place and flagged** rather than silently deleted.
+- **A25** — The brief has a `satellite-phd` agent run `gh repo create --private` from
+  `~/code/phd-milestones.tar.gz`. That path does not exist — the only surviving copy is a blob
+  in the Lead Architect's local object store from the Incident A1 commit — and sub-agents make
+  no `gh` mutations. The **Lead Architect** extracts it and creates the repository; the agent
+  works in a checkout.
 
 ## ADR candidates
 
@@ -496,7 +502,7 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C19** — A second `data` source would make the hub carry a second first-party renderer.
   ADR-0008 sets a high bar deliberately; revisit at Phase 5 when `agentic-kg` and
   `construction-ai-proposal` arrive.
-- **C20** — Manifest versioning. `schema_version` versions one payload; the *contract itself*
+- **C20 — CLOSED 2026-09-17** by ADR-0009 (optional now, required in Phase 5). Manifest versioning. `schema_version` versions one payload; the *contract itself*
   also changes (ADR-0008 altered the "fixed" format set three weeks after the design doc). With
   `additionalProperties: false`, a satellite cannot send a field before the hub accepts it, so
   a `manifest_version` must land optional first and become required later. Recommended: ADR
@@ -506,7 +512,7 @@ Phase 1's `firebase.json` carries no gate rewrites.
   leaves a mixed state no satellite can detect or prune.
 - **C22** — Lexical constraints on `slug` and `path`. `slug` becomes a URL segment, so the
   contract stream constrained it to `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 64.
-- **C23** — Retention and withdrawal semantics for published objects. An empty `items` array is
+- **C23 — CLOSED 2026-09-17** by ADR-0010. Retention and withdrawal semantics for published objects. An empty `items` array is
   the only way a satellite can retract content, since it cannot list and therefore cannot
   prune. This matters from Phase 3, when a withdrawn item may be private.
 - **C24** — `schema_version` convention, raised by the `cv` stream and binding on both
@@ -528,13 +534,50 @@ Phase 1's `firebase.json` carries no gate rewrites.
   not change, and with `cv` as the only satellite there is nothing a collection-driven section
   page would show that the existing first-party pages do not. Owner's decision at Checkpoint 3:
   accept the deferral to Phase 5 when real satellites arrive, or hold Phase 2 open for it.
-- **C27** — A source whose entire bucket prefix vanishes is undetectable. Withdrawal is
+- **C27 — CLOSED 2026-09-17** by ADR-0010 decision 4 (the hub declares its expected sources). A source whose entire bucket prefix vanishes is undetectable. Withdrawal is
   expressible only as an empty `items` array, so a missing manifest is treated as a fault and
   fails the build — but a wholly absent prefix looks like a source that never existed.
   Detecting it needs a recorded expected-source set. Matters from Phase 3, when the missing
   source may be the private one.
+- **C28** — `format: html` does not say what travels with a page. The `satellite-phd` stream
+  established this concretely: the manifest names two files while correct publication needs
+  three, because nothing names the stylesheet both pages load. It reaches the bucket only
+  because the publish action uploads all of `dist/` — a property of the upload step, not of
+  the contract. §4 calls `html` "a self-contained page or folder", and neither reading holds:
+  the pages are not self-contained, and "folder" collapses because **both items share one
+  directory**. The contract should state that a file-valued `html` path serves its containing
+  directory, and define what happens when two items share one. Not changed mid-phase: the
+  `site` stream is reading the schema and the fixtures as this is written.
+- **C29** — The refusal shape. The gate answers **404 with a static body** for every refused
+  caller, never a redirect. Its reasoning is good and worth preserving: the natural redirect
+  implementation ("look up, redirect if found, 404 if not") is an existence oracle for private
+  slugs; a redirect also puts the private path into `?next=`, browser history, `Referer` and
+  logs, and adds an open-redirect surface. A uniform 404 carries no information. GitHub does
+  this for private repositories for the same reason.
+- **C30** — Session lifetime and revocation. The cookie lasts 14 days and membership is re-read
+  per request, so removal from the allowlist takes effect immediately — but every sub-asset of
+  a page triggers an Identity Toolkit lookup, which is a real cost and a real dependency.
+- **C31** — Whether member access should be logged at all, given the material. The gate keeps
+  object paths out of logs by default; whether *any* record of who read what should exist is a
+  privacy decision, not an engineering one.
 
 ## Constraints discovered (bind later contracts)
+
+- **"Dependency-free X" does not imply "dependency-free X's tests."** `contract/`'s
+  validator is deliberately dependency-free — `contract/publish/action.yml` runs it with
+  nothing installed. Its *test suite* imports `ajv` to cross-check the hand-written
+  validator against a real JSON Schema implementation. Wiring the suite into CI without
+  `npm ci` passed locally (where `node_modules` already existed) and failed on the runner's
+  clean checkout with `ERR_MODULE_NOT_FOUND`. Any job added for a tree that was previously
+  untested in CI must be proven against an **empty** checkout, not the working tree — move
+  `node_modules` aside and run it. This is the same class as the exit-126 defect and the
+  non-hermetic tests, and it was introduced by the Lead Architect while fixing S-5.
+
+- **A cross-stream environment variable is a contract, and nothing checks it.** Two streams
+  can each be green while disagreeing about the name of a variable one sets and the other
+  reads; neither runs the other's code. Any future phase that splits a producer and a
+  consumer across streams must name the exact variable in the seam, not in prose. Phase 3
+  cost one such defect (the gate's `GATE_PRIVATE_BUCKET`).
 
 - **Gate session cookie must be named `__session`** — Firebase Hosting strips
   every other cookie on Cloud Run rewrites. Phase 3 gate contract. (ADR-0004)
@@ -857,6 +900,156 @@ bootstrap defect, closed by PR #20). **Left open:** #21 — `sync-content.sh` ne
 and misreports an old curl as a bucket-listing failure. CI is unaffected; it costs a
 contributor an hour on a first local sync.
 
+## Phase 3 integration findings (Lead Architect, 2026-09-17)
+
+All four streams reported green. These are the defects that existed **between** them —
+none discoverable by a stream validating its own scope, which is the point.
+
+- **The gate could not have started.** `infra/gate.tf` rendered the Cloud Run env var as
+  `PRIVATE_BUCKET`; `gate/app/config.py:71` reads `GATE_PRIVATE_BUCKET` and line 73 raises
+  `ValueError` when it is empty. Nothing in `gate/` reads the bare name, no gate test pins
+  it, and `gate.yml`'s deploy sets no env at all (only `--image`), so nothing would have
+  masked it. The revision would have failed its health check at Checkpoint 4 with a message
+  pointing at the gate, not at infra. **Fixed in `infra/gate.tf`** — every other gate
+  variable already carries the `GATE_` prefix, so infra was the deviant, not the gate.
+  `terraform fmt -check` and `validate` pass after the change.
+
+- **The leak check is inert in CI, and was going to stay that way.** It runs on every
+  deploy but exits 0 while printing that it proved nothing, because no private item is
+  published until Checkpoint 4. The deliberate failing demonstration existed and ran
+  nowhere. **Added the `leak-check-self-test` job** to `build.yml`: it publishes the
+  committed fixture, builds, and asserts the check *fails* on an injected slug. It runs in
+  its own job because `content:fixture` rewrites `site/src/content`, and doing that inside
+  `build` or `build-firebase` would put fixture content into the artifact those jobs upload
+  to the live site. It gates nothing; promoting it to a required check is a Checkpoint 4
+  decision for the owner.
+
+- **`vars.GCP_PRIVATE_BUCKET` was a false alarm.** The site stream flagged it as a name it
+  had invented and could not find in infra. `infra/outputs.tf` exports exactly that name in
+  `gate_github_actions_variables`. The two streams agreed by coincidence rather than by
+  contract, which is worth noting even though the outcome was correct.
+
+- **The leak check was verified failing, by hand.** 9 leaks on the injected build, exit 1 —
+  and five of them are content-only hits in `index.html` with no matching path (qualified-id,
+  slug, route, source, title). That is the class a path-only check misses, and it is the
+  disagreement ADR-0005 settled against the brief's §4 on reasoning alone. It now has
+  evidence.
+
+## Phase 3 review dispositions (Chief Reviewer, PR #25)
+
+Verdict **Request changes**; governance audit **DRIFTING**, no blocking audit finding. The
+full report is persisted verbatim at `handoffs/chief-reviewer-phase-3.md` and posted to #25.
+
+**Blocking — both fixed.**
+
+- **B-1 — design doc §6 still said the gate SA was the bucket's only reader.** Accepted and
+  fixed. §6 requirement 3 carries a dated amendment citing ADR-0010 decision 5 and SEAM-1,
+  and ADR-0010's Related Documents now declares the amendment, as ADR-0008 did for §2/§4. The
+  reviewer's reasoning is the point: every downstream artifact was amended and the one
+  artifact that outranks them was left contradicted, so a Phase 4 contributor "restoring" the
+  stated invariant would silently disable withdrawal.
+- **B-2 — the two-`srcDir` structure was an undocumented deviation from §5 requirement 4.**
+  Accepted and fixed: **ADR-0011** records it, naming the filter alternative and why it was
+  rejected, and the module-graph path a filter could never close.
+
+**Should-fix.**
+
+- **S-1 — nothing in the private output links to anything the gate can serve. NOT fixed
+  here, deliberately; tracked as its own issue.** Verified independently: five distinct
+  targets resolve outside `/p/` (the stylesheet, both `_payload` iframes, both item routes).
+  The fix belongs in the follow-up PR that adds the rewrites, because setting Astro's `base`
+  to `/p/` interacts with where files are emitted and therefore with the object names the
+  sync uploads and the gate resolves — and that cannot be tested against a gate that does
+  not exist yet. The guard the reviewer asks for (no link in `dist-private` resolving outside
+  `/p/`) would fail today, so it lands with the fix rather than before it.
+- **S-2 — the bucket IAM test ran nowhere while three documents said it ran on every push.**
+  Fixed: `check_private_bucket_config.py` is now a step in `budget-guard`, which is already a
+  required check on `main`, so it binds immediately. The three claims now name the job.
+- **S-3 — the sign-in page and the gate disagreed, producing the redirect loop SEAM-3
+  forbids.** Fixed, and it was slightly worse than reported: the gate returns **200** with
+  `{"status":"not_a_member"}`, so `response.ok` was *true* and a non-member took the success
+  branch; the `403` branch was unreachable. The page now branches on the body. SEAM-2 gains
+  the `/session` response contract.
+- **S-4 — `leak-check-self-test` gates nothing.** Owner action at Checkpoint 4: promoting it
+  to a required context is a branch-protection change, not a repository edit.
+- **S-5 — `contract/`'s suite ran nowhere in the PR that edits the schema (issue #26).**
+  Fixed: a `contract-tests` job in `ci.yml`.
+- **S-6 — the memory bank stated things that were false about merged reality.** Fixed:
+  PR #17 is no longer "pending merge", canon is v0.9.0 in all three files, and the ADR range
+  is 0001–0011.
+
+**Audit findings.**
+
+- **A-1 stale branches — RESOLVED as a non-finding, 2026-09-17.** The remote carries only
+  `main`, `feat/private-area`, `fellowship-sprint-notebook` and `fix/derive-education-assertion`.
+  `admin/phase-2-closeout` and `fix/content-bootstrap` were deleted at merge:
+  `delete_branch_on_merge` is `true` and worked. The reviewer was reading **stale local
+  remote-tracking refs**, which it could not have known, because pruning them is a git
+  mutation its contract forbade. Pruned. `handoff/research-hub` still must never be deleted.
+  Original finding, for the record:
+- **A-1 stale branches — report only, no deletion recommended.** `handoff/research-hub` must
+  **never** be recommended for deletion: it was never pushed, it is the only copy of its
+  commit, and it holds the SHA an Incident A1 purge would need. That `admin/phase-2-closeout`
+  and `fix/content-bootstrap` survive after merge is worth checking against
+  `delete_branch_on_merge`; three older branches need a PR query the reviewer could not run.
+- **A-2 L0 allowlist drift.** Fixed: the three vestigial root denies are annotated and
+  retained (so recreating those paths is denied by default rather than unlisted), and
+  `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` and `.gitignore` — covered by no rule at all —
+  are now denied.
+- **A-3 memory bank.** Fixed as S-6.
+
+**Notes accepted without change**, each recorded rather than actioned: N-1 (`firebaseauth.admin`
+is the widest grant in the phase and must not survive Checkpoint 4 quietly), N-3 (the deny-all
+Firestore ruleset stays), N-4 (`format: html` in the public output stays unexpanded pending its
+own ADR — the reviewer agrees and would have argued for it), N-5 (the deletion ceiling's
+denominator is inflated by ~70 public assets, so it is weaker than 34% suggests), N-7 (commit in
+`phd-milestones` with `core.fileMode=false`), N-8 (H-5, webfonts from a public CDN on private
+pages — an owner decision), N-11 (roadmap criterion 7 is half-unsatisfiable until Phase 4 and
+must be recorded **deferred**, not ticked), N-12/N-13 (no sign-out, no rate limit on
+`POST /session` — both belong to Phase 4 scope now, while the reasoning is fresh), N-14 (C30),
+N-15 (H-4 closed for the material that mattered). N-2, N-6, N-9, N-10 and N-16 were stale
+records and are now corrected.
+
+
+## Audit items the Chief Reviewer could not verify, closed by the Lead Architect (2026-09-17)
+
+The reviewer had no `gh`. These are the checks it named as UNVERIFIABLE, run and closed:
+
+- **Check 4 — governance level.** #25 declares **L3** in its body (the row names the L1 and
+  L2 components it mixes) and carries the `gov-L3` label, alongside `implementation`,
+  `priority-high`, `security-privacy` and `phase-3-private-area`. The reviewer's judgement
+  that L3 is right matches the actual declaration. PASS.
+- **Check 7 — platform surface.** `delete_branch_on_merge: true`. Required contexts on
+  `main` are exactly `governance-checks` and `budget-guard`; `strict: false`,
+  `enforce_admins: false` — which is what the delta's §Platform Enforcement Reality already
+  records honestly. All four `gov-L0..L3` labels exist, as do all seven phase labels (42
+  labels total). PASS.
+- **Consequence worth acting on:** neither `contract-tests` nor `leak-check-self-test` is a
+  required context, so both run without gating a merge. Promoting them is a one-time
+  branch-protection change and is on the Checkpoint 4 list (S-4).
+
+
+## Phase 3 — implementation complete, handed to Checkpoint 4 (2026-09-17)
+
+PR #25 is **out of draft** at `d8a2465`, with every check green: `governance-checks`,
+`budget-guard`, `contract-tests`, `build`, `build-firebase`, `check`, `deploy-tools`,
+`gate/test` and `leak-check-self-test`. Every deploy job is correctly skipped — nothing in
+Phase 3 has touched a cloud resource, by design.
+
+**Agents do not merge.** The PR stops here for the owner.
+
+What Phase 3 proved locally, and what it did not:
+
+- **Proved.** The leak check catches content-only leaks with no matching path (verified by
+  hand and now on every CI run via `leak-check-self-test`); the public build's router is
+  never shown private pages; the gate refuses signed-out and non-member callers on both
+  transports across 204 tests; the destructive sync refuses on an empty or unvalidated build
+  and deletes exactly a withdrawn item's objects.
+- **Not proved, and cannot be until Checkpoint 4.** Every cloud resource. The private sync's
+  bucket driver has never executed. The gate has never started. No satellite has published.
+  The private area's links do not work yet (issue #27).
+
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
@@ -952,6 +1145,40 @@ contributor an hour on a first local sync.
 
 ## Follow-ups
 
+- **A dev/staging site is needed, and Phase 3 proved why (owner, 2026-09-17).** The private
+  area cannot be looked at before it is deployed: the gate needs Cloud Run, Identity Platform
+  and a real session, so there is no way to review the members' area as a member without
+  either shipping it or hand-rolling a local mount. During this session the owner — working
+  over SSH, with no local browser — could not view a local preview at all, and the only
+  reviewable artifact was a text render. That is not a sustainable review loop for a feature
+  whose entire point is what a signed-in person sees. A dev site (its own project or its own
+  Hosting site + gate revision, with its own allowlist and fixture content) should be scoped
+  before Phase 4 adds shares, which multiplies the number of states that can only be seen
+  live. ADR candidate: whether dev is a separate GCP project or a second Hosting target in
+  the same project, and how its budget is bounded.
+
+- **The private area's links resolve outside `/p/` — the members' area is unreachable as
+  built.** Roadmap criterion 1 fails at Checkpoint 4 unless this lands with the rewrites.
+  Fix, both halves required: set the private build's base so Astro emits `/p/_astro/…`, and
+  prefix `routeFor()` and `payloadUrlFor()` in `site/src-private/lib/private-content.mjs`,
+  which build raw strings Astro's base does not touch. Update the two assertions in
+  `private-content.test.ts` that currently pin the broken values, and add the guard: no link
+  in `dist-private` may resolve outside `/p/`. Chief Reviewer S-1, and the single thing the
+  report says to look at before merging.
+- **Checkpoint 4 owner actions**, beyond the apply itself: flip `phd-milestones` to
+  `required: true` in `EXPECTED_SOURCES` after its first successful publish (until then C27
+  is not closed for the only source it was written for); promote `leak-check-self-test` to a
+  required status check (S-4); narrow `roles/firebaseauth.admin` (N-1); confirm
+  `phd-milestones` is private on GitHub — the Chief Reviewer could not, and if it is public
+  the entire boundary argument is moot; and run the prefix-boundary test's reverse leg **as
+  `cv`**, the direction where a defect would let a public satellite reach private source
+  material.
+- **Prove the private sync's bucket driver on its first run, in this order** (Chief Reviewer,
+  Part C): after the first successful `private-sync`, confirm the dry run's delete list is
+  empty against an empty bucket; then withdraw one item deliberately and confirm the next dry
+  run names exactly that item's objects and no others **before** the apply step runs. Cheap
+  while the bucket is nearly empty; do not skip to trusting it on a full one.
+
 - The tarball follow-up formerly here (delete it in Phase 3) is **withdrawn**: it
   is now immediate — see Blocked, A1.
 - Delete the merged remote branches (`gov/establish-hub`, `feat/foundation`,
@@ -1011,6 +1238,91 @@ From the Phase 2 `cv` stream (2026-09-16):
   belongs alongside `budget-guard`, which exists for the same reason: an invariant whose
   breakage is invisible where it is authored. Deferred out of Phase 2 because `build.yml`
   was the site stream's file and the Chief Reviewer is mid-review.
+
+Opened during Phase 3 (2026-09-17):
+
+- **Issue #26 — `contract/`'s test suite never runs in CI.** Found while adding
+  `manifest_version`: I ran the suite locally (57/57), then went looking for the CI job that
+  would confirm it and there isn't one. `build`/`build-firebase` run `npm test` with
+  `working-directory: site`; `deploy-tools` installs firebase-tools; nothing invokes
+  `contract/`'s `node --test`. So the schema, the dependency-free validator the publish action
+  actually runs, the 13 rejection fixtures and the fixture-coverage guard are verified only by
+  hand. Same shape as the exit-126 defect and the non-hermetic tests: passes locally,
+  unguarded on the runner. Not fixed now because `build.yml` belongs to the in-flight `site`
+  stream; lands at reconciliation or as its own PR.
+- **`firebase.json` rewrites are deliberately absent from this PR** and are a Checkpoint 4
+  sequencing item. Hosting rejects a configuration naming a Cloud Run service that does not
+  exist, so merging with `/p/**` and `/session` rewrites would break the **public** site's
+  deploy, not merely the private area. They land once `hub-gate` is live.
+- **The shared example fixture still names the real private item, and it is load-bearing.**
+  The `satellite-phd` stream found (H-4) that the public worked example used
+  `phd-milestones` / `committee-dossier` / "Twelve vetted external committee candidates,
+  ranked." The two **prose** files are fixed — `docs/satellites.md` and `contract/README.md`
+  now use a neutral placeholder. `contract/examples/manifest.example.json` is **not** fixed,
+  deliberately: it is asserted as the design doc §4 example verbatim
+  (`validate.test.mjs:95`), its `source` value is asserted at `:293`, the site suite reads it
+  too, and **eleven** invalid fixtures are derived from it and carry the same slug. Changing
+  it cascades across 11 fixtures and two test files, breaks a stated seam property, and
+  collides with the in-flight `site` stream which also reads them.
+
+  This is **propagation, not a new leak**: the identifiers and that summary have been public
+  in design doc §4 since 2026-09-10, and the Chief Reviewer flagged §4's example at Phase 0
+  (finding A1). The question for the owner and the reviewer is whether §4 itself, and the
+  fixture derived from it, should be re-worded — which is a design-authority change, not a
+  tidy-up, and should not be made mid-phase by an agent.
+- **Checkpoint 4 action — flip `phd-milestones` to `required: true`** in the hub's
+  `EXPECTED_SOURCES` after its first successful publish. Declaring it required before it has
+  ever published would fail the hub build on a source whose prefix does not exist yet
+  (ADR-0010 decision 4) — the same bootstrap shape as issue #19.
+- **The private pages load webfonts from a third-party CDN** (`satellite-phd` finding H-5).
+  A signed-in member reading private material therefore makes a request to that CDN, which
+  learns the reader's IP and the referring page. Not fixed: it would mean editing seed
+  content, which this phase's contract forbids. It is a real privacy property of the private
+  area and the owner should decide whether to self-host those fonts — the hub already
+  self-hosts its own via @fontsource.
+
+Decisions and flags from the Phase 3 `infra` stream (2026-09-17):
+
+- **Open question (a) resolved in the ADR's favour.** The roadmap clause and SEAM-1 are
+  amended; ADR-0010 decision 5 stands. Recorded above.
+- **The stronger form, for the owner.** A dedicated `private-sync` identity would mean the
+  **public** site's deploy identity holds no private-bucket access at all. Not taken
+  unilaterally — it needs a second auth step in `build.yml`, which is the site stream's file.
+  It is the available tightening if the owner wants it.
+- **`projectViewer` can read every private object.** Cloud Storage's automatic legacy
+  bindings apply to the private bucket as they do to the content bucket. That was accepted at
+  Checkpoint 3 for public content; on a bucket holding the committee dossier it needs an
+  explicit owner decision. Today the only project Viewer is the owner.
+- **`roles/firebaseauth.admin` on the gate is wider than needed.** Session-cookie minting
+  requires `firebaseauth.users.createSession` and no narrower *predefined* role was
+  confirmable from a primary source in this environment. Tightening to a custom role is a
+  Checkpoint 4 command in the infra handoff.
+- **A deny-all Firestore ruleset was added beyond the contract's deliverables**, and it is
+  kept. Without it `members/{email}` — two real email addresses — is readable by any
+  signed-in stranger through the public sign-in page's Web SDK. Beyond-scope work, flagged
+  honestly by the stream rather than smuggled in.
+
+From the Phase 3 `gate` stream (2026-09-17):
+
+- **SD-3 — CLOSED by the Lead Architect.** The gate was granted `roles/datastore.user`
+  (read **and** write) on the reasoning that Phase 4 shares would need write. Verified instead:
+  `gate/app/` contains no Firestore write of any kind — the only call sites are the import, the
+  client, and one `.document(key).get()` per request. Narrowed to `roles/datastore.viewer`.
+  Granting write now for a capability a later phase might need is the wrong trade when the
+  privilege is write access to the allowlist itself.
+- **SD-4 — there is no way to sign out.** A 14-day `HttpOnly` session cookie with no in-band
+  clear: a member on a shared machine cannot end their own session. Not in any Phase 3
+  acceptance criterion, and not built. It belongs with the Phase 4 session work.
+- **SD-7 — `dist-private` filenames must match the gate's path allowlist** (`[A-Za-z0-9._-]`
+  per segment) or the file is unreachable: it syncs fine, the build is green, and a signed-in
+  member gets 404. Undocumented in the contract, the seams and ADR-0005. Sent to the `site`
+  stream mid-flight; it should fail the private build on a violating segment.
+- **A defect in my own contracts, across the whole sprint.** Ten contracts told agents to run
+  bare `gh` (`gh issue view 24`). **`gh` is not on this machine's PATH** — only a Windows
+  binary the Lead Architect invokes by full path. The gate stream could not read issue #24 and
+  said so. Everything it needed was in the repository, so nothing was lost, but the instruction
+  was wrong in every contract that carried it. Corrected in the reviewer contract; future
+  contracts must not assume `gh`.
 
 ## Standing constraints
 

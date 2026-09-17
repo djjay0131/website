@@ -13,13 +13,16 @@ from `0000-template.md`.
 | ADR | Title | Status |
 |---|---|---|
 | [0001](0001-promote-website-to-hub-on-firebase-hosting.md) | Promote `website` to the hub and move hosting to Firebase Hosting | Accepted |
-| [0002](0002-satellite-publishing-via-content-bucket-and-dispatch.md) | Satellites publish to a content bucket and notify the hub by dispatch | Accepted |
+| [0002](0002-satellite-publishing-via-content-bucket-and-dispatch.md) | Satellites publish to a content bucket (the dispatch half is superseded by ADR-0007) | Accepted |
 | [0003](0003-keep-astro-with-react-islands.md) | Keep Astro, with React islands for interactive widgets | Accepted |
 | [0004](0004-private-area-cloud-run-gate-behind-hosting.md) | Private area via a Cloud Run gate behind Hosting rewrites | Accepted |
 | [0005](0005-two-output-build-with-leak-check.md) | Two-output build with a leak check | Accepted |
 | [0006](0006-hub-on-jason-cusati-us-subdomain.md) | The hub lives at `jason.cusati.us`; `research.cusati.us` redirects; `cusati.us` is reserved for a family site | Accepted |
 | [0007](0007-hub-polls-content-bucket-no-satellite-github-credential.md) | The hub polls the content bucket; no satellite holds a GitHub credential | Accepted |
 | [0008](0008-manifest-data-format-hub-renders-cv.md) | The manifest gains a `data` format; the hub keeps rendering the CV | Accepted |
+| [0009](0009-manifest-version-lands-optional-first.md) | `manifest_version` lands optional, and becomes required later | Accepted |
+| [0010](0010-withdrawal-semantics.md) | Withdrawal semantics — the manifest is the authority, and a private withdrawal must actually stop serving | Accepted |
+| [0011](0011-two-srcdirs-not-a-visibility-filter.md) | The private build is a second `srcDir`, not a visibility filter | Accepted |
 
 ## Lifecycle
 

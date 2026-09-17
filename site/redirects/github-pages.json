@@ -188,6 +188,10 @@
     "to": "/robots.txt"
   },
   {
+    "from": "/website/signin/",
+    "to": "/signin/"
+  },
+  {
     "from": "/website/sitemap-0.xml",
     "to": "/sitemap-0.xml"
   },

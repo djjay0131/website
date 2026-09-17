@@ -29,6 +29,31 @@ it cites win wherever the two disagree:
 `llm/governance/adr/0007-hub-polls-content-bucket-no-satellite-github-credential.md`,
 `llm/governance/adr/0008-manifest-data-format-hub-renders-cv.md`.
 
+## Two version fields, and which to bump
+
+The contract has two things that change independently, and they are versioned separately
+(ADR-0009). Getting these confused is the most likely way to publish something the hub
+then refuses.
+
+| Field | Versions | Bumped by | Consumed by |
+|---|---|---|---|
+| `manifest_version` | the **envelope** — the field set, the fixed enums, the rules every source obeys | the **hub**, when the contract itself changes | every source |
+| `schema_version` | one **`data` payload's** internal shape — which YAML keys exist, where files sit | the **satellite** that owns that payload | the hub's renderer for that one source |
+
+`manifest_version` is a top-level string matching `^[0-9]+$` — **integers only**, because the
+hub matches it exactly against a list of versions it understands. A dotted form would invite
+compatibility reasoning ("2.1 satisfies a consumer expecting 2") that nothing implements.
+
+**It is optional today, and absent means `"1"`.** Every manifest published before ADR-0009 is
+a version 1 manifest and stays valid unchanged. It becomes **required in Phase 5**, once every
+satellite emits it — which is the only order that works, because `additionalProperties: false`
+means a satellite cannot send a field before the hub accepts it.
+
+A `manifest_version` the hub does not recognise **fails the hub build**, exactly as an
+unrecognised `schema_version` does. Silent tolerance of an unknown envelope version is how a
+contract stops meaning anything.
+
+
 ## The manifest
 
 `manifest.json` lives at the **root of `dist/`**. The publish action takes one
@@ -39,19 +64,20 @@ it (SEAM-2).
 
 ```json
 {
-  "source": "phd-milestones",
+  "source": "example-notes",
+  "manifest_version": "1",
   "published": "2026-09-10T14:02:11Z",
   "items": [
     {
-      "slug": "committee-dossier",
-      "title": "External Committee Dossier",
+      "slug": "quarterly-review",
+      "title": "Quarterly Review",
       "section": "phd",
       "format": "html",
-      "path": "committee/index.html",
+      "path": "review/index.html",
       "visibility": "private",
       "date": "2026-08-31",
-      "summary": "Twelve vetted external committee candidates, ranked.",
-      "tags": ["committee", "phd"]
+      "summary": "A placeholder item. Private, so it never reaches the public site.",
+      "tags": ["example"]
     }
   ]
 }

@@ -138,8 +138,19 @@ variable "content_bucket_name" {
 # not main: cv is a public repository whose default branch is master (ADR-0008
 # decision 6, correcting design doc §2).
 #
-# Phase 3 adds phd-milestones here and nowhere else (roadmap "Not in this
-# phase" keeps it out of Phase 2).
+# Phase 3 (issue #24) added phd-milestones here AND NOWHERE ELSE. That is the
+# whole point of the for_each design in satellites.tf: the second satellite cost
+# one map entry, and no resource block in satellites.tf changed by a character.
+# Note its default_branch is main, while cv's is master -- which is exactly why
+# the field is per entry rather than a module-wide constant.
+#
+# phd-milestones is PRIVATE (SEAM-7) and publishes items whose visibility is
+# private. Nothing in this map says so, and nothing here should: the identity and
+# the prefix boundary are identical for a public and a private satellite. What
+# differs is the manifest each publishes, and what the hub's two-output build
+# then does with it (ADR-0005). The boundary that keeps phd-milestones' object
+# names out of cv's reach is the same one that has always been here -- no
+# storage.objects.list, and a prefix-conditioned binding (satellite-role.tf).
 variable "satellites" {
   description = "Satellite repositories allowed to publish to the content bucket, keyed by source name. Each gets a keyless service account, its own WIF provider in the satellites pool, and a write grant restricted to gs://<content bucket>/sources/<key>/."
   type = map(object({
@@ -155,6 +166,12 @@ variable "satellites" {
       repository_id       = "1211056144"
       repository_owner_id = "5666389"
       default_branch      = "master"
+    }
+    phd-milestones = {
+      repository          = "djjay0131/phd-milestones"
+      repository_id       = "1373915518"
+      repository_owner_id = "5666389"
+      default_branch      = "main"
     }
   }
 
@@ -196,5 +213,75 @@ variable "satellites" {
     # would silently produce a binding that admits nothing.
     condition     = alltrue([for satellite in values(var.satellites) : can(regex("^[A-Za-z0-9._/-]+$", satellite.default_branch)) && !startswith(satellite.default_branch, "refs/")])
     error_message = "Each satellite's default_branch is a bare branch name such as master or main: no refs/heads/ prefix, no wildcards and no spaces."
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Phase 3 (issue #24): the private bucket, the gate and its supporting services.
+# ---------------------------------------------------------------------------
+
+variable "private_bucket_name" {
+  description = "Name of the private bucket the gate serves from (SEAM-1). Null means <project_id>-private. Bucket names are globally unique across all of Cloud Storage, so this is a variable rather than a literal; override only if the default stem is already taken."
+  type        = string
+  default     = null
+
+  validation {
+    # Same Cloud Storage naming rules as content_bucket_name: 3-63 characters,
+    # lowercase letters, digits, hyphens and underscores, starting and ending
+    # alphanumeric. Dots are rejected rather than half-supported, because a name
+    # containing a dot requires domain verification.
+    condition     = var.private_bucket_name == null || can(regex("^[a-z0-9][a-z0-9_-]{1,61}[a-z0-9]$", var.private_bucket_name))
+    error_message = "private_bucket_name must be 3-63 characters of lowercase letters, digits, hyphens or underscores, starting and ending with a letter or digit, and must not contain a dot."
+  }
+
+  validation {
+    condition     = var.private_bucket_name == null || !can(regex("^goog|google", coalesce(var.private_bucket_name, "x")))
+    error_message = "private_bucket_name must not begin with \"goog\" or contain \"google\": Cloud Storage reserves those names."
+  }
+
+  validation {
+    # The two buckets must not be the same bucket. They have opposite access
+    # models -- satellites write to one under prefix conditions, and only the
+    # gate reads the other -- so collapsing them would put private rendered
+    # output in a bucket every satellite can write to.
+    condition     = var.private_bucket_name == null || var.content_bucket_name == null || var.private_bucket_name != var.content_bucket_name
+    error_message = "private_bucket_name must differ from content_bucket_name: the content bucket is written by satellites, and the private bucket is read only by the gate."
+  }
+}
+
+variable "firestore_location" {
+  description = "Location of the Firestore database holding the member allowlist. PERMANENT: a database's location cannot be changed after it is created, so changing this later means a new database and a migration. Defaults to the project's region (us-east1), matching the gate and both buckets."
+  type        = string
+  default     = "us-east1"
+
+  validation {
+    # A Firestore location is either a region (us-east1) or a multi-region
+    # (nam5, eur3). The shape is checked, not the membership: the valid list
+    # changes as Google adds locations, and an invalid one fails loudly at apply
+    # rather than silently.
+    condition     = can(regex("^[a-z][a-z0-9-]{2,29}$", var.firestore_location))
+    error_message = "firestore_location must be a Firestore location id such as us-east1 (regional) or nam5 (multi-region). See https://cloud.google.com/firestore/docs/locations."
+  }
+}
+
+variable "gate_image" {
+  description = "Container image for the hub-gate Cloud Run service. Defaults to Google's public sample container, which is a PLACEHOLDER: .github/workflows/gate.yml pushes the real gate image to Artifact Registry and deploys it, and Terraform ignores changes to this field afterwards (see gate.tf). Terraform creates the service so the invoker policy, runtime identity and scaling live in reviewed code rather than in a workflow."
+  type        = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+
+  validation {
+    condition     = length(trimspace(var.gate_image)) > 0
+    error_message = "gate_image must not be empty: Cloud Run requires an image to create a service."
+  }
+}
+
+variable "gate_max_instance_count" {
+  description = "Maximum Cloud Run instances for the gate (orchestration brief §4 Phase 3: maximum 3). The minimum is fixed at 0 in gate.tf so the service scales to zero and costs nothing at rest (design doc §6, §8). This caps what a burst of traffic to a public *.run.app URL can spend against the $5 budget."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.gate_max_instance_count >= 1 && var.gate_max_instance_count <= 10 && floor(var.gate_max_instance_count) == var.gate_max_instance_count
+    error_message = "gate_max_instance_count must be a whole number between 1 and 10. The design calls for 3; a larger cap needs a decision about the budget."
   }
 }

@@ -13,7 +13,14 @@ export const LEGACY_REDIRECTS = [
 
 // Sections that carry <meta name="robots" content="noindex">, stay out of the
 // sitemap and are never linked from the public navigation.
-export const NOINDEX_SECTIONS = ["phd"];
+//
+// "signin" is here for a different reason than "phd". The sign-in page is a
+// PUBLIC page and deliberately so (site-phase-3 contract D6) -- it is simply not
+// content: it is a functional endpoint that names nothing and lists nothing, so
+// there is no reason for a crawler to index it or for the sitemap to advertise
+// it. Keeping it out of the sitemap also holds sitemap-index.xml byte-identical
+// to its Phase 2 output, which is the property the contract protects.
+export const NOINDEX_SECTIONS = ["phd", "signin"];
 
 // The routes .github/workflows/build.yml's smoke test requests, as base-relative
 // URL paths with a leading slash. Keep in step with that workflow.

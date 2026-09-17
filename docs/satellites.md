@@ -52,19 +52,20 @@ your repo ──▶ build dist/ (manifest.json at its root) ──▶ GCS conten
 
 ```json
 {
-  "source": "phd-milestones",
+  "source": "example-notes",
+  "manifest_version": "1",
   "published": "2026-09-10T14:02:11Z",
   "items": [
     {
-      "slug": "committee-dossier",
-      "title": "External Committee Dossier",
+      "slug": "quarterly-review",
+      "title": "Quarterly Review",
       "section": "phd",
       "format": "html",
-      "path": "committee/index.html",
+      "path": "review/index.html",
       "visibility": "private",
       "date": "2026-08-31",
-      "summary": "Twelve vetted external committee candidates, ranked.",
-      "tags": ["committee", "phd"]
+      "summary": "A placeholder item. Private, so it never reaches the public site.",
+      "tags": ["example"]
     }
   ]
 }
@@ -77,6 +78,7 @@ hub build validates it again. A manifest that fails either one does not publish.
 | Field | Rule |
 |---|---|
 | `source` | Your assigned source name. Must match the prefix you upload to. |
+| `manifest_version` | Optional, for now. A plain integer as a string. Absent means `"1"`. See below. |
 | `published` | ISO 8601 timestamp. |
 | `slug` | Unique within your source. |
 | `title` | Shown in the hub's navigation and indexes. |
@@ -86,6 +88,27 @@ hub build validates it again. A manifest that fails either one does not publish.
 | `visibility` | `public` or `private`. |
 | `date` | ISO date. |
 | `summary`, `tags` | Optional. |
+
+### `manifest_version` — and how it differs from `schema_version`
+
+Two different things can change, so they are versioned separately. Confusing them is the
+likeliest way to publish something the hub then refuses.
+
+| Field | Versions | Who bumps it |
+|---|---|---|
+| `manifest_version` | the **envelope** — the fields, the fixed sets, the rules every source obeys | the **hub**, when the contract changes |
+| `schema_version` | one **`data` payload's** internal shape | **you**, when your payload's shape changes |
+
+If you publish `md`, `html`, `pdf` or `bundle` items, `schema_version` never concerns you —
+only `data` items carry it.
+
+`manifest_version` is a string of digits: `"1"`, `"2"`. Not `"1.2"`. The hub compares it
+exactly against the versions it understands, so a dotted form would suggest a compatibility
+rule that does not exist.
+
+**Today it is optional and absent means `"1"`**, so you need do nothing. It becomes required
+in a later phase, and you will be told before that happens. Sending a version the hub does not
+recognise fails the hub's build rather than publishing something half-understood.
 
 ### Formats
 
@@ -122,13 +145,40 @@ here rather than only in yours:
 
 Prefer any other format if one fits.
 
+### Withdrawing something you published
+
+Remove the item from your manifest. The hub renders from the manifest, so an item that is no
+longer listed stops being served — even though its bytes are still in the bucket. Publishing a
+manifest with an empty `items` array withdraws everything, and that is a legitimate operation,
+not an error: it is the only retraction you can express, since you cannot list your own prefix.
+
+**Withdrawal does not delete your bytes.** The hub never deletes from the content bucket — it
+is your storage, not the hub's. So if the material is genuinely sensitive, removing it from the
+manifest is not enough: **delete the object yourself** as well. Your publishing identity can,
+within your own prefix.
+
+One thing to know: do **not** simply delete your `manifest.json` to withdraw. A missing manifest
+is treated as a fault and fails the hub's build, because it is indistinguishable from a
+truncated sync or a half-finished upload — and treating it as "withdraw everything" would turn
+a transient failure into silent deletion.
+
 ### Private items
 
 `visibility: private` items never reach the public site. They go bucket → build →
 private bucket, and are served only behind the hub's sign-in gate. The hub build
 fails if a private item appears in public output.
 
-Private items are a Phase 3 capability. Until then, publish only `public` items.
+**Enforce your own visibility.** The hub runs a leak check that fails its build if a private
+item reaches the public output — but that is the hub's backstop, not your permission to be
+careless. Assert in your own build that items you intend to be private are marked `private`,
+so a mistake fails in your repository, at the moment you make it, rather than at the hub.
+`phd-milestones` does this in its generator's tests.
+
+**What travels with an `html` item.** A `format: html` page usually needs more than the one
+file its `path` names — a stylesheet, images, pages it links to. Everything under `dist/` is
+uploaded, so those files do reach the bucket, but nothing in the manifest names them. Make
+your build fail if a page references a local file that is not staged, rather than discovering
+it as an unstyled page later.
 
 ## The publish step
 

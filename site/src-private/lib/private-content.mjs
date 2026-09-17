@@ -1,0 +1,214 @@
+// THE PRIVATE SIDE OF THE TWO-OUTPUT BUILD (ADR-0005; ADR-0010; SEAM-1, SEAM-5).
+//
+// What counts as a private item, where it is served in the private output, and
+// which bytes have to travel with it. Imported by the private build's pages, by
+// scripts/private-build.mjs and by the tests, so there is one declaration of
+// each of those facts.
+//
+// Nothing in src/pages/** may import this file. That is not a convention: the
+// public build uses a different srcDir entirely and never resolves src-private/,
+// and scripts/private-structure.test.ts asserts the import direction as well.
+
+import fs from "node:fs";
+import path from "node:path";
+
+/** Where a private item's payload bytes are served from in the private output. */
+export const PAYLOAD_ROOT = "_payload";
+
+/**
+ * THE GATE'S PATH ALLOWLIST (gate stream finding SD-7).
+ *
+ * The gate validates `GET /p/{path}` with an ALLOWLIST: every path segment must
+ * match this character set, and anything else is refused with a 404 before the
+ * bucket is touched. That is the right choice -- a blocklist of traversal
+ * spellings is the kind of thing an attacker eventually out-spells.
+ *
+ * The consequence lands here. A file written into dist-private whose name
+ * contains anything outside this set syncs to the private bucket perfectly and
+ * then returns 404 to a signed-in member, with NOTHING failing anywhere: the
+ * build is green, the object exists, and the page is simply gone. That is the
+ * same silent shape as staging an html page without its stylesheet, and it is
+ * only ever visible to the handful of people the private area exists for.
+ *
+ * So the private build fails instead. Characters that plausibly get this wrong:
+ * spaces, `~`, `+`, `@`, `%`, `:`, parentheses, and any non-ASCII character
+ * reaching a filename from an item title or a satellite's `path`.
+ */
+export const GATE_SEGMENT_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * Output-relative paths the gate could never serve.
+ *
+ * @param {readonly string[]} relPaths output-relative file paths
+ * @returns {{path: string, segment: string}[]}
+ */
+export function findUnservablePaths(relPaths) {
+  const bad = [];
+  for (const rel of relPaths) {
+    for (const segment of String(rel).split("/")) {
+      if (segment === "") continue;
+      if (!GATE_SEGMENT_PATTERN.test(segment)) bad.push({ path: rel, segment });
+    }
+  }
+  return bad;
+}
+
+/**
+ * Page extensions. A file with one of these is a DOCUMENT, and a document is
+ * staged only when the manifest still declares it (see stagingPlanFor).
+ */
+const PAGE_EXTENSIONS = new Set([".html", ".htm"]);
+
+/**
+ * THE BASE IS NOT OPTIONAL IN PRACTICE (issue #27).
+ *
+ * The gate serves the private area under /p/**, stripping /p/ to form the object
+ * name. Astro's `base` rewrites the URLs IT generates -- stylesheets, scripts --
+ * but these two functions build raw strings, so `base` never reaches them. Before
+ * this was fixed, every route and payload URL in the private output pointed at the
+ * PUBLIC origin: the members' page loaded unstyled and every link 404'd, while the
+ * build, the sync and the gate were each individually correct.
+ *
+ * Callers pass `import.meta.env.BASE_URL`, which Astro sets from the same `base`
+ * that produced the asset URLs -- so the two can never drift apart. The default of
+ * "/" keeps these usable from plain node (private-build.mjs) and keeps the
+ * unprefixed behaviour explicit rather than accidental.
+ *
+ * `scripts/check-private-links.mjs` fails the build if any link in dist-private
+ * resolves outside the base. That guard is the reason this cannot regress.
+ */
+function withPrivateBase(base, rest) {
+  const prefix = String(base ?? "/").replace(/\/+$/, "");
+  return `${prefix}/${rest}`;
+}
+
+/** The private output route for an item: <base><section>/<source>/<slug>/ */
+export function routeFor(item, base = "/") {
+  return withPrivateBase(base, `${item.section}/${item.source}/${item.slug}/`);
+}
+
+/** Where an item's payload entry point is served: <base>_payload/<source>/<path> */
+export function payloadUrlFor(item, base = "/") {
+  return withPrivateBase(base, `${PAYLOAD_ROOT}/${item.source}/${item.path}`);
+}
+
+/**
+ * THE STAGING PLAN: which files under a source's synced prefix travel into the
+ * private output, and where each one lands.
+ *
+ * WHY A DIRECTORY AND NOT A FILE. Phase 2 staged one file per item, which is
+ * correct for `pdf` -- a PDF is the whole document. Phase 3 is the first phase
+ * with `format: html`, and an HTML page is NOT self-contained in practice: the
+ * two pages `phd-milestones` publishes both load a sibling stylesheet
+ * (site/assets/style.css) and cross-link to each other. Copying only the file
+ * named in `path` stages a page whose stylesheet and sibling links are missing,
+ * and NOTHING FAILS -- no error, no log line. It simply renders broken, and only
+ * to the signed-in people the private area exists for. That is the worst failure
+ * shape available, so the unit of staging for an html item is its CONTAINING
+ * DIRECTORY.
+ *
+ * WHY THE MANIFEST CANNOT TELL US THE FILE SET. The stylesheet reaches the
+ * bucket because the publish action uploads all of `dist/`, not because any
+ * manifest field names it. So the full set is a property of the upload, not of
+ * the contract, and it can only be taken from the directory.
+ *
+ * WHY DOCUMENTS ARE STILL FILTERED. Taking the whole directory collides with
+ * ADR-0010 decision 1: "an item absent from a source's manifest is not rendered,
+ * not staged, and not served -- regardless of whether its bytes are still
+ * present under that source's prefix." A satellite cannot prune (ADR-0007), so a
+ * WITHDRAWN page's bytes are still sitting in that directory, and a plain
+ * directory copy would re-publish the very document someone withdrew. So:
+ *
+ *     every file in the directory subtree is staged, EXCEPT an .html/.htm file
+ *     that no surviving item declares as its `path`.
+ *
+ * That keeps sibling assets (the stylesheet, images, scripts) and keeps the
+ * cross-links between live pages working, while a withdrawn page is left behind
+ * exactly as decision 1 requires.
+ *
+ * DIRECTORIES ARE DEDUPED. Both of `phd-milestones`' items live in `site/`, so
+ * the subtree is walked once and each file is emitted once.
+ *
+ * KNOWN RESIDUAL, stated rather than hidden: a withdrawn item's non-document
+ * assets (an image only it used) are not distinguishable from live shared assets
+ * and are still staged. They carry no item prose. ADR candidate: have `format:
+ * html` declare its asset set, which would remove the guesswork entirely -- the
+ * satellite stream raises the same ambiguity as its open question (a).
+ *
+ * @param {string} sourcesDir the synced tree (src/content/sources)
+ * @param {{source: string, slug: string, path: string, format: string}[]} items
+ *        the items to stage -- ONLY those the manifest still declares
+ * @returns {{from: string, to: string, source: string}[]} absolute `from`,
+ *        output-relative `to`
+ */
+export function stagingPlanFor(sourcesDir, items) {
+  const staged = new Map(); // to -> {from, source}
+
+  // Every document path still declared, per source. Anything else with a page
+  // extension is a withdrawn document and must not travel (ADR-0010 decision 1).
+  const declaredPages = new Map();
+  for (const item of items) {
+    if (!declaredPages.has(item.source)) declaredPages.set(item.source, new Set());
+    declaredPages.get(item.source).add(normalizeRel(item.path));
+  }
+
+  // Dedupe the directories to walk: both items of a source usually share one.
+  const dirs = new Map(); // `${source}\0${dir}` -> {source, dir}
+  for (const item of items) {
+    const rel = normalizeRel(item.path);
+    const dir = item.format === "html" || item.format === "bundle"
+      ? (rel.endsWith("/") ? rel.replace(/\/+$/, "") : path.posix.dirname(rel))
+      : null;
+
+    if (dir === null || dir === ".") {
+      // pdf/data/md and anything whose path sits at the prefix root: stage the
+      // named file alone, which is what Phase 2 did and is correct for them.
+      addFile(staged, sourcesDir, item.source, rel);
+      continue;
+    }
+    dirs.set(`${item.source} ${dir}`, { source: item.source, dir });
+  }
+
+  for (const { source, dir } of dirs.values()) {
+    const abs = path.join(sourcesDir, source, dir);
+    for (const rel of walk(abs)) {
+      const relFromPrefix = path.posix.join(dir, rel);
+      const ext = path.posix.extname(rel).toLowerCase();
+      if (PAGE_EXTENSIONS.has(ext) && !declaredPages.get(source)?.has(relFromPrefix)) {
+        continue; // a withdrawn document's leftover bytes
+      }
+      addFile(staged, sourcesDir, source, relFromPrefix);
+    }
+  }
+
+  return [...staged.entries()]
+    .map(([to, { from, source }]) => ({ from, to, source }))
+    .sort((a, b) => (a.to < b.to ? -1 : a.to > b.to ? 1 : 0));
+}
+
+function addFile(staged, sourcesDir, source, relFromPrefix) {
+  const from = path.join(sourcesDir, source, relFromPrefix);
+  if (!fs.existsSync(from)) return;
+  const to = path.posix.join(PAYLOAD_ROOT, source, relFromPrefix);
+  if (!staged.has(to)) staged.set(to, { from, source });
+}
+
+function normalizeRel(p) {
+  return String(p).replace(/^\/+/, "");
+}
+
+function walk(dir, rel = "") {
+  const out = [];
+  let entries;
+  try {
+    entries = fs.readdirSync(path.join(dir, rel), { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const child = rel ? path.posix.join(rel, entry.name) : entry.name;
+    if (entry.isDirectory()) out.push(...walk(dir, child));
+    else out.push(child);
+  }
+  return out;
+}

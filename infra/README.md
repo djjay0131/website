@@ -1,11 +1,14 @@
 # infra — the research hub's cloud foundation
 
-Terraform for Phases 1 and 2 of the research hub, per the design authority
-`llm/specs/2026-09-10-research-hub-design.md` §8 and §12, ADR-0001, ADR-0006 (the
-hub's hostnames), ADR-0007 (satellite publishing and the prefix boundary),
-ADR-0008 (`cv` is public, default branch `master`), and the seams in
-`llm/sprints/2026-09-hub/contracts/phase-1-seams.md` (SEAM-4) and
-`phase-2-seams.md` (SEAM-2, SEAM-3, SEAM-4, SEAM-6, SEAM-7).
+Terraform for Phases 1, 2 and 3 of the research hub, per the design authority
+`llm/specs/2026-09-10-research-hub-design.md` §8 and §12, ADR-0001, ADR-0004 (the
+gate behind Hosting, and why its invoker is `allUsers`), ADR-0006 (the hub's
+hostnames), ADR-0007 (satellite publishing and the prefix boundary), ADR-0008
+(`cv` is public, default branch `master`), ADR-0010 (withdrawal is destructive on
+the private side), and the seams in
+`llm/sprints/2026-09-hub/contracts/phase-1-seams.md` (SEAM-4),
+`phase-2-seams.md` (SEAM-2, SEAM-3, SEAM-4, SEAM-6, SEAM-7) and
+`phase-3-seams.md` (SEAM-1, SEAM-3, SEAM-5, SEAM-6, SEAM-7, SEAM-8, SEAM-9).
 
 **Phase 1 (issue #10)** — one reviewed `terraform apply`, run by the owner,
 creates the project's APIs, the deploy identity and Firebase Hosting. After the
@@ -20,11 +23,19 @@ the bucket, and holds no key and no GitHub credential. Adding the next satellite
 is one entry in `var.satellites`, not a new module. See
 [Phase 2: the content bucket and satellite publishing](#phase-2-the-content-bucket-and-satellite-publishing).
 
+**Phase 3 (issue #24)** — the same apply now also creates the **private area's
+cloud foundation**: a private bucket that only the gate can read, the gate's
+keyless runtime identity, the `hub-gate` Cloud Run service, Artifact Registry for
+its image, Identity Platform, Firestore for the member allowlist, and a separate
+identity for the gate's deploy workflow. It also adds **`phd-milestones` as
+satellite #2** — one entry in `var.satellites`, no new resource block anywhere.
+See [Phase 3: the private area](#phase-3-the-private-area).
+
 The full ordered runbook for Checkpoint 2 (create the project, Blaze, apply, DNS,
 variables, first deploy, rollback) is in
-`llm/sprints/2026-09-hub/handoffs/infra-phase-1.md` §Manual steps, and the
-Checkpoint 3 runbook is in `infra-phase-2.md`. This file is the reference for
-the module itself.
+`llm/sprints/2026-09-hub/handoffs/infra-phase-1.md` §Manual steps, the
+Checkpoint 3 runbook is in `infra-phase-2.md`, and the Checkpoint 4 runbook is in
+`infra-phase-3.md`. This file is the reference for the module itself.
 
 ## What this module manages
 
@@ -38,13 +49,28 @@ the module itself.
 | `storage.tf` | `google_project_service.phase2` (1 API), `google_storage_bucket.content`, `google_storage_bucket_iam_member.hub_deploy_content_viewer` | The content bucket: uniform bucket-level access (**required** — an IAM condition does not apply without it), public access prevention enforced, versioning, soft delete, three lifecycle rules, `force_destroy = false`. The hub's `hub-deploy` gets `roles/storage.objectViewer` on it, unconditioned, because the hub owns the bucket and must list and read every prefix (SEAM-4) |
 | `satellite-role.tf` | `google_project_iam_custom_role.satellite_publisher` | The satellite grant: **exactly** `storage.objects.create`, `storage.objects.delete`, `storage.objects.get`, and **never** `storage.objects.list`, which cannot be prefix-restricted (ADR-0007 decision 4). One role for all satellites; the prefix lives in the binding |
 | `satellites.tf` | `google_iam_workload_identity_pool.satellites`, and per satellite `google_iam_workload_identity_pool_provider.satellite`, `google_service_account.satellite_publish`, `google_service_account_iam_member.satellite_publish_wif`, `google_storage_bucket_iam_member.satellite_publish_prefix` | One keyless identity per satellite, in a pool **separate** from the hub's (ADR-0007 decision 5), admitted only from that repository and its default branch (`master` for `cv`), and granted the custom role on the bucket conditioned to `sources/<source>/` |
+| `phase3-apis.tf` | `google_project_service.phase3` (5 APIs) | Cloud Run, Artifact Registry, Firestore, Identity Toolkit and Firebase Rules. Each listed with the resource that needs it; Cloud Build and Secret Manager are deliberately **not** enabled |
+| `private-bucket.tf` | `google_storage_bucket.private`, `google_storage_bucket_iam_member.gate_private_reader`, `google_storage_bucket_iam_member.hub_deploy_private_sync` | The private bucket: UBLA (**required**), public access prevention enforced, versioning, soft delete, three lifecycle rules, `force_destroy = false`. Exactly **two** principals: the gate reads, the hub's deploy identity syncs |
+| `private-roles.tf` | `google_project_iam_custom_role.private_object_reader`, `google_project_iam_custom_role.private_sync_writer` | The gate's role is **exactly** `storage.objects.get` — never `list`, because private object names are themselves private. The sync role is exactly `create`/`delete`/`get`/`list`, the four ADR-0010 decision 5 needs |
+| `gate.tf` | `google_service_account.hub_gate` + 2 project roles, `google_cloud_run_v2_service.gate`, `google_cloud_run_v2_service_iam_member.gate_invoker_all_users`, `google_service_account.gate_deploy` + 4 bindings | The gate's runtime identity (private bucket read, Firestore, session minting), the Cloud Run service (min 0, max 3, **invoker `allUsers` deliberately** — ADR-0004), and a *separate* deploy identity that can push an image but cannot read private content |
+| `registry.tf` | `google_artifact_registry_repository.gate` | Docker repository for the gate image, keeping the 5 most recent versions (roadmap R-A4) |
+| `firestore.tf` | `google_firestore_database.hub`, `google_firebaserules_ruleset.firestore_deny_all`, `google_firebaserules_release.firestore` | Firestore Native for `members/{email}` (SEAM-3), its location **permanent**, delete protection on — plus a **deny-all ruleset** so no browser client can read the allowlist |
+| `identity-platform.tf` | `google_identity_platform_config.hub` | Email-link sign-in, and the authorized-domain list that makes sign-in work on `jason.cusati.us`. Google sign-in is a deliberate **manual** step: its Terraform resource requires an OAuth client secret |
+| `scripts/` | none (a Python and a Bash check) | The roadmap's bucket IAM test, in two halves: `check_private_bucket_config.py` (credential-free, every push) and `check-private-bucket-iam.sh` (live, deploy path and Checkpoint 4) |
 | `deploy-tools/` | none: `package.json` and `package-lock.json` | Pins `firebase-tools` to exactly 15.30.1 with its whole dependency tree. `build.yml` installs it with `npm ci --prefix infra/deploy-tools`. `node_modules/` is git-ignored |
 
-Not managed, by design (roadmap "Not in this phase"; Phase 3 owns them): the
-**private** bucket, Artifact Registry, Cloud Run, Identity Platform, Firestore,
-the sign-in gate, and any `phd-milestones` identity. Adding `phd-milestones`
-later is one entry in `var.satellites` plus whatever Phase 3 decides about
-private items — this module needs no new resource type for it.
+Not managed, by design, after Phase 3 (roadmap "Not in this phase"; Phase 4 or
+later owns them): share infrastructure of any kind (`/s/**`, `/share/**`, the
+`shares` collection), a member-management interface, and search. Nor does this
+module ever create the **contents** of anything: no member document, no
+published object, no gate image. Seeding the allowlist is the owner's step at
+Checkpoint 4, which is why no real email address appears anywhere in `infra/`.
+
+Still not Terraformed and deliberately manual (see §Phase 3 manual steps):
+enabling **Identity Platform in the Marketplace**, enabling **Google sign-in**
+(its Terraform resource requires an OAuth client secret, which §12.2 forbids
+this repository from holding), and the DNS and project/billing steps from
+Phase 1.
 
 Not Terraformable or deliberately manual: creating the project, linking billing
 (Blaze), the hub hostnames' DNS records at the registrar, and deploying site content (done by
@@ -64,7 +90,11 @@ Not Terraformable or deliberately manual: creating the project, linking billing
 | `github_repository_owner_id` | no | `5666389` | Immutable owner ID matched by the WIF condition |
 | `hosting_site_id` | no | `null` (= `project_id`) | Override only if the project ID is taken as a site ID |
 | `content_bucket_name` | no | `null` (= `<project_id>-content`) | Bucket names are globally unique; override if the default stem is taken. Validation rejects dots, uppercase, and `goog*`/`*google*` |
-| `satellites` | no | one entry, `cv` | Satellites allowed to publish, **keyed by source name**. Per satellite: `repository`, `repository_id`, `repository_owner_id`, `default_branch`. Validation enforces the SEAM-2 source-name shape, the service-account and provider ID length limits, numeric IDs, and a bare branch name |
+| `satellites` | no | two entries, `cv` and `phd-milestones` | Satellites allowed to publish, **keyed by source name**. Per satellite: `repository`, `repository_id`, `repository_owner_id`, `default_branch`. Validation enforces the SEAM-2 source-name shape, the service-account and provider ID length limits, numeric IDs, and a bare branch name. Note the per-entry branch: `cv` is `master`, `phd-milestones` is `main` |
+| `private_bucket_name` | no | `null` (= `<project_id>-private`) | The private bucket. Globally unique, like the content bucket. Validation rejects dots, uppercase, `goog*`/`*google*`, and a name equal to `content_bucket_name` |
+| `firestore_location` | no | `us-east1` | **Permanent.** A Firestore database's location cannot be changed after creation |
+| `gate_image` | no | Google's sample container | A **placeholder**. `gate.yml` pushes the real image and deploys it; Terraform ignores changes to this field afterwards |
+| `gate_max_instance_count` | no | `3` | Cloud Run maximum instances for the gate (brief §4 Phase 3). The minimum is fixed at 0 in code |
 
 Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in.
 `terraform.tfvars` is git-ignored (`infra/.gitignore`), as are state files and
@@ -84,6 +114,15 @@ Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in.
 | `hosting_default_url` | The `*.web.app` URL the Firebase smoke test uses when `SITE_URL` is unset |
 | `custom_domain_dns_records` | Records to add or remove at the registrar, one entry per record, for every connected hostname. `custom_domain` names the hostname each record is for |
 | `custom_domain_state` | Per hostname: `redirect_target`, and its ownership, host and certificate state |
+| `gate_github_actions_variables` | The Phase 3 variables to set on **this** repository: `GCP_PRIVATE_BUCKET`, `GCP_GATE_DEPLOY_SA`, `GCP_GATE_SERVICE`, `GCP_GATE_REGION`, `GCP_ARTIFACT_REGISTRY` |
+| `private_bucket_name`, `private_bucket_url` | The private bucket, as a name and as a `gs://` URL |
+| `gate_service_account_email` | The gate's **runtime** identity — the only principal that reads a private object to serve it |
+| `gate_deploy_service_account_email` | The **deploy** identity `gate.yml` authenticates as. It cannot read private content |
+| `gate_service_name`, `gate_service_uri` | The Cloud Run service `firebase.json` must name, and its direct `*.run.app` URL — where every authorisation check must also hold (ADR-0004) |
+| `gate_image_repository` | The Docker path to push the gate image to |
+| `firestore_database` | The database's name, **permanent** location and type |
+| `private_bucket_roles` | The two custom roles bound on the private bucket, for the Checkpoint 4 checks |
+| `private_bucket_iam_check_command` | The live bucket IAM test, ready to paste |
 
 ## Running it
 
@@ -287,6 +326,235 @@ between 7 and 37 days, so every satellite would be unable to publish for that
 window with no way to apply out of it. Revoke a satellite at its **binding**
 (step 1), never at the role.
 
+## Phase 3: the private area
+
+### What Phase 3 adds
+
+**29 resources** (`Plan: 29 to add, 0 to change, 0 to destroy` on top of Phase 1's
+19 and Phase 2's 9). Nothing existing is modified. A plan that wants to change or
+replace a Phase 1 or Phase 2 resource — or that mentions
+`google_billing_budget.hub` — is a signal to **stop**.
+
+Twenty-five of them are the private area; the other four are `phd-milestones`
+becoming satellite #2, generated from **one entry** in `var.satellites`. No
+resource block in `satellites.tf` changed by a character, which is exactly what
+the Phase 2 `for_each` design existed to make true.
+
+The boundary, in one line: **the gate's service account is the only identity that
+can read a private object to serve it, and it can do nothing else** — it cannot
+list the bucket, cannot write to it, and cannot reach the content bucket at all.
+
+### The settings that must never change
+
+Phase 2's two still hold ([above](#the-two-settings-that-must-never-change)), and
+Phase 3 adds a third and a fourth.
+
+3. **`uniform_bucket_level_access = true` on the private bucket**, for the same
+   reason as the content bucket and one more. Without it, IAM conditions stop
+   applying *and* object ACLs come back — and a single object ACL can make one
+   private object world-readable with no IAM change anywhere, invisible to every
+   policy check. This is the setting that fails **open**, silently.
+4. **The gate never gets `storage.objects.list`.** Its role is exactly
+   `storage.objects.get`. The reasoning is the satellites' reasoning applied
+   where the stakes are highest: object names in the private bucket are
+   committee and milestone filenames, which disclose before anyone reads a byte.
+   The gate is asked for a path and serves that path; it never enumerates.
+
+Both are asserted on every push, with no credentials, by
+`python3 infra/scripts/check_private_bucket_config.py`, which runs as a step in the
+`budget-guard` job of `.github/workflows/build.yml` — already a required status check on
+`main`, so the assertion binds immediately rather than waiting on a branch-protection
+change. (Wired 2026-09-17: until then this sentence was false and the check ran nowhere.)
+
+### Who may touch the private bucket
+
+Exactly two principals, and the Checkpoint 4 check asserts the policy holds
+these and nothing else:
+
+| Principal | Role | Permissions | Why |
+|---|---|---|---|
+| `hub-gate` (Cloud Run runtime) | `privateObjectReader` (custom) | `storage.objects.get` | Streams one object by name on `/p/**` (ADR-0004 decision 4) |
+| `hub-deploy` (the site's deploy identity) | `privateSyncWriter` (custom) | `storage.objects.create`, `.delete`, `.get`, `.list` | Publishes `site/dist-private` and **prunes** what the current build did not produce (ADR-0010 decision 5) |
+
+**Why the second one exists**, since the roadmap criterion reads "no reader other
+than the gate's service account": a destructive sync must list the destination to
+know what to delete, and list is a read. `hub-deploy` is not a third party that
+gained access — it is the process that *produces* these bytes, and it already
+reads every private **source** byte in the content bucket under
+`sources/phd-milestones/` (SEAM-1). Denying it here would protect nothing it
+cannot already see, while making withdrawal unimplementable. The full argument,
+the exact grant and the recommended wording change are in
+`llm/sprints/2026-09-hub/handoffs/infra-phase-3.md` §Open question (a).
+
+### Manual steps, in order
+
+Continues from the Phase 2 runbook, and every apply follows the same
+apply-provenance rule (§Guardrails).
+
+1. **Enable Identity Platform in the Marketplace** — *before* the apply, or it
+   fails at `google_identity_platform_config`. The provider is explicit: "You
+   must enable the Google Identity Platform in the marketplace prior to using
+   this resource." Enabling the `identitytoolkit` API is **not** the same action.
+
+   <https://console.cloud.google.com/marketplace/details/google-cloud-platform/customer-identity>
+
+   Expected: the Identity Platform page in the console loads and offers
+   providers.
+
+2. **Confirm the Firestore location before applying.** `firestore_location`
+   defaults to `us-east1` and **cannot be changed afterwards**: "once you
+   provision a database instance, you cannot change its location setting"
+   (Firestore, "Firestore locations"). Changing it later means a second database
+   and a migration.
+
+3. **Apply.** From `infra/`:
+   - `terraform init` — expected: `Terraform has been successfully initialized!`
+   - `terraform plan -out=tfplan` — expected: **`Plan: 29 to add, 0 to change, 0 to destroy.`**
+   - `terraform apply tfplan` — expected: `Apply complete! Resources: 29 added, 0 changed, 0 destroyed.`
+   - `terraform plan` again — expected: `No changes.` (§12.5).
+
+   If apply fails with `SERVICE_DISABLED`, an API is still propagating: wait two
+   minutes and apply again.
+
+4. **Confirm the private bucket's security settings** before anything writes to
+   it:
+
+   ```sh
+   gcloud storage buckets describe "$(terraform output -raw private_bucket_url)" \
+     --format="value(uniform_bucket_level_access.enabled,public_access_prevention,versioning.enabled)"
+   ```
+
+   Expected: `True  enforced  True`. **If the first value is not `True`, stop:**
+   object ACLs are live and the bucket's access story is no longer IAM-only.
+
+5. **Confirm the two private-bucket roles hold exactly their permissions:**
+
+   ```sh
+   gcloud iam roles describe privateObjectReader --project "$(terraform output -raw project_id)" \
+     --format="value(includedPermissions)"
+   gcloud iam roles describe privateSyncWriter --project "$(terraform output -raw project_id)" \
+     --format="value(includedPermissions)"
+   ```
+
+   Expected, exactly: `storage.objects.get` for the first, and
+   `storage.objects.create;storage.objects.delete;storage.objects.get;storage.objects.list`
+   for the second. **If `storage.objects.list` appears in `privateObjectReader`,
+   stop and raise it.**
+
+6. **Enable Google sign-in by hand**, in the Firebase console → Authentication →
+   Sign-in method → Google. This is deliberate, not an omission: the Terraform
+   resource (`google_identity_platform_default_supported_idp_config`) requires
+   `client_id` **and** `client_secret`, which would put a long-lived OAuth secret
+   in `terraform.tfvars` and in Terraform state — the exact thing §12.2 forbids.
+   The console provisions the OAuth client on the project's own behalf.
+
+   Expected: Google shows as Enabled. Email/Password with **email link** is
+   already on from the apply; confirm it shows as enabled too.
+
+7. **Set the Phase 3 GitHub Actions variables** in `djjay0131/website`. None is
+   secret.
+
+   ```sh
+   terraform -chdir=infra output -json gate_github_actions_variables | jq -r 'to_entries[] | "\(.key)\t\(.value)"'
+   gh variable set GCP_PRIVATE_BUCKET    --body "<GCP_PRIVATE_BUCKET>"
+   gh variable set GCP_GATE_DEPLOY_SA    --body "<GCP_GATE_DEPLOY_SA>"
+   gh variable set GCP_GATE_SERVICE      --body "<GCP_GATE_SERVICE>"
+   gh variable set GCP_GATE_REGION       --body "<GCP_GATE_REGION>"
+   gh variable set GCP_ARTIFACT_REGISTRY --body "<GCP_ARTIFACT_REGISTRY>"
+   ```
+
+   `GCP_WIF_PROVIDER` is **unchanged**: the gate workflow runs in this repository
+   and uses the hub's existing provider with a different service account.
+
+8. **Set the `phd-milestones` variables in that repository** (all four are new
+   there):
+
+   ```sh
+   terraform -chdir=infra output -json satellite_github_actions_variables \
+     | jq -r '."phd-milestones" | to_entries[] | "\(.key)\t\(.value)"'
+   gh variable set GCP_PROJECT_ID     --repo djjay0131/phd-milestones --body "<...>"
+   gh variable set GCP_WIF_PROVIDER   --repo djjay0131/phd-milestones --body "<...>"
+   gh variable set GCP_PUBLISH_SA     --repo djjay0131/phd-milestones --body "<...>"
+   gh variable set GCP_CONTENT_BUCKET --repo djjay0131/phd-milestones --body "<...>"
+   ```
+
+   The same trap as `cv`: `GCP_WIF_PROVIDER` exists in several repositories with
+   *different* values. This one must contain
+   `.../workloadIdentityPools/satellites/providers/github-phd-milestones`.
+
+9. **Seed the allowlist** with the member seed script (owner's step; the gate
+   stream owns the script). No email address is in this repository, and none
+   should be.
+
+10. **Run the Checkpoint 4 verification** below, before announcing the private
+    area works.
+
+### Cost
+
+Phase 3's expected addition to the bill: **$0.00/month**, with one line that can
+plausibly reach a few cents. Rates and allowances read 2026-09-17.
+
+| Line | Allowance / rate | Phase 3 usage | Cost |
+|---|---|---|---|
+| Cloud Run | Free tier: "2 million requests per month", "360,000 GB-seconds of memory, 180,000 vCPU-seconds of compute time", "1 GB of outbound data transfer from North America per month" ([Free Program](https://cloud.google.com/free/docs/free-cloud-features)) | `min-instances = 0`, so nothing runs at rest. A few hundred member requests a month, ~1s each at 1 vCPU / 512 MiB | **$0.00** |
+| Artifact Registry | "0.5 GB of storage per month" free ([Free Program](https://cloud.google.com/free/docs/free-cloud-features)) | 5 retained versions of one Python image. Layers are shared between versions, so five builds of the same base are ≈ one base plus five small application layers, not 5× the image | **$0.00**, see the sensitivity note |
+| Firestore (Native) | Free tier: "1 GiB of storage per project", "50,000 reads, 20,000 writes, and 20,000 deletes per day per project" ([Free Program](https://cloud.google.com/free/docs/free-cloud-features)) | Two documents. One read per private request | **$0.00** |
+| Identity Platform | "no-cost tier of 50,000" monthly active users ([Identity Platform pricing](https://cloud.google.com/identity-platform/pricing)) | Two users | **$0.00** |
+| Private bucket (Cloud Storage) | Free tier: 5 GB-months regional (US regions), 5,000 Class A, 50,000 Class B ops ([Cloud Storage pricing](https://cloud.google.com/storage/pricing)) | A few MB of rendered HTML, one destructive sync per deploy, one read per private request. us-east1 qualifies | **$0.00** |
+| IAM: 2 custom roles, 2 service accounts, 6 bindings, 1 WIF binding | "All use of Identity and Access Management API is free of charge" | — | **$0.00** |
+
+Sensitivity, so the number is honest rather than merely small:
+
+- **Artifact Registry is the one line that can leave the free tier.** If the gate
+  image is large and its layers do *not* dedupe well, five retained versions
+  could exceed 0.5 GB. At the published per-GB storage rate that is single-digit
+  cents a month — immaterial against the $5 budget, but it is the line to watch,
+  and it is why `keep-last-5` exists rather than unbounded retention. The
+  per-GB overage rate could not be re-read from the pricing page from this
+  environment; confirm it at Checkpoint 4 if the repository grows.
+- **Cloud Run's cost is bounded by `gate_max_instance_count = 3`**, which is what
+  stops a burst of traffic to a public `*.run.app` URL from spending real money.
+  The invoker is `allUsers` by design (ADR-0004), so this cap is a budget
+  control, not a formality.
+- The $5 budget is unchanged and untouched by this phase.
+
+### Rollback (Phase 3 resources only)
+
+The budget is never removed (§12.6), and no rollback runs `terraform destroy`
+without `-target`. In increasing order of severity:
+
+1. **Take the private area offline instantly, without touching data:** targeted
+   destroy of `google_storage_bucket_iam_member.gate_private_reader`. The gate
+   then 403s on every object; nothing is deleted. Fully reversible by re-applying.
+2. **Stop the gate serving at all:** targeted destroy of
+   `google_cloud_run_v2_service_iam_member.gate_invoker_all_users` (every request
+   is refused at the platform), or of the service itself —
+   `deletion_protection = false` makes that possible deliberately, because the
+   service is stateless and one apply plus one image deploy re-creates it.
+3. **Stop `phd-milestones` publishing:** remove its entry from `var.satellites`
+   and apply. That destroys its provider, service account and bucket binding —
+   nothing else, and nothing belonging to `cv`.
+4. **Stop the hub writing private output:** targeted destroy of
+   `google_storage_bucket_iam_member.hub_deploy_private_sync`. The build can then
+   neither publish nor prune; existing private content stays served.
+5. **Remove the private bucket:** only when it is empty. `force_destroy = false`
+   means a bucket still holding objects fails to destroy, by design.
+
+**Never** targeted-destroy `google_project_iam_custom_role.private_object_reader`
+or `private_sync_writer`: both are `deletion_policy = "PREVENT"`, and a deleted
+custom role locks its ID for 7–37 days, so the gate could not read (or the hub
+could not publish) for that whole window with no way to apply out of it. Revoke
+at the **binding** (steps 1 and 4), never at the role.
+
+Two things this module cannot roll back, stated so nobody tries:
+
+- **Firestore** has `delete_protection_state = "DELETE_PROTECTION_ENABLED"` and
+  `deletion_policy = "ABANDON"`. A destroy removes it from state and leaves the
+  database. Deleting it for real is a deliberate two-step change.
+- **Identity Platform** "is created only once during intialization and cannot be
+  deleted, individual Identity Providers may be disabled instead" (provider
+  docs). Disable providers; do not expect to remove the config.
+
 ## Guardrails
 
 - **No keys.** Nothing here creates a service-account key, and nothing may
@@ -413,3 +681,72 @@ gcloud storage buckets get-iam-policy "gs://${CONTENT_BUCKET}"
 gcloud iam service-accounts keys list \
   --iam-account="publish-cv@${PROJECT}.iam.gserviceaccount.com" --managed-by=user
 ```
+
+## Checkpoint 4 — verifying the private area
+
+Run **after apply and before announcing that the private area works**. The full
+procedure, with expected output for every command, is in
+`llm/sprints/2026-09-hub/handoffs/infra-phase-3.md` §Checkpoint 4. The two checks
+that matter most are here, because they are the ones whose failure is silent.
+
+### Proving the private bucket has exactly one reader
+
+"Exactly one reader" is an **equality** assertion, not an absence one: it is not
+enough to look for `allUsers` and find none. Enumerate the whole policy and
+compare it against the expected set.
+
+```sh
+cd infra
+PROJECT="$(terraform output -raw project_id)"
+BUCKET="$(terraform output -raw private_bucket_name)"
+GATE_SA="$(terraform output -raw gate_service_account_email)"
+HUB_SA="$(terraform output -raw deploy_service_account_email)"
+
+PROJECT="$PROJECT" BUCKET="$BUCKET" GATE_SA="$GATE_SA" HUB_SA="$HUB_SA" \
+  PROBE_OBJECT="index.html" \
+  bash scripts/check-private-bucket-iam.sh
+```
+
+It asserts, and fails loudly on any of them:
+
+1. `uniform_bucket_level_access` is `True` — **checked first, and it stops the
+   run if it fails**, because with it off an object ACL can publish a single
+   object while the IAM policy still looks perfect.
+2. `public_access_prevention` is `enforced`.
+3. No `allUsers` and no `allAuthenticatedUsers` anywhere in the policy.
+4. The non-legacy bindings are **exactly two**: `privateObjectReader` →
+   the gate, `privateSyncWriter` → `hub-deploy`. A third binding fails the check.
+5. An anonymous `GET` of a real private object is refused (401/403/404). This is
+   the roadmap's last clause, and it needs no credential at all.
+
+It also **prints, without failing on them**, the `legacyBucketOwner` /
+`legacyObjectReader` bindings Cloud Storage creates automatically on every
+bucket. They are not granted by this module, but they mean **any principal with
+project Viewer on `cusati-hub` can read every private object**. Today that is
+only the owner. This was recorded as acceptable for the content bucket at
+Checkpoint 3; now that the bucket holds private material it needs the owner's
+explicit acceptance. See the handoff §Risks.
+
+### Proving the satellite boundary still holds, in both directions
+
+Phase 2 proved `cv` cannot escape `sources/cv/`. With a second satellite the
+interesting failure is cross-satellite, so run it **both ways** — and note that
+the `phd-milestones` direction is the one where a leak would expose private
+source object names.
+
+Use the JSON API, never `gcloud storage`: `gcloud storage cp` requires
+`storage.objects.list` even for a single file into the satellite's *own* prefix,
+so a `gcloud` test fails on the allowed path too and looks like a broken
+boundary that is not one (verified at Checkpoint 3). The exact commands are in
+the handoff §Checkpoint 4, test 2.
+
+### The credential-free half, which runs on every push (in `budget-guard`)
+
+```sh
+python3 infra/scripts/check_private_bucket_config.py
+```
+
+Expected: `OK: private bucket declares uniform bucket-level access and enforced
+public access prevention, names no anonymous principal, and carries exactly two
+bindings …`. It needs no cloud access, so it belongs in CI on every pull request
+— see the handoff §Seam issues for the `build.yml` step the site stream owns.

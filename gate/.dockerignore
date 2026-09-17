@@ -1,0 +1,16 @@
+# Only the application and its lock file belong in the image.
+*
+!app/
+!requirements.txt
+
+# Belt and braces: never ship a credential, a test, or a virtualenv even if the
+# allowlist above is later loosened.
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+**/.pytest_cache/
+**/.ruff_cache/
+**/*.json.key
+**/*-key.json
+**/service-account*.json

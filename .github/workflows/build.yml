@@ -359,6 +359,24 @@ jobs:
       #     Phase 3, the private ones.
       # Neither produces an error, which is why they are asserted here rather than
       # trusted to review. Same reasoning as the budget check above.
+      # Design doc §12.1 is a non-negotiable: "No private content in public
+      # output. Build-time check, bucket IAM test, both on every deploy." The
+      # build-time check runs above; this is the bucket half, and until now it ran
+      # NOWHERE while three documents claimed it ran on every push.
+      #
+      # It lives in budget-guard on purpose. budget-guard is already a required
+      # status check on main, so the assertion binds from the moment it lands
+      # rather than waiting on a branch-protection change.
+      #
+      # Credential-free: it reads the Terraform, not the live policy. It asserts
+      # uniform bucket-level access, enforced public access prevention, no
+      # anonymous principal, and EXACTLY two bindings -- the gate with
+      # storage.objects.get, and the hub's sync with create/delete/get/list
+      # (SEAM-1, ADR-0010 decision 5). The live half needs credentials and is a
+      # Checkpoint 4 procedure (infra/README.md).
+      - name: Check the private bucket's declared IAM (design doc 12.1)
+        run: python3 infra/scripts/check_private_bucket_config.py
+
       - name: Check the satellite boundary invariants are declared
         if: ${{ !cancelled() }}
         run: |
@@ -428,6 +446,79 @@ jobs:
   # build the Pages deploy depends on, so the Firebase variant (build-firebase,
   # below) cannot fail or block it (SEAM-4). Pull requests stop here: nothing
   # below deploys on a pull_request event.
+  # Proves the leak check still catches a leak -- on every run, today.
+  #
+  # The real check (in build and build-firebase) exits 0 right now while printing
+  # that it proved nothing: no private item is published until phd-milestones
+  # first publishes at Checkpoint 4, so there is no private slug to search for.
+  # A guard that never fires is indistinguishable from one that is broken, and
+  # this is the guard the entire private phase rests on (ADR-0005, SEAM-4).
+  #
+  # It runs in its OWN job for one reason. demo:leak-check needs private items to
+  # exist, which means running content:fixture, which rewrites site/src/content.
+  # Doing that inside build or build-firebase would put fixture content into the
+  # artifact those jobs upload to the live site. A separate runner cannot
+  # contaminate a deploy.
+  #
+  # It gates nothing deliberately: a broken guard surfaces as a red job rather
+  # than blocking the deploy lane. Promoting it to a required check is the
+  # owner's call at Checkpoint 4.
+  leak-check-self-test:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+
+      - name: Install deps
+        run: npm ci
+
+      # The committed fixture publishes two PRIVATE items for exactly this
+      # purpose. No bucket, no credential, no network.
+      - name: Publish the fixture content
+        run: npm run content:fixture
+
+      # demo:leak-check copies an existing build; it does not produce one.
+      - name: Build the public output
+        env:
+          SITE_URL: https://djjay0131.github.io
+          SITE_BASE: /website/
+        run: npm run build
+
+      # Injects a private slug into a COPY of dist-public and asserts the leak
+      # check FAILS on it. Exits 0 only when the guard caught the leak.
+      - name: Prove the leak check catches a leak
+        run: npm run demo:leak-check
+
+      # AND the private-link guard, here rather than only in build-firebase.
+      #
+      # In build-firebase no private item is published yet, so the private build
+      # renders ONE page -- the members' index with no item links -- and
+      # check:private-links passes having inspected almost nothing. It would NOT
+      # have caught issue #27, whose broken links (/phd/..., /_payload/...) only
+      # exist once there are items. That is the same vacuous-guard failure the
+      # leak check had, and it is why this job exists at all.
+      #
+      # The fixture published above carries two private items, so here the private
+      # build renders five pages with real routes and real payload URLs, and the
+      # guard has something to prove.
+      - name: Build the private output from the fixture
+        run: npm run build:private
+
+      - name: Prove every private link resolves under the gate's base
+        run: npm run check:private-links
+
   build:
     needs: check
     if: needs.check.outputs.changed == 'true'
@@ -515,6 +606,17 @@ jobs:
       # route has no file in site/dist-public.
       - name: Check smoke-test routes exist (GitHub Pages variant)
         run: npm run check:smoke-routes
+
+      # SEAM-4 / ADR-0005: the leak check runs BETWEEN build and deploy, on
+      # every deploy, for BOTH hosts. GitHub Pages is still the authoritative
+      # public host until Phase 6, so a private item leaking into this variant
+      # is exactly as bad as one leaking into the Firebase variant.
+      #
+      # It greps file CONTENTS as well as paths: a private title rendered into a
+      # public index page is a leak with no matching path (K11; the brief's §4
+      # path-only form was insufficient and ADR-0005 overruled it).
+      - name: Check no private content reached the public build (GitHub Pages variant)
+        run: npm run check:no-private-in-public
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
@@ -607,13 +709,52 @@ jobs:
       - name: Check smoke-test routes exist (Firebase Hosting variant)
         run: npm run check:smoke-routes
 
-      # Only the deploy path consumes the artifact; a pull request stores none.
+      # THE SECOND OUTPUT (ADR-0005 decision 1). Same source tree, same synced
+      # content, same validated manifests; HUB_OUTPUT=private selects
+      # site/dist-private and a different srcDir, so the private routes exist
+      # only here and the public build above cannot emit them.
+      #
+      # It runs BEFORE the leak check on purpose: if the private build fails,
+      # nothing is deployed and nothing is synced, which is ADR-0010 decision 3.
+      - name: Build Astro (private output)
+        run: npm run build:private
+
+      # ISSUE #27. The gate serves this output under /p/** and strips /p/ to form
+      # the object name, so a link that does not start with /p/ reaches the PUBLIC
+      # origin and 404s for a signed-in member -- with the build, the sync and the
+      # gate each individually correct and nothing erroring anywhere. It also checks
+      # each link points at a file that EXISTS, because uniformly prefixed but wrong
+      # is just as broken as unprefixed.
+      - name: Check every private link resolves under the gate's base
+        run: npm run check:private-links
+
+      # SEAM-4 / ADR-0005: between build and deploy, on every deploy. Both
+      # outputs now exist, so this is the moment the public one can be checked
+      # against the full set of private items the private one rendered.
+      - name: Check no private content reached the public build
+        run: npm run check:no-private-in-public
+
+      # Only the deploy path consumes the artifacts; a pull request stores none.
       - name: Upload Firebase Hosting artifact
         if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: firebase-hosting
           path: site/dist-public
+          if-no-files-found: error
+          retention-days: 1
+
+      # The private output travels to the sync job as its own artifact. It
+      # includes .hub-private-build.json, the build receipt the sync refuses to
+      # run without -- so "the build succeeded and the manifests validated"
+      # arrives as evidence rather than as an assumption (ADR-0010 decision 3).
+      - name: Upload private output
+        if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hub-private
+          path: site/dist-private
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
 
@@ -749,6 +890,90 @@ jobs:
             --non-interactive \
             --message "${GITHUB_SHA} (run ${GITHUB_RUN_ID})"
 
+  # THE DESTRUCTIVE PRIVATE SYNC (ADR-0010 decision 5; SEAM-5).
+  #
+  # Pushes site/dist-private to the private bucket and DELETES objects the
+  # current build did not produce, so a withdrawn private item stops being
+  # READABLE rather than merely stopping being linked. dist-public gets that for
+  # free because it is redeployed wholesale; the private side is a sync, and a
+  # sync that only adds leaves a withdrawn dossier served at its old path to
+  # every member.
+  #
+  # THIS IS THE ONE JOB IN THIS WORKFLOW THAT CAN DESTROY DATA. Four things gate
+  # it, and they are deliberately layered so no single mistake is sufficient:
+  #
+  #   1. `needs: build-firebase` — it cannot start unless the content synced,
+  #      every manifest validated, the expected-source check passed, BOTH builds
+  #      succeeded and the leak check passed. That is ADR-0010 decision 3 at the
+  #      workflow level.
+  #   2. The build receipt inside the artifact — scripts/sync-private.mjs refuses
+  #      to delete anything without it, and it is written only at the very end of
+  #      a successful private build. That is the same gate at the script level,
+  #      and it survives someone re-ordering these steps.
+  #   3. The deploy path only. Never on a pull request, and only once the owner
+  #      has set both variables.
+  #   4. A deletion ceiling inside the script: a sync that would remove most of
+  #      the destination stops and asks for a human.
+  #
+  # It deliberately does NOT depend on firebase-deploy: the public host and the
+  # private bucket are separate targets, and a Hosting failure is no reason to
+  # leave withdrawn private content readable.
+  private-sync:
+    needs: build-firebase
+    runs-on: ubuntu-24.04
+    if: >-
+      github.event_name != 'pull_request'
+      && vars.GCP_PROJECT_ID != ''
+      && vars.GCP_PRIVATE_BUCKET != ''
+    permissions:
+      contents: read # checkout, for site/scripts/sync-private.mjs
+      id-token: write # the GitHub OIDC token exchanged through WIF
+    steps:
+      # Checkout comes before auth: auth writes its credentials file into the
+      # workspace, and a later checkout would delete it.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      # include-hidden-files was set on the upload so .hub-private-build.json
+      # travels. Without the receipt this job refuses to run at all, which is the
+      # intended behaviour rather than a hazard.
+      - name: Download the private output
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hub-private
+          path: site/dist-private
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          token_format: access_token
+
+      # Always printed, so every deletion this run intends is in the log BEFORE
+      # anything is removed, whether or not the apply step then succeeds.
+      - name: Plan the private sync (dry run)
+        working-directory: site
+        env:
+          GCS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PRIVATE_BUCKET: ${{ vars.GCP_PRIVATE_BUCKET }}
+        run: node scripts/sync-private.mjs --bucket "${PRIVATE_BUCKET}"
+
+      - name: Sync the private output, pruning what this build did not produce
+        working-directory: site
+        env:
+          GCS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PRIVATE_BUCKET: ${{ vars.GCP_PRIVATE_BUCKET }}
+        run: node scripts/sync-private.mjs --bucket "${PRIVATE_BUCKET}" --apply
+
   # Same routes and body-size checks as the Pages smoke test, against the
   # Firebase host at base path "/".
   firebase-smoke-test:
@@ -802,7 +1027,7 @@ jobs:
   # emailed by GitHub) even with no secrets configured at all. Without this,
   # nothing surfaced ~190 consecutive scheduled failures over 8 days.
   notify-failure:
-    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test]
+    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test, private-sync]
     runs-on: ubuntu-24.04
     # A failed PR check already shows up on the PR itself; only page out for
     # failures on the real deploy path.
@@ -862,7 +1087,7 @@ jobs:
   # skipped, do not count) and no failed job anywhere. The Firebase jobs may be
   # skipped -- they are until the owner configures them -- but not failed.
   notify-recovery:
-    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test]
+    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test, private-sync]
     runs-on: ubuntu-24.04
     if: >-
       !cancelled()

@@ -1,0 +1,55 @@
+---
+// THE PRIVATE NAVIGATION (contract D1: "the navigation that reaches them").
+//
+// Served by the gate at /p/. This is the ONLY page that lists private items, and
+// it exists only in the private output: the public build's srcDir is ./src and
+// never resolves this directory, so no fragment of this list can reach
+// dist-public by any build path. That is the structural guarantee, not a filter
+// someone has to remember to apply.
+import { getCollection } from "astro:content";
+import PrivateBase from "../layouts/PrivateBase.astro";
+import { routeFor } from "../lib/private-content.mjs";
+
+const items = (await getCollection("sources", ({ data }) => data.visibility === "private"))
+  .map((entry) => entry.data)
+  .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug < b.slug ? -1 : 1));
+
+// Astro sets BASE_URL from the same `base` that produced the asset URLs, so the
+// raw routes these functions build can never drift from them (issue #27).
+const base = import.meta.env.BASE_URL;
+const nav = items.map((item) => ({ href: routeFor(item, base), label: item.title }));
+---
+
+<PrivateBase title="Members' area" nav={nav}>
+  <h1>Shared with you</h1>
+
+  {items.length > 0 ? (
+    <ul class="items">
+      {items.map((item) => (
+        <li>
+          <h2><a href={routeFor(item, base)}>{item.title}</a></h2>
+          <p class="meta">
+            <time datetime={item.date}>{item.date}</time> · {item.source}
+          </p>
+          {item.summary && <p class="summary">{item.summary}</p>}
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p>Nothing has been shared with you yet.</p>
+  )}
+</PrivateBase>
+
+<style>
+  .items { list-style: none; padding: 0; margin: 0; }
+  .items li { padding: 1rem 0; border-bottom: 1px solid var(--color-border); }
+  .items li:last-child { border-bottom: none; }
+  .items h2 { font-size: 1.2rem; margin: 0 0 0.25rem; border: none; padding: 0; }
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    margin-bottom: 0.35rem;
+  }
+  .summary { color: var(--color-muted); }
+</style>

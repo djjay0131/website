@@ -1,0 +1,67 @@
+---
+// One private item, at /<section>/<source>/<slug>/.
+//
+// `format: html` is "a self-contained page or folder, served verbatim in a thin
+// frame with a back link" (docs/satellites.md). The frame is this page; the
+// payload itself is staged byte-for-byte under /_payload/<source>/... by
+// scripts/private-build.mjs, together with the sibling assets it loads, so its
+// own relative links and stylesheet resolve exactly as they do in the satellite.
+import { getCollection } from "astro:content";
+import PrivateBase from "../layouts/PrivateBase.astro";
+import { payloadUrlFor, routeFor } from "../lib/private-content.mjs";
+
+export async function getStaticPaths() {
+  const items = (await getCollection("sources", ({ data }) => data.visibility === "private"))
+    .map((entry) => entry.data);
+
+  return items.map((item) => ({
+    params: { itemPath: `${item.section}/${item.source}/${item.slug}` },
+    props: { item, all: items },
+  }));
+}
+
+const { item, all } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const nav = all
+  .slice()
+  .sort((a, b) => (a.title < b.title ? -1 : 1))
+  .map((i) => ({ href: routeFor(i, base), label: i.title }));
+const payload = payloadUrlFor(item, base);
+---
+
+<PrivateBase title={item.title} nav={nav}>
+  <p class="crumbs"><a href={base}>← Members' area</a></p>
+  <h1>{item.title}</h1>
+  <p class="meta">
+    <time datetime={item.date}>{item.date}</time> · {item.source} · {item.format}
+  </p>
+  {item.summary && <p class="summary">{item.summary}</p>}
+
+  {item.format === "html" ? (
+    <>
+      <iframe class="payload" src={payload} title={item.title} loading="lazy"></iframe>
+      <p class="fallback"><a href={payload}>Open this document on its own</a></p>
+    </>
+  ) : (
+    <p><a href={payload}>Open this document</a></p>
+  )}
+</PrivateBase>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    margin-bottom: 0.5rem;
+  }
+  .summary { color: var(--color-muted); margin-bottom: 1.5rem; }
+  .payload {
+    width: 100%;
+    min-height: 70vh;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+  }
+  .fallback { margin-top: 0.75rem; font-size: 0.9rem; }
+</style>

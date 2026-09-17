@@ -22,6 +22,47 @@ jobs:
   #
   # Kept separate from build.yml on purpose: build.yml is rewritten by the
   # Phase 1 infra work, and the governance gate must not ride along with it.
+  # The publishing contract's own suite (issue #26). It ran NOWHERE until now:
+  # build.yml runs `npm test` with working-directory: site, so the schema, the
+  # dependency-free validator the publish action actually executes, the rejection
+  # fixtures and the fixture-coverage guard were verified only by hand. That was
+  # tolerable while contract/ was untouched; PR #25 edits the schema, and the
+  # contract now carries private items.
+  #
+  # The VALIDATOR is dependency-free -- contract/publish/action.yml runs it with
+  # nothing installed, and that property is deliberate. The TEST SUITE is not: it
+  # imports ajv (a devDependency, pinned and locked) to cross-check the
+  # hand-written validator against a real JSON Schema implementation. So this job
+  # must `npm ci` before `npm test`.
+  #
+  # An earlier version of this job skipped the install on the mistaken belief that
+  # "dependency-free validator" meant "dependency-free suite". It passed locally,
+  # where contract/node_modules already existed, and failed on the runner's clean
+  # checkout with ERR_MODULE_NOT_FOUND. That is the exact failure class this job
+  # was added to catch, so it is recorded here rather than quietly corrected.
+  contract-tests:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: contract
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+
+      - name: Install the contract's dev dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run the publishing contract's test suite
+        run: npm test
+
   governance-checks:
     runs-on: ubuntu-24.04
     steps:

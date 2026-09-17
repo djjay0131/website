@@ -16,6 +16,11 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{0,38}$"
     },
+    "manifest_version": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Version of the manifest ENVELOPE - the field set, the fixed enums, the rules every source obeys. Optional; absent means \"1\". Integers only: the hub matches it exactly against a known list, so a dotted form would invite compatibility reasoning nothing implements. Distinct from an item's schema_version, which versions one data payload's internal shape (ADR-0009)."
+    },
     "published": {
       "description": "ISO 8601 timestamp of this publish, in UTC (Z) or with an explicit numeric offset. Example: 2026-09-10T14:02:11Z.",
       "type": "string",
