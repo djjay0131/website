@@ -77,6 +77,7 @@ hub build validates it again. A manifest that fails either one does not publish.
 | Field | Rule |
 |---|---|
 | `source` | Your assigned source name. Must match the prefix you upload to. |
+| `manifest_version` | Optional, for now. A plain integer as a string. Absent means `"1"`. See below. |
 | `published` | ISO 8601 timestamp. |
 | `slug` | Unique within your source. |
 | `title` | Shown in the hub's navigation and indexes. |
@@ -86,6 +87,27 @@ hub build validates it again. A manifest that fails either one does not publish.
 | `visibility` | `public` or `private`. |
 | `date` | ISO date. |
 | `summary`, `tags` | Optional. |
+
+### `manifest_version` — and how it differs from `schema_version`
+
+Two different things can change, so they are versioned separately. Confusing them is the
+likeliest way to publish something the hub then refuses.
+
+| Field | Versions | Who bumps it |
+|---|---|---|
+| `manifest_version` | the **envelope** — the fields, the fixed sets, the rules every source obeys | the **hub**, when the contract changes |
+| `schema_version` | one **`data` payload's** internal shape | **you**, when your payload's shape changes |
+
+If you publish `md`, `html`, `pdf` or `bundle` items, `schema_version` never concerns you —
+only `data` items carry it.
+
+`manifest_version` is a string of digits: `"1"`, `"2"`. Not `"1.2"`. The hub compares it
+exactly against the versions it understands, so a dotted form would suggest a compatibility
+rule that does not exist.
+
+**Today it is optional and absent means `"1"`**, so you need do nothing. It becomes required
+in a later phase, and you will be told before that happens. Sending a version the hub does not
+recognise fails the hub's build rather than publishing something half-understood.
 
 ### Formats
 

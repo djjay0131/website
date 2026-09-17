@@ -15,12 +15,10 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ## Current position
 
-**Phase 2 — Publishing contract. COMPLETE.** Every roadmap Phase 2 item is ticked, including
-the end-to-end criterion, verified on the live site: `build-info.json` reports
-`content_source: bucket` with an empty `cv_fingerprint`, and all eight CV routes return 200.
-The hub serves the CV **through the contract**, not from a GitHub release.
-
-Phase 3 has not started and waits for the owner's go.
+**Phase 3 — Private area. IN PROGRESS** (issue #24, branch `feat/private-area`, owner's go
+2026-09-17). Phase 2 is complete and the hub serves the CV through the contract. Phase 3 puts
+the milestone tracker and committee dossier behind sign-in, and is the first phase where
+private material touches the system.
 
 ## Done
 
@@ -360,6 +358,13 @@ Phase 1's `firebase.json` carries no gate rewrites.
 | — | Full label taxonomy + phase milestones — owner, 2026-09-14 | Delta §Milestone Labels |
 | — | **Phase 2 publish notification — option A:** the hub polls the content bucket on a schedule and rebuilds on change; satellites hold no GitHub credential for `website` (resolves the direction of C1/K13; the ADR is written at Phase 2 start) — owner, 2026-09-15 | STATE C1 |
 | — | **Email and Privacy pages** at `/email/` and `/privacy/`, titled "Email" and "Privacy", no "OpenClaw" name, owner's wording used as supplied — owner, 2026-09-15 | Issue #13 |
+- **§10 Q4 — answered (owner, 2026-09-17).** Seed members: **`djjay@vt.edu`** with
+  `role: owner`, **`cbrown@vt.edu`** as member. Those two only. **The allowlist matches the
+  exact email in the Firebase ID token**, and the owner's gcloud/GitHub identity is
+  `djjay0131@gmail.com` — signing in with that account yields a token that will not match and
+  produces the "not shared with you" page, which is indistinguishable from a gate bug. Sign-in
+  must use the VT Google account or email-link to `djjay@vt.edu`. Recorded in the seed
+  script's output and in the Checkpoint 4 steps.
 
 ## Assumptions (conservative choices, not §10 questions)
 
@@ -443,6 +448,17 @@ Phase 1's `firebase.json` carries no gate rewrites.
   named format, and the owner may prefer the `format: html` alternative despite its cost.
 - **A22** — The artifacts slot `docs/` is declared in this PR, which creates its first content
   (`docs/satellites.md`), exactly as A1 said it would be.
+- **A23** — The `phd-milestones` seed's embedded git history (1 commit, 1 branch, no remotes,
+  tracked set identical to the working tree) is **preserved** rather than squashed, so
+  provenance survives. It adds no exposure beyond what Incident A1 already assessed.
+- **A24** — The seed carries a `.gitlab-ci.yml`, dead config in a GitHub-bound repository. The
+  brief says not to alter the tarball's content beyond adding the workflow and manifest, so it
+  is **left in place and flagged** rather than silently deleted.
+- **A25** — The brief has a `satellite-phd` agent run `gh repo create --private` from
+  `~/code/phd-milestones.tar.gz`. That path does not exist — the only surviving copy is a blob
+  in the Lead Architect's local object store from the Incident A1 commit — and sub-agents make
+  no `gh` mutations. The **Lead Architect** extracts it and creates the repository; the agent
+  works in a checkout.
 
 ## ADR candidates
 
@@ -496,7 +512,7 @@ Phase 1's `firebase.json` carries no gate rewrites.
 - **C19** — A second `data` source would make the hub carry a second first-party renderer.
   ADR-0008 sets a high bar deliberately; revisit at Phase 5 when `agentic-kg` and
   `construction-ai-proposal` arrive.
-- **C20** — Manifest versioning. `schema_version` versions one payload; the *contract itself*
+- **C20 — CLOSED 2026-09-17** by ADR-0009 (optional now, required in Phase 5). Manifest versioning. `schema_version` versions one payload; the *contract itself*
   also changes (ADR-0008 altered the "fixed" format set three weeks after the design doc). With
   `additionalProperties: false`, a satellite cannot send a field before the hub accepts it, so
   a `manifest_version` must land optional first and become required later. Recommended: ADR
@@ -506,7 +522,7 @@ Phase 1's `firebase.json` carries no gate rewrites.
   leaves a mixed state no satellite can detect or prune.
 - **C22** — Lexical constraints on `slug` and `path`. `slug` becomes a URL segment, so the
   contract stream constrained it to `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 64.
-- **C23** — Retention and withdrawal semantics for published objects. An empty `items` array is
+- **C23 — CLOSED 2026-09-17** by ADR-0010. Retention and withdrawal semantics for published objects. An empty `items` array is
   the only way a satellite can retract content, since it cannot list and therefore cannot
   prune. This matters from Phase 3, when a withdrawn item may be private.
 - **C24** — `schema_version` convention, raised by the `cv` stream and binding on both
@@ -528,7 +544,7 @@ Phase 1's `firebase.json` carries no gate rewrites.
   not change, and with `cv` as the only satellite there is nothing a collection-driven section
   page would show that the existing first-party pages do not. Owner's decision at Checkpoint 3:
   accept the deferral to Phase 5 when real satellites arrive, or hold Phase 2 open for it.
-- **C27** — A source whose entire bucket prefix vanishes is undetectable. Withdrawal is
+- **C27 — CLOSED 2026-09-17** by ADR-0010 decision 4 (the hub declares its expected sources). A source whose entire bucket prefix vanishes is undetectable. Withdrawal is
   expressible only as an empty `items` array, so a missing manifest is treated as a fault and
   fails the build — but a wholly absent prefix looks like a source that never existed.
   Detecting it needs a recorded expected-source set. Matters from Phase 3, when the missing

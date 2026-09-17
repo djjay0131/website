@@ -145,6 +145,7 @@ test('every invalid fixture is rejected, and the error names the offending field
 test('the reason each fixture is rejected is the reason its name claims', async (t) => {
   const expectations = {
     'manifest-missing-required-field.json': /missing required field "published"/,
+    'manifest-version-not-an-integer.json': /manifest_version.*required pattern/,
     'item-missing-required-field.json': /missing required field "date"/,
     'section-out-of-set.json': /"section" must be one of .*"phd".*got "notes"/,
     'format-out-of-set.json': /"format" must be one of .*"data".*got "docx"/,
