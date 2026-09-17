@@ -9,7 +9,8 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
-- Sprint `2026-09-hub`: **Phase 2 — Publishing contract, at Checkpoint 3** (issue #16,
+- Sprint `2026-09-hub`: **Phase 2 — Publishing contract is COMPLETE.** Checkpoint 3 passed
+  2026-09-16/17; the hub serves the CV through the contract. (issue #16,
   PR #17, branch `feat/publishing-contract`). Reviewed — Chief Reviewer verdict *Comment,
   nothing blocking the merge*. All six required checks green.
 - Phase 1 — Foundation is complete. PR #12 merged 2026-09-15; Checkpoint 2 verified live the

@@ -18,6 +18,10 @@ merged reality, not plans.
 - Governance adopted (agentic-governance v0.8); `main` requires `governance-checks` and
   `budget-guard` (since 2026-09-15).
 - ADRs 0001–0008 Accepted; master roadmap in force.
+- **The CV is published through the contract.** `cv` pushes to its own `master`, its publish
+  job uploads to `gs://cusati-hub-content/sources/cv/` over Workload Identity Federation
+  holding no GitHub credential for this repository, and the hub polls that bucket, builds and
+  deploys. Live: `build-info.json` reports `content_source: bucket`.
 - The Phase 2 cloud foundation is **applied and verified live**: content bucket
   `cusati-hub-content` with uniform bucket-level access, public access prevention enforced,
   versioning and 7-day soft delete; a `satellitePublisher` custom role holding exactly
