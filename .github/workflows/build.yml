@@ -501,6 +501,24 @@ jobs:
       - name: Prove the leak check catches a leak
         run: npm run demo:leak-check
 
+      # AND the private-link guard, here rather than only in build-firebase.
+      #
+      # In build-firebase no private item is published yet, so the private build
+      # renders ONE page -- the members' index with no item links -- and
+      # check:private-links passes having inspected almost nothing. It would NOT
+      # have caught issue #27, whose broken links (/phd/..., /_payload/...) only
+      # exist once there are items. That is the same vacuous-guard failure the
+      # leak check had, and it is why this job exists at all.
+      #
+      # The fixture published above carries two private items, so here the private
+      # build renders five pages with real routes and real payload URLs, and the
+      # guard has something to prove.
+      - name: Build the private output from the fixture
+        run: npm run build:private
+
+      - name: Prove every private link resolves under the gate's base
+        run: npm run check:private-links
+
   build:
     needs: check
     if: needs.check.outputs.changed == 'true'
