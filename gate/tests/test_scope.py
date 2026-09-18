@@ -19,7 +19,14 @@ from app.members import normalise_email
 def test_no_share_routes_are_declared(deps):
     paths = {getattr(route, "path", "") for route in create_app(deps).routes}
 
-    assert paths == {"/session", "/p/{path:path}", "/_health"}
+    # /client-events is the fourth route, added deliberately: browser errors had
+    # nowhere to go, so a sign-in failure could only be diagnosed by a person
+    # describing symptoms. It is the ONLY unauthenticated writable route, and it
+    # reads nothing and serves nothing -- see test_client_events.py.
+    #
+    # This assertion is exact on purpose. Its job is to make a new route -- a
+    # half-built share endpoint especially -- fail loudly rather than appear.
+    assert paths == {"/session", "/p/{path:path}", "/_health", "/client-events"}
 
 
 @pytest.mark.parametrize(

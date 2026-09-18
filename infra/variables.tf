@@ -285,3 +285,14 @@ variable "gate_max_instance_count" {
     error_message = "gate_max_instance_count must be a whole number between 1 and 10. The design calls for 3; a larger cap needs a decision about the budget."
   }
 }
+
+variable "ops_email" {
+  description = "Where operational alerts go. Not a secret -- it is the owner's own address and appears in the notification channel. Override with TF_VAR_ops_email when handing the deployment to a different operator. The address must click Google's verification link after the first apply, or the channel accepts alerts and silently delivers nothing."
+  type        = string
+  default     = "djjay@vt.edu"
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.ops_email))
+    error_message = "ops_email must be a single email address."
+  }
+}

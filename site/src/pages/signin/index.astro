@@ -100,9 +100,27 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
         signInWithEmailLink,
       } = await import("firebase/auth");
 
+      // Classify, show, and REPORT. Every catch below used to be `catch {}`,
+      // which discarded the one fact that mattered. The same classifier drives
+      // the sentence on screen and the label in the log, so they cannot drift.
+      const { classifyAuthError, classifyEmailLinkMismatch } = await import(
+        "../../lib/auth-errors.mjs"
+      );
+      const { recordEvent, correlationId, installGlobalHandlers } = await import(
+        "../../lib/client-events.mjs"
+      );
+      installGlobalHandlers();
+
       const statusEl = document.getElementById("status")!;
       const say = (message: string) => {
         statusEl.textContent = message;
+      };
+
+      /** Show the person what to do, and tell the gate which class it was. */
+      const fail = (stage: string, error: unknown) => {
+        const { failureClass, message, code } = classifyAuthError(error);
+        say(message);
+        recordEvent("signin_failed", { stage, failure_class: failureClass, code }, { immediate: true });
       };
 
       const app = initializeApp(boot.firebaseConfig);
@@ -118,12 +136,12 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
         try {
           response = await fetch("/session", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "X-Trace-Id": correlationId() },
             body: JSON.stringify({ idToken }),
             credentials: "same-origin",
           });
-        } catch {
-          say("Could not reach the sign-in service. Please try again.");
+        } catch (error) {
+          fail("exchange_unreachable", error);
           return;
         }
         // BRANCH ON THE BODY, NOT THE STATUS. The gate answers a verified
@@ -145,6 +163,7 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
           // Deliberately the gate's own wording, and deliberately not alarming:
           // it names nothing and implies nothing about what exists.
           say("You're signed in, but nothing here has been shared with you.");
+          recordEvent("signin_not_a_member", { stage: "exchange" }, { immediate: true });
           return;
         }
         if (response.ok && body?.status === "ok") {
@@ -152,14 +171,23 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
           return;
         }
         say("Sign-in did not complete. Please try again.");
+        recordEvent(
+          "signin_failed",
+          { stage: "exchange", failure_class: "unknown", http_status: response.status },
+          { immediate: true },
+        );
       }
 
       document.getElementById("google")?.addEventListener("click", async () => {
         try {
           const credential = await signInWithPopup(auth, new GoogleAuthProvider());
           await exchange(await credential.user.getIdToken());
-        } catch {
-          say("Sign-in was cancelled or did not complete.");
+        } catch (error) {
+          // This is the one that cost an afternoon: a popup that opened and
+          // vanished was auth/operation-not-allowed -- no provider enabled --
+          // and the page said "cancelled", sending the owner to look at their
+          // own browser.
+          fail("google_popup", error);
         }
       });
 
@@ -176,8 +204,8 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
           });
           window.localStorage.setItem(EMAIL_KEY, email);
           say("Check your email for a sign-in link.");
-        } catch {
-          say("Could not send a sign-in link. Please check the address and try again.");
+        } catch (error) {
+          fail("email_link_send", error);
         }
       });
 
@@ -191,8 +219,24 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
             const credential = await signInWithEmailLink(auth, stored, window.location.href);
             window.localStorage.removeItem(EMAIL_KEY);
             await exchange(await credential.user.getIdToken());
-          } catch {
-            say("That sign-in link has expired or has already been used.");
+          } catch (error) {
+            // Firebase reports "link sent to a different address" and "expired"
+            // with the same code. Disambiguate before classifying, because the
+            // advice is different: retype your address vs request a new link.
+            const mismatch =
+              (error as { code?: string })?.code === "auth/invalid-action-code" &&
+              stored !== window.localStorage.getItem(EMAIL_KEY);
+            if (mismatch) {
+              const m2 = classifyEmailLinkMismatch();
+              say(m2.message);
+              recordEvent(
+                "signin_failed",
+                { stage: "email_link_return", failure_class: m2.failureClass, code: m2.code },
+                { immediate: true },
+              );
+            } else {
+              fail("email_link_return", error);
+            }
           }
         }
       }
