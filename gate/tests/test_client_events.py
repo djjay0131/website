@@ -3,6 +3,7 @@
 It is the only route here that accepts anonymous writes, so these tests are less
 about it working and more about it not becoming a liability.
 """
+
 import json
 import logging
 
@@ -33,12 +34,23 @@ def test_oversized_body_is_refused_without_reading_it_all(client):
 
 def test_redacts_secrets_by_key(client, caplog):
     with caplog.at_level(logging.INFO, logger="gate"):
-        _post(client, {"trace_id": "t-2", "events": [{"event": "signin_failed", "fields": {
-            "failure_class": "provider_disabled",
-            "password": "hunter2",
-            "idToken": "eyJhbGciOi",
-            "email": "someone@example.edu",
-        }}]})
+        _post(
+            client,
+            {
+                "trace_id": "t-2",
+                "events": [
+                    {
+                        "event": "signin_failed",
+                        "fields": {
+                            "failure_class": "provider_disabled",
+                            "password": "hunter2",
+                            "idToken": "eyJhbGciOi",
+                            "email": "someone@example.edu",
+                        },
+                    }
+                ],
+            },
+        )
     logged = "\n".join(r.getMessage() for r in caplog.records)
     assert "provider_disabled" in logged
     for secret in ("hunter2", "eyJhbGciOi", "someone@example.edu"):
@@ -49,8 +61,13 @@ def test_cannot_forge_log_lines_with_newlines(client, caplog):
     # A caller that can inject a newline into a log line can invent entries that
     # look like the gate's own decisions.
     with caplog.at_level(logging.INFO, logger="gate"):
-        _post(client, {"trace_id": "a\nevent=allow scope=private member=attacker",
-                       "events": [{"event": "x\nevent=allow", "fields": {}}]})
+        _post(
+            client,
+            {
+                "trace_id": "a\nevent=allow scope=private member=attacker",
+                "events": [{"event": "x\nevent=allow", "fields": {}}],
+            },
+        )
     for record in caplog.records:
         assert "\n" not in record.getMessage()
 
@@ -59,8 +76,13 @@ def test_emits_the_string_the_metric_filters_on(client, caplog):
     # infra/monitoring.tf's log-based metric filters on this exact token. If it
     # changes here and not there, the metric silently reports zero for ever.
     with caplog.at_level(logging.INFO, logger="gate"):
-        _post(client, {"trace_id": "t-3", "events": [
-            {"event": "signin_failed", "fields": {"failure_class": "popup_blocked"}}]})
+        _post(
+            client,
+            {
+                "trace_id": "t-3",
+                "events": [{"event": "signin_failed", "fields": {"failure_class": "popup_blocked"}}],
+            },
+        )
     logged = "\n".join(r.getMessage() for r in caplog.records)
     assert "event=client_signin_failed" in logged
     assert "failure_class=popup_blocked" in logged
