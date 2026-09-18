@@ -1116,6 +1116,48 @@ Python is 3.8 and gcloud refuses it) -- worth knowing before the next checkpoint
   `members/cbrown@vt.edu` with no role, both `added_by: djjay@vt.edu`. Those two only.
 
 
+## Public branding, and one deliberate disclosure (2026-09-17)
+
+- **Virginia Tech colours replace petrol as the accent family** (PR #36, live on
+  `eadd904f`). The hex values were read out of VT's own delivered stylesheet
+  (`brand.vt.edu` `root.min.css`), where `#861f41` occurs 138 times and `#e5751f`
+  36 — not recalled from memory. Maroon leads in light and orange in dark, because
+  Chicago Maroon is very nearly black on the dark ground and fails AA as text;
+  both are VT primaries, so which one leads is a legibility decision. Contrast
+  improved: maroon is 8.39:1 on the light ground where petrol was 7.11, and the
+  suite still reports 52 pairs, 0 below AA. `--tracker-petrol` remains **declared
+  but consumed by nothing**, because `tokens.test.ts` pins the tracker palette
+  verbatim; it paints nothing.
+- **`tokens.test.ts` was re-pointed, not gutted.** It had pinned the petrol accent
+  and required every site token to map onto the tracker palette — both assertions
+  encoded the previous decision. The accent pin now names the VT colours so the
+  brand cannot drift a shade at a time, and the mapping rule gained a carve-out
+  exactly three tokens wide (`color-accent`, `color-link`, `color-focus`) plus a
+  new positive test proving those three resolve to the `--vt-*` ramp. The Phase 3
+  review found a test defending a broken value; the lesson cuts both ways, and
+  deleting an inconvenient assertion is the same failure wearing the other face.
+- **THE DISCLOSURE DECISION.** The public footer now links to `/signin/`. Until
+  now nothing on the public site revealed that a members' area exists, and the
+  gate's uniform 404 (C29) meant `/p/` was not an existence oracle either. This is
+  a deliberate, owner-chosen widening of that: it names no item, no slug and no
+  count, so it does not touch ADR-0005's guarantee that no public page lists,
+  links or names a private item — the leak check still proves that on every build,
+  and `/signin/` keeps `noindex` and stays out of the sitemap. The footer was
+  chosen over the main navigation as the smallest disclosure that still makes it
+  findable. Recorded here because "the private area's existence is undisclosed"
+  was previously true and is now, deliberately, not.
+- **The VT logo and the HokieBird are NOT used, and must not be added casually.**
+  `brand.vt.edu` states downloading the logos "is permitted by authorized
+  employees and external parties with approval from the Virginia Tech Office of
+  Licensing and Trademarks. Unauthorized use of these trademarks is prohibited."
+  Colours are not trademarks; the marks are. A logo may be added only once the
+  owner confirms permitted use.
+- Open, owner's call: adding VT's open-source brand fonts (`@fontsource/crimson-text`
+  and `@fontsource/rubik`, both OFL-1.1, the same licence as the three already
+  self-hosted); and `#c64600`, VT's own darkened orange, which would let orange
+  carry text in the light theme — `#e5751f` is ~3:1 on paper and is decorative only.
+
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
