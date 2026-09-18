@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   AUTH_FAILURE_CLASSES,
   classifyAuthError,
+  classifyEmailLinkFailure,
   classifyEmailLinkMismatch,
 } from "./auth-errors.mjs";
 
@@ -86,5 +87,51 @@ describe("sign-in failure classification", () => {
   it("never leaks an email address or a token through the message", () => {
     const r = classifyAuthError({ code: "auth/invalid-email", customData: { email: "djjay@vt.edu" } });
     expect(r.message).not.toMatch(/@/);
+  });
+});
+
+describe("the email-link return leg, which fooled us in production", () => {
+  const invalid = { code: "auth/invalid-action-code" };
+
+  it("only claims 'wrong email' when there is something to compare against", () => {
+    // THE PRODUCTION BUG. With nothing remembered, the old inline check compared
+    // a typed address against null -- always unequal -- so an expired link was
+    // reported as a wrong address. This is the regression test for that.
+    const r = classifyEmailLinkFailure(invalid, { remembered: null, used: "djjay@vt.edu" });
+    expect(r.failureClass).toBe("link_expired");
+    expect(r.certain).toBe(false);
+    expect(r.message).toMatch(/expired/i);
+    expect(r.message).toMatch(/different address/i);
+  });
+
+  it("does claim 'wrong email' when the remembered address really differs", () => {
+    const r = classifyEmailLinkFailure(invalid, {
+      remembered: "someone@example.edu",
+      used: "djjay@vt.edu",
+    });
+    expect(r.failureClass).toBe("link_wrong_email");
+    expect(r.certain).toBe(true);
+  });
+
+  it("treats a matching remembered address as an ordinary expired link", () => {
+    const r = classifyEmailLinkFailure(invalid, {
+      remembered: "djjay@vt.edu",
+      used: "djjay@vt.edu",
+    });
+    expect(r.failureClass).toBe("link_expired");
+  });
+
+  it("passes non-link errors through to the ordinary classifier", () => {
+    const r = classifyEmailLinkFailure({ code: "auth/network-request-failed" }, { remembered: null });
+    expect(r.failureClass).toBe("network_unreachable");
+  });
+
+  it("never invents a class outside the closed vocabulary", () => {
+    for (const err of [invalid, { code: "auth/whatever" }, null, "boom"]) {
+      for (const remembered of [null, "", "a@b.c"]) {
+        const r = classifyEmailLinkFailure(err, { remembered, used: "x@y.z" });
+        expect(AUTH_FAILURE_CLASSES).toContain(r.failureClass);
+      }
+    }
   });
 });

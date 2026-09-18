@@ -117,6 +117,53 @@ export function classifyAuthError(error) {
 }
 
 /**
+ * Classify a failure on the email-link RETURN leg.
+ *
+ * Firebase reports "link was for a different address" and "link expired or was
+ * already used" with the SAME code, auth/invalid-action-code. The only thing
+ * that can tell them apart is whether we remembered which address the link was
+ * requested for -- and often we did not, because the link was opened in a
+ * different browser from the one that asked for it.
+ *
+ * THIS FUNCTION EXISTS BECAUSE THE FIRST VERSION GOT IT WRONG, IN PRODUCTION.
+ * The check was inline in the sign-in page and read, in effect,
+ * `used !== localStorage.getItem(KEY)`. With nothing in storage that compares a
+ * typed address against null and is ALWAYS true, so every invalid code with
+ * empty storage was reported as "wrong email address" -- including a link that
+ * had simply expired four hours earlier, which is what actually happened. The
+ * observability caught it; the heuristic was untested because it lived inline in
+ * an .astro file, which is why it now lives here.
+ *
+ * @param error      what Firebase threw
+ * @param remembered the address we had stored, or null if we had none
+ * @param used       the address actually offered to signInWithEmailLink
+ */
+export function classifyEmailLinkFailure(error, { remembered = null, used = "" } = {}) {
+  const code = typeof error?.code === "string" ? error.code : "";
+  const invalid = code === "auth/invalid-action-code";
+  const haveComparison = typeof remembered === "string" && remembered !== "";
+
+  if (invalid && haveComparison && used !== remembered) {
+    // The only case where "wrong address" is a claim rather than a guess.
+    return { ...classifyEmailLinkMismatch(), certain: true };
+  }
+
+  if (invalid && !haveComparison) {
+    // Genuinely ambiguous. Say so, rather than pick one and sound sure.
+    return {
+      failureClass: "link_expired",
+      message:
+        "That sign-in link did not work. It may have expired, already been used, " +
+        "or been sent to a different address. Request a new one.",
+      code,
+      certain: false,
+    };
+  }
+
+  return { ...classifyAuthError(error), certain: true };
+}
+
+/**
  * The email-link return leg fails in one way the codes above do not cover: the
  * link is valid but was requested for a DIFFERENT address than the one being
  * offered. Firebase reports that as invalid-action-code, indistinguishable from

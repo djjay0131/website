@@ -103,7 +103,7 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
       // Classify, show, and REPORT. Every catch below used to be `catch {}`,
       // which discarded the one fact that mattered. The same classifier drives
       // the sentence on screen and the label in the log, so they cannot drift.
-      const { classifyAuthError, classifyEmailLinkMismatch } = await import(
+      const { classifyAuthError, classifyEmailLinkFailure } = await import(
         "../../lib/auth-errors.mjs"
       );
       const { recordEvent, correlationId, installGlobalHandlers } = await import(
@@ -220,23 +220,32 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
             window.localStorage.removeItem(EMAIL_KEY);
             await exchange(await credential.user.getIdToken());
           } catch (error) {
-            // Firebase reports "link sent to a different address" and "expired"
-            // with the same code. Disambiguate before classifying, because the
-            // advice is different: retype your address vs request a new link.
-            const mismatch =
-              (error as { code?: string })?.code === "auth/invalid-action-code" &&
-              stored !== window.localStorage.getItem(EMAIL_KEY);
-            if (mismatch) {
-              const m2 = classifyEmailLinkMismatch();
-              say(m2.message);
-              recordEvent(
-                "signin_failed",
-                { stage: "email_link_return", failure_class: m2.failureClass, code: m2.code },
-                { immediate: true },
-              );
-            } else {
-              fail("email_link_return", error);
-            }
+            // Firebase reports "link sent to a different address" and "expired or
+            // already used" with the SAME code. Only a remembered address can
+            // tell them apart, and often there is none -- the link gets opened in
+            // a different browser from the one that asked for it.
+            //
+            // The first version of this compared the typed address against an
+            // empty localStorage, which is always unequal, so it reported "wrong
+            // email" for a link that had merely expired. That went out, and the
+            // logging caught it. The judgement now lives in the tested module,
+            // and `certain` records whether we could actually tell -- a log that
+            // admits ambiguity is worth more than one that sounds sure and is not.
+            const outcome = classifyEmailLinkFailure(error, {
+              remembered: window.localStorage.getItem(EMAIL_KEY),
+              used: stored,
+            });
+            say(outcome.message);
+            recordEvent(
+              "signin_failed",
+              {
+                stage: "email_link_return",
+                failure_class: outcome.failureClass,
+                code: outcome.code,
+                certain: outcome.certain,
+              },
+              { immediate: true },
+            );
           }
         }
       }
