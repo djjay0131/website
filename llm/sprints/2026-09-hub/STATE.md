@@ -1158,6 +1158,54 @@ Python is 3.8 and gcloud refuses it) -- worth knowing before the next checkpoint
   carry text in the light theme — `#e5751f` is ~3:1 on paper and is decorative only.
 
 
+## The gate's structured logging never worked in production (2026-09-18)
+
+Found by the end-to-end probe of the new observability work, not by a test. Worth
+recording in full, because everything about it was designed to be invisible.
+
+- **`gate/app/main.py` created `logging.getLogger("gate")` and configured nothing.**
+  No handler, no level, no `basicConfig` — a grep for
+  `basicConfig|addHandler|setLevel|dictConfig|propagate` across the entire `gate/`
+  tree returned nothing. Under uvicorn the root logger sits at WARNING with no
+  handler, so all **21** `logger.` call sites in that file were discarded.
+- **Not one `event=` line ever reached Cloud Logging** — confirmed over 48 hours
+  and four revisions. A signed-out `GET /p/index.html` at 15:34:23 should have
+  emitted `event=deny scope=private` and emitted nothing.
+- **Consequence:** both log-based metrics in `infra/monitoring.tf` were dead on
+  arrival and the `signin_failing` alert could never have fired. The monitoring
+  built to end interactive troubleshooting would itself have been silent.
+- **Why nobody noticed.** Uvicorn's own access lines (`"POST /client-events" 204`)
+  appear in Cloud Logging because uvicorn configures *its* loggers, so the gate
+  looked like it was logging. And every test asserting those lines uses pytest's
+  `caplog`, which attaches its own root handler and forces propagation — **the
+  harness supplied the exact thing production lacked.** Earlier claims in this
+  sprint that the gate's logging was "already strong" rested on `caplog`, never on
+  a deployed container.
+- **Fixed** with `_configure_logging()`: a `StreamHandler` on `sys.stdout` at INFO,
+  `propagate = False`, marked and idempotent so repeated `create_app()` calls do
+  not stack handlers and multiply every line, plus an `event=boot logging=...`
+  line so the chosen handler is readable from the boot logs instead of inferred.
+  Deliberately **not** `CloudLoggingHandler`: Cloud Run already ships stdout as
+  `textPayload`, which is what the metrics match, and `CloudLoggingHandler` writes
+  `jsonPayload` — it would have emptied the same metrics a different way.
+- **The regression test cannot use `caplog`**, for the reason above. It also
+  cannot use `capsys` or `capfd`: the handler binds `sys.stdout` once, at the
+  first `create_app()` in the process, which under pytest happens while capture is
+  active — so the handler holds pytest's replacement stream and neither capture
+  fixture can see it. Two versions failed that way while pytest printed the line
+  under "Captured stdout". `tests/test_logging_config.py` therefore asserts the
+  property directly: a `StreamHandler` bound to the live `sys.stdout`, at INFO,
+  not propagating, idempotent, and a record formatted through the handler.
+
+**The general lesson, and it is the same one twice.** A test that passes because
+the harness provides what production does not is worse than no test: it is
+evidence pointing the wrong way. This is the third time in this sprint a guard has
+proved nothing while reporting success — the leak check with no private items
+published, the private-link check with one page, and now the whole logging layer.
+Each was found by asking "what would this look like if it were broken?" rather
+than by the suite going red.
+
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
