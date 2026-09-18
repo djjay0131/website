@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -38,6 +39,47 @@ from .members import FirestoreMemberDirectory, MemberDirectory
 from .serve import GcsObjectStore, ObjectStore, UnsafePath, safe_object_path
 
 logger = logging.getLogger("gate")
+
+
+def _configure_logging() -> str:
+    """Give the gate's logger somewhere to actually write.
+
+    WITHOUT THIS, EVERY logger CALL IN THIS FILE IS DISCARDED IN PRODUCTION.
+    `logging.getLogger("gate")` creates a logger with no handler; under uvicorn
+    the root logger sits at WARNING with no handler either, so INFO records go
+    nowhere. Uvicorn's own access lines still appear -- it configures its own
+    loggers -- which makes the gate look like it is logging when it is not.
+
+    That was true for four revisions and 48 hours: not one `event=` line ever
+    reached Cloud Logging, so both log-based metrics in infra/monitoring.tf were
+    dead on arrival and the sign-in alert could never have fired. It was invisible
+    because the tests use pytest's caplog, which attaches its OWN handler and
+    forces propagation -- the harness supplied the very thing production lacked.
+    tests/test_logging_config.py asserts against stdout instead, for that reason.
+
+    A plain StreamHandler to stdout, deliberately, and NOT CloudLoggingHandler:
+    Cloud Run already ships stdout to Cloud Logging as `textPayload`, which is
+    what the metric filters match. CloudLoggingHandler would write `jsonPayload`
+    instead and silently empty those same metrics -- trading one invisible
+    failure for another.
+
+    Returns the handler name so the caller can say which one it chose; silent
+    degradation should be readable from the boot logs.
+    """
+    if any(getattr(h, "_hub_gate_handler", False) for h in logger.handlers):
+        return "already-configured"
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
+    # Marked so repeated create_app() calls -- every test builds one -- do not
+    # stack duplicate handlers and multiply every line.
+    handler._hub_gate_handler = True  # type: ignore[attr-defined]
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    # uvicorn's root handler would otherwise print every line a second time.
+    logger.propagate = False
+    return "StreamHandler(stdout)"
+
 
 # The exact value §6 and the roadmap require. Firebase Hosting marks rewrite
 # responses private by default and its CDN caches a gate response only if the
@@ -121,6 +163,9 @@ def _log_path(name: str, settings: Settings) -> str:
 
 
 def create_app(dependencies: Dependencies | None = None) -> FastAPI:
+    _chosen = _configure_logging()
+    logger.info("event=boot logging=%s", _chosen)
+
     deps = dependencies or build_dependencies()
 
     # No /docs, /redoc or /openapi.json. The service is reachable by anyone at
