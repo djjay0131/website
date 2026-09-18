@@ -49,6 +49,19 @@ PRIVATE_CACHE_CONTROL = "private, no-store"
 # attempt, and reading it would be work done on behalf of an anonymous caller.
 MAX_SESSION_BODY_BYTES = 8192
 
+# Client event ingestion. Smaller than a session body on purpose: this endpoint
+# is UNAUTHENTICATED, because the failures worth capturing happen before a
+# session exists, so these caps are the only thing standing between it and
+# anyone who finds it.
+MAX_CLIENT_EVENT_BODY_BYTES = 4096
+MAX_CLIENT_EVENTS_PER_BATCH = 20
+# Field values are truncated, not rejected: a too-long value should cost the
+# detail, not the whole event.
+MAX_CLIENT_FIELD_CHARS = 200
+# Allowlist, matched case-insensitively as a substring. The browser scrubs too;
+# this is the copy that cannot be bypassed by editing the page.
+CLIENT_EVENT_REDACT = ("password", "token", "secret", "email", "code", "cookie", "auth")
+
 
 @dataclass
 class Dependencies:
@@ -80,6 +93,20 @@ def build_dependencies(settings: Settings | None = None) -> Dependencies:
 
 def _html(body: str, status_code: int) -> HTMLResponse:
     return HTMLResponse(content=body, status_code=status_code)
+
+
+def _clean_client_value(value: object) -> str:
+    """Flatten an untrusted client value into something safe to put in a log line.
+
+    Anything a browser sends can contain newlines, control characters or a
+    megabyte of text. A log line is a single line, and a caller that can inject
+    newlines can forge log entries -- so this strips them rather than escaping
+    them, and truncates.
+    """
+    text = value if isinstance(value, str) else repr(value)
+    text = "".join(ch for ch in text if ch.isprintable())
+    text = text.replace(" ", "_")
+    return text[:MAX_CLIENT_FIELD_CHARS]
 
 
 def _log_path(name: str, settings: Settings) -> str:
@@ -269,6 +296,66 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
     # Verified at Checkpoint 4 -- /_health and /nope both reach the app, /healthz
     # alone does not, and the same image returns {"status":"ok"} for /healthz when
     # run locally. Renaming the route is the fix; the handler is unchanged.
+    # Browser errors, which previously went nowhere at all.
+    #
+    # WHY UNAUTHENTICATED. Every other route here refuses anonymous callers.
+    # This one cannot: it exists to capture sign-in failures, and a sign-in
+    # failure by definition has no session. The protections are therefore caps
+    # and scrubbing rather than identity -- a caller can write log lines, and
+    # nothing else. It reads nothing, serves nothing, and touches no bucket.
+    #
+    # It answers 204 to everything, including malformed input. A telemetry
+    # endpoint that returns errors invites a retry storm from the very page that
+    # is already broken, and the browser is told never to care about the reply.
+    @app.post("/client-events")
+    async def client_events(request: Request) -> Response:
+        declared = request.headers.get("content-length")
+        if declared is not None and declared.isdigit() and int(declared) > MAX_CLIENT_EVENT_BODY_BYTES:
+            logger.info("event=reject reason=client_events_too_large")
+            return Response(status_code=204)
+
+        raw = await request.body()
+        if len(raw) > MAX_CLIENT_EVENT_BODY_BYTES:
+            logger.info("event=reject reason=client_events_too_large")
+            return Response(status_code=204)
+
+        try:
+            payload = json.loads(raw or b"{}")
+        except ValueError:
+            logger.info("event=reject reason=client_events_malformed")
+            return Response(status_code=204)
+
+        if not isinstance(payload, dict):
+            return Response(status_code=204)
+
+        trace = _clean_client_value(payload.get("trace_id"))
+        events = payload.get("events")
+        if not isinstance(events, list):
+            return Response(status_code=204)
+
+        for item in events[:MAX_CLIENT_EVENTS_PER_BATCH]:
+            if not isinstance(item, dict):
+                continue
+            name = _clean_client_value(item.get("event")) or "unnamed"
+            fields = item.get("fields")
+            pairs = []
+            if isinstance(fields, dict):
+                for key, value in list(fields.items())[:10]:
+                    k = _clean_client_value(key)
+                    if not k:
+                        continue
+                    if any(r in k.lower() for r in CLIENT_EVENT_REDACT):
+                        continue
+                    pairs.append(f"{k}={_clean_client_value(value)}")
+
+            # "client_signin_failed" is the string the log-based metric in
+            # infra/monitoring.tf filters on. Changing it here without changing
+            # it there silently empties the metric, so they are named together.
+            prefix = "client_signin_failed" if name == "signin_failed" else f"client_{name}"
+            logger.info("event=%s trace=%s %s", prefix, trace or "none", " ".join(pairs))
+
+        return Response(status_code=204)
+
     @app.get("/_health")
     async def healthz() -> Response:
         # Deploy verification only. Says nothing about configuration, identity

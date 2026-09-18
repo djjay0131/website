@@ -750,3 +750,83 @@ Expected: `OK: private bucket declares uniform bucket-level access and enforced
 public access prevention, names no anonymous principal, and carries exactly two
 bindings …`. It needs no cloud access, so it belongs in CI on every pull request
 — see the handoff §Seam issues for the `build.yml` step the site stream owns.
+
+## Monitoring and alerting
+
+Before this existed the project had **no** alert policies, **no** uptime checks, **no**
+notification channels and **no** log-based metrics. Nothing would ever have said the site
+was down or that sign-in was broken — and nothing did: a sign-in failure was found by
+trying to sign in, and diagnosed by an afternoon of interactive troubleshooting.
+
+Everything is declared in `monitoring.tf`. Nothing is clicked in a console, so nothing
+silently reverts.
+
+### What is watched
+
+| | |
+|---|---|
+| `Hub public site` uptime | `https://<domain>/` every 5 minutes |
+| `Hub private gate` uptime | the gate's `/_health`, every 5 minutes |
+| `hub-gate-denials` | counts the gate's own `event=deny` lines |
+| `hub-signin-failures` | counts `event=client_signin_failed`, reported by the browser |
+
+Three alert policies — site down, gate down, sign-in failing — each carrying the literal
+`gcloud logging read` command in its `documentation{}` block. The alert email is meant to be
+the first page of the runbook; an alert that only says "something is wrong" restarts the
+very back-and-forth this exists to end.
+
+### After the first apply — two things that must be VERIFIED, not assumed
+
+**1. Click the verification link.** Google emails `var.ops_email` a confirmation. Until it is
+clicked the channel exists, accepts every policy, and **delivers nothing**. That state looks
+exactly like "nothing is wrong".
+
+```bash
+gcloud alpha monitoring channels list --project <project> \
+  --format='value(displayName,type,verificationStatus)'
+```
+
+Expect `VERIFIED`. `UNVERIFIED` means every alert below is silent.
+
+**2. Confirm each policy actually has the channel attached.**
+
+```bash
+gcloud alpha monitoring policies list --project <project> \
+  --format='value(displayName,enabled,notificationChannels)'
+```
+
+Expect a channel on every row. This check exists because in the project this design was
+taken from, the single most important alert had its `notification_channels` line commented
+out and had been firing into the void — nobody noticed, because a silent alert and a healthy
+system are indistinguishable from the outside.
+
+### Why `/_health` and not `/healthz`
+
+Google's frontend answers `/healthz` for this service before the request reaches the
+container, so an uptime check against it would report on Google's error page rather than on
+the gate. Verified at Checkpoint 4: `/healthz` returns a 1568-byte Google page while the
+gate's own 404 is 329 bytes, and no `/healthz` request ever appears in the container log.
+
+### Querying by hand
+
+```bash
+# Why is sign-in failing? The class is a closed vocabulary, so this says WHICH way.
+gcloud logging read 'resource.type="cloud_run_revision" AND textPayload:"event=client_signin_failed"' \
+  --project <project> --freshness=30m --limit=50
+
+# What did the gate itself decide?
+gcloud logging read 'resource.type="cloud_run_revision" AND textPayload:"event=deny"' \
+  --project <project> --freshness=30m --limit=50
+```
+
+A browser and the gate share one `X-Trace-Id` per page load, so one id ties the click, the
+classified failure and the gate's decision onto a single timeline.
+
+### Sharp edges, each a 400 at apply time
+
+1. An alert filter must constrain `resource.type` even when the log metric already does.
+2. Log-based counters are `DELTA` — use `ALIGN_DELTA`; `ALIGN_COUNT` is rejected.
+3. `condition_absent` cannot catch "never emitted at all". The sign-in policy deliberately
+   uses `EVALUATION_MISSING_DATA_INACTIVE`: no data means nobody failed, and firing on that
+   would page continuously on a healthy site.
+4. Uptime checks take the host **without** a scheme.

@@ -56,6 +56,21 @@ const { title, nav = [] } = Astro.props;
     <footer class="private-footer">
       <p>Not for redistribution.</p>
     </footer>
+  
+    <script>
+      // Capture what the members' area would otherwise swallow.
+      //
+      // DELIBERATELY NOT IN Base.astro. That layout has no client script at all,
+      // and adding one would ship this module to every public page -- including
+      // the CV -- on a site that is otherwise almost JavaScript-free and
+      // self-hosts everything it loads. Beaconing a public visitor's browser
+      // errors is a different thing from diagnosing the owner's own members'
+      // area, and only the second was asked for.
+      //
+      // /signin/ installs it separately, because that is where sign-in fails.
+      const { installGlobalHandlers } = await import("../../src/lib/client-events.mjs");
+      installGlobalHandlers();
+    </script>
   </body>
 </html>
 
