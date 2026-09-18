@@ -108,6 +108,15 @@ const ariaCurrent = (section: string) =>
     </main>
     <footer class="site-footer" role="contentinfo">
       <p>&copy; {new Date().getFullYear()} Jason Cusati</p>
+      {/* A members' area exists; this says nothing about what is in it. It names
+          no item, no slug and no count, so it does not touch ADR-0005's guarantee
+          that no public page lists, links or names a private item -- and the leak
+          check still proves that on every build. /signin/ stays out of the
+          sitemap and carries noindex (site-routes.mjs NOINDEX_SECTIONS), so this
+          is a link for the two people who need it, not an invitation to crawlers.
+          Deliberately in the footer rather than the main navigation: the owner
+          chose the smallest disclosure that still makes it findable. */}
+      <p class="footer-signin"><a href={`${base}signin/`}>Sign in</a></p>
     </footer>
   </body>
 </html>
@@ -184,7 +193,15 @@ const ariaCurrent = (section: string) =>
   }
 
   .site-header {
+    /* The VT two-colour band: maroon over orange in the light theme, and orange
+       over maroon in dark, because --color-accent and --color-brand-rule swap
+       with the theme (tokens.css). Both are VT primaries; which one leads is a
+       legibility decision, since maroon is near-black on a dark ground.
+       A box-shadow rather than a second element, so the markup is unchanged.
+       Purely decorative, so it carries no text and needs no contrast guarantee --
+       the AA checker governs text pairs only. */
     border-bottom: 3px solid var(--color-accent);
+    box-shadow: 0 3px 0 var(--color-brand-rule);
     background: var(--color-bg);
   }
 

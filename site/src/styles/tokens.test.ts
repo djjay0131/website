@@ -34,14 +34,33 @@ const TRACKER_PALETTE: Record<"light" | "dark", Record<string, string>> = {
   },
 };
 
+// The only tokens allowed to leave the tracker palette for a reason other than
+// AA. They are the brand accent family, and they point at the --vt-* ramp instead
+// (tokens.css). Everything else in TOKEN_SOURCES -- surfaces, text, muted, and the
+// status colours -- stays governed by the mapping rule below, so this carve-out is
+// three tokens wide and no wider. The test after it proves these three really do
+// resolve to the VT ramp, so exempting them from one rule does not leave them
+// unguarded.
+const BRAND_ACCENT_TOKENS = new Set(["color-accent", "color-link", "color-focus"]);
+
 describe("design tokens", () => {
   it("computes WCAG contrast correctly", () => {
     expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);
     expect(contrastRatio("#777777", "#ffffff")).toBeCloseTo(4.48, 2);
   });
 
-  it("uses the petrol accent #0F5C5A in the light theme", () => {
-    expect(parseThemes(css).light["color-accent"]).toBe("#0f5c5a");
+  // The accent family is Virginia Tech's, not the tracker's. Maroon leads in the
+  // light theme and burnt orange in the dark one, because Chicago Maroon at
+  // #861f41 is very nearly black against the dark ground -- it fails AA as text.
+  // Both are VT primaries; which one leads is a legibility decision.
+  //
+  // This test is pinned deliberately. It replaced one that pinned the petrol
+  // accent, and it exists for the same reason that one did: so the brand cannot
+  // drift a shade at a time without someone saying so.
+  it("uses the VT accent: Chicago Maroon in light, Burnt Orange in dark", () => {
+    const themes = parseThemes(css);
+    expect(themes.light["color-accent"]).toBe("#861f41");
+    expect(themes.dark["color-accent"]).toBe("#f0913f");
   });
 
   it("carries over the tracker palette verbatim in both themes", () => {
@@ -58,6 +77,7 @@ describe("design tokens", () => {
     const themes = parseThemes(css);
     for (const theme of ["light", "dark"] as const) {
       for (const [token, source] of Object.entries(TOKEN_SOURCES)) {
+        if (BRAND_ACCENT_TOKENS.has(token)) continue;
         if (declarations[theme][token] === `var(--${source})`) continue;
         // A literal value is allowed only where the carried-over colour fails
         // a checked text pair for this token, and the replacement passes.
@@ -65,6 +85,18 @@ describe("design tokens", () => {
         const pairs = TEXT_PAIRS.filter(([fg]) => fg === token);
         const sourceFails = pairs.some(([, bg]) => contrastRatio(tokens[source], tokens[bg]) < AA_NORMAL_TEXT);
         expect(sourceFails, `${theme} --${token} departs from --${source} without an AA failure`).toBe(true);
+      }
+    }
+  });
+
+  it("points every brand accent token at the VT ramp, in both themes", () => {
+    const declarations = parseDeclarations(css);
+    const themes = parseThemes(css);
+    const vt = { light: "#861f41", dark: "#f0913f" };
+    for (const theme of ["light", "dark"] as const) {
+      for (const token of BRAND_ACCENT_TOKENS) {
+        expect(declarations[theme][token], `${theme} --${token}`).toMatch(/^var\(--vt-/);
+        expect(themes[theme][token], `${theme} --${token} resolves`).toBe(vt[theme]);
       }
     }
   });
