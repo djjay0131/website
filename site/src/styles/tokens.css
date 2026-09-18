@@ -68,6 +68,25 @@
   --tracker-clay: #9c3b2e;
   --tracker-clay-soft: #f3e0dc;
 
+  /* Virginia Tech brand. Chicago Maroon and Burnt Orange are the university's
+     two primary colours -- "our primary palette will always include Chicago
+     maroon and burnt orange, supplemented by yardline white and Hokie stone as
+     neutrals" (brand.vt.edu Color Guide). The two hex values are not recalled
+     from memory: they were read out of VT's own delivered stylesheet
+     (brand.vt.edu root.min.css), where #861f41 occurs 138 times and #e5751f 36,
+     by far the most frequent of the brand family. VT also ships #c64600, a
+     darkened burnt orange, which is evidently their own answer to the problem
+     noted below -- worth reaching for if orange ever needs to carry text here. Colours are not trademarks -- the LOGO and the HokieBird
+     are, and neither is used here. The derived steps exist because the two
+     primaries alone cannot carry a whole interface at AA: burnt orange on the
+     light ground is about 3:1, which is fine for a rule or a focus ring and not
+     fine for body text, so maroon leads in light and orange leads in dark, where
+     the ground is inverted. src/styles/tokens.test.ts enforces that. */
+  --vt-maroon: #861f41;
+  --vt-orange: #e5751f;
+  --vt-maroon-deep: #5f162e; /* maroon mixed toward ink, for hover */
+  --vt-maroon-soft: #f3e4e8;
+
   /* Surfaces */
   --color-bg: var(--tracker-paper);
   --color-surface: var(--tracker-card);
@@ -77,13 +96,16 @@
   --color-text: var(--tracker-ink);
   --color-muted: #636a68; /* AA: ink-3 #6b7370 is 4.45:1 on paper */
 
-  /* Accent: petrol */
-  --color-accent: var(--tracker-petrol);
-  --color-accent-strong: #114444; /* petrol mixed 35% toward ink */
+  /* Accent: VT Chicago Maroon */
+  --color-accent: var(--vt-maroon);
+  --color-accent-strong: var(--vt-maroon-deep);
   --color-on-accent: var(--tracker-card);
-  --color-link: var(--tracker-petrol);
-  --color-link-hover: #114444;
-  --color-focus: var(--tracker-petrol);
+  --color-link: var(--vt-maroon);
+  --color-link-hover: var(--vt-maroon-deep);
+  --color-focus: var(--vt-maroon);
+  /* Burnt orange is decorative only in the light theme: at ~3:1 on paper it is
+     legitimate for a rule or a focus ring and must never carry text. */
+  --color-brand-rule: var(--vt-orange);
 
   /* Status: brass = caution, clay = risk, green = confirmed */
   --color-caution: #87620d; /* AA: brass #8a6512 is 4.32:1 on brass-soft */
@@ -112,11 +134,24 @@
     --tracker-clay: #e08a79;
     --tracker-clay-soft: #33201c;
 
+    /* VT brand, dark. Chicago Maroon at #861f41 is very nearly black against
+       this ground -- it fails AA as text and reads as a smudge -- so burnt
+       orange leads here and maroon returns as the tint. Both are VT primaries;
+       which one leads is a legibility decision, not a brand one. */
+    --vt-maroon: #d98ba3;
+    --vt-orange: #f0913f;
+    --vt-maroon-deep: #e9b3c3;
+    --vt-maroon-soft: #2b1219;
+
     /* Tokens that are literal in the light theme */
     --color-muted: var(--tracker-ink-3);
-    --color-accent-strong: #9bd3cd; /* petrol mixed 35% toward ink */
+    --color-accent: var(--vt-orange);
+    --color-accent-strong: #f7b374;
     --color-on-accent: var(--tracker-paper);
-    --color-link-hover: #9bd3cd;
+    --color-link: var(--vt-orange);
+    --color-link-hover: #f7b374;
+    --color-focus: var(--vt-orange);
+    --color-brand-rule: var(--vt-maroon);
     --color-caution: var(--tracker-brass);
     --color-ok: #8cc98f;
     --color-ok-bg: #1b2b1c;
