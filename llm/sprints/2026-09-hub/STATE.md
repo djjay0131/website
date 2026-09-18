@@ -1206,6 +1206,54 @@ Each was found by asking "what would this look like if it were broken?" rather
 than by the suite going red.
 
 
+## The observability chain, proven end to end (2026-09-18)
+
+Recorded only after verification, not on merge. Revision `hub-gate-00005-n4g`,
+probed through the public domain rather than against the container:
+
+```
+event=boot logging=StreamHandler(stdout)
+event=deny scope=private stage=session reason=no_session_cookie
+event=client_signin_failed trace=probe154740 failure_class=provider_disabled
+```
+
+Four `event=` lines, where the preceding 48 hours and four revisions produced
+**zero**. What each one proves:
+
+- **`event=boot`** — the handler now reports which one it chose, so a future
+  silent degradation is readable from the boot logs instead of inferred from an
+  absence of evidence. That absence is precisely what hid the original defect.
+- **`event=deny`** — the **21 pre-existing** call sites reach Cloud Logging. This
+  matters more than the new endpoint: the gate's whole decision grammar had never
+  been delivered, so `hub-gate-denials` was counting a string nothing emitted.
+- **`event=client_signin_failed` with `failure_class`** — the exact token
+  `infra/monitoring.tf` filters on, carrying the classified failure, having
+  travelled browser → Hosting rewrite → gate → Cloud Logging.
+- **The planted secret was absent** — and non-vacuously, because four lines were
+  actually written. The previous round's identical "pass" proved nothing, since
+  nothing at all had been logged.
+
+**The metrics then counted it**, which closes the link the log line alone could
+not prove:
+
+```
+hub-signin-failures   15:49:47Z -> 1
+hub-gate-denials      15:49:47Z -> 1,  15:48:47Z -> 1
+```
+
+So the chain holds all the way from a browser through the Hosting rewrite, the
+gate, Cloud Logging and into a log-based metric that an attached alert policy
+reads.
+
+**One link remains unproven, and is deliberately not claimed: delivery.** The
+notification channel has no `verificationStatus` field at all, which means
+unverified — Google emailed `djjay@vt.edu` at 15:27:37Z and until that link is
+clicked all three policies accept events and deliver nothing. Worth noting that the owner reports
+Firebase sign-in emails never arriving either; if the monitoring email also fails
+to land, that is a second independent symptom of one delivery problem, and the
+alerting design should stop depending on email.
+
+
 ## Risks carried forward
 
 1. **Base-path + tree migration (Phase 1).** Current site is GitHub Pages at
