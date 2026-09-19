@@ -559,7 +559,7 @@ and the whole adversarial and tester round are added before the wave closes.
 | RT-4 | S5 FALSE — Google sign-in unconfigured | **Escalate — #31.** Console-only OAuth work; a §10 hard stop. No duplicate issue filed, as the stream itself flagged |
 | RT-5 | D6.1 — the `required: true` flip existed only in an uncommitted tree | **Fixed — PR #48** |
 | RT-6 | D6.2 — the two transports refuse encoded traversal differently | **Fix later.** Harmless now, load-bearing in Phase 4. Handed to the Red Team as a Wave 1 target |
-| RT-7 | D6.3 — the live half of the bucket IAM test runs nowhere | **Fix now.** Folded into `infra`'s satellite-role guard, which lands in `budget-guard` (already a required check) rather than a new job that would gate nothing |
+| RT-7 | D6.3 — the live half of the bucket IAM test runs nowhere | **~~Fix now. Folded into `infra`'s satellite-role guard, which lands in `budget-guard`.~~ WRONG — corrected 2026-09-19, filed as #58.** Verified: `check_private_bucket_config.py` (the *static* half) is wired at `build.yml:378`/`:481`, so §12.1 is half-satisfied and Phase 3's S-2 holds. But `check-private-bucket-iam.sh` (the *live* half) is referenced by **no workflow at all** — only a comment calling it "a Checkpoint procedure". And it cannot simply be added to `budget-guard`: that job runs on pull requests, where `wif.tf` admits `refs/heads/main` only, so a PR build **cannot authenticate** to read the bucket policy. My disposition assumed a fix that does not work. #55's `roles/editor` exposure and #53's new `roles/viewer` check both live in that unwired script |
 | RT-8 | D6.4 — `/healthz` resolved in substance | **Closed.** See the corrected record above |
 | RT-9 | D6.5 — all three alert policies deliver nothing; if this is the same failure as the missing sign-in emails, A1 is unverifiable by **anyone** | **Partly fixed, partly escalated — my first disposition understated it.** I wrote that `infra` was "looking for" a non-email channel; it **found and built one** (I-6 below). Still escalated: verifying either channel is console work only the owner can do |
 | RT-10 | D6.6 — `cv/anthropic-fellow` is publicly reachable, contradicting D8 | **Fix now, in Wave 0b — highest priority there.** Confirmed by my own probes. Not an Incident A1 event, for the reason recorded above. Stopgap available to the owner |
@@ -719,6 +719,56 @@ deletions. Rules of engagement held.
 **An operational note for future waves:** several agents probed production concurrently, so
 the logs carry lines that are not any one agent's. The Live Prober filtered by its own paths
 and timestamps and recommends serialising live probes. Accepted.
+
+### From the `Security Tester` — **BLOCKED, 4 FAILs**
+
+§8 is explicit: a single FAIL blocks every merge in this wave. There are four, so **nothing
+merges**. The gate did exactly what it exists to do.
+
+| Check | Verdict | Disposition |
+|---|---|---|
+| 1 Private content off the public path | PASS | Proven by planting, not asserted — red three ways including a **title-only** plant that exercises the contents half alone |
+| 2 Private bucket | PASS (finding S-1) | UBLA `true` and PAP `enforced` read live; exactly two non-legacy principals; legacy bindings present and `roles/viewer` empty — both halves confirmed |
+| 3 The gate | **FAIL** | **Fix now.** `/session/end`'s CSRF check is bypassed **over real HTTP** by `Origin` + `X-Forwarded-Host` set to the same attacker value — also by a comma list, also by `Host` alone. Impact today is low (`OPTIONS` → 405, no ACAO, so browsers block it; a non-browser caller has no victim cookie) but **the property was asserted and is false**, the code itself records the Hosting header-provenance question as unsettled, and the same helper is slated to guard Phase 4's mint and revoke. Confirms and extends A-5 |
+| 4 Identity | **FAIL** | **Describes pre-merge state, which #53 resolves.** `firebaseauth.admin` is still bound live and `gateSessionMinter` does not exist; the read-only plan shows `2 to add, 0 to change, 1 to destroy`, destroying exactly that binding. An IAM binding is **not** on §8's stateful-resource list, so that destroy does not bar the apply — but I re-verify the plan immediately before applying. The "attempt the access and be refused" sub-test is **NOT TESTED**, not passed: every impersonation failed at the impersonation step, proving nothing either way |
+| 5 Firestore | PASS + **NOT TESTED** (half) | Exactly **one** ruleset exists project-wide, so the #30 churn fix holds and #53 does not regress it |
+| 6 Supply chain | **FAIL** | **Fix now — #56.** `npm audit` reports 1 critical + 9 high, `astro` a **direct** dependency — and `site/package.json` has **no `devDependencies`**, so the `--omit=dev` in my own §7 checklist excludes nothing. Separately, `agentic-kgis` and `construction-ai-proposal` pin no action by SHA (Phase 5 items). `actionlint` and `pip-audit` clean |
+| 7 Static public site | **FAIL** | **Fix now, by ADR rather than removal.** `/client-events` is an unauthenticated Cloud Run rewrite present in neither the contract's rewrite list nor design doc §8, with no authorising ADR. My addition. Lowest severity of the four |
+| 8 Cost | PASS | `budget-guard` green; the $5 budget present in state |
+| 9 Logging | PASS (finding **S-4**) | `event=boot` is live in production — the layer is genuinely alive. **S-4 is new and is a privacy property, not a config nit:** uvicorn's access lines write full request paths to Cloud Logging **unconditionally**, so `/p/<private-slug>` lands there regardless of `GATE_LOG_OBJECT_PATHS`. That setting's stated guarantee is **partial**. Recorded for Wave 1 |
+| 10 Repos | PASS | `phd-milestones` private, checked via API |
+
+**Two things it flagged that change my sequencing**, both verified by me: merging **#47 + #53
+turns the gate suite red** (#57 — the alert-channel guard counts a string shape that #53's
+refactor removes *while improving the code*, and neither branch's CI can catch it); and **#48
+must merge before or with #47**, confirmed live — `/session/end` through Hosting currently hits
+the static 404 with `cache-control: max-age=3600`.
+
+**And the correction I sent mid-run worked as intended.** It reports verifying my corrected WIF
+premise independently *before* relying on it, noting that had it tested what the contract
+literally said, **it would have blocked this wave on my drafting error**.
+
+### From the `Skeptic Verifier` — 2 un-failable guards, and a good headline
+
+Across **40+** break→red→restore→green cycles it could not find a single guard in this wave's
+new work that reports success while proving nothing. After four such defects in one sprint,
+that is the result worth stating first.
+
+| # | Finding | Disposition |
+|---|---|---|
+| U-1 | `PRIVATE_SYNC_PLAN_ONLY` is **un-failable**: `vars.*` is server-side, `act` unavailable, `actionlint` checks syntax not behaviour. Nothing in the repo would notice if the `if:` line were deleted or inverted | **Accepted; blocks *done*, not *merge*.** It guards the only mechanism in this system that can delete data, and **it has never been observed to work**. I verify it live after merge, before Wave 0 closes — that verification is now a wave-exit condition, not a nice-to-have |
+| U-2 | `gate.yml`'s three sign-out smoke assertions are properties of a deployed revision behind Google's edge | **Accepted; same reading.** Exactly the `/healthz` shape — four green local suites and a broken deployed route. Settled by probes P5–P7 after #48 and #47 land |
+| F-1 | `check:private-links` **cannot see an off-origin link** — its regex only matches links starting with `/`, so `https://evil.invalid/x` and `../../elsewhere/` both pass green | **Fix now.** A coverage gap, not a vacuous guard — it does catch its real subject (#27). But the timing is sharp: it is the guard that would have caught a satellite's off-origin font `<link>` regressing, **in the same wave that removed one**. One-line regex fix |
+| F-2 | `caplog` blindness confirmed and **scoped**: exactly four assertions, all in `test_client_events.py`, two defending `monitoring.tf`'s log metric and the redaction of an unauthenticated endpoint | **Fix later**, and now precisely bounded rather than suspected. Pre-existing; this wave's new guards are built correctly. Closes G-4 as scoped |
+| F-3 | Four `skipif` contract assertions go **quiet** rather than red when `monitoring.tf` or `gate.yml` vanish — `265 passed, 4 skipped`, exit 0 | **Fix later, but soon.** Latent in CI today; SEAM-10 is about to move `infra/**` around, which is exactly when a silent skip becomes a silent hole |
+| F-4 | The `roles/viewer` guard asserts over an empty set today; it stubbed `gcloud` and proved it **does** fire | **Accepted — correct-but-unexercised, not vacuous.** Note the interaction with #55: it fires correctly, on the wrong role, from a script that runs nowhere (#58) |
+| **F-5** | It reproduced the infra stream's `storage.tf:15` near-miss **and then nearly repeated it** — its first oracle break anchored on a string occurring **twice** in `main.py`, patched the mint path instead of sign-out, and returned `43 passed`. One step from reporting the gate's most important assertion un-failable | **Accepted, and raised as an ADR candidate.** It re-anchored uniquely and re-tested every green with `assert s.count(anchor) == 1`. **Three agents hit this trap in one sprint** — that is a pattern, not three accidents: an ambiguous anchor in break-it testing produces a false pass *and* a false "un-failable", and both look like diligence |
+
+**It verified claims rather than accepting them:** the site stream's "+11, none weakened" holds
+under a name-diff (three removals are renamed supersets); gate's 223→269 and 43 sign-out cases
+confirmed; the exec-bit guard proven to read the **index** and not the filesystem in both
+directions, with the eight shebang `.mjs` files correctly not flagged. And it found
+`roadmap-truth`'s S10 **understated** — which is what produced #58.
 
 ### Environment note
 
