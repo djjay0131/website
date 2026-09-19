@@ -69,6 +69,9 @@ THE CHECKLIST — all must pass
      signed-in member with no error anywhere (SD-7).
      NOTE: a uniform 404 is the CORRECT refusal here, not a defect (C29). But verify the 404
      comes from the gate: a matching event=deny line in Cloud Logging, and a ~426-byte body
+     (CORRECTED 2026-09-18: that size is PATH-DEPENDENT — ~426 bytes on `/p/`, 329 bytes on
+     `/healthz/`. Attribute by the container log line, not by size. A 404 with no log line
+     never reached the service; that is how /healthz was diagnosed after four revisions.)
      with <html lang="en"> quoted. Google's frontend 404 is ~1568 bytes with <html lang=en>
      unquoted, and /healthz genuinely is intercepted that way.
 
@@ -76,6 +79,21 @@ THE CHECKLIST — all must pass
      No JSON key anywhere: grep git log -p for "type": "service_account"; list Actions
      secrets in every repo; grep Terraform state.
      Every WIF binding pins numeric repository_id, owner_id AND the default-branch ref.
+
+     CORRECTED 2026-09-18, mid-run, by the Lead Architect. The line above is WRONG about
+     WHERE the ref is pinned, and the agent was sent this correction directly.
+       - NO attributeCondition on any provider mentions `ref` at all. Providers pin
+         assertion.repository_id, assertion.repository_owner_id, assertion.repository, and
+         refuse pull_request_target.
+       - The ref pin lives on each service account's workloadIdentityUser BINDING:
+           publish-cv              <- .../attribute.repository_id_ref/1211056144/refs/heads/master
+           publish-phd-milestones  <- .../1373915518/refs/heads/main
+           hub-deploy, gate-deploy <- .../1212933399/refs/heads/main
+     The invariant holds; it is enforced by the binding, not the provider. Check the
+     binding. Do NOT record a PASS for "the provider pins the ref" -- it does not -- and do
+     not raise a FAIL from the provider's silence, which under §8 would block the wave on my
+     error. Note the branches genuinely differ (`cv` is master, `phd-milestones` is main),
+     which is why the field is per satellite and why a copy-paste error would be invisible.
      The satellites pool is separate from the hub pool.
      No satellite role holds storage.objects.list — ever.
      The gate runtime SA holds only objects.get on the private bucket, datastore.viewer, and

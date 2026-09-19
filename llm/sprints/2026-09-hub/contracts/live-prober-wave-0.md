@@ -44,6 +44,9 @@ WHAT TO PROBE THIS WAVE
 
 HOW TO TELL THE GATE FROM GOOGLE'S FRONTEND — you will need this repeatedly
   The gate's own 404 is ~426 bytes with `<html lang="en">` (quoted).
+  CORRECTED 2026-09-18, on this stream's own finding: the byte count is PATH-DEPENDENT —
+  ~426 bytes on `/p/`, **329 bytes** on `/healthz/`. Do not use size as the discriminator.
+  The container log line is the authority, which is what this stream in fact did.
   Google's frontend 404 is ~1568 bytes with `<html lang=en>` (unquoted).
   The decisive test is a matching line in Cloud Logging:
       gcloud logging read 'resource.type="cloud_run_revision"

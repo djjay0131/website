@@ -37,7 +37,15 @@ WHAT YOU CAN DO YOURSELF (read-only, no impersonation)
   3. The satellitePublisher custom role's permission set: exactly storage.objects.create,
      .delete, .get. No list, ever.
   4. WIF pool separation: the satellites pool is distinct from the hub's github-actions pool,
-     and every provider pins numeric repository_id, owner_id AND the default-branch ref. Note
+     and every provider pins numeric repository_id, owner_id AND the default-branch ref.
+
+     CORRECTED 2026-09-18 by the Lead Architect, on this stream's own finding. The claim
+     above is wrong about WHERE the ref is pinned: no provider attributeCondition mentions
+     `ref`. The pin lives on each service account's workloadIdentityUser binding, per
+     satellite. This stream checked, found the discrepancy, and reported it rather than
+     recording a PASS against the object the contract named -- which is what a bounded
+     contract is for. Kept here with the correction rather than rewritten, so the record
+     shows what was asked and what was true. Note
      cv's default branch is `master` and construction-ai-proposal's is `master`, while
      phd-milestones and agentic-kgis are `main` — that is why the field is per satellite.
   5. Anonymous GET of a private object: refused.

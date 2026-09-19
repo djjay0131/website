@@ -58,6 +58,11 @@ ITEM 1 — THE HEALTH PATH
       and running that exact digest LOCALLY returns {"status":"ok"} on /healthz.
     - The 404 body is 1568 bytes of Google's error page (`<html lang=en>`, unquoted) while
       the gate's own 404 is ~426 bytes (`<html lang="en">`, quoted).
+      CORRECTED 2026-09-18: that byte count is PATH-DEPENDENT and I propagated it as
+      universal. The gate's 404 is ~426 bytes on `/p/` and **329 bytes** on `/healthz/`.
+      Quoted-vs-unquoted `<html lang=...>` still separates the gate from Google's page, but
+      the only reliable attribution is a matching container log line: a 404 with no log line
+      never reached the service.
     - No /healthz request appears in the container log at all, while /session returns 405
       and /healthz/ returns 307 — both from the application.
     => Google's frontend takes the path for this service. The service is fine.

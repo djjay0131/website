@@ -96,6 +96,8 @@ KNOWN-CORRECT BEHAVIOUR — do not report these as defects
      slugs and writes the private path into ?next=, history, Referer and logs. Confirm the
      404 comes FROM THE GATE, not from Google's frontend — the discriminator is a matching
      `event=deny` line in Cloud Logging plus a 426-byte body with `<html lang="en">` quoted;
+     (CORRECTED 2026-09-18: the byte count is path-dependent — ~426 on `/p/`, 329 on
+     `/healthz/`. The log line is the authority; body size is corroboration at best.)
      Google's page is 1568 bytes with `<html lang=en>` unquoted. /healthz is genuinely
      intercepted by Google's frontend; that one IS a real finding and is already tracked.
   2. The private bucket carries exactly TWO non-legacy principals, not one. ADR-0010
