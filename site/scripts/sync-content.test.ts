@@ -4,7 +4,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { stagePublicAssets } from "./stage-public-assets.mjs";
-import { PUBLIC_PDF_DIR, PUBLIC_PHOTO_PATH } from "../src/lib/hub-content.mjs";
+import {
+  CONTENT_PROVENANCE_FILE,
+  PUBLIC_PDF_DIR,
+  PUBLIC_PHOTO_PATH,
+} from "../src/lib/hub-content.mjs";
 
 // scripts/sync-content.sh CANNOT be exercised against a real content bucket
 // here: no credential exists, none may be created, and the bucket itself does
@@ -150,5 +154,60 @@ describe("stage-public-assets — Phase 1's URLs keep resolving", () => {
   it("stages nothing, and fails nothing, when no content has been synced", () => {
     const { staged } = stagePublicAssets(path.join(os.tmpdir(), "absent-sources"), siteRoot);
     expect(staged).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The provenance marker (ADR-0010 decision 4; src/lib/hub-content.mjs)
+// ---------------------------------------------------------------------------
+//
+// The expected-source check asks "has a declared source's whole prefix
+// vanished?", and that question means nothing for a tree whose producer could
+// never have carried every source. This script is the only writer of the synced
+// tree, so it is the only thing that knows -- and it records the answer here
+// rather than leaving every later step to infer it.
+describe("sync-content.sh records how the tree was produced", () => {
+  let dest: string;
+  beforeEach(() => {
+    dest = fs.mkdtempSync(path.join(os.tmpdir(), "sync-prov-"));
+  });
+  afterEach(() => fs.rmSync(dest, { recursive: true, force: true }));
+
+  const marker = () =>
+    JSON.parse(fs.readFileSync(path.join(dest, CONTENT_PROVENANCE_FILE), "utf8"));
+
+  it("writes a marker on every sync, defaulting a --from tree to local and COMPLETE", () => {
+    const r = run(["--from", FIXTURE, "--dest", dest, "--no-stage"]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(marker().provenance).toBe("local");
+    expect(marker().complete).toBe(true);
+    expect(marker().objectCount).toBeGreaterThan(0);
+    expect(marker().syncedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("records --provenance and --partial, exactly as fetch-data.sh passes them", () => {
+    // The cv release carries "cv" alone, and every pull-request build reads it.
+    const r = run([
+      "--from", FIXTURE, "--dest", dest, "--no-stage",
+      "--provenance", "cv-release", "--partial",
+    ]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(marker().provenance).toBe("cv-release");
+    expect(marker().complete).toBe(false);
+    expect(r.stdout).toContain("complete=false");
+  });
+
+  it("REWRITES the marker on every run, so a stale one cannot outlive its tree", () => {
+    // The destination is rebuilt from scratch, so an exemption written by one
+    // producer can never be inherited by the next. Without this, one fallback
+    // run would silently disable the check for every later bucket sync.
+    fs.writeFileSync(
+      path.join(dest, CONTENT_PROVENANCE_FILE),
+      JSON.stringify({ provenance: "cv-release", complete: false }),
+    );
+    const r = run(["--from", FIXTURE, "--dest", dest, "--no-stage"]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(marker().complete).toBe(true);
+    expect(marker().provenance).toBe("local");
   });
 });
