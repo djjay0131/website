@@ -23,6 +23,7 @@ from `0000-template.md`.
 | [0009](0009-manifest-version-lands-optional-first.md) | `manifest_version` lands optional, and becomes required later | Accepted |
 | [0010](0010-withdrawal-semantics.md) | Withdrawal semantics — the manifest is the authority, and a private withdrawal must actually stop serving | Accepted |
 | [0011](0011-two-srcdirs-not-a-visibility-filter.md) | The private build is a second `srcDir`, not a visibility filter | Accepted |
+| [0012](0012-dev-staging-in-a-separate-project.md) | Dev-staging lives in a separate GCP project | Proposed |
 
 ## Lifecycle
 

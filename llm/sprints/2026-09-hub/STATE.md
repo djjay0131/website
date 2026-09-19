@@ -561,7 +561,7 @@ and the whole adversarial and tester round are added before the wave closes.
 | RT-6 | D6.2 — the two transports refuse encoded traversal differently | **Fix later.** Harmless now, load-bearing in Phase 4. Handed to the Red Team as a Wave 1 target |
 | RT-7 | D6.3 — the live half of the bucket IAM test runs nowhere | **Fix now.** Folded into `infra`'s satellite-role guard, which lands in `budget-guard` (already a required check) rather than a new job that would gate nothing |
 | RT-8 | D6.4 — `/healthz` resolved in substance | **Closed.** See the corrected record above |
-| RT-9 | D6.5 — all three alert policies deliver nothing; if this is the same failure as the missing sign-in emails, A1 is unverifiable by **anyone** | **Escalate to the owner.** Clicking the channel verification link is console-only. `infra` is separately looking for a non-email channel at zero cost |
+| RT-9 | D6.5 — all three alert policies deliver nothing; if this is the same failure as the missing sign-in emails, A1 is unverifiable by **anyone** | **Partly fixed, partly escalated — my first disposition understated it.** I wrote that `infra` was "looking for" a non-email channel; it **found and built one** (I-6 below). Still escalated: verifying either channel is console work only the owner can do |
 | RT-10 | D6.6 — `cv/anthropic-fellow` is publicly reachable, contradicting D8 | **Fix now, in Wave 0b — highest priority there.** Confirmed by my own probes. Not an Incident A1 event, for the reason recorded above. Stopgap available to the owner |
 | RT-11 | O5 and O6 remain open | **O5: answered in Wave 1** as `GET /share`, owner-only. **O6: answered in Wave 3's ADR** |
 | RT-12 | Plain `curl` normalises `..` client-side and produced a false 200 | **Accepted as a standing caution.** `--path-as-is` is now required in every traversal probe, and is written into the Red Team and Security Tester briefs |
@@ -583,6 +583,36 @@ and the whole adversarial and tester round are added before the wave closes.
 | S-3 | The Projects **meta description** still reads "Selected projects and research…" | **Escalate to the owner.** It names content, not the page title, so D7 does not clearly cover it |
 | S-4 | The CV's own `<h2>Selected Projects & Research</h2>` may be in scope | **Escalate to the owner.** Same reason; it is `cv`'s content, not the hub's chrome |
 | S-5 | SEAM-10 specifies the private-sync identity split, naming two existing guards that will fail until renamed | **Accepted.** `infra` is consuming it now |
+
+### From the `infra` stream (PR #53)
+
+| # | Claim | Disposition |
+|---|---|---|
+| I-1 | **Its own first test of the UBLA assertion silently passed.** Breaking UBLA left the guard green, because the `sed` hit a *comment* at `storage.tf:15` while the real line at `:87` stayed `true` | **Accepted, and it is the most important finding of the wave.** The guard was right; the **test** was hollow. Caught only by expecting red and getting green. This is the **fourth** vacuous check this sprint and the first where the test rather than the guard was the empty half. Corrected to fire on both buckets |
+| I-2 | Our own `gate.tf` comment was wrong: it claimed verification needs no IAM and proposed a `createSession`-only role, which would **mint cookies and then fail every verify** — both paths run `check_revoked=True` and fetch the user record | **Accepted. The role is `createSession` + `users.get`.** A comment in our own repository was design authority nobody had checked |
+| I-3 | Custom-role eligibility was established by showing the field **is** emitted elsewhere — 70 `NOT_SUPPORTED`, 400 `TESTING` across 13,673 permissions | **Accepted as the right epistemics**, and worth naming: absence only means something once presence has been demonstrated. That reasoning is reusable and this sprint has been bitten by its opposite |
+| I-4 | Post-apply step (f) is **not optional**: mint and verify need different permissions, so testing only the mint is how a half-narrowed role ships looking healthy | **Accepted and binding on me.** I run mint **and** verify after apply, or the narrowing is unverified. Rollback is one `add-iam-policy-binding`; the custom role is **never** destroyed — a destroyed custom role locks its ID for 7–37 days and would block all publishing with no way to apply out |
+| I-5 | `projectViewer`'s residual is **empty**, but not for the contract's reason. UBLA does **not** remove the legacy bindings — all four are still present. But `cusati-hub` has no `roles/viewer` binding at all; the owner holds `roles/owner` → `projectOwner` | **Accepted, and the chosen remedy is better than the contract's.** Removing the bindings needs an authoritative policy that would strip the **owner's own** object access, since `roles/owner` reaches the bucket *through* them. Instead the check **fails if anyone is ever granted `roles/viewer`** — making a latent widening loud rather than removing something harmless |
+| I-6 | A second alert channel exists at zero cost: `sms`, GA, `count = 0` by default, attached to all three policies beside email | **Fix now — implemented, dormant.** Channel types were enumerated **from the API**, not recalled, and webhook and pubsub were rejected against this contract's own test: "free in Monitoring but not free of a *receiver*." Google's caveat is kept rather than glossed — SMS "isn't a fully reliable notification channel type", so it is a **second** channel, never a replacement. Off by default because a channel pointing at no number is the same failure as the unverified email one |
+| I-7 | dev-staging is **not** blocked by budget ($0.00 incremental, ~99% headroom). It is blocked by Firebase Hosting exposing **zero** `*hosting*iam*` resources while `firebasehosting.admin` is project-wide — so a `dev`-branch identity could deploy **production** | **Accepted. Filed as ADR-0012**, recommending a separate project. The default design would have shipped a privilege escalation from the least-reviewed branch in the repo, introduced by the very mechanism meant to make review safer. The stream declined to implement either the default or a silently different design — the right call: that is deciding an ADR-class question by writing Terraform |
+| I-8 | The kill switch could **not** be proven locally — `vars.*` is server-side and `act` is unavailable; `actionlint` validates syntax, not behaviour | **Accepted as stated, not as proven.** Recorded as unverified rather than claimed working. Post-merge commands are in the handoff, and the Skeptic Verifier is asked to treat its absence as absence |
+
+### Required-check promotion — cautions recorded before I act
+
+Context names, verbatim and identical to the YAML keys (neither job sets a `name:`):
+**`contract-tests`** and **`leak-check-self-test`**. Required on `main` today are only
+`governance-checks` and `budget-guard`, so both currently run **without gating a merge**
+(#26, S-4).
+
+Two things to get right when I flip branch protection, written down **before** rather than
+after:
+
+1. **`leak-check-self-test` carries `if: github.event_name != 'schedule'`.** It reports on
+   every pull request, so promoting it is safe — but the failure mode of a required context
+   that never reports is a **stuck merge queue, not a red X**, which is far harder to diagnose.
+   Verified against the last 8 commits on `main` before promotion, not assumed.
+2. **Never promote `gate.yml`'s `test`** without renaming it first. It is a generic context
+   name, and the distinct set observed on `main` already contains sixteen others.
 
 ### Environment note
 
