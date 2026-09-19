@@ -20,10 +20,13 @@ what a contributor needs to pick up work today.
   `djjay@vt.edu`.** The Google button will fail until the OAuth provider is configured in
   the console (issue #31), and the owner's Google identity `djjay0131@gmail.com` is not on
   the allowlist in any case.
-- Open after Checkpoint 4: **#27** (private-area link base — fixed and merged, verified by
-  `check:private-links`), **#30** (`terraform apply` is not idempotent: the Firestore
-  deny-all ruleset is replaced every run, briefly unreleasing the rules that protect
-  `members/{email}`), **#31** (Google sign-in provider not configured).
+- **CLOSED since Checkpoint 4** *(corrected 2026-09-19 on the Wave 0 Governance Audit, which
+  found this line listing two closed issues as open — the S-6/A-3 recurrence of a record
+  describing intent rather than merged reality)*: **#27** (private-area link base — fixed,
+  merged, verified by `check:private-links`) and **#30** (`terraform apply` idempotency — fixed
+  by PR #35; the Firestore ruleset and its release now refresh with no diff, verified in the
+  Wave 0 preconditions).
+- **Still open: #31** — Google sign-in provider not configured. Console-only; owner action.
 - Sprint `2026-09-hub`: **Phase 2 — Publishing contract is COMPLETE.** Checkpoint 3 passed
   2026-09-16/17; the hub serves the CV through the contract. (issue #16,
   PR #17, branch `feat/publishing-contract`). Reviewed — Chief Reviewer verdict *Comment,
@@ -41,9 +44,16 @@ what a contributor needs to pick up work today.
   temporary impersonation grant that was removed and verified removed.
   **Do not re-apply and do not re-delete: both are done.** Evidence: `STATE.md`
   §Checkpoint 3 execution record.
-- **Stop point:** the rest of Checkpoint 3 is the owner's alone — revoke the PAT *token* at
-  github.com/settings/tokens (deleting the repository secret did not), then merge `cv` #14,
-  hub #17, `cv` #13, in that order. Agents do not merge.
+- **Stop point (rewritten 2026-09-19; the previous text was two phases stale, still describing
+  Checkpoint 3's PAT revocation and merge order as the current stop).** The owner authorised a
+  run to the end of Phase 6 on 2026-09-18 (D1–D8), including **gated** merge and apply
+  authority. **Wave 0 is BLOCKED under §8**: the Security Tester returned 4 FAILs and the Chief
+  Reviewer returned *§8 conditions NOT met*, so nothing merges. Blockers: #54, #55, #56, #57,
+  #58, the `/session/end` CSRF defect, and an ADR for `/client-events`.
+- **Owner-only, outstanding:** #31 (Google OAuth, console); verifying the alert notification
+  channel, without which all three policies deliver nothing; and whether to flip
+  `cv/anthropic-fellow` to `visibility: private` in the `cv` satellite as a stopgap, since it is
+  publicly reachable on five origins against decision D8.
 - Orchestration state: `llm/sprints/2026-09-hub/STATE.md`.
 
 ## Decisions on record
