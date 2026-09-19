@@ -296,3 +296,32 @@ variable "ops_email" {
     error_message = "ops_email must be a single email address."
   }
 }
+
+variable "ops_sms_number" {
+  description = "Optional phone number in E.164 form (for example +15035550123) for the SECOND alert channel, which does not depend on email. Empty (the default) creates no SMS channel at all. Not a secret, but it is personal data: set it with TF_VAR_ops_sms_number or a git-ignored terraform.tfvars rather than committing it. Like the email channel it must be VERIFIED after the first apply -- Google sends a code by SMS and it is entered in the console -- and until then it accepts alerts and delivers nothing. Google's own caveat applies: SMS is not a fully reliable channel type and may be unavailable in some regions, which is why it is a second channel beside email rather than a replacement for it."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.ops_sms_number == "" || can(regex("^\\+[1-9][0-9]{7,14}$", var.ops_sms_number))
+    error_message = "ops_sms_number must be empty, or an E.164 number: a leading +, then 8 to 15 digits, with no spaces, dashes or parentheses."
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Wave 0 (#54): the gate's CSRF accepted-origin set.
+# ---------------------------------------------------------------------------
+
+variable "gate_extra_allowed_origins" {
+  description = "Additional origins the gate's CSRF check accepts, BEYOND the two rendered automatically into GATE_ALLOWED_ORIGINS (the site domain, and the service's project-number *.run.app URL). Empty by default, which is the intended state. The one known candidate is this service's OLDER <service>-<hash>-<regioncode>.a.run.app spelling, which is also live on this project and which Terraform cannot render itself: reading google_cloud_run_v2_service.gate.uri from the service's own env block is a self-reference cycle. Adding an origin WIDENS what may make a state-changing request to the gate, so add one only after confirming the gate actually serves on it (terraform output -raw gate_allowed_origins_check_command)."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for origin in var.gate_extra_allowed_origins :
+      can(regex("^https://[A-Za-z0-9._-]+(:[0-9]{1,5})?$", origin))
+    ])
+    error_message = "Each entry must be a serialized https origin -- https://host or https://host:port, with no path, trailing slash, query or fragment. The gate drops malformed entries rather than guessing at them."
+  }
+}

@@ -165,6 +165,11 @@ output "private_bucket_url" {
   value       = google_storage_bucket.private.url
 }
 
+output "auditor_service_account_email" {
+  description = "GCP_AUDITOR_SA: the read-only identity the private-bucket-live-iam job in build.yml authenticates as (issue #58). Set this GitHub Actions variable on this repository as soon as this module is applied -- the job FAILS rather than skipping while it is unset, deliberately. It holds no storage.objects.* permission and cannot read a private object."
+  value       = google_service_account.hub_auditor.email
+}
+
 output "gate_service_account_email" {
   description = "The gate's RUNTIME identity: the only principal that reads a private object to serve it. Not a deploy identity."
   value       = google_service_account.hub_gate.email
@@ -183,6 +188,20 @@ output "gate_service_name" {
 output "gate_service_uri" {
   description = "The gate's direct *.run.app URL. Its invoker is allUsers deliberately (ADR-0004), so every authorisation check must hold on THIS URL as well as through Hosting -- which is a roadmap acceptance criterion, not a footnote."
   value       = google_cloud_run_v2_service.gate.uri
+}
+
+output "gate_allowed_origins" {
+  description = "The exact string rendered into the gate's GATE_ALLOWED_ORIGINS environment variable (issue #54). The gate builds its CSRF accepted-origin set from this at startup and has no header fallback, so if it is wrong, sign-out refuses every request. Compare it against the set the running revision prints in its boot line -- see gate_allowed_origins_check_command."
+  value       = local.gate_allowed_origins
+}
+
+output "gate_allowed_origins_check_command" {
+  description = "Post-apply verification for the CSRF origin set, in three parts: the URL Cloud Run actually serves (which may use the older <service>-<hash>-<regioncode>.a.run.app spelling rather than the project-number form this module constructs), the accepted set the running revision parsed at boot, and any misconfiguration line. The first two must agree; allowed_origins=none means the variable never reached the revision. Add a missing spelling with var.gate_extra_allowed_origins."
+  value = join(" ; ", [
+    "gcloud run services describe ${google_cloud_run_v2_service.gate.name} --project ${var.project_id} --region ${var.region} --format 'value(status.url)'",
+    "gcloud logging read 'resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${google_cloud_run_v2_service.gate.name}\" AND textPayload:\"event=boot\"' --project ${var.project_id} --limit 1 --freshness=1h --format='value(textPayload)'",
+    "gcloud logging read 'resource.type=\"cloud_run_revision\" AND textPayload:\"event=misconfigured\"' --project ${var.project_id} --freshness=1h --limit=5",
+  ])
 }
 
 output "gate_image_repository" {
@@ -219,6 +238,16 @@ output "gate_github_actions_variables" {
 }
 
 output "private_bucket_iam_check_command" {
-  description = "The live half of the roadmap's bucket IAM test (§12.1), ready to paste. The credential-free half runs on every push in the budget-guard job (a required check): python3 infra/scripts/check_private_bucket_config.py."
+  description = "The live half of the roadmap's bucket IAM test (§12.1), ready to paste for an owner-run check. It ALSO runs automatically, hourly and on every push to main, in build.yml's private-bucket-live-iam job as the read-only auditor (issue #58) -- this command is for running it by hand, not the only place it runs. The credential-free half runs on every push and pull request in the budget-guard job (a required check): python3 infra/scripts/check_private_bucket_config.py."
   value       = "PROJECT=${var.project_id} BUCKET=${google_storage_bucket.private.name} GATE_SA=${google_service_account.hub_gate.email} HUB_SA=${google_service_account.hub_deploy.email} bash infra/scripts/check-private-bucket-iam.sh"
+}
+
+output "gate_session_minter_role_id" {
+  description = "The custom role the gate holds instead of roles/firebaseauth.admin (N-1): exactly firebaseauth.users.createSession and firebaseauth.users.get. Read it back after apply with: gcloud iam roles describe gateSessionMinter --project <project id>."
+  value       = google_project_iam_custom_role.gate_session_minter.name
+}
+
+output "gate_auth_role_check_command" {
+  description = "Post-apply verification for the narrowed Identity Platform grant. The first command must print exactly the two permissions; the second must print NO row for roles/firebaseauth.admin. Sign-in itself cannot be proven by either -- that needs the live email-link sign-in in the Checkpoint runbook."
+  value       = "gcloud iam roles describe gateSessionMinter --project ${var.project_id} --format='value(includedPermissions)' && gcloud projects get-iam-policy ${var.project_id} --flatten='bindings[].members' --filter='bindings.members:${google_service_account.hub_gate.email}' --format='value(bindings.role)'"
 }

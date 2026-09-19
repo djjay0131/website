@@ -7,11 +7,21 @@
 # THIS SCRIPT REQUIRES CLOUD CREDENTIALS. It reads a live IAM policy, so it
 # cannot run in a credential-free CI job, and it is not pretending otherwise.
 # Its home is:
-#   - the deploy path, after authentication (the hub's deploy identity can read
-#     this bucket's IAM policy only if granted storage.buckets.getIamPolicy --
-#     see the note at the bottom, which is a real gap, not an oversight);
-#   - the Checkpoint 4 runbook, run by the owner, which is where it actually
-#     proves the criterion for the first time.
+#   - the private-bucket-live-iam job in .github/workflows/build.yml, which runs
+#     on the HOURLY SCHEDULE and on every push to main, authenticating as the
+#     read-only auditor identity (infra/auditor.tf). It fails that job. The
+#     scheduled half is the load-bearing one: a bucket exposure introduced by a
+#     console action changes no file here and is invisible to any check that
+#     runs only on a code change (issue #58);
+#   - the Checkpoint 4 runbook, run by the owner, where the PROBE_OBJECT half
+#     can be pointed at a real private object.
+#
+# IT RAN NOWHERE UNTIL WAVE 0. Before issue #58 this script was named in one
+# COMMENT in build.yml and invoked by no workflow, while infra/README.md and two
+# other documents described it as the mitigation for a live exposure. The guard
+# that asserts this stays wired -- credential-free, so it runs on pull requests
+# too -- is the "live bucket IAM check is wired to a job that runs" step in
+# build.yml's budget-guard job.
 #
 # The credential-free half -- that the CONFIGURATION still says the right thing
 # -- is scripts/check_private_bucket_config.py, which runs on every push with no
@@ -69,10 +79,24 @@ echo
 SETTINGS_JSON="$(gcloud storage buckets describe "gs://${BUCKET}" \
   --project "${PROJECT}" --format=json)"
 
+#
+# BOTH SPELLINGS ARE READ, for UBLA as well as for PAP (Wave 0 item A-11). Until
+# now the PAP reader tolerated snake_case AND camelCase while the UBLA reader
+# accepted snake_case only -- an asymmetry with no reason behind it. It fails
+# CLOSED, so it was never dangerous: a gcloud that returned
+# `uniformBucketLevelAccess` would resolve None, compare unequal to True and
+# stop the run. But stopping the run on a CORRECT bucket is precisely the
+# Checkpoint 4 cry-wolf failure described above, paid for a second time.
+#
+# `if ubla is None` rather than `a or b`: `or` would also swallow a literal
+# False, reporting the field as absent when it was present and OFF -- the one
+# case where the message must be exact, because it is the real finding.
 read -r UBLA PAP <<<"$(printf '%s' "${SETTINGS_JSON}" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 ubla = d.get('uniform_bucket_level_access')
+if ubla is None:                    # a future gcloud may spell it camelCase
+    ubla = d.get('uniformBucketLevelAccess')
 if isinstance(ubla, dict):          # older gcloud nests it
     ubla = ubla.get('enabled')
 pap = d.get('public_access_prevention') or d.get('publicAccessPrevention')
@@ -82,7 +106,7 @@ print(f'{ubla} {pap}')
 if [ "${UBLA}" = "True" ]; then
   pass "uniform_bucket_level_access is True -- object ACLs are disabled and IAM is the only access path"
 else
-  fail "uniform_bucket_level_access is '${UBLA}', expected True. STOP: with it off, an object ACL can make a private object public with no IAM change, and this script's remaining checks prove nothing."
+  fail "uniform_bucket_level_access is '${UBLA}', expected True (read under both the snake_case and camelCase spellings of the field). STOP: with it off, an object ACL can make a private object public with no IAM change, and this script's remaining checks prove nothing."
   exit 1
 fi
 
@@ -146,9 +170,9 @@ else
 fi
 echo
 
-echo "For information (not a failure): the legacy project-role bindings Cloud Storage"
-echo "creates automatically on every bucket. They mean project Viewer can read every"
-echo "object here. See the Phase 3 handoff, Risks."
+echo "The legacy project-role bindings Cloud Storage creates automatically on every"
+echo "bucket. They are not declared by this module and cannot be removed by adding"
+echo "IAM members to it -- only by replacing the bucket's whole IAM policy."
 echo "${POLICY}" | python3 -c '
 import json, sys
 policy = json.load(sys.stdin)
@@ -156,6 +180,114 @@ for binding in policy.get("bindings", []):
     if binding.get("role", "").startswith("roles/storage.legacy"):
         print("   ", binding["role"], "->", ", ".join(binding.get("members", [])))
 '
+echo
+
+# ---------------------------------------------------------------------------
+# 2b. WHAT THE LEGACY PLACEHOLDERS ACTUALLY EXPAND TO. This is the check that
+#     turns a silent, latent exposure into a loud one.
+#
+# The four legacy bindings printed above name PLACEHOLDERS, not principals:
+#
+#   projectViewer:<project>  <- every principal holding roles/viewer
+#     legacyBucketReader, legacyObjectReader -> objects.get, objects.list
+#
+#   projectEditor:<project>  <- every principal holding roles/editor
+#     legacyBucketOwner  -> objects.create, objects.delete, objects.list,
+#                           objects.restore, and buckets.setIamPolicy
+#     legacyObjectOwner  -> objects.get, objects.update, objects.setIamPolicy
+#     UNION: create, delete, get, LIST, update, setIamPolicy on EVERY object.
+#
+#   projectOwner:<project>   <- every principal holding roles/owner
+#     the same two owner bindings as projectEditor.
+#
+# WHY THIS BLOCK WAS WRONG UNTIL WAVE 0, stated plainly because the mistake is
+# instructive (#55; Chief Reviewer B-4; Boundary Tester 6b; Skeptic Verifier
+# F-4). It expanded roles/viewer ONLY, and its reasoning was entirely about
+# READERS. Live IAM says roles/viewer has no binding on this project at all,
+# while roles/editor is POPULATED. So the guard asserted over the empty set,
+# passed, protected nothing -- and was presented in infra/README.md as the
+# mitigation for exactly the exposure it could not see. A guard that cannot fail
+# is worse than no guard, because it is counted as coverage.
+#
+# objects.list is the sharpest part of the editor union. SEAM-1 withholds list
+# from the GATE deliberately -- "object names in this bucket are themselves
+# private material" -- and privateObjectReader holds exactly storage.objects.get
+# for that reason. An untracked identity reaching the same bucket with list
+# undoes that decision without touching this module.
+#
+# Uniform bucket-level access does NOT remove these bindings: established from
+# the live policy rather than assumed. UBLA is enforced on this bucket and all
+# four legacy bindings are still present in the output printed above.
+#
+# THE THREE ROLES ARE TREATED DIFFERENTLY, and the difference is the point:
+#   roles/viewer  FAILS -- nobody should hold it; it reads every private object.
+#   roles/editor  FAILS -- it reads, WRITES, DELETES and LISTS every private
+#                 object, and can rewrite the bucket's own IAM policy.
+#   roles/owner   REPORTED, never failed -- the project owner holds it, that is
+#                 expected and irremovable, and failing on it would make this
+#                 check red on every run. A check that is always red is a check
+#                 that gets switched off, and then the two above stop being
+#                 watched too.
+#
+# Removing the legacy bindings is NOT attempted here and must not be: it needs
+# an authoritative google_storage_bucket_iam_policy, which would also strip the
+# OWNER's own object access, since projectOwner reaches objects by the same
+# mechanism. That is a separate decision with the owner (Wave 0 infra handoff,
+# item 5).
+# ---------------------------------------------------------------------------
+PROJECT_POLICY="$(gcloud projects get-iam-policy "${PROJECT}" --format=json)"
+
+# One read of the project policy, three expansions of it. Reading it once also
+# means the three answers cannot disagree with each other.
+members_of() {
+  printf '%s' "${PROJECT_POLICY}" | python3 -c '
+import json, sys
+wanted = sys.argv[1]
+policy = json.load(sys.stdin)
+for binding in policy.get("bindings", []):
+    if binding.get("role") == wanted:
+        for member in binding.get("members", []):
+            print(member)
+' "$1" | sort
+}
+
+VIEWERS="$(members_of roles/viewer)"
+EDITORS="$(members_of roles/editor)"
+OWNERS="$(members_of roles/owner)"
+
+if [ -z "${VIEWERS}" ]; then
+  pass "no principal holds roles/viewer on ${PROJECT}, so projectViewer expands to the empty set and the legacy READER bindings grant nobody anything"
+else
+  fail "roles/viewer on ${PROJECT} is NOT empty. Through the automatic legacyBucketReader/legacyObjectReader bindings, each principal below can READ (storage.objects.get) and ENUMERATE (storage.objects.list) EVERY PRIVATE OBJECT in gs://${BUCKET}:"
+  echo "${VIEWERS}" | sed 's/^/    /'
+  echo "    Remove roles/viewer from them, or replace this bucket's IAM policy"
+  echo "    authoritatively to drop the legacy reader bindings (Wave 0 infra"
+  echo "    handoff, item 5 -- note it would also drop the owner's own access)."
+fi
+
+if [ -z "${EDITORS}" ]; then
+  pass "no principal holds roles/editor on ${PROJECT}, so projectEditor expands to the empty set and the legacy OWNER bindings grant nobody anything"
+else
+  fail "roles/editor on ${PROJECT} is NOT empty. Through the automatic legacyBucketOwner/legacyObjectOwner bindings, each principal below holds create, delete, get, LIST, update and setIamPolicy on EVERY OBJECT in gs://${BUCKET}, plus storage.buckets.setIamPolicy on the bucket itself -- so it can read the committee dossier, DESTROY it, ENUMERATE every private object name, and rewrite who else may do so:"
+  echo "${EDITORS}" | sed 's/^/    /'
+  echo "    storage.objects.list is the sharpest of those: SEAM-1 withholds it"
+  echo "    from the GATE itself, because object names in this bucket are"
+  echo "    private material. An untracked identity must not hold it."
+  echo "    Remove roles/editor from them (the default compute service account"
+  echo "    holds it unless it was removed), or replace this bucket's IAM policy"
+  echo "    authoritatively -- see the note above on what that also removes."
+fi
+
+# Reported, never failed. See the header: the owner holds roles/owner, and a
+# check that is red on every correct run is a check nobody keeps running.
+if [ -n "${OWNERS}" ]; then
+  echo "NOTE: roles/owner on ${PROJECT} expands to the principals below. They reach"
+  echo "      every object in gs://${BUCKET} through projectOwner, by exactly the"
+  echo "      same legacy mechanism as projectEditor. This is EXPECTED and is not"
+  echo "      failed on -- but it is the reason the legacy bindings cannot simply"
+  echo "      be dropped, and it should be a SHORT list:"
+  echo "${OWNERS}" | sed 's/^/    /'
+fi
 echo
 
 # ---------------------------------------------------------------------------
@@ -195,27 +327,26 @@ fi
 echo "Private bucket IAM test passed."
 
 # ---------------------------------------------------------------------------
-# A NOTE ON RUNNING THIS ON THE DEPLOY PATH, stated plainly rather than
-# discovered at Checkpoint 4:
+# WHICH IDENTITY RUNS THIS, and why it is not the deploy identity. Settled in
+# Wave 0 (#58); the previous version of this note left it open.
 #
-# Reading a bucket's IAM policy needs storage.buckets.getIamPolicy. The hub's
-# deploy identity does NOT hold it: its grants are roles/storage.objectViewer on
-# the content bucket and the four object permissions of privateSyncWriter on this
-# one -- object permissions, none of which reads bucket metadata or policy. (The
-# same gap was recorded in Phase 2: roles/storage.objectViewer does not include
-# storage.buckets.get.)
+# Reading a bucket's IAM policy needs storage.buckets.getIamPolicy, and §2b
+# additionally needs resourcemanager.projects.getIamPolicy. The hub's deploy
+# identity holds NEITHER: its grants are roles/storage.objectViewer on the
+# content bucket and privateSyncWriter's four object permissions on this one --
+# object permissions, none of which reads bucket metadata, a bucket policy, or
+# the project policy. (The same gap was recorded in Phase 2:
+# roles/storage.objectViewer does not include storage.buckets.get.)
 #
-# So a deploy-path run of THIS script needs one of:
-#   (a) storage.buckets.getIamPolicy added to privateSyncWriter -- a real
-#       widening of the deploy identity, for a check rather than for the work;
-#   (b) a separate, read-only auditor identity used by the check step only;
-#   (c) accept that the live check is an owner/Checkpoint procedure, while every
-#       deploy runs the credential-free configuration check
-#       (check_private_bucket_config.py) plus the anonymous-request probe in
-#       section 3, which needs no credential whatsoever.
-#
-# (c) is what this phase implements and what the handoff recommends: the
-# anonymous probe is the half of the criterion that actually catches a public
-# object, and it runs on every deploy with no identity at all. (a) and (b) are
-# recorded for the owner as an ADR candidate.
+# The three options were:
+#   (a) add those permissions to privateSyncWriter -- rejected. It widens the
+#       identity that can DELETE every private object, for a check rather than
+#       for the work.
+#   (b) a separate, read-only auditor identity used by the check only -- TAKEN.
+#       infra/auditor.tf: hub-auditor holds exactly three permissions, no
+#       storage.objects.* of any kind, no key, and authenticates only from
+#       refs/heads/main through the existing WIF pool.
+#   (c) leave it an owner/Checkpoint procedure -- which is what "this phase
+#       implements" used to say, and is how the live half came to run nowhere
+#       for two phases while three documents said it ran.
 # ---------------------------------------------------------------------------

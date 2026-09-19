@@ -42,6 +42,68 @@ resource "google_monitoring_notification_channel" "ops_email" {
 }
 
 # ---------------------------------------------------------------------------
+# THE SECOND CHANNEL, WHICH DOES NOT DEPEND ON EMAIL.
+#
+# WHY. On 2026-09-18 the email channel above had no verificationStatus field at
+# all, which means unverified: Google emailed the address at 15:27:37Z and until
+# that link is clicked all three policies accept events and deliver NOTHING.
+# The owner separately reports that Firebase sign-in emails never arrive. Two
+# independent symptoms pointing at one delivery problem is enough to stop
+# designing alerting that depends on email, so this channel exists to give the
+# chain a second, unrelated delivery path.
+#
+# WHY SMS AND NOT A WEBHOOK. A webhook channel is free in Cloud Monitoring but
+# is not free of a RECEIVER, and no receiver exists here at zero cost that the
+# owner already operates. pubsub has the same problem one layer down: it
+# delivers to a topic, and a topic is not a person. slack, pagerduty and
+# google_chat each need an account or a space this project does not have.
+# sms is GA in this project, needs no third party, and Cloud Monitoring's
+# pricing bills metrics ingestion, API calls, uptime checks and alerting-policy
+# metric references -- not notification delivery. Channel types available here
+# were read from the API rather than assumed:
+#   GET https://monitoring.googleapis.com/v3/projects/<project>/notificationChannelDescriptors
+# returns campfire(DEPRECATED), email, google_chat(BETA), hipchat(DEPRECATED),
+# pagerduty(BETA), pubsub, slack, sms, webhook_basicauth, webhook_tokenauth.
+#
+# ITS VERIFICATION PATH IS THE POINT: Google sends a code by SMS and the owner
+# enters it. That path shares nothing with email, so it still works if email
+# delivery is the thing that is broken.
+#
+# GOOGLE'S OWN CAVEAT, recorded rather than glossed: "SMS isn't a fully reliable
+# notification channel type, and it might not be available in certain regions",
+# and Google recommends pairing it with a different type. That is exactly what
+# this is -- a SECOND channel beside email, not a replacement for it. Both are
+# attached to every policy below.
+#
+# OFF BY DEFAULT. ops_sms_number is "" unless the owner sets it, because a
+# channel pointing at no number is worse than no channel: it looks like
+# redundancy and delivers nothing, which is the failure this whole file exists
+# to stop repeating.
+resource "google_monitoring_notification_channel" "ops_sms" {
+  count = var.ops_sms_number == "" ? 0 : 1
+
+  project      = var.project_id
+  display_name = "Hub ops SMS"
+  type         = "sms"
+
+  labels = {
+    number = var.ops_sms_number
+  }
+
+  force_delete = false
+}
+
+locals {
+  # Every policy attaches EVERY configured channel. The rule learned from the
+  # reference project was a policy whose channels were commented out; the rule
+  # learned here is that one channel is a single point of delivery failure.
+  alert_notification_channels = concat(
+    [google_monitoring_notification_channel.ops_email.id],
+    google_monitoring_notification_channel.ops_sms[*].id,
+  )
+}
+
+# ---------------------------------------------------------------------------
 # Is the public site answering at all?
 # ---------------------------------------------------------------------------
 resource "google_monitoring_uptime_check_config" "public_site" {
@@ -175,7 +237,7 @@ resource "google_monitoring_alert_policy" "site_down" {
     }
   }
 
-  notification_channels = [google_monitoring_notification_channel.ops_email.id]
+  notification_channels = local.alert_notification_channels
 
   documentation {
     mime_type = "text/markdown"
@@ -221,7 +283,7 @@ resource "google_monitoring_alert_policy" "gate_down" {
     }
   }
 
-  notification_channels = [google_monitoring_notification_channel.ops_email.id]
+  notification_channels = local.alert_notification_channels
 
   documentation {
     mime_type = "text/markdown"
@@ -277,7 +339,7 @@ resource "google_monitoring_alert_policy" "signin_failing" {
     }
   }
 
-  notification_channels = [google_monitoring_notification_channel.ops_email.id]
+  notification_channels = local.alert_notification_channels
 
   documentation {
     mime_type = "text/markdown"
@@ -298,6 +360,138 @@ resource "google_monitoring_alert_policy" "signin_failing" {
       Sign-in decisions the gate itself made are a different query:
 
           gcloud logging read 'resource.type="cloud_run_revision" AND textPayload:"event=deny"' --project ${var.project_id} --freshness=30m --limit=50
+    EOT
+  }
+}
+
+# ---------------------------------------------------------------------------
+# THE GATE CAME UP MISCONFIGURED (issue #54; gate handoff gate-wave-0-fixes.md;
+# Chief Reviewer routing 2026-09-19).
+#
+# WHY THIS IS NOT COVERED BY WHAT IS ALREADY HERE. The gate's CSRF check now
+# builds its accepted-origin set from GATE_ALLOWED_ORIGINS and has NO header
+# fallback: unset, POST /session/end refuses every request and no member can
+# sign out. The gate stream's own risk note says plainly that its "the deploy
+# fails loudly" claim leans on .github/workflows/gate.yml's smoke assertions,
+# which the Skeptic Verifier recorded as un-failable by construction (U-2) and
+# which that stream was told not to touch. So the deploy is NOT the safety net.
+#
+# What is independently solid is the log: the revision emits
+# event=misconfigured at ERROR once at startup. That is what this watches.
+#
+# It is deliberately a SEPARATE policy from the denial spike. hub-gate-denials
+# already matches the resulting refusals (they log event=deny), so a
+# misconfigured deploy would eventually show up there -- but only once a member
+# tries to sign out and fails, and reported as "denials are up" rather than as
+# "the gate started without its origin set". This fires at BOOT, before anyone
+# is affected, and names the cause.
+#
+# COST, stated because a new resource needs one (§12.6). Two charges exist and
+# both are effectively zero here:
+#   - The log-based metric is a user-defined metric, chargeable by bytes
+#     ingested, against a free allotment of the first 150 MiB per billing
+#     account per month. A DELTA counter whose filter matches a single line at
+#     startup ingests a negligible number of bytes, and this project is far
+#     below the allotment.
+#   - Alerting policies are billed "$0.35 per month for each metric reference in
+#     an alerting policy", with NO free allotment -- but the effective date on
+#     Google's pricing summary is 1 September 2027. Until then this policy is
+#     free. From that date it costs $0.35/month, and the three policies already
+#     in this file start costing the same each, so the whole file becomes about
+#     $1.40/month against the $5 budget. That is worth knowing in advance; it is
+#     not a reason to leave a loud failure unwatched today.
+# ---------------------------------------------------------------------------
+resource "google_logging_metric" "gate_misconfigured" {
+  project = var.project_id
+  name    = "hub-gate-misconfigured"
+
+  # Emitted once, at startup, by a revision that came up without a setting it
+  # cannot work without. The gate's line is:
+  #   event=misconfigured setting=GATE_ALLOWED_ORIGINS effect=signout_refuses_every_request
+  # Anchored on the EVENT rather than on the setting name, so a second such
+  # setting is covered the day it exists rather than the day someone remembers
+  # this file.
+  filter = <<-EOT
+    resource.type="cloud_run_revision"
+    resource.labels.service_name="${google_cloud_run_v2_service.gate.name}"
+    textPayload:"event=misconfigured"
+  EOT
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    unit        = "1"
+  }
+}
+
+resource "google_monitoring_alert_policy" "gate_misconfigured" {
+  project      = var.project_id
+  display_name = "Hub — gate started misconfigured"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "gate logged event=misconfigured at startup"
+    condition_threshold {
+      filter = join(" AND ", [
+        "metric.type=\"logging.googleapis.com/user/${google_logging_metric.gate_misconfigured.name}\"",
+        # Sharp edge 1: the alert filter must constrain resource.type even
+        # though the log metric's own filter already does.
+        "resource.type=\"cloud_run_revision\"",
+      ])
+
+      # ANY occurrence. One is a fault: a revision only logs this when it came
+      # up unable to do its job.
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "0s"
+
+      aggregations {
+        alignment_period = "300s"
+        # Sharp edge 2: DELTA metric, so ALIGN_DELTA.
+        per_series_aligner = "ALIGN_DELTA"
+      }
+
+      trigger { count = 1 }
+
+      # INACTIVE, for the same reason as the sign-in failure counter: this is a
+      # FAULT counter, and no data means no revision has come up misconfigured,
+      # which is the state we want. ACTIVE would page continuously on a healthy
+      # service and an alert that cries wolf gets muted.
+      evaluation_missing_data = "EVALUATION_MISSING_DATA_INACTIVE"
+    }
+  }
+
+  notification_channels = local.alert_notification_channels
+
+  documentation {
+    mime_type = "text/markdown"
+    content   = <<-EOT
+      A gate revision started without a setting it cannot work without, and said so.
+
+      Today that means GATE_ALLOWED_ORIGINS is unset or empty. The CSRF check then
+      has no accepted origins at all, so POST /session/end refuses EVERY request
+      and no member can sign out. It fails CLOSED -- nothing is exposed, no session
+      is affected -- but the sign-out capability is gone until this is fixed.
+
+      What the revision said:
+
+          gcloud logging read 'resource.type="cloud_run_revision" AND textPayload:"event=misconfigured"' --project ${var.project_id} --freshness=1h --limit=10
+
+      What it actually parsed at boot (allowed_origins=none is the tell):
+
+          gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="${google_cloud_run_v2_service.gate.name}" AND textPayload:"event=boot"' --project ${var.project_id} --freshness=1h --limit=1 --format='value(textPayload)'
+
+      What it should be, and the URL the service actually answers on -- these two
+      must agree, and the second may use the older <service>-<hash>-<region>.a.run.app
+      spelling this module cannot construct:
+
+          terraform -chdir=infra output -raw gate_allowed_origins
+          gcloud run services describe ${google_cloud_run_v2_service.gate.name} --project ${var.project_id} --region ${var.region} --format 'value(status.url)'
+
+      Fix: apply infra/ so the env var reaches the service (Terraform owns the env
+      block; gate.yml owns only the image), then roll a revision. If the serving URL
+      is a spelling this module does not construct, add it to
+      var.gate_extra_allowed_origins rather than editing the service by hand.
     EOT
   }
 }
