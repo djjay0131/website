@@ -117,6 +117,14 @@ PREFIX="$PREFIX" node -e '
   }
 '
 
-./scripts/sync-content.sh --from "$STAGE"
+# --partial, and this is load-bearing rather than bookkeeping. This tree holds
+# "cv" and nothing else BY CONSTRUCTION -- the cv release contains one source --
+# while the hub declares phd-milestones as a REQUIRED source (ADR-0010 decision
+# 4). Every pull-request build reads this path, because a PR run cannot
+# authenticate to the content bucket. Without this flag the expected-source check
+# would fail every pull request on a "vanished prefix" that never existed here,
+# which is how a correct guard gets deleted. src/lib/hub-content.mjs carries the
+# argument in full.
+./scripts/sync-content.sh --from "$STAGE" --provenance cv-release --partial
 
 echo "fetch-data: CV payload in place through the contract path."

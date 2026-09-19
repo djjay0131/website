@@ -18,6 +18,14 @@
 #   --link       --from only: symlink instead of copy, so a local cv checkout
 #                hot-reloads (used by scripts/sync-local-data.sh)
 #   --no-stage   skip the public-asset staging step
+#   --provenance NAME
+#                record NAME as how this tree was produced. Default "bucket"
+#                with --bucket, "local" with --from.
+#   --partial    record that this producer CANNOT supply every declared source,
+#                so the expected-source check (ADR-0010 decision 4) does not
+#                apply to the tree. scripts/fetch-data.sh passes it: the cv
+#                release carries "cv" alone, and every pull-request build reads
+#                it. See src/lib/hub-content.mjs for the whole argument.
 #
 # ONLY TWO CLOUD OPERATIONS ARE USED, AND BOTH ARE OBJECT OPERATIONS:
 #
@@ -51,6 +59,8 @@ TOKEN="${GCS_ACCESS_TOKEN:-}"
 FINGERPRINT_ONLY=0
 LINK=0
 STAGE=1
+PROVENANCE=""
+PARTIAL=0
 
 die() { echo "sync-content: $*" >&2; exit 1; }
 
@@ -63,6 +73,8 @@ while [ $# -gt 0 ]; do
     --fingerprint) FINGERPRINT_ONLY=1; shift ;;
     --link) LINK=1; shift ;;
     --no-stage) STAGE=0; shift ;;
+    --provenance) PROVENANCE="${2:-}"; shift 2 ;;
+    --partial) PARTIAL=1; shift ;;
     -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     *) die "unknown argument $1" ;;
   esac
@@ -177,6 +189,45 @@ else
     fi
   done <"$TMP/listing"
   echo "sync-content: synced ${OBJECT_COUNT} object(s) into ${DEST}."
+fi
+
+# ---------------------------------------------------------------------------
+# The provenance marker (src/lib/hub-content.mjs, CONTENT_PROVENANCE_FILE).
+#
+# Written on EVERY run, into a destination this script has just rebuilt from
+# scratch, so it always describes the tree it sits in and can never outlive it.
+# The expected-source check reads it: a producer that cannot supply every
+# declared source says so here, once, rather than every later step inferring it.
+#
+# The filename comes from hub-content.mjs rather than being spelled again here:
+# one declaration of the fact, which is the same rule the rest of this module
+# follows.
+# ---------------------------------------------------------------------------
+if [ -z "$PROVENANCE" ]; then
+  if [ -n "$BUCKET" ]; then PROVENANCE="bucket"; else PROVENANCE="local"; fi
+fi
+
+PROVENANCE="$PROVENANCE" PARTIAL="$PARTIAL" COUNT="$OBJECT_COUNT" DEST="$DEST" \
+node --input-type=module -e '
+  import fs from "node:fs";
+  import path from "node:path";
+  import { CONTENT_PROVENANCE_FILE } from "./src/lib/hub-content.mjs";
+  const marker = {
+    provenance: process.env.PROVENANCE,
+    complete: process.env.PARTIAL !== "1",
+    syncedAt: new Date().toISOString(),
+    objectCount: Number(process.env.COUNT),
+  };
+  fs.writeFileSync(
+    path.join(process.env.DEST, CONTENT_PROVENANCE_FILE),
+    `${JSON.stringify(marker, null, 2)}\n`,
+  );
+'
+
+if [ "$PARTIAL" -eq 1 ]; then
+  echo "sync-content: provenance ${PROVENANCE}, complete=false -- this tree cannot carry every declared source, so the expected-source check does not apply to it."
+else
+  echo "sync-content: provenance ${PROVENANCE}, complete=true."
 fi
 
 if [ "$STAGE" -eq 1 ]; then

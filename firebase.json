@@ -23,6 +23,13 @@
         }
       },
       {
+        "source": "/session/end",
+        "run": {
+          "serviceId": "hub-gate",
+          "region": "us-east1"
+        }
+      },
+      {
         "source": "/client-events",
         "run": {
           "serviceId": "hub-gate",

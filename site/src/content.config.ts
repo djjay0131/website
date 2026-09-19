@@ -37,6 +37,8 @@ import {
   KNOWN_MANIFEST_VERSIONS,
   SOURCES_DIR,
   claimFor,
+  CONTENT_PROVENANCE_FILE,
+  expectedSourcesEnforcement,
   findMissingExpectedSources,
   isKnownManifestVersion,
   manifestVersionOf,
@@ -302,6 +304,20 @@ export interface LoadedSource {
  * that has not run scripts/sync-content.sh, simply has no published content
  * yet. A tree that is present and wrong IS an error, and stops the build.
  */
+export function readContentProvenance(
+  sourcesDir: string,
+): { provenance?: string; complete?: boolean } | null {
+  const markerPath = path.join(sourcesDir, CONTENT_PROVENANCE_FILE);
+  if (!fs.existsSync(markerPath)) return null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(markerPath, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    // Unreadable is not exempt: expectedSourcesEnforcement fails closed on null.
+    return null;
+  }
+}
+
 export function loadSources(sourcesDir: string): LoadedSource[] {
   if (!fs.existsSync(sourcesDir)) return [];
   const loaded: LoadedSource[] = [];
@@ -336,6 +352,19 @@ export function loadSources(sourcesDir: string): LoadedSource[] {
   // This is deliberately NOT the same thing as an empty `items` array, which is
   // a legitimate withdrawal (decision 2) and is accepted. Withdrawing everything
   // still means publishing a manifest.
+  //
+  // It applies only to a tree whose producer could have carried every declared
+  // source. The cv-release fallback cannot (every pull-request build takes it),
+  // and says so in its provenance marker; anything else enforces, including a
+  // tree with no marker at all. hub-content.mjs holds the rule and the reasoning.
+  const { enforce, reason } = expectedSourcesEnforcement(readContentProvenance(sourcesDir));
+  if (!enforce) {
+    console.warn(
+      `[hub-content] the expected-source check (ADR-0010 decision 4) did NOT run: ${reason}`,
+    );
+    return loaded;
+  }
+
   const missing = findMissingExpectedSources(loaded.map((l) => l.source));
   if (missing.length > 0) {
     throw new HubContentError(
