@@ -642,6 +642,47 @@ against a tree that does not exist — it named that as evidence rather than ass
 worked from this file's summary of the 76 KB `roadmap-truth` handoff rather than the handoff
 itself.
 
+### From the `Regression Tester` — PASS, 0 regressions
+
+Everything probed against production is **`main`**; none of #47/#48/#53 has merged or deployed.
+Site `built_from_sha` `f98a928a`, gate revision `hub-gate-00005-n4g` at 100% traffic. Branch
+items read via `git diff main...<branch>`, no branch checked out.
+
+All 34 sitemap routes plus `/pdfs/academic.pdf`, `/signin/`, `/phd/` and `/robots.txt` return
+200, including all ten `/research/**` pages. `/cv/academic/` 23486b and `/papers/` 6231b, both
+far over the 500-byte floor. `build-info.json` still reports `content_source: "bucket"` at the
+exact `main` SHA — **the issue #19 silent fallback has not recurred**. `research.cusati.us`
+preserves paths. Gate logging is alive on the serving revision: `boot` 1, `deny` 77,
+`client_signin_failed` 9 in 24 hours. Suites: vitest 199/1, gate pytest 223, contract 57/0,
+both builds, ruff clean.
+
+| # | Finding | Disposition |
+|---|---|---|
+| G-R1 | **`/session/end` is split across two branches.** #47 adds the handler; #48 adds the `firebase.json` rewrite. Merging #47 alone leaves the route matched by no rewrite, so sign-out fails **through the CDN only** — direct `*.run.app` tests still pass | **Accepted, and it binds my merge order: #48 merges before or with #47.** Premise independently confirmed — `main` carries only `/p/**`, `/session`, `/client-events`, and `/session` is a literal. This is the same failure class `main.py` warns about for the `__session` cookie name: works when called directly, fails behind Hosting. Recorded in §8 sequencing below |
+| G-R2 | The narrowed role correctly keeps `users.get`, not just `createSession` — both verify paths run `check_revoked=True`, an accounts lookup rather than an offline JWT check | **Accepted as independent confirmation of I-2.** Two separate agents reached the same conclusion from different directions, which is worth more than either alone |
+| G-R3 | Sign-in end-to-end **NOT VERIFIABLE BY ME**, with all four sub-checks passing: `/signin/` renders `configured = true`; Identity Platform has email enabled and the domain authorised; the gate SA holds `createSession` today and via `gateSessionMinter` on #53; three deliberate non-member failures were classified and logged within ~30s | **Accepted exactly as stated.** It did not infer from a rendering page that sign-in works. Only a live member sign-in after #53 applies settles it — which is why D-3's gate on #49 exists |
+| G-R4 | The `event=` string set is **identical** between `main` and #47, and #53 leaves both metric filters untouched | **Accepted.** The two log-based metrics stay fed across this wave — the regression that would otherwise be invisible |
+| G-R5 | `gate/.venv` shipped without `pytest` despite a populated `.pytest_cache`; a contributor following the README would conclude the suite cannot run | **See the check below** — whether this is a repo defect or a local artifact depends on whether `.venv` is tracked |
+
+**Two corrections it made mid-run, recorded because they would otherwise look like passes it
+got for free:** it first probed `/website/research/**`, which are GitHub-Pages-base paths that
+correctly 404 on the custom domain — the live legacy routes are `/research/agentic-harnesses*`.
+And its local `build:public` used fixture data, so the byte-comparison is only valid on
+content-independent pages; `/research/`, `/privacy/` and `/email/` came out byte-identical,
+which is what actually establishes the template layer matches `main`.
+
+### §8 merge sequencing for this wave
+
+Derived from G-R1 and the SEAM-6 ordering note, so the order is decided before the gates
+report rather than improvised after:
+
+1. **#48 (site)** first, or simultaneously with #47 — it carries the `/session/end` rewrite.
+2. **#47 (gate)** — the handler. Merging it alone ships a sign-out that works only on the
+   `run.app` URL, which is useless to a member and passes every direct test.
+3. **#53 (infra)** — but **the apply is gated separately** by D-3 on #49: no narrowing until a
+   sign-in route is proven to deliver.
+4. **#45 (record)** last, so it can record what actually happened rather than what was planned.
+
 ### Environment note
 
 A stray `Error: claude native binary not installed` appeared once mid-pipeline during a commit.
