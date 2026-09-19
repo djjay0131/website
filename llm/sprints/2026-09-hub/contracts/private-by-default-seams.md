@@ -207,12 +207,44 @@ Named here so they are designed against, not discovered afterwards:
 
 ## Exit criteria
 
+> **Amended 2026-09-18, on the Live Prober's and Red Team's findings, before implementation.**
+> As first written, these criteria were satisfiable by a fix that leaves the fellowship CV
+> publicly readable. Both agents independently found it reachable on **five origins**, and the
+> Lead Architect verified this directly:
+>
+> | Origin | `/cv/anthropic-fellow/` | `/pdfs/anthropic-fellow.pdf` |
+> |---|---|---|
+> | `jason.cusati.us` | 200 | 200 |
+> | `cusati-hub.web.app` | 200 | — |
+> | `cusati-hub.firebaseapp.com` | 200 | — |
+> | `djjay0131.github.io/website` | **200** | **200** |
+>
+> The **GitHub Pages mirror is the one that matters**: it is an independent, `main`-built
+> deployment that the allowlist does not govern at all, and it carries its own sitemap, a
+> **self-referential canonical** pointing at itself rather than at the hub, **no `noindex`**,
+> and `robots.txt: Allow: /`. Its `og:description` exposes a CV summary to link unfurlers.
+>
+> The allowlist governs the Firebase `dist-public` build. Pages is not retired until Phase 6.
+> So, in the Live Prober's words: **"a fix scoped to `jason.cusati.us` will look complete and
+> not be."**
+
 Live probes show:
 
-- the three CVs public, and the fellowship CV **absent signed-out** and **present signed-in**;
+- the three public CVs served, and the fellowship CV **absent signed-out** and **present
+  signed-in**, on **every origin that serves this site** — `jason.cusati.us`,
+  `cusati-hub.web.app`, `cusati-hub.firebaseapp.com`, **and the GitHub Pages mirror**. An
+  exit check that probes only the canonical domain does not satisfy this criterion;
+- the fellowship CV absent from **every** sitemap, including the Pages sitemap, and from any
+  search index, RSS feed and OG image;
 - `kgis/kgis-docs` and the research digests public;
 - the §7 security gate green **with its new lines** — the private-by-default checks in §7
   item 2, not merely the pre-existing ones.
+
+**If Pages cannot be fixed within this wave**, say so explicitly and record what remains
+reachable there, rather than declaring the wave complete against the canonical domain alone.
+Phase 6 retires Pages and replaces it with forwarding stubs; until then the honest options are
+to exclude the item from the Pages build, or to accept and record the residual. Silence is not
+one of them.
 
 ## Cross-references
 

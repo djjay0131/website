@@ -683,6 +683,43 @@ report rather than improvised after:
    sign-in route is proven to deliver.
 4. **#45 (record)** last, so it can record what actually happened rather than what was planned.
 
+### From the adversarial round — Red Team, Live Prober, Boundary Tester
+
+Eight of ten Wave 0 handoffs are in. **No path reached `phd-milestones` private content**:
+session-first ordering, the gate's strict path validator and prefix-scoped satellite IAM all
+held under attack. Five of eight Red Team attacks succeeded; none of them read private data.
+
+| # | Finding | Disposition |
+|---|---|---|
+| **A-1** | **Metric forgery SUCCEEDED against live production.** `POST /client-events` is unauthenticated by design, and both log-based metrics match a **substring of `textPayload` anywhere in the line** — so an anonymous caller can carry a metric's trigger inside an ordinary field value and make it count | **Fix now — #54, and it is my defect.** I built that endpoint on 2026-09-18. `_clean_client_value()` is *not* at fault: newline injection was correctly scrubbed, so no separate line can be forged. The flaw is that the filter does not care *where* its trigger appears. Impact is alert **integrity** — inflate to train the owner to ignore alerts, or mask a real event in the noise. Compounding: the channel is unverified, so fixing delivery without fixing this would turn a silent alerting path into a forgeable one |
+| **A-2** | **The private bucket's real exposure.** `projectEditor` holds **both** legacy bindings; their union is `create`, `delete`, `get`, **`list`**, `update`, `setIamPolicy` on every object, plus `buckets.setIamPolicy`. Held by the default compute SA via `roles/editor` | **Fix now — #55.** Found independently by two agents, then verified directly. `objects.list` is the sharpest part: SEAM-1 withholds it from the *gate* deliberately, because "object names in this bucket are themselves private material" — and an untracked identity has it. **Latent, not live**: zero keys, zero impersonation bindings, nothing runs as that account, Compute API disabled. That is prioritisation, not dismissal |
+| **A-3** | **I narrowed A-2 on partial evidence and was wrong.** I dumped `legacyObjectOwner`, saw no plain `delete`/`create`, and wrote that both agents had overstated it — without dumping `legacyBucketOwner`, which carries exactly those | **Recorded against myself.** Second-guessing a correct finding on incomplete evidence is the same error as accepting an incorrect one, and it is the more dangerous direction here because it would have downgraded a real exposure |
+| **A-4** | **The new guard watches the wrong role.** PR #53's check expands `roles/viewer` (empty → passes) and never expands `roles/editor` (populated, and the role that actually carries object access) | **Fix now — folded into #55.** Its own comment block reasons entirely about *readers*. One extra expansion makes it loud |
+| **A-5** | `/session/end`'s Origin check is forgeable by a non-browser caller setting `Origin` and `X-Forwarded-Host` to the same value | **Accepted; confirms the gate stream's own Risk 1 and extends G-7.** Void on the `run.app` transport and a nuisance for sign-out today — but the same helper is load-bearing for Phase 4's mint and revoke. Probe P6 after #48 deploys decides whether the `X-Forwarded-Host` branch can simply be deleted |
+| **A-6** | **`cv/anthropic-fellow` is reachable on five origins, not one** — both Hosting aliases and the **GitHub Pages mirror**, which has its own sitemap, a self-referential canonical, no `noindex`, and `robots.txt: Allow: /` | **Widens RT-10, and changes Wave 0b's exit criteria.** Verified directly. The allowlist governs the Firebase `dist-public` build only; Pages is an independent deployment not retired until Phase 6. *"A fix scoped to `jason.cusati.us` will look complete and not be."* Seams amended so it cannot pass |
+| **A-7** | **`/healthz` interception is exact-path, not prefix.** `/healthz/` reaches the container; `/healthz` produces zero container lines | **Corrects my own record**, which stated the rule without that nuance and would have misled the next tester — and would have falsified the ADR `roadmap-truth` proposed. Verified myself. Also: the gate's 404 is **329 bytes** on that path, not the 426 I had been using as the discriminator — **the body-size heuristic is path-dependent** and the log line is the only reliable attribution |
+| **A-8** | The gate has **no HEAD handler on any route**, including `/_health` (405). Hosting hides it by converting HEAD→GET upstream | **Fix later.** Harmless today because the uptime check uses GET — but any monitor that switched verb would read 405 as an outage. Recorded so that change is made knowingly |
+| **A-9** | **The default-branch ref is NOT pinned on the WIF provider.** No `attributeCondition` mentions `ref`; the pin lives on each SA's `workloadIdentityUser` binding | **Corrects a premise I wrote into two contracts.** The invariant holds — it is enforced by the binding, not the provider — but a reviewer checking only the provider would wrongly conclude it was unpinned. The Security Tester was corrected mid-run, since a false FAIL here would have blocked the wave on my error |
+| **A-10** | The satellite set is **two, not four**. `construction-ai-proposal` and `kgis` have no SA, provider, prefix or Terraform entry | **Corrects another of my premises.** They are Phase 5 items (D4). My Security and Boundary contracts both overstated it |
+| **A-11** | `check-private-bucket-iam.sh` reads PAP shape-tolerantly but UBLA in snake_case only | **Fix now — folded into #55.** It fails **closed**, so not dangerous, but it is the same cry-wolf failure Checkpoint 4 already paid for once. One `or` fixes it |
+| **A-12** | The two transports diverge on encoded traversal and on empty-segment `/p//`; Hosting's 302 leaks an internal `…-firebasehosting-origin.googleapis.com` hostname | **Fix later — Phase 4.** All variants refuse and none leaks private data. Extends D6.2/RT-6; handed to the Wave 1 Red Team as a target |
+
+**What held, and is worth recording as held:** the existence oracle on `/p/` was refused —
+identical 404s, timing in the noise — and the Live Prober confirmed the refusal is byte-identical
+across **five** transports, not the two the contract required, each attributed by a matching
+container log line rather than by body size. The reverse satellite leg was refused by IAM.
+The Boundary Tester also declined to specify a probe that would have looked like a pass: the
+`sources/kgis/` reverse probes are vacuous today, because with no `kgis` boundary in existence
+the refusal comes from `cv`'s own condition, which another probe already proves.
+
+**Red Team production side effects, disclosed:** three `/client-events` log lines tagged
+`trace=rtprobe1789789925` — the endpoint's designed behaviour. No mints, grants, writes or
+deletions. Rules of engagement held.
+
+**An operational note for future waves:** several agents probed production concurrently, so
+the logs carry lines that are not any one agent's. The Live Prober filtered by its own paths
+and timestamps and recommends serialising live probes. Accepted.
+
 ### Environment note
 
 A stray `Error: claude native binary not installed` appeared once mid-pipeline during a commit.
