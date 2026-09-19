@@ -451,6 +451,82 @@ time and the leak check proves the residue absent, or the `cv` satellite splits 
 That is Wave 0b's to decide and record, and the Skeptic Verifier plants a marker string in
 the fellowship variant and shows the leak check catch it.
 
+## Wave 0 — Checkpoint 4 is NOT passed (2026-09-18)
+
+The `roadmap-truth` stream audited every Phase 3 checkbox against live evidence. **All 32
+boxes stay unchecked.** Scope 14 TRUE / 1 FALSE; Acceptance 9 TRUE (2 qualified) / 3 FALSE /
+4 NOT VERIFIABLE.
+
+It refused to infer, which is the point. The four NOT VERIFIABLE criteria — A1, A3, A5 and
+the non-member half of A4 — are all "a member signs in and sees X". It holds no member
+credential, the allowlist matches the exact email in a Firebase ID token, and this machine's
+identity `djjay0131@gmail.com` is deliberately not a member. It named the evidence that would
+settle each rather than substituting a signed-out probe.
+
+| # | Criterion | Verdict |
+|---|---|---|
+| A7 | no `/p/**` **or `/s/**`** response carries `public`/`s-maxage` | **FALSE — deferred** (#51) |
+| A12 | the gate's SA can read only the private bucket and Firestore | **FALSE** (#49) — it holds project-level `roles/firebaseauth.admin` |
+| A13 | recorded test that `phd-milestones`' identity cannot write outside its prefix | **FALSE** (#50) — deferred at Phase 3 and never run; only the `cv` leg exists |
+| S5 | Identity Platform with Google **and** email-link sign-in | **FALSE** — `defaultSupportedIdpConfigs` returns `{}` (#31, owner console) |
+
+### A7 — my decision, recorded rather than assumed
+
+`roadmap-truth` explicitly declined to make this one. Criterion 7 asserts that no `/p/**`
+**or `/s/**`** response carries `public` or `s-maxage`. Share routes do not exist in Phase 3
+and a test actively pins their absence, so the `/s/**` half is **unsatisfiable here** — it can
+never become TRUE within this phase.
+
+**Decision: criterion 7 is recorded DEFERRED to Phase 4, not ticked.** The `/p/**` half is
+verified and holds; the `/s/**` half is verified in Wave 1 when the routes exist, against
+Checkpoint 5. N-11 predicted exactly this and said it must be recorded deferred rather than
+ticked. Ticking a half-unsatisfiable criterion is precisely the failure this sprint keeps
+punishing, and a deferral that is written down is not a gap.
+
+**Checkpoint 4 can therefore be recorded passed only once A12, A13 and S5 are closed and the
+four NOT VERIFIABLE criteria have a member session behind them.** It is not passed today.
+Tracked as **#52**, with #49 (A12), #50 (A13), #51 (A7, closed by decision) and #31 (S5,
+owner console) as its dependencies.
+
+### Three findings that are not bookkeeping
+
+- **D6.1 — the `required: true` flip was never committed.** `HEAD` and the deployed build both
+  still carried `required: false`, so C27 was open for the one source it was written for while
+  the private sync is destructive. It lands in PR #48.
+- **D6.5 — all three alert policies are enabled and deliver nothing**, because the channel is
+  unverified. Connecting two separately recorded facts: if that is the same delivery failure
+  as the missing Firebase sign-in emails, then **A1 is unverifiable by anyone**, not merely by
+  an agent — email-link is the only working sign-in route. Clicking the verification link is a
+  §10 owner step.
+- **D6.6 — `cv/anthropic-fellow` is publicly reachable**, contradicting owner decision D8.
+  **Confirmed independently by the Lead Architect, not relayed:**
+
+  ```
+  200  57915b  /pdfs/anthropic-fellow.pdf
+  200  21032b  /cv/anthropic-fellow/
+  named on /resumes/ ("Anthropic Fellow application")
+  present in sitemap-0.xml
+  cv manifest: anthropic-fellow -> public / pdf
+  ```
+
+  The leak check is **structurally blind** to it: it reads manifests, and `cv`'s still says
+  `public`. **This is not an Incident A1 class event** and the distinction matters — it is the
+  owner's own CV variant, published by design until D8 designated it private on 2026-09-18.
+  Nothing we did exposed it. But live state now contradicts a standing owner decision, so it
+  is the **highest-priority item in Wave 0b**, whose allowlist is the designed fix. A faster
+  stopgap exists if the owner wants it — flipping the item to `visibility: private` in the
+  `cv` satellite takes effect on the next poll — but `cv` is not in this run's stream roster
+  and that is the owner's call, not mine.
+
+Also recorded: the two transports refuse encoded traversal differently (harmless now,
+load-bearing in Phase 4); the live half of the bucket IAM test runs nowhere; and a caution for
+anyone re-running these probes — **plain `curl` normalises `..` client-side** and briefly
+produced a false 200 that looked like a gate defect. `--path-as-is` is required.
+
+**O1, O2, O3, O4 and O7 are closed** with reasons and locations. **O5 and O6 remain open.**
+O5 — no share-list route is defined anywhere — must be answered before Phase 4 starts, and
+Wave 1 is already scoped to answer it as `GET /share`, owner-only.
+
 ## Assumptions (conservative choices, not §10 questions)
 
 - **A1** — Artifacts slot (`docs/`) undeclared until its first content lands
@@ -1178,6 +1254,29 @@ Python is 3.8 and gcloud refuses it) -- worth knowing before the next checkpoint
   and `/healthz/` returns 307, both from the app. So the path is taken by Google's frontend
   for this service. It does not affect `/p/**` or `/session`, which is what the private area
   uses. The health route needs a different path, or the smoke test does.
+
+  **RESOLVED, and this record was stale for a day (2026-09-18).** The route moved to
+  `/_health` in `f155fe4` — the same Checkpoint 4 PR — and the app, `gate.yml`'s smoke test,
+  `infra/monitoring.tf`'s uptime check and both READMEs have agreed ever since. This paragraph
+  was never updated, so the Wave 0 contract was written for work already done. The `gate`
+  stream reported that rather than re-doing it, and declined the rename the contract
+  suggested, because `infra/monitoring.tf` pins `/_health` for a live uptime check across a
+  stream boundary. **Proven live 2026-09-18**, which no local test can do:
+
+  | Probe | Result |
+  |---|---|
+  | `/_health` on `run.app` | **200** `{"status":"ok"}` |
+  | `/healthz` on `run.app` | 404, 1568 bytes, `<html lang=en>` unquoted — Google's page |
+  | `/healthz` through Hosting | 404, 1568 bytes — Google's page |
+  | `/_health` through Hosting | 404, 21376 bytes — the **static site's** 404 |
+
+  The last row is expected and correct: `/_health` has no Hosting rewrite and should not have
+  one. Health is a deploy-and-uptime concern on the service's own URL, and the uptime check
+  already targets the Cloud Run URI directly. Recorded so nobody reads it as the defect.
+
+  What was genuinely missing is now fixed: the health path is a **three-way** contract — app
+  route, uptime check, smoke test — and nothing compared the three. Three tests do now,
+  including an explicit assertion that `/healthz` is **not** in the declared route set.
 - **The satellite published for the first time**, successfully: `manifest.json`,
   `site/index.html`, `site/committee.html` and `site/assets/style.css` are under
   `sources/phd-milestones/`. Before that, `private-sync` correctly refused with **P5 --
