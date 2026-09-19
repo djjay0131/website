@@ -527,6 +527,70 @@ produced a false 200 that looked like a gate defect. `--path-as-is` is required.
 O5 — no share-list route is defined anywhere — must be answered before Phase 4 starts, and
 Wave 1 is already scoped to answer it as `GET /share`, owner-only.
 
+## Wave 0 dispositions
+
+Every finding from a stream, adversary, tester or reviewer is logged here with its evidence
+and a disposition. **No finding is closed by silence.** Builders never disposition findings
+against their own work; they propose and the Lead Architect decides.
+
+This section covers the four streams that have landed. `infra` is still running; its findings
+and the whole adversarial and tester round are added before the wave closes.
+
+### From the `gate` stream (PR #47)
+
+| # | Claim | Disposition |
+|---|---|---|
+| G-1 | The health path was already fixed in `f155fe4`; STATE was stale, so the contract was written for completed work | **Accepted — my error.** STATE corrected above with the live proof table. The stream reporting it beat re-doing it |
+| G-2 | Declined the contract's suggested rename to `/_gate/health` | **Accepted.** `infra/monitoring.tf` pins `/_health` for a live uptime check across a stream boundary. The contract invited a reasoned alternative and got one |
+| G-3 | `/_health` has no Hosting rewrite, so it returns the static site's 404 through the domain | **Rejected as a defect — correct as built.** Health is a deploy-and-uptime concern on the service's own URL; the uptime check targets the Cloud Run URI directly. Recorded so nobody "fixes" it |
+| G-4 | The remaining `caplog` tests in `test_client_events.py` are blind to a missing log handler — demonstrated by B7 | **Fix later.** Not this stream's file to rewrite mid-wave, and now a documented live example. Routed to the Skeptic Verifier to confirm the blindness independently |
+| G-5 | Sign-out clears the cookie but does **not** revoke server-side; a stolen cookie outlives it for up to 14 days | **Accepted, and must not be misdescribed.** This is SD-4's scope as written ("a member on a shared machine"). It is never to be described to the owner as "sign out everywhere". ADR candidate |
+| G-6 | `POST /session` (mint) deliberately did **not** get the Origin check | **Accepted for this wave.** Changing the only working sign-in flow immediately before Checkpoint 5 is a risk for a smaller benefit. Phase 4 adds it with mint and revoke behind the same helper, verified in one live pass |
+| G-7 | Unknown which header carries the site domain on a Hosting→Cloud Run rewrite | **Fix now, cheaply.** The gate accepts `Host` or `X-Forwarded-Host` so it cannot fail closed. Probe P6 settles it after PR #48's rewrite deploys; if it is `Host`, the forgeable branch is three lines to delete |
+| G-8 | ADR candidates: the health-path decision; the Origin-check rule; sign-out's non-revocation | **Accepted, all three.** Written in Wave 0's close. The health-path one is overdue — it survived four revisions precisely because nobody wrote it as a decision |
+
+### From the `roadmap-truth` stream
+
+| # | Claim | Disposition |
+|---|---|---|
+| RT-1 | A12 FALSE — gate SA holds project-level `roles/firebaseauth.admin` (N-1 survived Checkpoint 4) | **Fix now — #49.** `infra` is implementing the custom role. Ships with post-apply sign-in verification **and** rollback |
+| RT-2 | A13 FALSE — the `phd-milestones` prefix proof was deferred at Phase 3 and never run; the reverse leg as `cv` has never run either | **Fix now — #50.** Specified in the boundary-tester contract; I run them under a temporary grant, removed and verified removed |
+| RT-3 | A7 FALSE — the `/s/**` half is unsatisfiable in Phase 3 | **Decided: deferred to Phase 4, not ticked — #51.** My call, recorded above |
+| RT-4 | S5 FALSE — Google sign-in unconfigured | **Escalate — #31.** Console-only OAuth work; a §10 hard stop. No duplicate issue filed, as the stream itself flagged |
+| RT-5 | D6.1 — the `required: true` flip existed only in an uncommitted tree | **Fixed — PR #48** |
+| RT-6 | D6.2 — the two transports refuse encoded traversal differently | **Fix later.** Harmless now, load-bearing in Phase 4. Handed to the Red Team as a Wave 1 target |
+| RT-7 | D6.3 — the live half of the bucket IAM test runs nowhere | **Fix now.** Folded into `infra`'s satellite-role guard, which lands in `budget-guard` (already a required check) rather than a new job that would gate nothing |
+| RT-8 | D6.4 — `/healthz` resolved in substance | **Closed.** See the corrected record above |
+| RT-9 | D6.5 — all three alert policies deliver nothing; if this is the same failure as the missing sign-in emails, A1 is unverifiable by **anyone** | **Escalate to the owner.** Clicking the channel verification link is console-only. `infra` is separately looking for a non-email channel at zero cost |
+| RT-10 | D6.6 — `cv/anthropic-fellow` is publicly reachable, contradicting D8 | **Fix now, in Wave 0b — highest priority there.** Confirmed by my own probes. Not an Incident A1 event, for the reason recorded above. Stopgap available to the owner |
+| RT-11 | O5 and O6 remain open | **O5: answered in Wave 1** as `GET /share`, owner-only. **O6: answered in Wave 3's ADR** |
+| RT-12 | Plain `curl` normalises `..` client-side and produced a false 200 | **Accepted as a standing caution.** `--path-as-is` is now required in every traversal probe, and is written into the Red Team and Security Tester briefs |
+
+### From the `satellite-phd` stream
+
+| # | Claim | Disposition |
+|---|---|---|
+| SP-1 | Part C's "confirm the dry run **before** the apply step" is **not achievable** as `build.yml` stands — plan and apply are consecutive steps with no gate | **Fix now.** Routed to `infra`, which owns `build.yml` this wave. One-line `if:` on the apply step, defaulting to apply-enabled, and it must be shown skipping and running. This also gives a kill switch for the one mechanism ADR-0010 itself calls the place "where a build defect can remove data" |
+| SP-2 | Its 21 new files would have staged `100755` on this mount, flipping 14 unrelated files and making the executable-bit guard assert something meaningless | **Fixed.** Committed with `core.fileMode=false`; every file `100644`, verified with `git ls-files -s`. This also confirms the correction to my own earlier wrong diagnosis |
+| SP-3 | Two of the five withdrawal failure signatures **look like success** | **Accepted, and load-bearing.** An empty delete list is indistinguishable from the step-1 baseline, so step 1 alone proves nothing; a right-count/wrong-names result is why objects are enumerated rather than counted |
+
+### From the `site` stream (PR #48)
+
+| # | Claim | Disposition |
+|---|---|---|
+| S-1 | The provenance marker changes **where** ADR-0010 decision 4 applies — raised as its own ADR candidate rather than absorbed into a routine flip | **Accepted, and the instinct is right.** An unqualified flip would have failed every PR build, since PRs cannot authenticate to the bucket and fall back to a `cv`-only tree. ADR written at Wave 0's close. Its own words: *"I'd rather it were rejected in the open than merged unnoticed"* |
+| S-2 | The marker is a **file**, not an environment variable, to avoid the `PRIVATE_BUCKET`/`GATE_PRIVATE_BUCKET` defect class | **Accepted.** A marker that travels with the tree cannot desync from it |
+| S-3 | The Projects **meta description** still reads "Selected projects and research…" | **Escalate to the owner.** It names content, not the page title, so D7 does not clearly cover it |
+| S-4 | The CV's own `<h2>Selected Projects & Research</h2>` may be in scope | **Escalate to the owner.** Same reason; it is `cv`'s content, not the hub's chrome |
+| S-5 | SEAM-10 specifies the private-sync identity split, naming two existing guards that will fail until renamed | **Accepted.** `infra` is consuming it now |
+
+### Environment note
+
+A stray `Error: claude native binary not installed` appeared once mid-pipeline during a commit.
+Investigated rather than ignored: `.git/hooks/` contains only samples, `core.hooksPath` is
+unset, no hook references `claude`, and a bare `git status` emits nothing on stderr. The commit
+landed correctly. Recorded as non-reproducible environmental noise with no repository cause.
+
 ## Assumptions (conservative choices, not §10 questions)
 
 - **A1** — Artifacts slot (`docs/`) undeclared until its first content lands
