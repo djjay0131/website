@@ -5,7 +5,11 @@ run-to-completion prompt; it read "Approved for Phase 0–3 execution". Roadmap 
 R-A3, which rested on that wording, is retired with it.)*
 Last updated: 2026-09-10
 Owner: Jason Cusati (project owner, sole human reviewer)
-Governance: agentic-governance v0.5 (pin in governance-delta.md)
+Governance: agentic-governance **v0.9.1** (pin in governance-delta.md) *(corrected 2026-09-19
+on the Wave 0 Governance Audit; this header still read v0.5, which the delta superseded when
+the pin moved to v0.9.0 by PR #22 and then to v0.9.1. The delta is authoritative for the pin;
+this line is a stale copy of it, which is exactly why policy is stated once and cited
+elsewhere.)*
 Path in repo: `llm/specs/2026-09-10-research-hub-design.md` (handoff branch `handoff/research-hub`)
 
 This is the design-authority document for the research hub. Per the

@@ -847,3 +847,36 @@ quoted anywhere in this document (§Assumptions 2). No test was weakened, skippe
 the three assertions that pinned `required: false` and the pre-flip `findMissingExpectedSources`
 returns were **updated to pin the new behaviour**, and eight further assertions were added
 around them.
+
+---
+
+## Lead Architect addendum — 2026-09-19: SEAM-10's H1 claim is amended
+
+*Appended, not edited. The text above is this stream's delivered record and stays as written.*
+
+The Wave 0 Governance Audit found that `STATE.md` says "SEAM-10's H1 wording is amended" while
+this document — which the `infra` stream consumes **as its specification** — still carries H1
+as originally written. The amendment existed only in the record, not in the artifact anyone
+implements from. That is the gap, and the audit is right to call it one.
+
+**What H1 claims, and why it is overstated.** H1 presents the dedicated private-sync identity
+as "the stronger form": the public deploy identity holding no private-bucket access. The
+Dissenter's objection 1 disputed that, and the Lead Architect verified it:
+
+- `build-firebase` authenticates as `hub-deploy` (`build.yml:878`), **builds `dist-private`**
+  (`:937`), and uploads it as artifact `hub-private` (`:971`).
+- `private-sync` declares `needs: build-firebase` (`:1140`), downloads that artifact (`:1160`)
+  and pushes it **verbatim**.
+- `wif.tf:57–70` maps only `repository`, `repository_id`, `repository_owner_id`, `ref` and the
+  composite — **no `workflow_ref`, no job, no environment** — so anything running on `main` can
+  assume either identity.
+
+**So the split changes who *writes* to the bucket, not who *decides what is deleted*.** The
+bytes and the delete set are still produced under `hub-deploy`. What actually bounds damage is
+`DEFAULT_MAX_DELETE_RATIO = 0.34` in `sync-private.mjs`.
+
+**The amendment.** H1 is a real mitigation **against token leakage from the four non-private
+jobs**, and it is **not** "the stronger form" in the sense of bounding a compromised build.
+Implement it on that basis. What would make the original claim true is binding on
+`attribute.workflow_ref`, or a GitHub Environment — which would also close `infra`'s own
+Risk 5. Neither is done here; both are recorded as the follow-up.

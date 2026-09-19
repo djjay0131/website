@@ -77,10 +77,25 @@ contexts on `main` are still only `governance-checks` and `budget-guard`.
 
 ## Current position
 
-**Phase 3 — Private area. IN PROGRESS** (issue #24, branch `feat/private-area`, owner's go
-2026-09-17). Phase 2 is complete and the hub serves the CV through the contract. Phase 3 puts
-the milestone tracker and committee dossier behind sign-in, and is the first phase where
-private material touches the system.
+**Wave 0 of the run-to-completion — BLOCKED under §8** (issue #44, 2026-09-19).
+
+*(Corrected 2026-09-19 on the Governance Audit's check 7. This section read "Phase 3 — Private
+area. IN PROGRESS (issue #24, branch `feat/private-area`)" — naming a **closed** issue, a
+**merged** PR and a **deleted** branch as current, two phases out of date. The audit is right
+that a record describing intent rather than merged reality is the S-6/A-3 recurrence.)*
+
+Phases 0–3 are **merged and deployed**; Checkpoint 4 was executed but is **NOT passed** (#52).
+The owner authorised a run to the end of Phase 6 on 2026-09-18 (D1–D8).
+
+**Wave 0 status.** All ten stream and review handoffs are in. Four PRs open, all draft, all
+green on both required contexts: **#45** the record (L3), **#47** gate sign-out, **#48** site,
+**#53** infra. **Nothing merges**: the Security Tester reports 4 FAILs and §8 makes one
+sufficient to block. Open blockers: #54, #55, #56, #57, #58, plus the `/session/end` CSRF
+defect and an ADR for `/client-events`.
+
+**Merge order when it unblocks** — #48 before or with #47 (the `/session/end` rewrite and its
+handler are split across them), then #53, then #45. #53's **apply** is separately gated by D-3
+until a sign-in route is proven to deliver.
 
 ## Done
 
