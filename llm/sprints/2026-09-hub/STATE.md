@@ -614,6 +614,34 @@ after:
 2. **Never promote `gate.yml`'s `test`** without renaming it first. It is a generic context
    name, and the distinct set observed on `main` already contains sixteen others.
 
+### From the `Dissenter` (five objections, four of which I accept)
+
+The adversarial round's first report. Two of its claims were factual, and I verified both
+against the code rather than accepting them — both hold, and the first is worse than argued.
+
+| # | Objection | Disposition |
+|---|---|---|
+| D-1 | **The private-sync identity split buys less than it is credited with.** `build-firebase` authenticates as `hub-deploy` (`build.yml:878`), builds `dist-private` (`:937`), and uploads it as artifact `hub-private` (`:971`); `private-sync` declares `needs: build-firebase` (`:1140`), downloads that artifact (`:1160`) and pushes it verbatim. So **the bytes and the delete set are still decided under `hub-deploy`** | **Accepted — verified, and worse than stated.** Today *both* jobs already authenticate as `vars.GCP_DEPLOY_SA`. Even after SEAM-10, the split changes who **writes** to the bucket, not who **decides what is deleted**. **SEAM-10's H1 wording is amended**: the split is a real mitigation against token leakage from the four non-private jobs, and it is *not* "the stronger form" in the sense of bounding a compromised build. What actually bounds damage is `DEFAULT_MAX_DELETE_RATIO = 0.34` in `sync-private.mjs`. Binding on `attribute.workflow_ref`, or a GitHub Environment, is what would make the claim true — recorded as the follow-up, not done here |
+| D-2 | `wif.tf` maps only `repository`, `repository_id`, `repository_owner_id`, `ref` and the composite — **no `workflow_ref`, no job, no environment** — so anything on `main` can assume either identity | **Accepted — verified** at `wif.tf:57–70`. This is why D-1 holds. A GitHub Environment would also close `infra`'s own Risk 5 |
+| D-3 | **N-1's verification may not be runnable when it is needed.** Its only real step is an email-link sign-in to `djjay@vt.edu` — but D6.5 says email may not deliver at all, and Google sign-in is unconfigured (#31) | **Accepted, and it changes my sequencing.** Three facts already in this file that nobody had put side by side. **I do not apply the narrowing until a sign-in route is proven to deliver.** Recorded on #49 so whoever applies it sees it there. Its proposed `PERMISSION_DENIED` log-based alert at $0.00 is accepted too: a broken mint should announce itself rather than wait to be noticed |
+| D-4 | **SEAM-B5 condition 1 hands an untrusted satellite a kill switch on the hub's deploy** — and on withdrawal, via `needs: build-firebase` | **Accepted. My seam, my error, amended before implementation.** A `cv` slug rename is ordinary content editing; §12.3 says satellites are untrusted. Condition B now hard-fails on the hub's own PRs and warns loudly on the deploy build. It was never load-bearing anyway: the AND already means a stale entry publishes nothing |
+| D-5 | **Lesson 3 was tested in this wave and lost.** SEAM-10 is atomic by its own specification, was split spec/implement across two concurrent streams, and the wave's highest-risk IAM item shipped as `WAITING — nothing implemented` | **Accepted against myself.** Third instance of one shape, with the `PRIVATE_BUCKET`/`GATE_PRIVATE_BUCKET` defect and SP-1: *a change that is one thing owned by two agents*. `execution-patterns.md` lesson 3 carried "no evidence yet — onboarded 2026-09-14"; it now has this repo's own evidence, and I will record it there at the wave's close |
+| D-6 | **dev-staging in a second project doubles every invariant** (§12.5, §12.6 — `budget-guard` asserts one budget by file) and cannot rehearse content, since fixtures are mandatory. A no-traffic tagged Cloud Run revision may be cheaper *and* more faithful | **Recorded as an alternative against ADR-0012, for the owner.** It is a consequence of D8-adjacent work rather than an objection to a decision, and it deserves to be in front of the owner before the second project is created. One probe falsifies it |
+
+**What it examined and dismissed**, which is as useful as what it kept: the uniform 404 is
+better than my own brief assumed — `main.py:293–327` discriminates by *caller class*, never by
+resource, and refused callers never reach the bucket, so the timing variant is designed against
+too. The provenance marker is well built and cannot reach `dist-public`. The allowlist's L0
+classification survives, on a fact it went looking to use against it — Steward Activation is
+**INACTIVE**, so L0 means "small diff", not "an agent may merge"; it becomes live on activation.
+The executable-bit guard answers the false-positive risk better than the contract asked.
+
+**Its own stated caveats, recorded rather than quietly dropped:** objection 3's severity depends
+on which job evaluates the allowlist, which SEAM-B5 does not yet say and could not be verified
+against a tree that does not exist — it named that as evidence rather than assuming. And it
+worked from this file's summary of the 76 KB `roadmap-truth` handoff rather than the handoff
+itself.
+
 ### Environment note
 
 A stray `Error: claude native binary not installed` appeared once mid-pipeline during a commit.

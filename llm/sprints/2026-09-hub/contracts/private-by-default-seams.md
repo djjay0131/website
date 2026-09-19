@@ -128,16 +128,44 @@ and its module-graph assertion still binds.
 
 ## SEAM-B5 — The build-time allowlist guard
 
-The build **fails** when:
-
-1. an allowlist entry names a `(source, slug)` that **does not exist** — a stale allowlist
-   must not silently allow nothing, because it would look like a working control while
-   protecting an item that is no longer there; or
-2. an allowlist entry names an item whose **manifest says `private`** — the allowlist cannot
-   override a satellite's own privacy. The two conditions are an **AND**, in both directions.
-
-Condition 2 is the one that keeps this honest. The hub is the authority on making things
+**Condition A — always a hard build failure.** An allowlist entry names an item whose
+**manifest says `private`**. The allowlist cannot override a satellite's own privacy. This is
+the condition that keeps the whole model honest: the hub is the authority on making things
 public, not on overriding a satellite that has asked for privacy.
+
+**Condition B — a stale entry naming a `(source, slug)` that does not exist.**
+
+> **Amended 2026-09-18, on the Dissenter's objection 3, before implementation.** As first
+> written this was also a hard failure "because a stale allowlist must not silently allow
+> nothing." That reasoning does not survive contact with the rest of the system.
+>
+> **It hands an untrusted satellite a kill switch on the hub's deploy.** A `cv` slug rename is
+> ordinary content editing, and §12.3 says satellites are untrusted. Under the original wording
+> that rename fails the hub build — and `private-sync` declares `needs: build-firebase`
+> (`build.yml:1140`, verified), so it halts **withdrawal** too. A withdrawn private item would
+> go on being served at its old path while the system reported a build failure somewhere else
+> entirely. That is precisely the privacy failure ADR-0010 decision 5 exists to prevent,
+> reached by a route nobody intended.
+>
+> **And it was never load-bearing for safety.** Conditions A and B are an AND, so a stale entry
+> already publishes nothing — it names an item that does not exist. The original wording bought
+> tidiness and paid for it with availability of the withdrawal path.
+
+So condition B is **context-dependent**:
+
+| Where | Behaviour |
+|---|---|
+| The hub's own pull requests | **hard failure** — a stale entry is the hub's own bookkeeping error and should be fixed before merge |
+| The deploy build on `main` | **warn, loudly, and continue** — never let a satellite's content edit stop the hub deploying or withdrawing |
+
+The warning must name the stale entry and must not be suppressible, so "warn" does not decay
+into "ignore".
+
+**Open, and to be settled when this is built:** which job evaluates the allowlist. The
+Dissenter flagged that objection 3's severity depends on it and correctly declined to assume,
+since the tree does not exist yet. If the check runs inside `build-firebase`, the coupling
+above is exact; if it runs earlier, the blast radius differs. Name the job in the
+implementation and re-check this table against it.
 
 ## SEAM-B6 — The leak check's private set widens
 
