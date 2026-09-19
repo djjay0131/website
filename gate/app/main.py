@@ -23,10 +23,10 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 from dataclasses import dataclass
 from datetime import timedelta
-from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -35,7 +35,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import pages
 from .auth import FirebaseTokenVerifier, Principal, TokenRejected, TokenVerifier
-from .config import SESSION_COOKIE_NAME, Settings, load_settings
+from .config import ALLOWED_ORIGINS_VAR, SESSION_COOKIE_NAME, Settings, load_settings, parse_origin
 from .members import FirestoreMemberDirectory, MemberDirectory
 from .serve import GcsObjectStore, ObjectStore, UnsafePath, safe_object_path
 
@@ -123,6 +123,24 @@ MAX_CLIENT_FIELD_CHARS = 200
 # this is the copy that cannot be bypassed by editing the page.
 CLIENT_EVENT_REDACT = ("password", "token", "secret", "email", "code", "cookie", "auth")
 
+# The gate's OWN log grammar, which no client-supplied string may contain (#54).
+#
+# Both log-based metrics in infra/monitoring.tf match a SUBSTRING of textPayload
+# anywhere in the line -- `textPayload:"event=deny"` and
+# `textPayload:"event=client_signin_failed"`. So an anonymous caller who puts a
+# metric's trigger inside an ordinary field value makes that metric count an
+# event that never happened. Demonstrated against production: a `note=event=deny`
+# field made the denials metric count a denial from an endpoint that performs no
+# authorisation at all.
+#
+# _clean_client_value() is NOT at fault and is unchanged: it correctly stops
+# NEWLINE injection, so no caller can forge a separate LINE. This is the narrower
+# hole -- the grammar INSIDE one line -- and this is where it closes.
+CLIENT_EVENT_GRAMMAR = "event="
+# Replaced rather than deleted, with a spelling no metric filter matches, so the
+# operator can still read what was attempted. `event=deny` becomes `event-deny`.
+CLIENT_EVENT_GRAMMAR_NEUTRALISED = "event-"
+
 
 @dataclass
 class Dependencies:
@@ -170,6 +188,26 @@ def _clean_client_value(value: object) -> str:
     return text[:MAX_CLIENT_FIELD_CHARS]
 
 
+def _neutralise_grammar(text: str) -> tuple[str, int]:
+    """Take the gate's own `event=` grammar out of a client string; count the hits.
+
+    Returns the neutralised text and how many occurrences were found, because the
+    count is the thing an operator needs: a single stray value in a browser error
+    message is noise, and a sustained stream of them is someone working on the
+    metrics. The caller emits it as a field.
+    """
+    hits = text.lower().count(CLIENT_EVENT_GRAMMAR)
+    if not hits:
+        return text, 0
+    # Case-insensitive and in one pass, so `EVENT=` cannot survive by spelling.
+    return re.sub(
+        re.escape(CLIENT_EVENT_GRAMMAR),
+        CLIENT_EVENT_GRAMMAR_NEUTRALISED,
+        text,
+        flags=re.IGNORECASE,
+    ), hits
+
+
 def _log_path(name: str, settings: Settings) -> str:
     """Render an object path for a log line, or nothing.
 
@@ -183,9 +221,26 @@ def _log_path(name: str, settings: Settings) -> str:
 
 def create_app(dependencies: Dependencies | None = None) -> FastAPI:
     _chosen = _configure_logging()
-    logger.info("event=boot logging=%s", _chosen)
 
     deps = dependencies or build_dependencies()
+
+    # The accepted-origin set, named in the boot log. These are public hostnames
+    # -- the site's domain and a *.run.app URL anyone can reach (ADR-0004) -- not
+    # secrets, and printing them is what makes a typo in Terraform visible as a
+    # missing entry rather than as a sign-out that 403s for reasons nobody can
+    # reconstruct three weeks later.
+    if deps.settings.allowed_origins:
+        logger.info(
+            "event=boot logging=%s allowed_origins=%s",
+            _chosen,
+            ",".join(sorted(deps.settings.allowed_origins)),
+        )
+    else:
+        logger.info("event=boot logging=%s allowed_origins=none", _chosen)
+        logger.error(
+            "event=misconfigured setting=%s effect=signout_refuses_every_request",
+            ALLOWED_ORIGINS_VAR,
+        )
 
     # No /docs, /redoc or /openapi.json. The service is reachable by anyone at
     # its *.run.app URL, and a schema document would publish the shape of the
@@ -330,7 +385,19 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
     # on every request once something calls it. See the handoff.
     @app.post("/session/end")
     async def end_session(request: Request) -> Response:
-        if not _same_origin(request):
+        if not deps.settings.allowed_origins:
+            # Distinct from a refused caller, and at ERROR, because this is a
+            # deployment fault rather than an attack. Sign-out is down until it
+            # is fixed -- which is the direction this check is allowed to fail
+            # in, and the reason it is not a silent fallback to header
+            # comparison.
+            logger.error(
+                "event=deny scope=signout reason=no_allowed_origins_configured setting=%s",
+                ALLOWED_ORIGINS_VAR,
+            )
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        if not _same_origin(request, deps.settings):
             logger.info("event=deny scope=signout reason=cross_origin")
             # No Set-Cookie on this path: a refused caller must not be able to
             # clear anything, or the refusal would be the attack it prevents.
@@ -434,7 +501,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         if not isinstance(payload, dict):
             return Response(status_code=204)
 
-        trace = _clean_client_value(payload.get("trace_id"))
+        trace, trace_smuggled = _neutralise_grammar(_clean_client_value(payload.get("trace_id")))
         events = payload.get("events")
         if not isinstance(events, list):
             return Response(status_code=204)
@@ -442,17 +509,52 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         for item in events[:MAX_CLIENT_EVENTS_PER_BATCH]:
             if not isinstance(item, dict):
                 continue
-            name = _clean_client_value(item.get("event")) or "unnamed"
+            # The trace id is client-supplied too, and it is on every line this
+            # loop writes -- so a poisoned trace taints the whole batch, which is
+            # exactly what the count below should say.
+            smuggled = trace_smuggled
+            name, hits = _neutralise_grammar(_clean_client_value(item.get("event")) or "unnamed")
+            smuggled += hits
             fields = item.get("fields")
             pairs = []
             if isinstance(fields, dict):
                 for key, value in list(fields.items())[:10]:
-                    k = _clean_client_value(key)
+                    k, hits = _neutralise_grammar(_clean_client_value(key))
+                    smuggled += hits
                     if not k:
                         continue
                     if any(r in k.lower() for r in CLIENT_EVENT_REDACT):
+                        # A redacted value never reaches the line, so it cannot
+                        # forge anything and is not counted.
                         continue
-                    pairs.append(f"{k}={_clean_client_value(value)}")
+                    v, hits = _neutralise_grammar(_clean_client_value(value))
+                    smuggled += hits
+                    pairs.append(f"{k}={v}")
+
+            if smuggled:
+                # NOT DROPPED, deliberately. A report discarded because it looks
+                # suspicious is the same blindness this endpoint exists to end,
+                # wearing a different costume -- and the caller would learn which
+                # payloads vanish. So it is counted, emitted under its own event
+                # class, and carries the neutralised text: an operator reading
+                # Cloud Logging sees
+                #
+                #   INFO gate event=client_grammar_rejected trace=t-1 smuggled=1
+                #        reported=probe note=event-deny
+                #
+                # which says what was sent, how many times the grammar appeared,
+                # and matches NEITHER metric filter. Reclassifying is the point:
+                # the caller does not get to choose which metric its report lands
+                # in, so `signin_failed` with a poisoned field is not counted as a
+                # sign-in failure either.
+                logger.info(
+                    "event=client_grammar_rejected trace=%s smuggled=%d reported=%s %s",
+                    trace or "none",
+                    smuggled,
+                    name,
+                    " ".join(pairs),
+                )
+                continue
 
             # "client_signin_failed" is the string the log-based metric in
             # infra/monitoring.tf filters on. Changing it here without changing
@@ -471,50 +573,59 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
     return app
 
 
-def _same_origin(request: Request) -> bool:
-    """Did this state-changing request come from the gate's own origin?
+def _same_origin(request: Request, settings: Settings) -> bool:
+    """Did this state-changing request come from one of the gate's OWN origins?
 
     The CSRF check. `SameSite=Lax` is not one: Lax still sends the cookie on a
     top-level POST that a cross-site page triggers, which is exactly the shape of
     a forged sign-out -- and, in Phase 4, of a forged mint or revoke.
 
-    The comparison is Origin against the host the request was addressed to, with
-    NOTHING configured. That is deliberate. ADR-0004 puts the invoker at
-    `allUsers`, so the same code must be right on https://jason.cusati.us and on
-    the service's own https://hub-gate-....run.app; a list of permitted domains
-    would be a fourth place (after Terraform, Hosting and the app) that has to be
-    kept in step, and the first one to go stale fails closed on the real domain.
+    THE ACCEPTED SET COMES FROM THE ENVIRONMENT, NEVER FROM THE REQUEST, and that
+    is the whole of it. The version this replaces built the accepted set out of
+    `Host` and `X-Forwarded-Host` and then compared `Origin` against it -- every
+    value on both sides supplied by the caller, which proves nothing. Three
+    spellings were demonstrated over real HTTP: a forged `X-Forwarded-Host`; a
+    comma list whose second element was the attacker; and a forged `Host` alone.
+    On the direct *.run.app transport the invoker is `allUsers` (ADR-0004), so
+    the caller controls every header and the check was worth precisely zero there.
+
+    The reasoning that produced it was that a configured allowlist is a fourth
+    place that must be kept in step, and the first one to go stale fails closed on
+    the real domain. THAT TRADE IS BACKWARDS. Failing closed on sign-out is a
+    nuisance: visible immediately, and a member can work around it by clearing
+    cookies. Failing open is silent, and is the vulnerability. A check an attacker
+    can satisfy entirely with their own headers is not a weaker check -- it is not
+    a check.
+
+    BOTH TRANSPORTS STAY CORRECT because GATE_ALLOWED_ORIGINS names both origins
+    the gate answers on: the site's domain and the service's own *.run.app URL.
+    That is a requirement on the value, not a property of this code, so it is
+    stated in app/config.py where the variable is read and asserted by the boot
+    line create_app() writes.
+
+    UNSET MEANS REFUSE EVERYTHING. There is no fallback to header comparison,
+    because a fallback is the same bug returning under a better name. The caller
+    logs it at ERROR, create_app() logs it at boot, and gate.yml's deploy smoke
+    test asserts that a same-origin sign-out returns 200 -- so an unset variable
+    fails the deploy loudly instead of quietly disarming the check.
 
     A MISSING Origin is refused, not waved through. Every browser sends Origin on
     a cross-site POST, so treating its absence as trustworthy would admit the one
     request this exists to refuse. A non-browser caller that genuinely wants the
     route sends its own Origin -- gate.yml's smoke test does exactly that.
 
-    X-Forwarded-Host is accepted alongside Host because which of the two carries
-    the site's domain on a Firebase Hosting -> Cloud Run rewrite is NOT settled
-    here (the handoff carries the probe that settles it). Honouring it is not a
-    way in: a cross-site form POST cannot set that header, and setting it from
-    fetch() makes the request preflighted -- and the gate answers no preflight
-    and sends no Access-Control-Allow-* header, so the browser never sends it.
+    `null`, an http:// downgrade, and an Origin carrying a path, query or fragment
+    are all refused by parse_origin(), which is the same function that parsed the
+    configured set.
     """
-    origin = request.headers.get("origin", "").strip()
-    if not origin:
+    if not settings.allowed_origins:
         return False
 
-    parsed = urlsplit(origin)
-    # A serialized origin is scheme://host[:port] and nothing else. `null`, a
-    # bare hostname, and anything carrying a path or query is not one.
-    if parsed.scheme != "https" or not parsed.netloc:
-        return False
-    if parsed.path or parsed.query or parsed.fragment:
+    origin = parse_origin(request.headers.get("origin", ""))
+    if origin is None:
         return False
 
-    addressed_to = {request.headers.get("host", "").strip().lower()}
-    forwarded = request.headers.get("x-forwarded-host", "")
-    addressed_to.update(candidate.strip().lower() for candidate in forwarded.split(","))
-    addressed_to.discard("")
-
-    return parsed.netloc.lower() in addressed_to
+    return origin in settings.allowed_origins
 
 
 def _authenticate(request: Request, deps: Dependencies) -> tuple[Principal | None, str | None]:

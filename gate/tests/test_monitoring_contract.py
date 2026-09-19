@@ -99,6 +99,127 @@ def test_the_deploy_smoke_test_probes_the_path_the_app_actually_serves():
     )
 
 
+# ---------------------------------------------------------------------------
+# Every alert policy has a channel attached (#57).
+#
+# WHAT THIS REPLACES, AND WHY IT HAD TO CHANGE. The previous guard counted the
+# literal string `notification_channels = [` and required one per policy. That
+# asserts a SPELLING; its own docstring states the property. PR #53 replaces all
+# three inline list literals with `local.alert_notification_channels`, and that
+# local concatenates the email channel with an optional SMS one -- so every
+# policy gains a SECOND delivery path. The count went to 0 while the code
+# IMPROVED, and the guard went red at the moment of the improvement. Verified:
+# main 3 policies / 3 matches; the infra branch 3 policies / 0 matches.
+#
+# A guard that goes red on an improvement gets deleted, and the invariant goes
+# with it. So the property is asserted instead: every policy block carries a
+# `notification_channels` assignment with a non-empty value -- inline list,
+# `local.*` or variable alike.
+#
+# The guard is a pure function over text so that it can be tested against inputs
+# this repository does not contain, which is the only way to show it FAILING on a
+# policy that delivers nowhere without breaking a file this stream does not own.
+# ---------------------------------------------------------------------------
+
+ALERT_POLICY = re.compile(r'^resource "google_monitoring_alert_policy" "([^"]+)"', re.MULTILINE)
+# A top-level HCL block starts in column 1. Everything inside one -- including
+# the indented heredocs these policies carry, braces and all -- does not, so this
+# is where one policy's text ends. Brace counting would be defeated by `${...}`
+# and `%{...}` inside those heredocs.
+NEXT_TOP_LEVEL_BLOCK = re.compile(r"^[a-z]", re.MULTILINE)
+CHANNEL_ASSIGNMENT = re.compile(r"^[ \t]*notification_channels\s*=\s*(.*)$", re.MULTILINE)
+
+
+def _assigned_channel_value(block: str) -> str | None:
+    """The right-hand side of a policy's `notification_channels`, or None."""
+    found = CHANNEL_ASSIGNMENT.search(block)
+    if found is None:
+        return None
+    value = found.group(1).strip()
+    if value.startswith("[") and not value.endswith("]"):
+        # A list literal spread over several lines.
+        value = value + block[found.end() :].split("]", 1)[0] + "]"
+    return value
+
+
+def _delivers_somewhere(value: str | None) -> bool:
+    """Is this assignment's value capable of naming a channel at all?"""
+    if value is None:
+        return False
+    inner = value.strip()
+    if inner.startswith("[") and inner.endswith("]"):
+        inner = inner[1:-1]
+    inner = inner.replace(",", " ").strip()
+    return bool(inner) and inner != "null"
+
+
+def policies_without_a_channel(tf: str) -> list[str]:
+    """Names of the alert policies in `tf` that would deliver nowhere."""
+    missing = []
+    for match in ALERT_POLICY.finditer(tf):
+        end = NEXT_TOP_LEVEL_BLOCK.search(tf, match.end())
+        block = tf[match.end() : end.start() if end else len(tf)]
+        if not _delivers_somewhere(_assigned_channel_value(block)):
+            missing.append(match.group(1))
+    return missing
+
+
+def _policy(name: str, channels: str) -> str:
+    """A minimal alert policy, with the heredoc braces that defeat naive parsing."""
+    return (
+        f'resource "google_monitoring_alert_policy" "{name}" ' + "{\n"
+        '  display_name = "example"\n'
+        "  conditions {\n    condition_threshold {\n      trigger { count = 1 }\n    }\n  }\n"
+        f"{channels}"
+        "  documentation {\n    content = <<-EOT\n"
+        "      braces in a heredoc: ${var.project_id} and %{http_code}\n"
+        "    EOT\n  }\n}\n"
+    )
+
+
+ATTACHED = [
+    ("inline list", "  notification_channels = [google_monitoring_notification_channel.ops_email.id]\n"),
+    ("a local, which is what #53 moves to", "  notification_channels = local.alert_notification_channels\n"),
+    ("a variable", "  notification_channels = var.alert_channels\n"),
+    (
+        "a multi-line list",
+        "  notification_channels = [\n    google_monitoring_notification_channel.ops_email.id,\n  ]\n",
+    ),
+]
+
+DELIVERS_NOWHERE = [
+    ("no assignment at all", ""),
+    ("an empty list", "  notification_channels = []\n"),
+    ("commented out, which is how it was lost before", "  # notification_channels = [x]\n"),
+    ("an empty multi-line list", "  notification_channels = [\n  ]\n"),
+]
+
+
+@pytest.mark.parametrize("label,channels", ATTACHED, ids=[label for label, _ in ATTACHED])
+def test_the_channel_guard_accepts_every_spelling_of_an_attached_channel(label, channels):
+    """The property is delivery, not formatting. This is the half #57 was about."""
+    assert policies_without_a_channel(_policy("p", channels)) == [], label
+
+
+@pytest.mark.parametrize("label,channels", DELIVERS_NOWHERE, ids=[label for label, _ in DELIVERS_NOWHERE])
+def test_the_channel_guard_catches_a_policy_that_delivers_nowhere(label, channels):
+    """And the guard can still fail, which is the only thing that makes it a guard."""
+    assert policies_without_a_channel(_policy("p", channels)) == ["p"], label
+
+
+def test_the_channel_guard_finds_every_policy_in_a_multi_policy_file():
+    # The count matters as much as the verdict. A parser that silently saw one
+    # policy in a three-policy file would report "nothing missing" for ever while
+    # checking almost nothing -- a vacuous guard counted as coverage.
+    tf = (
+        _policy("has_a_local", "  notification_channels = local.alert_notification_channels\n")
+        + _policy("has_nothing", "")
+        + _policy("has_a_list", "  notification_channels = [x]\n")
+    )
+
+    assert policies_without_a_channel(tf) == ["has_nothing"]
+
+
 @pytest.mark.skipif(not MONITORING.exists(), reason="infra/monitoring.tf not present")
 def test_every_alert_policy_has_a_notification_channel():
     """An alert with no channel fires into the void.
@@ -110,12 +231,19 @@ def test_every_alert_policy_has_a_notification_channel():
     a code review comment.
     """
     tf = MONITORING.read_text(encoding="utf-8")
-    policies = tf.count('resource "google_monitoring_alert_policy"')
-    attached = tf.count("notification_channels = [")
-    assert policies > 0, "no alert policies found; did the file move?"
-    assert attached >= policies, (
-        f"{policies} alert policies but only {attached} notification_channels "
-        f"assignments. Every policy must attach a channel."
+    declared = tf.count('resource "google_monitoring_alert_policy"')
+
+    assert declared > 0, "no alert policies found; did the file move?"
+    # The parser must see every policy the file declares, or its verdict is empty.
+    assert len(ALERT_POLICY.findall(tf)) == declared, (
+        "the alert-policy parser did not see every policy in monitoring.tf; its "
+        "verdict covers only the ones it found"
+    )
+
+    missing = policies_without_a_channel(tf)
+    assert missing == [], (
+        f"alert policies that would deliver nowhere: {missing}. Every policy must "
+        f"attach a channel -- inline list, local.* or variable alike."
     )
     # And it must not be commented out, which is exactly how it was lost before.
     assert "# notification_channels" not in tf

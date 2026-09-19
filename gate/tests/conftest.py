@@ -20,6 +20,7 @@ made visible in CI instead of at Checkpoint 4.
 
 from __future__ import annotations
 
+import io
 from datetime import timedelta
 
 import pytest
@@ -27,7 +28,7 @@ from fastapi.testclient import TestClient
 
 from app.auth import Principal, TokenRejected, principal_from_claims
 from app.config import Settings
-from app.main import Dependencies, create_app
+from app.main import Dependencies, create_app, logger
 from app.members import StaticMemberDirectory
 from app.serve import StoredObject, guess_content_type
 
@@ -48,6 +49,16 @@ HOSTING_HEADERS = {
     "x-forwarded-for": "203.0.113.5",
 }
 DIRECT_HEADERS = {"host": "hub-gate-abcdef1234-ue.a.run.app"}
+
+# What GATE_ALLOWED_ORIGINS carries in production, modelled here.
+#
+# DERIVED from the two header sets above rather than written out again, for the
+# same reason origin_header() is: the gate answers on BOTH origins because the
+# Cloud Run invoker is `allUsers` (ADR-0004), and a test that hard-coded one of
+# them would prove the CSRF check works on that one only -- which is the failure
+# the ADR warns about. The real value is rendered by Terraform; see the handoff
+# for its name and shape.
+ALLOWED_ORIGINS = frozenset({f"https://{HOSTING_HEADERS['host']}", f"https://{DIRECT_HEADERS['host']}"})
 
 
 class FakeVerifier:
@@ -137,6 +148,7 @@ def settings() -> Settings:
         session_days=14,
         check_revoked=True,
         log_object_paths=False,
+        allowed_origins=ALLOWED_ORIGINS,
     )
 
 
@@ -197,6 +209,30 @@ def origin_header(transport: str) -> str:
     """
     headers = HOSTING_HEADERS if transport == "hosting" else DIRECT_HEADERS
     return f"https://{headers['host']}"
+
+
+def through_the_gates_own_handler(call) -> str:
+    """Run `call` with the gate's OWN log handler writing into a buffer.
+
+    NOT caplog, and the difference is the whole point. pytest's caplog attaches
+    its own handler and forces propagation -- which is precisely what production
+    lacked for four revisions and 48 hours while every logging test passed, so
+    not one `event=` line reached Cloud Logging and both log-based metrics were
+    dead on arrival. A caplog assertion passes whether or not the gate can log at
+    all. This one fails if the gate's logging is misconfigured, because it writes
+    through the handler the gate configured for itself.
+
+    Lives here so the sign-out tests and the client-event tests share one copy;
+    tests/test_logging_config.py is the file that proves the pattern.
+    """
+    handler = next(h for h in logger.handlers if getattr(h, "_hub_gate_handler", False))
+    buffer = io.StringIO()
+    original, handler.stream = handler.stream, buffer
+    try:
+        call()
+    finally:
+        handler.stream = original
+    return buffer.getvalue()
 
 
 @pytest.fixture
