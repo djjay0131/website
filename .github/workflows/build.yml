@@ -475,8 +475,14 @@ jobs:
       # uniform bucket-level access, enforced public access prevention, no
       # anonymous principal, and EXACTLY two bindings -- the gate with
       # storage.objects.get, and the hub's sync with create/delete/get/list
-      # (SEAM-1, ADR-0010 decision 5). The live half needs credentials and is a
-      # Checkpoint 4 procedure (infra/README.md).
+      # (SEAM-1, ADR-0010 decision 5). It also asserts that the read-only
+      # auditor role added for the live check holds no storage.objects.*
+      # permission at all (infra/auditor.tf).
+      #
+      # The LIVE half needs credentials and now runs in the
+      # private-bucket-live-iam job below, on the schedule and on main. It used
+      # to say "and is a Checkpoint 4 procedure" here, which is how it came to
+      # run nowhere for two phases (#58).
       - name: Check the private bucket's declared IAM (design doc 12.1)
         run: python3 infra/scripts/check_private_bucket_config.py
 
@@ -508,8 +514,10 @@ jobs:
       #
       # Credential-free: it reads the Terraform, not the live policy. The private
       # bucket's own two-principal invariant is asserted by the step above
-      # (check_private_bucket_config.py); the live half is a Checkpoint procedure
-      # (infra/scripts/check-private-bucket-iam.sh).
+      # (check_private_bucket_config.py); the live half runs in the
+      # private-bucket-live-iam job (infra/scripts/check-private-bucket-iam.sh),
+      # and the step after this one asserts that it is still wired to a job that
+      # actually runs.
       - name: Check the satellite boundary invariants are declared
         if: ${{ !cancelled() }}
         run: |
@@ -611,6 +619,243 @@ jobs:
                 f"and no satellite holds a project-level role.")
           PY
 
+      # THE WIRING GUARD (issue #58). Every other step in this job checks the
+      # CONFIGURATION. This one checks that the one check which cannot run here
+      # -- the live bucket IAM test, which needs a credential -- is still
+      # attached to a job that actually runs.
+      #
+      # WHY IT EXISTS. Before Wave 0, infra/scripts/check-private-bucket-iam.sh
+      # was referenced by this workflow in exactly one place: a COMMENT. No job
+      # invoked it. Meanwhile infra/README.md, the roadmap and the Phase 3
+      # handoff all described it as the mitigation for a live exposure. A
+      # missing guard and a working guard look identical from outside, and this
+      # is the fifth time that shape has been found in this sprint.
+      #
+      # THE WORKFLOW IS PARSED, NOT GREPPED, and that is the whole design. The
+      # exact state this guard exists to prevent is one where the only mention
+      # of the script is prose -- and a comment does not survive yaml.safe_load.
+      # A grep-based version of this guard would have passed happily on the
+      # state that produced #58.
+      - name: Check the live bucket IAM check is wired to a job that runs
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+
+          try:
+              import yaml
+          except ImportError:
+              # FAIL CLOSED. A guard that cannot run must not report success:
+              # that is the defect class this whole job exists for.
+              print("::error file=.github/workflows/build.yml::PyYAML is not "
+                    "available on this runner, so the live-check wiring could not be "
+                    "verified. This guard fails closed rather than passing silently.")
+              sys.exit(1)
+
+          WORKFLOW = ".github/workflows/build.yml"
+          SCRIPT = "infra/scripts/check-private-bucket-iam.sh"
+
+          failures = []
+
+          def fail(message):
+              failures.append(message)
+
+          # The F-1 lesson: a guard whose subject has been DELETED must go red,
+          # not quietly assert nothing.
+          if not os.path.exists(SCRIPT):
+              fail(f"{SCRIPT} does not exist. The live half of the §12.1 bucket IAM "
+                   f"test is the only check that can see an IAM grant made outside "
+                   f"this repository; it is not optional.")
+
+          with open(WORKFLOW, encoding="utf-8") as handle:
+              workflow = yaml.safe_load(handle)
+
+          # YAML 1.1 parses a bare `on:` key as the boolean True. Read both.
+          triggers = workflow.get("on", workflow.get(True)) or {}
+          if "schedule" not in triggers:
+              fail(f"{WORKFLOW} has no `schedule:` trigger. The live bucket IAM check "
+                   f"must run on a schedule: an exposure introduced by a console "
+                   f"action changes no file here, so a check that runs only on a code "
+                   f"change cannot see it (#55 is exactly that shape).")
+
+          # "Mentions the path" is NOT "invokes it" -- a distinction this guard
+          # learned about itself. Its own source contains the path as a string
+          # literal, so a substring test made THIS step look like the call site
+          # and reported the wrong job. The path must appear at a COMMAND
+          # position: start of a line, after optional env assignments and an
+          # optional interpreter. Same reasoning as the executable-bit guard
+          # above, which classifies by how a file is reached rather than by how
+          # its name is spelled.
+          INVOCATION = re.compile(
+              r"(?m)^[ \t]*(?:[A-Za-z_][A-Za-z0-9_]*=\S*[ \t]+)*"
+              r"(?:(?:bash|sh)[ \t]+)?\.?/?" + re.escape(SCRIPT) + r"\b"
+          )
+
+          jobs = workflow.get("jobs") or {}
+          invoking = [
+              (name, job, step)
+              for name, job in jobs.items()
+              for step in (job.get("steps") or [])
+              if INVOCATION.search(step.get("run") or "")
+          ]
+
+          if not invoking:
+              fail(f"no job in {WORKFLOW} runs {SCRIPT}. It was referenced only from a "
+                   f"comment for two phases while three documents claimed it ran on "
+                   f"every deploy (#58). A comment is not a call site.")
+
+          for name, job, step in invoking:
+              condition = str(job.get("if", ""))
+
+              if "schedule" not in condition:
+                  fail(f'job "{name}" runs {SCRIPT}, but its `if:` does not admit the '
+                       f"schedule event. Deploy-triggered runs catch drift only within "
+                       f"a deploy cycle and only when someone pushes; the scheduled run "
+                       f"is the half that catches a change made outside this repository.")
+
+              # The job must not be conditioned on the auditor variable: an
+              # unset variable would then SKIP the job, and a skipped guard is
+              # the failure mode this file has now hit five times. The step
+              # inside fails loudly instead.
+              if "GCP_AUDITOR_SA" in condition:
+                  fail(f'job "{name}" is conditioned on vars.GCP_AUDITOR_SA. That makes an '
+                       f"unset variable SKIP the live check silently. The job must run and "
+                       f"its first step must FAIL when the variable is missing.")
+
+              if job.get("continue-on-error") or step.get("continue-on-error"):
+                  fail(f'job "{name}" (or its live-check step) sets continue-on-error, so '
+                       f"the check reports and exits 0. It must fail the job it runs in.")
+
+              notified = jobs.get("notify-failure", {}).get("needs") or []
+              if name not in notified:
+                  fail(f'job "{name}" is not in notify-failure\'s `needs`, so a live IAM '
+                       f"failure would page nobody. A scheduled check that fails "
+                       f"invisibly is not a check.")
+
+          for message in failures:
+              print(f"::error file={WORKFLOW}::{message}")
+          if failures:
+              print(f"\n{len(failures)} live-check wiring violation(s).")
+              sys.exit(1)
+
+          names = ", ".join(sorted(name for name, _, _ in invoking))
+          print(f"OK: {SCRIPT} is invoked by job(s) [{names}], on triggers "
+                f"{sorted(triggers)}, with no continue-on-error, and a failure pages "
+                f"through notify-failure.")
+          PY
+
+  # THE LIVE HALF OF THE §12.1 BUCKET IAM TEST (issues #58 and #55).
+  #
+  # "The bucket IAM test runs on every deploy and fails if the private bucket
+  # grants public access or any reader other than the gate's service account."
+  # The credential-free half (check_private_bucket_config.py, in budget-guard
+  # above) reads the Terraform. THIS is the half that reads the actual policy,
+  # and until Wave 0 it ran nowhere at all.
+  #
+  # WHAT EACH TRIGGER CATCHES, AND WHAT IT DOES NOT -- stated because choosing
+  # only one of them was the mistake that produced #58's disposition:
+  #
+  #   schedule (hourly, the existing cron -- THE LOAD-BEARING ONE)
+  #     CATCHES: anything granted outside this repository. A console click, a
+  #       `gcloud projects add-iam-policy-binding`, a role added to a service
+  #       account, an inherited grant from a new org policy. This is exactly how
+  #       #55 arises: granting roles/editor touches no file here, so no
+  #       code-triggered check can ever see it.
+  #     DOES NOT CATCH: nothing that has happened yet at the moment it runs --
+  #       it has an up-to-one-hour blind window, and it reports drift rather
+  #       than preventing it.
+  #
+  #   push to main
+  #     CATCHES: drift within one deploy cycle, and gives the merge a live
+  #       verdict rather than a configuration-only one.
+  #     DOES NOT CATCH: the pull request that introduced the change -- the PR
+  #       run cannot authenticate at all, see below -- and nothing at all during
+  #       a quiet week when nobody pushes.
+  #
+  #   pull_request: IMPOSSIBLE, not omitted. infra/wif.tf admits only
+  #     refs/heads/main; a PR run carries refs/pull/<n>/merge, so it cannot
+  #     obtain a token to read any policy. This is the same constraint that
+  #     keeps scripts/fetch-data.sh alive as the PR content source (STATE C25),
+  #     and it is why "fold it into budget-guard" -- which runs on PRs -- could
+  #     never have worked. The PR-time cover is the credential-free
+  #     configuration check plus the wiring guard above.
+  #
+  # NO `needs:`. This job audits the LIVE project, which no job in this workflow
+  # changes -- Terraform is applied by hand, not by CI. Hanging it off `build`
+  # or `deploy` would mean a broken site hides an IAM exposure, and would stop
+  # it running on the scheduled polls that find nothing new to build (the
+  # `check` job short-circuits those, and those are most of the runs).
+  #
+  # IT FAILS THE JOB. check-private-bucket-iam.sh exits 1 on any failure, so
+  # this job goes red, and notify-failure opens the tracking issue.
+  private-bucket-live-iam:
+    # Enumerated rather than `!= 'pull_request'` so a reader -- and the wiring
+    # guard above -- can see that the schedule is admitted.
+    #
+    # Deliberately NOT conditioned on vars.GCP_AUDITOR_SA: that would turn a
+    # missing variable into a silently skipped job, which is the defect this
+    # whole change exists to end. The first step fails loudly instead.
+    if: >-
+      (github.event_name == 'schedule'
+      || github.event_name == 'push'
+      || github.event_name == 'workflow_dispatch')
+      && vars.GCP_PROJECT_ID != ''
+      && vars.GCP_PRIVATE_BUCKET != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read # checkout, for infra/scripts/check-private-bucket-iam.sh
+      id-token: write # the GitHub OIDC token exchanged through WIF
+    steps:
+      # Checkout comes first: auth writes its credentials file into the
+      # workspace, and a later checkout would delete it.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Check the auditor identity is configured
+        env:
+          GCP_AUDITOR_SA: ${{ vars.GCP_AUDITOR_SA }}
+        run: |
+          if [ -z "${GCP_AUDITOR_SA}" ]; then
+            echo "::error::vars.GCP_AUDITOR_SA is not set, so the LIVE half of the bucket IAM test cannot authenticate. Set it to the value of: terraform output -raw auditor_service_account_email (infra/README.md, Phase 3). This step FAILS rather than skipping, deliberately: a live check that is quietly not running, inside a green pipeline, is issue #58."
+            exit 1
+          fi
+          echo "auditor identity: ${GCP_AUDITOR_SA}"
+
+      # The READ-ONLY auditor (infra/auditor.tf), not the deploy identity.
+      # hub-deploy holds object permissions only and cannot read a bucket policy
+      # or the project policy; widening it for a check would widen the identity
+      # that can delete every private object. hub-auditor holds exactly three
+      # permissions and no storage.objects.* at all.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_AUDITOR_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      # GATE_SA is derived rather than carried as a fourth repository variable:
+      # "hub-gate" is a fixed local in infra/gate.tf (local.gate_service_name),
+      # not a Terraform variable, precisely because firebase.json names it
+      # literally. If it ever stops matching, section 2 of the script fails on
+      # the equality assertion -- loudly, which is the correct outcome.
+      #
+      # PROBE_OBJECT runs the anonymous-request clause of the criterion, which
+      # needs no credential at all. It defaults to the private build's root
+      # page; override it with vars.GCP_PRIVATE_PROBE_OBJECT if that ever stops
+      # being a real object. No private path is committed here.
+      - name: Read the live private-bucket IAM policy and fail on any exposure
+        env:
+          PROJECT: ${{ vars.GCP_PROJECT_ID }}
+          BUCKET: ${{ vars.GCP_PRIVATE_BUCKET }}
+          HUB_SA: ${{ vars.GCP_DEPLOY_SA }}
+          PROBE_OBJECT: ${{ vars.GCP_PRIVATE_PROBE_OBJECT || 'index.html' }}
+        run: |
+          export GATE_SA="hub-gate@${PROJECT}.iam.gserviceaccount.com"
+          bash infra/scripts/check-private-bucket-iam.sh
 
   # Exercises firebase-deploy's locked install without any credential (delta
   # review B3). firebase-deploy is skipped on pull requests and dormant until
@@ -1279,7 +1524,7 @@ jobs:
   # emailed by GitHub) even with no secrets configured at all. Without this,
   # nothing surfaced ~190 consecutive scheduled failures over 8 days.
   notify-failure:
-    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test, private-sync]
+    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test, private-sync, private-bucket-live-iam]
     runs-on: ubuntu-24.04
     # A failed PR check already shows up on the PR itself; only page out for
     # failures on the real deploy path.
@@ -1339,7 +1584,7 @@ jobs:
   # skipped, do not count) and no failed job anywhere. The Firebase jobs may be
   # skipped -- they are until the owner configures them -- but not failed.
   notify-recovery:
-    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test, private-sync]
+    needs: [check, budget-guard, build, deploy, smoke-test, build-firebase, firebase-deploy, firebase-smoke-test, private-sync, private-bucket-live-iam]
     runs-on: ubuntu-24.04
     if: >-
       !cancelled()

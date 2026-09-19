@@ -56,7 +56,8 @@ Checkpoint 3 runbook is in `infra-phase-2.md`, and the Checkpoint 4 runbook is i
 | `registry.tf` | `google_artifact_registry_repository.gate` | Docker repository for the gate image, keeping the 5 most recent versions (roadmap R-A4) |
 | `firestore.tf` | `google_firestore_database.hub`, `google_firebaserules_ruleset.firestore_deny_all`, `google_firebaserules_release.firestore` | Firestore Native for `members/{email}` (SEAM-3), its location **permanent**, delete protection on — plus a **deny-all ruleset** so no browser client can read the allowlist |
 | `identity-platform.tf` | `google_identity_platform_config.hub` | Email-link sign-in, and the authorized-domain list that makes sign-in work on `jason.cusati.us`. Google sign-in is a deliberate **manual** step: its Terraform resource requires an OAuth client secret |
-| `scripts/` | none (a Python and a Bash check) | The roadmap's bucket IAM test, in two halves: `check_private_bucket_config.py` (credential-free, every push) and `check-private-bucket-iam.sh` (live, deploy path and Checkpoint 4) |
+| `auditor.tf` | `google_service_account.hub_auditor`, `google_project_iam_custom_role.private_bucket_auditor`, `google_project_iam_member.hub_auditor_policy_reader`, `google_service_account_iam_member.hub_auditor_wif_main` | The **read-only** identity the live bucket IAM check runs as (issue #58). Exactly `resourcemanager.projects.getIamPolicy`, `storage.buckets.get`, `storage.buckets.getIamPolicy` — and **no `storage.objects.*` at all**, so it reads the policy that says who can reach a private object and never the object. Keyless, admitted only from `refs/heads/main` |
+| `scripts/` | none (a Python and a Bash check) | The roadmap's bucket IAM test, in two halves: `check_private_bucket_config.py` (credential-free, every push and pull request) and `check-private-bucket-iam.sh` (live — the hourly `private-bucket-live-iam` job in `build.yml`, and the Checkpoint 4 runbook) |
 | `deploy-tools/` | none: `package.json` and `package-lock.json` | Pins `firebase-tools` to exactly 15.30.1 with its whole dependency tree. `build.yml` installs it with `npm ci --prefix infra/deploy-tools`. `node_modules/` is git-ignored |
 
 Not managed, by design, after Phase 3 (roadmap "Not in this phase"; Phase 4 or
@@ -95,6 +96,7 @@ Not Terraformable or deliberately manual: creating the project, linking billing
 | `firestore_location` | no | `us-east1` | **Permanent.** A Firestore database's location cannot be changed after creation |
 | `gate_image` | no | Google's sample container | A **placeholder**. `gate.yml` pushes the real image and deploys it; Terraform ignores changes to this field afterwards |
 | `gate_max_instance_count` | no | `3` | Cloud Run maximum instances for the gate (brief §4 Phase 3). The minimum is fixed at 0 in code |
+| `gate_extra_allowed_origins` | no | `[]` | **Widens** the gate's CSRF accepted-origin set beyond the two rendered automatically (the site domain, and the project-number `*.run.app` URL). Empty is the intended state. The one known candidate is this service's older `<service>-<hash>-<regioncode>.a.run.app` spelling, which is live on this project and which Terraform cannot render itself — reading the service's own `uri` from its own `env` block is a self-reference cycle. Validation requires `https://host[:port]` with no path or trailing slash |
 
 Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in.
 `terraform.tfvars` is git-ignored (`infra/.gitignore`), as are state files and
@@ -119,10 +121,13 @@ Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in.
 | `gate_service_account_email` | The gate's **runtime** identity — the only principal that reads a private object to serve it |
 | `gate_deploy_service_account_email` | The **deploy** identity `gate.yml` authenticates as. It cannot read private content |
 | `gate_service_name`, `gate_service_uri` | The Cloud Run service `firebase.json` must name, and its direct `*.run.app` URL — where every authorisation check must also hold (ADR-0004) |
+| `gate_allowed_origins` | The exact value rendered into `GATE_ALLOWED_ORIGINS`. The gate builds its CSRF accepted-origin set from it at startup, with **no header fallback**: if it is wrong, `/session/end` refuses every request |
+| `gate_allowed_origins_check_command` | Three commands: the URL Cloud Run actually serves, the accepted set the running revision printed at boot, and any `event=misconfigured` line. The first two must agree |
 | `gate_image_repository` | The Docker path to push the gate image to |
 | `firestore_database` | The database's name, **permanent** location and type |
 | `private_bucket_roles` | The two custom roles bound on the private bucket, for the Checkpoint 4 checks |
-| `private_bucket_iam_check_command` | The live bucket IAM test, ready to paste |
+| `auditor_service_account_email` | **`GCP_AUDITOR_SA`** — the read-only identity the hourly live bucket IAM check authenticates as. Set it as a repository variable the moment this module is applied: the job **fails** rather than skipping while it is unset |
+| `private_bucket_iam_check_command` | The live bucket IAM test, ready to paste for a by-hand run. It also runs hourly and on every push to main in `build.yml`'s `private-bucket-live-iam` job |
 
 ## Running it
 
@@ -401,18 +406,35 @@ the live policy rather than assumed: UBLA is `True` on `<project>-private` and
 `gcloud storage buckets get-iam-policy` still returns all four. UBLA disables
 object *ACLs*; these are ordinary IAM bindings in the bucket's policy.
 
-So `projectViewer` can read every private object — including the committee
-dossier — and nothing in this module mentions it. **Today that expands to
-nobody**: the project has no `roles/viewer` binding at all, and the owner holds
-`roles/owner`, which maps to `projectOwner`, not `projectViewer`. The exposure
-is therefore *latent*, not live, and it activates silently the first time anyone
-is granted project Viewer.
+So each placeholder can reach every private object — including the committee
+dossier — and nothing in this module mentions any of them. **What they expand to
+is the whole question, and an earlier version of this section got it wrong:**
+
+| Placeholder | Expands to | Live state | Reaches |
+|---|---|---|---|
+| `projectViewer` | `roles/viewer` holders | **empty** — no such binding exists | `objects.get`, `objects.list` |
+| `projectEditor` | `roles/editor` holders | **NOT empty** — the default compute service account | `objects.create`, `.delete`, `.get`, **`.list`**, `.update`, `.setIamPolicy`, plus `buckets.setIamPolicy` |
+| `projectOwner` | `roles/owner` holders | the owner, as expected | the same as `projectEditor` |
+
+The exposure that is real is therefore the **editor** one, not the viewer one
+(issue #55). It is *latent, not live* — that account has no user-managed keys,
+no impersonation binding, nothing runs as it and the Compute API is disabled —
+and it becomes live the moment any of those changes, **none of which touches
+this bucket's policy or any file in this repository**. `objects.list` is the
+sharpest part: SEAM-1 withholds exactly that from the *gate*, because object
+names in this bucket are themselves private material.
 
 Two consequences, both acted on rather than noted:
 
-- `scripts/check-private-bucket-iam.sh` now **fails** if any principal holds
-  `roles/viewer`, so the moment that grant happens it is loud rather than
-  invisible.
+- `scripts/check-private-bucket-iam.sh` **fails** if `roles/viewer` **or
+  `roles/editor`** is non-empty, naming the principals and what each role
+  reaches — and it now runs **hourly** in `build.yml`'s
+  `private-bucket-live-iam` job, so the moment such a grant happens it is loud
+  rather than invisible. Until Wave 0 both halves of that sentence were false:
+  the check expanded only `roles/viewer`, which is the empty role, and no
+  workflow ran it at all (#55, #58). `roles/owner` is printed but never failed
+  on: the owner holds it, and a check that is red on every correct run is a
+  check that gets switched off.
 - Removing the legacy reader bindings requires replacing the bucket's whole IAM
   policy authoritatively (`google_storage_bucket_iam_policy`), because
   `google_storage_bucket_iam_member` is additive and structurally cannot remove
@@ -420,6 +442,51 @@ Two consequences, both acted on rather than noted:
   as well would remove the owner's own object access to the bucket — so it is an
   **owner decision**, written up in
   `llm/sprints/2026-09-hub/handoffs/infra-wave-0.md` item 5.
+
+### The gate's CSRF accepted-origin set
+
+The gate's `POST /session/end` used to decide "is this same-origin?" by comparing the
+request's `Origin` against the request's own `Host` and `X-Forwarded-Host`. Every value in
+that comparison came from the request, so it proved nothing, and three forged spellings were
+demonstrated over real HTTP. Its replacement compares `Origin` against a set built **at
+startup** from `GATE_ALLOWED_ORIGINS`, which the request cannot influence. Rendering that
+variable is infra's half of the fix (`gate.tf`, `local.gate_allowed_origins`).
+
+| | |
+|---|---|
+| Name | `GATE_ALLOWED_ORIGINS`, in the `env` block of `google_cloud_run_v2_service.gate` |
+| Shape | comma-separated `https://host[:port]` — no path, no trailing slash, no query, no fragment |
+| Value | `https://<var.domain>` **and** `https://<service>-<project number>.<region>.run.app`, plus anything in `var.gate_extra_allowed_origins` |
+| Unset | the gate logs `event=misconfigured` at `ERROR`, boots with `allowed_origins=none`, and **refuses every sign-out**. There is no header fallback by design |
+
+It is **not** a GitHub Actions variable and nothing needs setting by hand: Terraform owns the
+service's env block, `gate.yml` owns only the image.
+
+**Both** origins are required because ADR-0004 puts the invoker at `allUsers`: the same code
+must be correct on the site domain and on the service's own `*.run.app` URL. One without the
+other passes one transport's tests and refuses every real sign-out on the other.
+`var.redirect_domains` is deliberately excluded — those hosts answer a 301 to `var.domain`,
+so a browser never has one as its origin when it POSTs.
+
+**Why it is constructed instead of read from the service.** The obvious spelling,
+`google_cloud_run_v2_service.gate.uri`, is a self-reference: the service's own `env` block
+cannot read the service's own computed URL, and Terraform refuses the configuration. The
+value is built from `local.gate_service_name`, `data.google_project.hub.number` and
+`var.region` instead. `check_private_bucket_config.py` asserts both halves of this — that the
+variable is rendered under exactly that name, and that `gate.tf` never reaches for `.uri`.
+
+**Verify it after the first apply rather than assuming it.** This project has **two** live
+`*.run.app` spellings for the gate: the project-number form this module constructs, and an
+older `<service>-<hash>-<regioncode>.a.run.app` form. If the service answers on the older
+one, sign-out from that host is refused until it is added to
+`var.gate_extra_allowed_origins`. The gate prints the set it parsed verbatim in its boot
+line, so one look settles it:
+
+```sh
+terraform -chdir=infra output -raw gate_allowed_origins_check_command
+# then run the three commands it prints: the serving URL, the boot line, and any
+# event=misconfigured line. The first two must agree.
+```
 
 ### The gate's Identity Platform role
 
@@ -513,10 +580,17 @@ apply-provenance rule (§Guardrails).
    gh variable set GCP_GATE_SERVICE      --body "<GCP_GATE_SERVICE>"
    gh variable set GCP_GATE_REGION       --body "<GCP_GATE_REGION>"
    gh variable set GCP_ARTIFACT_REGISTRY --body "<GCP_ARTIFACT_REGISTRY>"
+
+   # Wave 0 (#58). The live bucket IAM check authenticates as this identity.
+   # Set it in the SAME session as the apply: until it is set, the
+   # private-bucket-live-iam job FAILS on every scheduled run and on every push
+   # to main, deliberately and loudly, rather than skipping quietly.
+   gh variable set GCP_AUDITOR_SA --body "$(terraform -chdir=infra output -raw auditor_service_account_email)"
    ```
 
    `GCP_WIF_PROVIDER` is **unchanged**: the gate workflow runs in this repository
-   and uses the hub's existing provider with a different service account.
+   and uses the hub's existing provider with a different service account, and so
+   does the auditor.
 
 8. **Set the `phd-milestones` variables in that repository** (all four are new
    there):
@@ -553,9 +627,17 @@ plausibly reach a few cents. Rates and allowances read 2026-09-17.
 | Firestore (Native) | Free tier: "1 GiB of storage per project", "50,000 reads, 20,000 writes, and 20,000 deletes per day per project" ([Free Program](https://cloud.google.com/free/docs/free-cloud-features)) | Two documents. One read per private request | **$0.00** |
 | Identity Platform | "no-cost tier of 50,000" monthly active users ([Identity Platform pricing](https://cloud.google.com/identity-platform/pricing)) | Two users | **$0.00** |
 | Private bucket (Cloud Storage) | Free tier: 5 GB-months regional (US regions), 5,000 Class A, 50,000 Class B ops ([Cloud Storage pricing](https://cloud.google.com/storage/pricing)) | A few MB of rendered HTML, one destructive sync per deploy, one read per private request. us-east1 qualifies | **$0.00** |
-| IAM: 2 custom roles, 2 service accounts, 6 bindings, 1 WIF binding | "All use of Identity and Access Management API is free of charge" | — | **$0.00** |
+| IAM: 4 custom roles, 3 service accounts and their bindings | "All use of Identity and Access Management API is free of charge" | Wave 0 adds `gateSessionMinter`, and `privateBucketAuditor` with the keyless `hub-auditor` identity, its project binding and its WIF binding | **$0.00** |
+| The **live** bucket IAM check (Wave 0, #58) | Cloud Storage free tier: 5,000 Class A and 50,000 Class B operations per month in US regions ([Cloud Storage pricing](https://cloud.google.com/storage/pricing)); Resource Manager reads are not billed | Two Class B operations (`buckets.get`, `buckets.getIamPolicy`) plus one project-policy read per run, on the existing hourly schedule and on each push to main — roughly 1,500 Class B operations a month | **$0.00** |
+| Cloud Monitoring: one extra log-based metric and one extra alert policy (Wave 0, #54) | Metrics: chargeable by bytes ingested against the first 150 MiB per billing account per month. Alerting policies: "$0.35 per month for each metric reference in an alerting policy", **no** free allotment, **effective 1 September 2027** ([Cloud Monitoring pricing](https://cloud.google.com/stackdriver/pricing)) | A DELTA counter matching one line at container startup, and one condition referencing it | **$0.00** today; see the sensitivity note |
 
 Sensitivity, so the number is honest rather than merely small:
+
+- **Alerting stops being free on 1 September 2027.** From that date each metric
+  reference in an alerting policy costs $0.35/month with no free allotment, so
+  this module's four policies become roughly **$1.40/month** — still well inside
+  the $5 budget, but it is the one line that changes without anyone touching
+  this repository, and the budget alert is what will say so.
 
 - **Artifact Registry is the one line that can leave the free tier.** If the gate
   image is large and its layers do *not* dedupe well, five retained versions
@@ -741,6 +823,13 @@ procedure, with expected output for every command, is in
 `llm/sprints/2026-09-hub/handoffs/infra-phase-3.md` §Checkpoint 4. The two checks
 that matter most are here, because they are the ones whose failure is silent.
 
+Since Wave 0 the first of them is **not only** a by-hand procedure: the same
+script runs hourly and on every push to main in `build.yml`'s
+`private-bucket-live-iam` job, as the read-only auditor (`auditor.tf`), and
+fails that job. Running it here is still worth doing at Checkpoint 4 — it is the
+run where a human reads the output rather than a job going green — but the
+private area is no longer relying on someone remembering to.
+
 ### Proving the private bucket has exactly one reader
 
 "Exactly one reader" is an **equality** assertion, not an absence one: it is not
@@ -770,14 +859,23 @@ It asserts, and fails loudly on any of them:
    the gate, `privateSyncWriter` → `hub-deploy`. A third binding fails the check.
 5. An anonymous `GET` of a real private object is refused (401/403/404). This is
    the roadmap's last clause, and it needs no credential at all.
+6. **`roles/viewer` and `roles/editor` on the project are both empty.** These are
+   what the automatic `projectViewer` / `projectEditor` legacy bindings expand
+   to, and a non-empty expansion reaches every object in the bucket without one
+   line of this module changing. The failure names the role, the principals and
+   what that role reaches, because the two have different consequences:
+   `roles/viewer` reads and lists, `roles/editor` also **writes, deletes and
+   rewrites the bucket's IAM policy**.
 
-It also **prints, without failing on them**, the `legacyBucketOwner` /
-`legacyObjectReader` bindings Cloud Storage creates automatically on every
-bucket. They are not granted by this module, but they mean **any principal with
-project Viewer on `cusati-hub` can read every private object**. Today that is
-only the owner. This was recorded as acceptable for the content bucket at
-Checkpoint 3; now that the bucket holds private material it needs the owner's
-explicit acceptance. See the handoff §Risks.
+It also **prints, without failing on them**, the four legacy bindings Cloud
+Storage creates automatically on every bucket, and the expansion of
+`roles/owner` — which is the owner, is expected, and is exactly why the legacy
+bindings cannot simply be deleted: an authoritative bucket policy that dropped
+the `projectEditor` pair would drop the owner's own object access with it. That
+remains an owner decision (handoff §Risks, item 5). What changed in Wave 0 is
+that the **editor** expansion is now watched at all: until then the check
+expanded `roles/viewer` only, which is the empty role, so it passed while the
+populated one went unwatched (#55).
 
 ### Proving the satellite boundary still holds, in both directions
 
@@ -808,14 +906,26 @@ waiting on a branch-protection change.
 It now also asserts the gate's Identity Platform role holds exactly
 `firebaseauth.users.createSession` and `firebaseauth.users.get`, and that
 `gate.tf` names no predefined Authentication role — so re-widening N-1 fails CI
-instead of passing review.
+instead of passing review. Wave 0 adds two more assertions to the same script:
+that the CI auditor role holds its three permissions and **no `storage.objects.*`
+at all**, and that `gate.tf` renders `GATE_ALLOWED_ORIGINS` under exactly that
+name without reaching for the service's own `uri` — the cross-stream contract
+that Phase 3 got wrong once already, as `PRIVATE_BUCKET` vs `GATE_PRIVATE_BUCKET`.
 
-Two further credential-free guards run in the same job:
+Three further credential-free guards run in the same job:
 
 | Step | Asserts |
 |---|---|
 | `Check the executable bit on every tracked script` | every `*.sh` with a shebang, and every file invoked directly anywhere, is committed `100755`; every interpreted module is `100644` |
 | `Check the satellite boundary invariants are declared` | uniform bucket-level access on **both** buckets; `satellitePublisher` holds exactly its three permissions and never `storage.objects.list`; every satellite binding uses that custom role **with** a `startsWith` prefix condition; no satellite holds a project-level role |
+| `Check the live bucket IAM check is wired to a job that runs` | that `check-private-bucket-iam.sh` is invoked by a real job, that the job admits the **`schedule`** event, is not `continue-on-error`, is **not** conditioned on `GCP_AUDITOR_SA` (which would make a missing variable skip it silently), and is in `notify-failure`'s `needs` |
+
+The last one exists because the live check ran **nowhere** for two phases while
+three documents said otherwise (#58). It **parses** the workflow rather than
+grepping it, which is the whole design: the state it exists to prevent is one
+where the only mention of the script is a comment, and a comment does not
+survive `yaml.safe_load`. A grep-based version would have passed on exactly the
+state that produced the defect.
 
 The executable-bit guard reads modes from the **index** (`git ls-files -s`) and
 file contents from the index blob, never from the working tree. `/mnt/c` is a
@@ -860,11 +970,29 @@ silently reverts.
 | `Hub private gate` uptime | the gate's `/_health`, every 5 minutes |
 | `hub-gate-denials` | counts the gate's own `event=deny` lines |
 | `hub-signin-failures` | counts `event=client_signin_failed`, reported by the browser |
+| `hub-gate-misconfigured` | counts `event=misconfigured` — a revision that started without a setting it cannot work without |
 
-Three alert policies — site down, gate down, sign-in failing — each carrying the literal
-`gcloud logging read` command in its `documentation{}` block. The alert email is meant to be
-the first page of the runbook; an alert that only says "something is wrong" restarts the
-very back-and-forth this exists to end.
+Four alert policies — site down, gate down, sign-in failing, and **gate started
+misconfigured** — each carrying the literal `gcloud logging read` command in its
+`documentation{}` block. The alert email is meant to be the first page of the runbook; an
+alert that only says "something is wrong" restarts the very back-and-forth this exists to
+end.
+
+The fourth exists because the gate's CSRF check has no header fallback: with
+`GATE_ALLOWED_ORIGINS` unset it refuses every `POST /session/end`, and the gate stream's
+"the deploy fails loudly" claim leans on `gate.yml` smoke assertions that are recorded as
+**un-failable by construction** (Skeptic Verifier U-2). The boot `ERROR` line is the part
+that is independently solid, so that is what is watched. It fires at startup, before a
+member is affected, rather than waiting for the resulting denial spike.
+
+**Cost, stated because it is not permanently zero.** The log-based metric is chargeable by
+bytes ingested against a free allotment of the first 150 MiB per billing account per month,
+and a counter matching one line at startup is negligible. Alerting policies are billed
+"$0.35 per month for each metric reference in an alerting policy" with **no** free
+allotment — but the effective date on Google's pricing summary is **1 September 2027**.
+Until then all four policies are free; from that date they cost about **$1.40/month** in
+total against the $5 budget. Worth knowing in advance; not a reason to leave a loud failure
+unwatched today.
 
 ### After the first apply — three things that must be VERIFIED, not assumed
 
@@ -908,8 +1036,6 @@ channel type, and it might not be available in certain regions", and Google reco
 pairing it with another type. It is therefore a **second** channel beside email, never a
 replacement. Cloud Monitoring bills metrics ingestion, API calls, uptime checks and
 alerting-policy metric references — not notification delivery — so this line is **$0.00**.
-
-**2. Confirm each policy actually has the channel attached.**
 
 **2. Confirm each policy actually has the channel attached.**
 

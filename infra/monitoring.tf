@@ -363,3 +363,135 @@ resource "google_monitoring_alert_policy" "signin_failing" {
     EOT
   }
 }
+
+# ---------------------------------------------------------------------------
+# THE GATE CAME UP MISCONFIGURED (issue #54; gate handoff gate-wave-0-fixes.md;
+# Chief Reviewer routing 2026-09-19).
+#
+# WHY THIS IS NOT COVERED BY WHAT IS ALREADY HERE. The gate's CSRF check now
+# builds its accepted-origin set from GATE_ALLOWED_ORIGINS and has NO header
+# fallback: unset, POST /session/end refuses every request and no member can
+# sign out. The gate stream's own risk note says plainly that its "the deploy
+# fails loudly" claim leans on .github/workflows/gate.yml's smoke assertions,
+# which the Skeptic Verifier recorded as un-failable by construction (U-2) and
+# which that stream was told not to touch. So the deploy is NOT the safety net.
+#
+# What is independently solid is the log: the revision emits
+# event=misconfigured at ERROR once at startup. That is what this watches.
+#
+# It is deliberately a SEPARATE policy from the denial spike. hub-gate-denials
+# already matches the resulting refusals (they log event=deny), so a
+# misconfigured deploy would eventually show up there -- but only once a member
+# tries to sign out and fails, and reported as "denials are up" rather than as
+# "the gate started without its origin set". This fires at BOOT, before anyone
+# is affected, and names the cause.
+#
+# COST, stated because a new resource needs one (§12.6). Two charges exist and
+# both are effectively zero here:
+#   - The log-based metric is a user-defined metric, chargeable by bytes
+#     ingested, against a free allotment of the first 150 MiB per billing
+#     account per month. A DELTA counter whose filter matches a single line at
+#     startup ingests a negligible number of bytes, and this project is far
+#     below the allotment.
+#   - Alerting policies are billed "$0.35 per month for each metric reference in
+#     an alerting policy", with NO free allotment -- but the effective date on
+#     Google's pricing summary is 1 September 2027. Until then this policy is
+#     free. From that date it costs $0.35/month, and the three policies already
+#     in this file start costing the same each, so the whole file becomes about
+#     $1.40/month against the $5 budget. That is worth knowing in advance; it is
+#     not a reason to leave a loud failure unwatched today.
+# ---------------------------------------------------------------------------
+resource "google_logging_metric" "gate_misconfigured" {
+  project = var.project_id
+  name    = "hub-gate-misconfigured"
+
+  # Emitted once, at startup, by a revision that came up without a setting it
+  # cannot work without. The gate's line is:
+  #   event=misconfigured setting=GATE_ALLOWED_ORIGINS effect=signout_refuses_every_request
+  # Anchored on the EVENT rather than on the setting name, so a second such
+  # setting is covered the day it exists rather than the day someone remembers
+  # this file.
+  filter = <<-EOT
+    resource.type="cloud_run_revision"
+    resource.labels.service_name="${google_cloud_run_v2_service.gate.name}"
+    textPayload:"event=misconfigured"
+  EOT
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    unit        = "1"
+  }
+}
+
+resource "google_monitoring_alert_policy" "gate_misconfigured" {
+  project      = var.project_id
+  display_name = "Hub — gate started misconfigured"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "gate logged event=misconfigured at startup"
+    condition_threshold {
+      filter = join(" AND ", [
+        "metric.type=\"logging.googleapis.com/user/${google_logging_metric.gate_misconfigured.name}\"",
+        # Sharp edge 1: the alert filter must constrain resource.type even
+        # though the log metric's own filter already does.
+        "resource.type=\"cloud_run_revision\"",
+      ])
+
+      # ANY occurrence. One is a fault: a revision only logs this when it came
+      # up unable to do its job.
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "0s"
+
+      aggregations {
+        alignment_period = "300s"
+        # Sharp edge 2: DELTA metric, so ALIGN_DELTA.
+        per_series_aligner = "ALIGN_DELTA"
+      }
+
+      trigger { count = 1 }
+
+      # INACTIVE, for the same reason as the sign-in failure counter: this is a
+      # FAULT counter, and no data means no revision has come up misconfigured,
+      # which is the state we want. ACTIVE would page continuously on a healthy
+      # service and an alert that cries wolf gets muted.
+      evaluation_missing_data = "EVALUATION_MISSING_DATA_INACTIVE"
+    }
+  }
+
+  notification_channels = local.alert_notification_channels
+
+  documentation {
+    mime_type = "text/markdown"
+    content   = <<-EOT
+      A gate revision started without a setting it cannot work without, and said so.
+
+      Today that means GATE_ALLOWED_ORIGINS is unset or empty. The CSRF check then
+      has no accepted origins at all, so POST /session/end refuses EVERY request
+      and no member can sign out. It fails CLOSED -- nothing is exposed, no session
+      is affected -- but the sign-out capability is gone until this is fixed.
+
+      What the revision said:
+
+          gcloud logging read 'resource.type="cloud_run_revision" AND textPayload:"event=misconfigured"' --project ${var.project_id} --freshness=1h --limit=10
+
+      What it actually parsed at boot (allowed_origins=none is the tell):
+
+          gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="${google_cloud_run_v2_service.gate.name}" AND textPayload:"event=boot"' --project ${var.project_id} --freshness=1h --limit=1 --format='value(textPayload)'
+
+      What it should be, and the URL the service actually answers on -- these two
+      must agree, and the second may use the older <service>-<hash>-<region>.a.run.app
+      spelling this module cannot construct:
+
+          terraform -chdir=infra output -raw gate_allowed_origins
+          gcloud run services describe ${google_cloud_run_v2_service.gate.name} --project ${var.project_id} --region ${var.region} --format 'value(status.url)'
+
+      Fix: apply infra/ so the env var reaches the service (Terraform owns the env
+      block; gate.yml owns only the image), then roll a revision. If the serving URL
+      is a spelling this module does not construct, add it to
+      var.gate_extra_allowed_origins rather than editing the service by hand.
+    EOT
+  }
+}

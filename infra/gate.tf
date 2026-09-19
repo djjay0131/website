@@ -18,6 +18,44 @@ locals {
   # exactly that failure, which breaks the PUBLIC site's deploy, not just the
   # private area.
   gate_service_name = "hub-gate"
+  # THE CSRF ACCEPTED-ORIGIN SET (gate handoff gate-wave-0-fixes.md; issue #54).
+  #
+  # The gate's CSRF check used to compare Origin against Host and
+  # X-Forwarded-Host -- every value in the comparison supplied by the request,
+  # so it proved nothing and three forged spellings were demonstrated over real
+  # HTTP. Its replacement compares Origin against a frozenset built at startup
+  # from GATE_ALLOWED_ORIGINS, and there is NO header fallback: unset means
+  # /session/end refuses every request, loudly (ERROR event=misconfigured at
+  # boot, reason=no_allowed_origins_configured on each refusal). The variable is
+  # load-bearing, not optional, and routing it is infra's half of that fix.
+  #
+  # BOTH origins, because ADR-0004 puts the invoker at allUsers: the same code
+  # must be correct on the site domain AND on the service's own *.run.app URL.
+  # One without the other passes one transport's tests and refuses every real
+  # sign-out on the other.
+  #
+  # CONSTRUCTED FROM THE PROJECT NUMBER, NOT FROM .uri. The obvious spelling,
+  # google_cloud_run_v2_service.gate.uri, is a SELF-REFERENCE: the service's own
+  # env block cannot read the service's own computed URL, and Terraform refuses
+  # the configuration. check_private_bucket_config.py asserts that this file
+  # never reaches for it.
+  #
+  # var.redirect_domains is deliberately excluded: those hosts answer a 301 to
+  # var.domain, so a browser never has one as its origin when it POSTs. If that
+  # ever changes they must be added.
+  #
+  # VERIFY AFTER THE FIRST APPLY rather than assuming. If this service predates
+  # Cloud Run's current URL scheme its host may be the older
+  # <service>-<hash>-<regioncode>.a.run.app spelling -- and this project has
+  # BOTH spellings live (the Wave 0 live probe reached the gate on
+  # hub-gate-<hash>-ue.a.run.app as well as on the project-number form). The
+  # gate prints the set it parsed verbatim in its boot line, so one look
+  # confirms it: terraform output -raw gate_allowed_origins_check_command.
+  # var.gate_extra_allowed_origins exists for exactly that case.
+  gate_allowed_origins = join(",", concat([
+    "https://${var.domain}",
+    "https://${local.gate_service_name}-${data.google_project.hub.number}.${var.region}.run.app",
+  ], var.gate_extra_allowed_origins))
 }
 
 # ---------------------------------------------------------------------------
@@ -230,6 +268,14 @@ resource "google_cloud_run_v2_service" "gate" {
       env {
         name  = "GOOGLE_CLOUD_PROJECT"
         value = var.project_id
+      }
+
+      # The accepted-origin set for the CSRF check. See local.gate_allowed_origins
+      # above for why it is constructed rather than read from the service's uri,
+      # and why it must name both transports.
+      env {
+        name  = "GATE_ALLOWED_ORIGINS"
+        value = local.gate_allowed_origins
       }
     }
   }
