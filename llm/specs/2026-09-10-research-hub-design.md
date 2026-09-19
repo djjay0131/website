@@ -1,6 +1,8 @@
 # Research Hub — Design Authority Document
 
-Status: Approved for Phase 0–3 execution
+Status: Approved for Phase 0–6 execution *(amended 2026-09-18 by the owner in the
+run-to-completion prompt; it read "Approved for Phase 0–3 execution". Roadmap assumption
+R-A3, which rested on that wording, is retired with it.)*
 Last updated: 2026-09-10
 Owner: Jason Cusati (project owner, sole human reviewer)
 Governance: agentic-governance v0.5 (pin in governance-delta.md)

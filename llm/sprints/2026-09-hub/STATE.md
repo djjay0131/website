@@ -13,6 +13,68 @@ declared in `llm/governance/governance-delta.md` §Canon Location.
 
 ---
 
+## Run-to-completion — preconditions (2026-09-18)
+
+The owner authorised a run from here to the end of Phase 6 without stopping, except at the
+hard stops. These are the §1 preconditions, verified rather than assumed. **All pass.**
+
+| Check | Result |
+|---|---|
+| repo / branch / remote | `djjay0131/website`, clean, on `main`, 0 ahead 0 behind `origin/main` at `f98a928` |
+| node / npm | v24.18.0 / 11.16.0 — Node 20+ satisfied |
+| python | system **3.8.5**; uv CPython **3.12.11** resolved for the gate and for `CLOUDSDK_PYTHON` |
+| `gh` | **not on PATH**, exactly as Risk 3 predicted. Resolved once to the Windows binary; authed as `djjay0131`, scopes `repo`/`workflow` |
+| gcloud | account `djjay0131@gmail.com`; project was **unset** and is now `cusati-hub` (410552878319, ACTIVE) |
+| firebase | `login:list` reports no authorized account — deviation 2 |
+| terraform | **not on PATH** (Risk 3). Run through `hashicorp/terraform:1.14.0`, the container Checkpoints 2–4 used. `init` OK; `plan -detailed-exitcode` → **exit 0, "No changes."** |
+| governance-checks `--layout` | 4 of 4 PASS |
+| `build-info.json` | `content_source: "bucket"`, `built_from_sha` `f98a928a`, matching local HEAD |
+| `/p/index.html` | **404** — never 200. Deviation 1 |
+
+**Deviation 1 — the private path answers 404, not 401/403/redirect.** The brief expects one
+of the latter; the gate answers a uniform 404 and that is deliberate. C29 records the
+reasoning: a redirect or a 403 is an existence oracle for private slugs, and a redirect also
+writes the private path into `?next=`, browser history, `Referer` and logs. The precondition's
+intent — never 200 — holds, and the implemented behaviour is stronger than the specified one.
+
+It was **proven to be the gate rather than Google's frontend**, which is the failure already
+on record for `/healthz`. Cloud Logging carries the matching decision for each probe:
+
+```
+02:58:31Z  INFO gate event=deny scope=private stage=session reason=no_session_cookie
+02:59:10Z  INFO gate event=deny scope=private stage=session reason=no_session_cookie
+httpRequest 404  /p/index.html  02:58:31Z, 02:59:10Z
+httpRequest 404  /p/            02:58:31Z
+```
+
+The body is 426 bytes with `<html lang="en">` quoted; Google's error page is 1568 bytes with
+`<html lang=en>` unquoted. `/session` returns 405 from the application. Serving revision
+`hub-gate-00005-n4g`. This is the first time the `/p/` refusal has been confirmed from the
+gate's own logs rather than inferred from a status code — possible only because the logging
+defect was fixed on 2026-09-18.
+
+**Deviation 2 — `firebase login:list` reports no authorized account.** Recorded, not fixed.
+Interactive `firebase login` is browser-only and would be a §10 console hard stop, but nothing
+in this run needs it: Hosting deploys run in CI through WIF, and the CLI answers read queries
+through ADC (`firebase projects:list` returns `cusati-hub`). Escalate only if a local CLI
+write ever becomes genuinely necessary.
+
+**Finding — issue #30 does not reproduce, and this one matters.** STATE records that
+`terraform apply` was not idempotent: `google_firebaserules_ruleset.firestore_deny_all` and
+its release were replaced on every apply, briefly unreleasing the deny-all rules that protect
+`members/{email}`. The current plan is clean — both resources refresh with no diff — so PR #35
+fixed it. This is not merely bookkeeping: the run brief names the ruleset/release pair as a
+stateful resource, so a `replace` on it is a hard stop before any apply. It is therefore
+re-verified immediately before each apply rather than trusted from this record.
+
+**Also verified, closing two long-standing unknowns.** `phd-milestones` is **private** on
+GitHub (`private: true`) — the Chief Reviewer recorded this as UNVERIFIABLE and noted that if
+it were public the entire boundary argument would be moot. And `contract-tests` now exists as
+a job in `ci.yml`, so issue #26 reduces to promoting it to a required check; the required
+contexts on `main` are still only `governance-checks` and `budget-guard`.
+
+---
+
 ## Current position
 
 **Phase 3 — Private area. IN PROGRESS** (issue #24, branch `feat/private-area`, owner's go
@@ -355,6 +417,39 @@ Phase 1's `firebase.json` carries no gate rewrites.
   produces the "not shared with you" page, which is indistinguishable from a gate bug. Sign-in
   must use the VT Google account or email-link to `djjay@vt.edu`. Recorded in the seed
   script's output and in the Checkpoint 4 steps.
+
+### Owner decisions, 2026-09-18 (run-to-completion prompt)
+
+Eight decisions given at once to unblock a run from Phase 4 to the end of Phase 6. None of
+them is to be re-asked.
+
+| # | Decision |
+|---|---|
+| D1 | **Go for Phases 4, 5 and 6.** The design doc's status line is amended to "Approved for Phase 0–6 execution"; roadmap assumption **R-A3 is retired** |
+| D2 | **§10 Q3 — share links are wanted.** Phase 4 executes as written (design doc §6 responsibility 4, roadmap §phase-4-sharing) |
+| D3 | **§10 Q4 — members are seeded**: `djjay@vt.edu` (`role: owner`) and `cbrown@vt.edu`. Those two only. **Do not add members** |
+| D4 | **§10 Q6 — satellite order**: `agentic-kgis` first, publishing as `source: kgis`, then `construction-ai-proposal`. `agentic-kgis` is substituted for `agentic-kg` because its website content already exists — `docs-site/` with a contract-valid manifest, item `kgis-docs`, `section: projects`, `format: html`, mount `/projects/kgis/kgis-docs/`, and a gated `docs-publish.yml` awaiting provisioning. `agentic-kg` becomes "later, optional". **Recorded as an ADR amending design doc §2 and §11** |
+| D5 | **Merge and apply authority — granted, gated.** The Lead Architect may merge to `main` and run `terraform apply` when, and only when, every condition in the run brief's §8 holds. This supersedes "agents do not merge" **for this run only**. Anything that destroys or replaces a stateful cloud resource, and every §10 hard stop, still stops |
+| D6 | **Phases 4–6 each close with a checkpoint** the Lead Architect defines in this file **before** the phase starts: that phase's roadmap acceptance criteria verified live, plus the run's security gate. **Closes roadmap O7.** Checkpoints 5, 6 and 7 are written into the roadmap |
+| D7 | **`research` and `projects` stay separate sections.** The owner considered merging them and declined; the section enum is unchanged. The Projects page title, currently "Selected Projects & Research", becomes **"Projects"**. Research keeps the digests |
+| D8 | **Private by default — the hub owns the publish decision.** An item is public only if **both** its satellite manifest says `visibility: public` **and** the hub's committed publish allowlist names its `(source, slug)`. Everything else renders only in the private build, behind sign-in. The manifest's `visibility` becomes a *request*; the hub is the authority — which is what §12.3 ("satellites are untrusted") always implied. **Recorded as an ADR amending design doc §4 and §5, and ADR-0011's `srcDir` model as needed** |
+
+**D8 — the day-one allowlist, exactly.** `cv/academic`, `cv/research-professional`,
+`cv/sde-long`, `cv/cv-data` (the data item the public CV pages render from), `kgis/kgis-docs`,
+and the first-party `soa-agentic-se` research digests, keyed `hub/<path>`.
+
+- **`cv/anthropic-fellow` is private.** It must not appear on `/resumes/`, `/cv/`, in
+  `/pdfs/`, in the sitemap, the search index, RSS, OG images, or any `dist-public` byte.
+- **`construction-ai-proposal` items start private** and stay so until the owner adds them.
+- The allowlist lives in the repo (`site/publish-allowlist.json` or equivalent under
+  `site/`), is an **L0-shaped edit**, and is the only way to make something public.
+
+**Consequence worth stating plainly.** `cv/cv-data` is a single data item carrying all four
+variant definitions and the shared content pool, so allowlisting it does not by itself keep
+the fellowship variant out of the public build. Either the hub filters the payload at render
+time and the leak check proves the residue absent, or the `cv` satellite splits the payload.
+That is Wave 0b's to decide and record, and the Skeptic Verifier plants a marker string in
+the fellowship variant and shows the leak check catch it.
 
 ## Assumptions (conservative choices, not §10 questions)
 
