@@ -26,6 +26,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from datetime import timedelta
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -86,6 +87,24 @@ def _configure_logging() -> str:
 # gate itself sends `public` or `s-maxage` (ADR-0004), so this string -- and the
 # middleware that applies it unconditionally -- is the whole defence.
 PRIVATE_CACHE_CONTROL = "private, no-store"
+
+# The session cookie's attributes, defined ONCE and used by both the mint path
+# and the sign-out path.
+#
+# WHY IT IS A SHARED CONSTANT. A browser keys a cookie on name, domain and path,
+# so a `Set-Cookie` that clears `__session` at a different Path -- or that omits
+# Secure, HttpOnly or SameSite -- can be stored as a SECOND cookie and leave the
+# original in place. The member is told they signed out, the gate logs that they
+# did, and the 14-day session is still there. Nothing observable goes wrong.
+# Sharing one definition makes the two headers identical by construction;
+# tests/test_signout.py still parses both and compares them, because a shared
+# constant is a reason to believe, not a proof.
+SESSION_COOKIE_ATTRS = {
+    "path": "/",
+    "httponly": True,
+    "secure": True,
+    "samesite": "lax",
+}
 
 # An ID token is a JWT of a few kilobytes. Anything larger is not a sign-in
 # attempt, and reading it would be work done on behalf of an anonymous caller.
@@ -279,12 +298,54 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             key=SESSION_COOKIE_NAME,
             value=cookie,
             max_age=deps.settings.session_max_age_seconds,
-            path="/",
-            httponly=True,
-            secure=True,
-            samesite="lax",
+            **SESSION_COOKIE_ATTRS,
         )
         logger.info("event=allow scope=session member=%s", principal.email)
+        return response
+
+    # Sign-out (SD-4). Until this route existed there was NO WAY OUT: a 14-day
+    # HttpOnly cookie that only the browser could forget, so a member on a shared
+    # machine could not end their own session. That is a defect today, and Phase 4
+    # adds more session state on top of it.
+    #
+    # Four properties, each of which is a test in tests/test_signout.py:
+    #
+    #   * it clears the cookie with EVERY attribute the mint path set (see
+    #     SESSION_COOKIE_ATTRS), because a header that differs in one of them can
+    #     be stored as a different cookie and leave the session standing;
+    #   * it refuses a cross-origin POST. A forged sign-out is only a nuisance --
+    #     but the mint and revoke routes Phase 4 adds are POSTs with the same
+    #     SameSite=Lax cookie, and Lax does not stop a top-level form POST. The
+    #     check is written here, once, where getting it wrong costs nothing;
+    #   * it answers identically whether or not a session existed. It never reads
+    #     the cookie, so there is no oracle to build and nothing to time -- the
+    #     rule C29 already imposes on /p/**;
+    #   * it says so in the log, in the same `event=` grammar as every other
+    #     decision here, so a sign-out is visible in Cloud Logging.
+    #
+    # No revocation. Clearing the cookie ends the session in THIS browser; it does
+    # not invalidate the cookie server-side, which would need the uid, which would
+    # need the cookie verified -- work done for an anonymous caller, and an oracle.
+    # "Sign out everywhere" is Phase 4's, and `check_revoked` already makes it bite
+    # on every request once something calls it. See the handoff.
+    @app.post("/session/end")
+    async def end_session(request: Request) -> Response:
+        if not _same_origin(request):
+            logger.info("event=deny scope=signout reason=cross_origin")
+            # No Set-Cookie on this path: a refused caller must not be able to
+            # clear anything, or the refusal would be the attack it prevents.
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        response = JSONResponse({"status": "ok"}, status_code=200)
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value="",
+            max_age=0,
+            **SESSION_COOKIE_ATTRS,
+        )
+        # No member= field, deliberately: naming the member would mean verifying
+        # the cookie, which is the existence oracle this route does not build.
+        logger.info("event=allow scope=signout")
         return response
 
     # ---------------------------------------------------------------------
@@ -408,6 +469,52 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         return JSONResponse({"status": "ok"}, status_code=200)
 
     return app
+
+
+def _same_origin(request: Request) -> bool:
+    """Did this state-changing request come from the gate's own origin?
+
+    The CSRF check. `SameSite=Lax` is not one: Lax still sends the cookie on a
+    top-level POST that a cross-site page triggers, which is exactly the shape of
+    a forged sign-out -- and, in Phase 4, of a forged mint or revoke.
+
+    The comparison is Origin against the host the request was addressed to, with
+    NOTHING configured. That is deliberate. ADR-0004 puts the invoker at
+    `allUsers`, so the same code must be right on https://jason.cusati.us and on
+    the service's own https://hub-gate-....run.app; a list of permitted domains
+    would be a fourth place (after Terraform, Hosting and the app) that has to be
+    kept in step, and the first one to go stale fails closed on the real domain.
+
+    A MISSING Origin is refused, not waved through. Every browser sends Origin on
+    a cross-site POST, so treating its absence as trustworthy would admit the one
+    request this exists to refuse. A non-browser caller that genuinely wants the
+    route sends its own Origin -- gate.yml's smoke test does exactly that.
+
+    X-Forwarded-Host is accepted alongside Host because which of the two carries
+    the site's domain on a Firebase Hosting -> Cloud Run rewrite is NOT settled
+    here (the handoff carries the probe that settles it). Honouring it is not a
+    way in: a cross-site form POST cannot set that header, and setting it from
+    fetch() makes the request preflighted -- and the gate answers no preflight
+    and sends no Access-Control-Allow-* header, so the browser never sends it.
+    """
+    origin = request.headers.get("origin", "").strip()
+    if not origin:
+        return False
+
+    parsed = urlsplit(origin)
+    # A serialized origin is scheme://host[:port] and nothing else. `null`, a
+    # bare hostname, and anything carrying a path or query is not one.
+    if parsed.scheme != "https" or not parsed.netloc:
+        return False
+    if parsed.path or parsed.query or parsed.fragment:
+        return False
+
+    addressed_to = {request.headers.get("host", "").strip().lower()}
+    forwarded = request.headers.get("x-forwarded-host", "")
+    addressed_to.update(candidate.strip().lower() for candidate in forwarded.split(","))
+    addressed_to.discard("")
+
+    return parsed.netloc.lower() in addressed_to
 
 
 def _authenticate(request: Request, deps: Dependencies) -> tuple[Principal | None, str | None]:

@@ -26,7 +26,16 @@ def test_no_share_routes_are_declared(deps):
     #
     # This assertion is exact on purpose. Its job is to make a new route -- a
     # half-built share endpoint especially -- fail loudly rather than appear.
-    assert paths == {"/session", "/p/{path:path}", "/_health", "/client-events"}
+    # /session/end is the fifth, added for SD-4: a 14-day HttpOnly cookie with no
+    # in-band clear meant a member on a shared machine could not sign out. It is
+    # session teardown, not a share route -- see tests/test_signout.py.
+    assert paths == {
+        "/session",
+        "/session/end",
+        "/p/{path:path}",
+        "/_health",
+        "/client-events",
+    }
 
 
 @pytest.mark.parametrize(

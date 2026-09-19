@@ -12,6 +12,7 @@ Phase 3 builds §6 responsibilities 1–3, and only those:
 | Route | Purpose |
 |---|---|
 | `POST /session` | Verify a Firebase ID token, mint a 14-day session cookie |
+| `POST /session/end` | Sign out: clear `__session`. Origin-checked; identical whether or not a session existed |
 | `GET /p/{path}` | Verify the session, check the allowlist, stream the object |
 | `GET /_health` | Deploy verification; reveals nothing. **Not** `/healthz`: that path never reaches the container on Cloud Run (Google's frontend answers it), verified at Checkpoint 4. |
 
@@ -36,6 +37,51 @@ Every authorisation test therefore runs twice — see `tests/conftest.py`
 `request_headers()`, which sends each case both as Hosting would deliver it
 (every cookie but `__session` stripped) and as a direct request. A check that
 holds only behind Hosting is not a check.
+
+## Signing out
+
+`POST /session/end` clears `__session`. Before it existed there was no way out
+of a 14-day `HttpOnly` session — only the browser could forget it — so a member
+on a shared machine could not end their own session (STATE, SD-4).
+
+Three things about it are easy to get wrong, and each has a test in
+`tests/test_signout.py`:
+
+**The clear must match the mint attribute for attribute.** A browser keys a
+cookie on name, domain and path, so a `Set-Cookie` that differs in `Path`, or
+that omits `Secure`, `HttpOnly` or `SameSite`, can be stored as a *second*
+cookie and leave the session exactly where it was. The response still says 200
+and the log still says the member signed out. `app/main.py` defines the
+attributes once, in `SESSION_COOKIE_ATTRS`, and both paths use it; the test
+parses both headers and compares them anyway.
+
+**It is Origin-checked.** `SameSite=Lax` is not a CSRF defence for this: Lax
+still sends the cookie on a top-level POST that a cross-site page triggers. The
+gate compares `Origin` against the host the request was addressed to (`Host`,
+or `X-Forwarded-Host`) and refuses anything else, including a POST with no
+`Origin` at all. Nothing is configured, so the same code is right on the site's
+domain and on the service's own `*.run.app` URL. A forged sign-out is only a
+nuisance; the check lives here because Phase 4's mint and revoke need the same
+one and the stakes there are not a nuisance.
+
+**It answers identically whether or not a session existed.** It never reads the
+cookie — no verification, no lookup, nothing to time — so it is not an
+existence oracle, which is the rule `/p/**` already follows.
+
+It does **not** revoke the session server-side. Clearing the cookie ends the
+session in that browser; "sign out everywhere" needs the uid, which needs the
+cookie verified, which is work done for an anonymous caller. That belongs with
+Phase 4's session work, where `GATE_CHECK_REVOKED` already makes revocation
+bite on every request.
+
+A client calls it same-origin, which is what makes the browser send `Origin`:
+
+```js
+await fetch("/session/end", { method: "POST", credentials: "same-origin" });
+```
+
+`/session/end` needs a Firebase Hosting rewrite to reach the gate through the
+site's domain, in the same shape as `/session`.
 
 ## Caching
 

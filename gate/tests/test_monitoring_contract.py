@@ -14,13 +14,33 @@ constraint -- "a cross-stream contract is a contract, and nothing checks it". Th
 is that check.
 """
 
+import re
 from pathlib import Path
 
 import pytest
 
+from app.main import create_app
+
 REPO = Path(__file__).resolve().parents[2]
 MAIN = REPO / "gate" / "app" / "main.py"
 MONITORING = REPO / "infra" / "monitoring.tf"
+GATE_WORKFLOW = REPO / ".github" / "workflows" / "gate.yml"
+
+# The health path is a THREE-WAY contract with nothing holding it together: the
+# app declares the route, infra/monitoring.tf points an uptime check at it, and
+# gate.yml's smoke test curls it on every deploy. Change any one alone and
+# nothing here fails -- the deploy goes green, the uptime check goes red for a
+# reason no test explains, or the smoke test passes against a path Google's
+# frontend answered on the service's behalf.
+#
+# WHY THIS PATH AND NOT /healthz. `/healthz` never reaches this container on
+# Cloud Run: Google's frontend answers it with a 1568-byte error page of its own,
+# no such request appears in the container log, and the same image returns
+# {"status":"ok"} for /healthz when run locally. Four revisions carried a smoke
+# test that could not pass. The route was moved; this is the test that stops it
+# moving back, or the other two ends drifting off it.
+HEALTH_PATH = "/_health"
+INTERCEPTED_HEALTH_PATH = "/healthz"
 
 # Every token the gate emits that something downstream filters on.
 CONTRACTED_TOKENS = [
@@ -46,6 +66,37 @@ def test_the_gate_emits_the_signin_failure_token():
     # monitoring.tf keeps the old filter.
     source = MAIN.read_text(encoding="utf-8")
     assert "client_signin_failed" in source
+
+
+def test_the_app_serves_the_health_path_and_not_the_intercepted_one(deps):
+    paths = {getattr(route, "path", "") for route in create_app(deps).routes}
+
+    assert HEALTH_PATH in paths
+    assert INTERCEPTED_HEALTH_PATH not in paths, (
+        "the health route is back on a path Google's frontend answers before the "
+        "request reaches this container; the smoke test can never pass and the "
+        "uptime check reports on Google's error page, not on the gate"
+    )
+
+
+@pytest.mark.skipif(not MONITORING.exists(), reason="infra/monitoring.tf not present")
+def test_the_uptime_check_probes_the_path_the_app_actually_serves():
+    tf = MONITORING.read_text(encoding="utf-8")
+
+    assert re.search(rf'path\s*=\s*"{re.escape(HEALTH_PATH)}"', tf), (
+        f"infra/monitoring.tf's uptime check no longer probes {HEALTH_PATH}. An "
+        f"uptime check on a path the gate does not serve measures Google's 404 page."
+    )
+
+
+@pytest.mark.skipif(not GATE_WORKFLOW.exists(), reason=".github/workflows/gate.yml not present")
+def test_the_deploy_smoke_test_probes_the_path_the_app_actually_serves():
+    workflow = GATE_WORKFLOW.read_text(encoding="utf-8")
+
+    assert f'{HEALTH_PATH}"' in workflow, (
+        f"gate.yml's smoke test no longer probes {HEALTH_PATH}. This is the exact "
+        f"shape of the defect that survived four revisions."
+    )
 
 
 @pytest.mark.skipif(not MONITORING.exists(), reason="infra/monitoring.tf not present")

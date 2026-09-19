@@ -214,3 +214,33 @@ jobs:
             exit 1
           fi
           echo "OK: signed-out /p/ returned ${PRIVATE_STATUS}"
+
+          # Sign-out (SD-4), asserted HERE on the direct *.run.app URL rather than
+          # only through Hosting: the invoker is allUsers (ADR-0004), so the check
+          # has to hold on this request exactly as it does through the CDN.
+          #
+          # Both halves are asserted. A CSRF check that never refuses anything is
+          # indistinguishable from no check at all, and the clearing half is the
+          # one that fails silently -- a Set-Cookie the browser stores as a
+          # different cookie leaves the session standing while reporting success.
+          # ${URL} is already a serialized origin (https://host, no path), so it
+          # is exactly what a same-origin browser would send.
+          SIGNOUT_HEADERS="$(curl -sS -D - -o /dev/null --max-time 30 \
+            -X POST -H "Origin: ${URL}" "${URL}/session/end")"
+          if ! printf '%s' "${SIGNOUT_HEADERS}" | grep -qi '^set-cookie: *__session='; then
+            echo "::error::POST /session/end set no __session cookie at all"
+            exit 1
+          fi
+          if ! printf '%s' "${SIGNOUT_HEADERS}" | grep -qi 'max-age=0'; then
+            echo "::error::POST /session/end did not clear __session (no Max-Age=0)"
+            exit 1
+          fi
+          echo "OK: /session/end cleared __session"
+
+          FORGED_STATUS="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+            -X POST -H "Origin: https://cross-site.invalid" "${URL}/session/end")"
+          if [ "${FORGED_STATUS}" != "403" ]; then
+            echo "::error::cross-origin POST /session/end returned ${FORGED_STATUS}, not 403"
+            exit 1
+          fi
+          echo "OK: cross-origin /session/end refused with 403"
