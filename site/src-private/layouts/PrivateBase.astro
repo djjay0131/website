@@ -48,7 +48,19 @@ const { title, nav = [] } = Astro.props;
             ))}
           </ul>
         )}
+        <!-- THE SIGN-OUT CONTROL (SD-4; finding B-8).
+             A BUTTON, not a link: sign-out is a state change, so it is a POST.
+             An <a href> or a GET here would be triggerable by an <img> tag on
+             any page the member visits. The call itself lives in
+             src-private/lib/signout.mjs, where its three security properties are
+             pinned by tests rather than by review.
+             It sits in the layout so that EVERY private page carries it -- a
+             sign-out a member has to go looking for is one they will not use. -->
+        <button id="sign-out" type="button" class="sign-out">Sign out</button>
       </nav>
+      <!-- A failed sign-out must be SEEN. A member who believes they signed out
+           and did not is worse off than one who sees an error. -->
+      <p id="sign-out-error" class="sign-out-error" role="alert" hidden></p>
     </header>
     <main>
       <slot />
@@ -68,8 +80,45 @@ const { title, nav = [] } = Astro.props;
       // area, and only the second was asked for.
       //
       // /signin/ installs it separately, because that is where sign-in fails.
-      const { installGlobalHandlers } = await import("../../src/lib/client-events.mjs");
+      const { installGlobalHandlers, recordEvent } = await import("../../src/lib/client-events.mjs");
       installGlobalHandlers();
+
+      // SIGN-OUT (SD-4; B-8). The gate has owned this route, and firebase.json
+      // its rewrite, since Wave 0 -- with no caller anywhere in site/. This is
+      // the caller. The endpoint and the request shape are NOT spelled here:
+      // they belong to signout.mjs, so there is one copy of them and a test can
+      // assert it.
+      const { signOut } = await import("../lib/signout.mjs");
+      const signOutButton = document.getElementById("sign-out") as HTMLButtonElement | null;
+      const signOutError = document.getElementById("sign-out-error");
+
+      signOutButton?.addEventListener("click", async () => {
+        signOutButton.disabled = true;
+        if (signOutError) {
+          signOutError.textContent = "";
+          signOutError.hidden = true;
+        }
+
+        const outcome = await signOut({
+          onFailure: (message) => {
+            if (!signOutError) return;
+            signOutError.textContent = message;
+            signOutError.hidden = false;
+          },
+        });
+
+        // On success the browser is already navigating away. On failure the
+        // member stays here, sees why, and can try again -- and the gate hears
+        // about it in the same event grammar sign-in failures use.
+        if (!outcome.ok) {
+          signOutButton.disabled = false;
+          recordEvent(
+            "signout_failed",
+            { reason: outcome.reason, http_status: outcome.status ?? 0 },
+            { immediate: true },
+          );
+        }
+      });
     </script>
   </body>
 </html>
@@ -122,6 +171,30 @@ const { title, nav = [] } = Astro.props;
     font-weight: 600;
     font-size: 1.2rem;
     color: var(--color-text);
+  }
+  .sign-out {
+    margin-left: auto;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    padding: 0.3rem 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .sign-out:hover { border-color: var(--color-accent); }
+  .sign-out:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+  .sign-out[disabled] { opacity: 0.6; cursor: progress; }
+  .sign-out-error {
+    max-width: var(--max-width);
+    margin: 0.5rem auto 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-risk);
+    border-radius: var(--radius);
+    background: var(--color-risk-bg);
+    color: var(--color-text);
+    font-size: 0.85rem;
   }
   .badge {
     max-width: var(--max-width);
