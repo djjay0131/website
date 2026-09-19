@@ -20,8 +20,33 @@ the run rate must stay within a $5 budget (§8, §12.6).
    14-day session cookie (`HttpOnly`, `Secure`, `SameSite=Lax`).
 3. **Allowlist.** Firestore `members/{email}`; members with `role: owner` manage
    members and shares.
-4. **Serving.** The gate's service account is the private bucket's only
-   reader. Responses carry `Cache-Control: private, no-store`.
+4. **Serving.** ~~The gate's service account is the private bucket's only
+   reader.~~ Responses carry `Cache-Control: private, no-store`.
+
+   > **AMENDED 2026-09-19 by ADR-0010 decision 5.** The struck clause is **false and must
+   > not be restored.** Making withdrawal real requires the hub's deploy identity to prune
+   > `dist-private` destructively, and pruning requires `list` — which is a read. The bucket
+   > therefore carries **exactly two principals**: the gate's runtime service account with
+   > `storage.objects.get` only (never `objectViewer`, which carries `objects.list`, and in
+   > this bucket the object names are themselves private material), and `hub-deploy` with
+   > `create`, `delete`, `get`, `list` on this bucket alone.
+   >
+   > **Why this amendment is being made five days late.** ADR-0010 decision 5 amended design
+   > doc §6, roadmap criterion 10, SEAM-1's prose and its own Related Documents — and left
+   > *this* ADR, which outranks all of them, contradicted. The Wave 0 Chief Reviewer found it.
+   > It is the identical shape to its own Phase 3 finding B-1, at a node nobody thought to
+   > check, and the consequence is the one that matters: a future contributor "restoring the
+   > stated invariant" would remove `hub-deploy`, and **withdrawal would silently stop
+   > working** — a withdrawn dossier still served at its old path while the system reported
+   > success.
+   >
+   > The equality — exactly these two, in exactly these roles — is also strictly more
+   > testable than "no reader other than X", and is what
+   > `infra/scripts/check_private_bucket_config.py` actually asserts.
+   >
+   > Note also that Cloud Storage's automatic legacy bindings sit outside this count and grant
+   > `projectEditor` create/delete/get/list on every object (issue #55). "Exactly two" has
+   > always meant two **non-legacy** principals, and that qualifier was never written down.
 5. **Share links.** Random tokens in Firestore `shares/{token}`, scoped to one
    slug, expiring and revocable (Phase 4; §10 Q3 may still cut them).
 

@@ -1,9 +1,18 @@
 # Research Hub — Design Authority Document
 
-Status: Approved for Phase 0–3 execution
-Last updated: 2026-09-10
+Status: Approved for Phase 0–6 execution *(amended 2026-09-18 by the owner in the
+run-to-completion prompt; it read "Approved for Phase 0–3 execution". Roadmap assumption
+R-A3, which rested on that wording, is retired with it.)*
+Last updated: 2026-09-19 *(the body carries dated amendments from 2026-09-16 onward — ADR-0008
+to §2 and §4, ADR-0010 decision 5 to §6, ADR-0011 to §5, and the owner's 2026-09-18 status
+change to Phases 0–6. This line read 2026-09-10 until the Wave 0 Chief Reviewer noticed a
+document amended four times still claiming to be untouched.)*
 Owner: Jason Cusati (project owner, sole human reviewer)
-Governance: agentic-governance v0.5 (pin in governance-delta.md)
+Governance: agentic-governance **v0.9.1** (pin in governance-delta.md) *(corrected 2026-09-19
+on the Wave 0 Governance Audit; this header still read v0.5, which the delta superseded when
+the pin moved to v0.9.0 by PR #22 and then to v0.9.1. The delta is authoritative for the pin;
+this line is a stale copy of it, which is exactly why policy is stated once and cited
+elsewhere.)*
 Path in repo: `llm/specs/2026-09-10-research-hub-design.md` (handoff branch `handoff/research-hub`)
 
 This is the design-authority document for the research hub. Per the

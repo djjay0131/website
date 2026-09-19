@@ -37,9 +37,13 @@ re-decide, add, or cut scope. The design document binds each phase through §10
   Open Questions and in the CPO handoff.
 - **R-A2.** Brief details that refine a §11 phase without contradicting it
   are recorded and attributed to "brief §4".
-- **R-A3.** Phases 4–6 are recorded but **not approved for execution**. The
-  design document's status is "Approved for Phase 0–3 execution", and the
-  brief stops at Checkpoint 4 (brief §3).
+- **R-A3. RETIRED (owner, 2026-09-18, run-to-completion prompt).** It read: "Phases
+  4–6 are recorded but **not approved for execution**. The design document's status
+  is 'Approved for Phase 0–3 execution', and the brief stops at Checkpoint 4 (brief
+  §3)." The owner has given the go for Phases 4, 5 and 6, and amended the design
+  document's status line to **Phases 0–6**. The brief's stopping at Checkpoint 4 no
+  longer constrains execution; each of Phases 4–6 now closes with a checkpoint
+  defined by the Lead Architect in `STATE.md` before the phase starts (closing O7).
 - **R-A4.** §11 does not assign Artifact Registry to a phase. It is recorded
   in Phase 3 because the gate is its first consumer (§8, §9 `gate.yml`). This
   classification is uncertain and is flagged for human review.
@@ -337,15 +341,24 @@ checkpoint the brief defines.
 
 ### Blocked on
 
-- §10 Q3: whether share links are wanted at all (open; the owner may cut this phase)
-- The owner's go to execute beyond Phase 3 (design doc status line; R-A3)
-- A closing checkpoint, which no brief yet defines
+- ~~§10 Q3: whether share links are wanted at all~~ — **answered: wanted** (owner, 2026-09-18)
+- ~~The owner's go to execute beyond Phase 3~~ — **given** (owner, 2026-09-18); R-A3 retired
+- ~~A closing checkpoint, which no brief yet defines~~ — **Checkpoint 5**, defined below
+
+Nothing blocks this phase.
 
 ### Closing checkpoint
 
-None defined. The brief ends at Checkpoint 4 (brief §3).
+**Checkpoint 5** (owner, 2026-09-18: Phases 4–6 each close with a checkpoint the Lead
+Architect defines in `STATE.md` before the phase starts — closing O7). It is this phase's
+acceptance criteria verified **live**, plus the security gate: a real 14-day share minted by
+the owner identity through the gate's own API, opened in a signed-out browser, then revoked
+and re-tested; the full path-traversal suite refused under `/s/`; a non-owner member refused
+mint, list and revoke; and every `/s/**` and `/share/**` response carrying
+`Cache-Control: private, no-store`.
 
-- [ ] Phase 4 PRs merged by the owner
+- [ ] Phase 4 PRs merged
+- [ ] Checkpoint 5 defined in `STATE.md` before the phase starts, and recorded passed after
 
 ---
 
@@ -384,15 +397,24 @@ None defined. The brief ends at Checkpoint 4 (brief §3).
 
 ### Blocked on
 
-- §10 Q6: the order of `agentic-kg` and `construction-ai-proposal` (open)
-- The owner's go to execute beyond Phase 3 (R-A3)
-- A closing checkpoint, which no brief yet defines
+- ~~§10 Q6: the order of `agentic-kg` and `construction-ai-proposal`~~ — **answered** (owner, 2026-09-18): **`agentic-kgis` first**, publishing as `source: kgis`, then `construction-ai-proposal`. `agentic-kg` becomes later/optional
+- ~~The owner's go to execute beyond Phase 3~~ — **given** (owner, 2026-09-18); R-A3 retired
+- ~~A closing checkpoint, which no brief yet defines~~ — **Checkpoint 6**, defined below
+
+Nothing blocks this phase.
 
 ### Closing checkpoint
 
-None defined. The brief ends at Checkpoint 4 (brief §3).
+**Checkpoint 6** (owner, 2026-09-18; closes O7). This phase's acceptance criteria verified
+**live**, plus the security gate: a docs push to `agentic-kgis` with no commit to `website`
+updates `jason.cusati.us/projects/kgis/kgis-docs/` within one poll interval; a push to
+`construction-ai-proposal` updates its page **in the private build only**, since per the
+private-by-default decision its items are not allowlisted — so the live proof is a signed-in
+probe plus a signed-out probe that finds nothing; and the reverse-leg boundary proof passes,
+with `cv` refused both read and write against `sources/kgis/` and `sources/phd-milestones/`.
 
-- [ ] Phase 5 PRs merged by the owner
+- [ ] Phase 5 PRs merged
+- [ ] Checkpoint 6 defined in `STATE.md` before the phase starts, and recorded passed after
 
 ---
 
@@ -425,15 +447,20 @@ None defined. The brief ends at Checkpoint 4 (brief §3).
 
 ### Blocked on
 
-- The owner's go to execute beyond Phase 3 (R-A3)
-- The redirect mechanism, given that Pages is also retired (Open Questions O6)
-- A closing checkpoint, which no brief yet defines
+- ~~The owner's go to execute beyond Phase 3~~ — **given** (owner, 2026-09-18); R-A3 retired
+- The redirect mechanism, given that Pages is also retired (Open Questions O6) — settled in this phase's own ADR
+- ~~A closing checkpoint, which no brief yet defines~~ — **Checkpoint 7**, defined below
 
 ### Closing checkpoint
 
-None defined. The brief ends at Checkpoint 4 (brief §3).
+**Checkpoint 7** (owner, 2026-09-18; closes O7). This phase's acceptance criteria verified
+**live**, plus the security gate: every entry in the redirect map lands on its target under a
+browser-equivalent probe; and a deliberate test plants a private slug and title in
+`dist-private` and proves that none of the search index, sitemap, RSS feed or OG images
+contains it — the leak check shown failing, not merely reported passing.
 
-- [ ] Phase 6 PRs merged by the owner
+- [ ] Phase 6 PRs merged
+- [ ] Checkpoint 7 defined in `STATE.md` before the phase starts, and recorded passed after
 
 ---
 
@@ -447,10 +474,10 @@ Only the owner answers these. Recording an answer here is an L1 edit.
 |---|---|---|---|
 | Q1 | Domain name | Phase 1 deploy | Answered: `cusati.us` (ADR-0001; issue #7); amended by ADR-0006 to `jason.cusati.us` |
 | Q2 | GCP project id; Blaze confirmed | Phase 1 infra | Answered: new project, intended id `cusati-hub`, personal account (ADR-0001). Blaze confirmation not yet on the record. |
-| Q3 | Share links wanted, or cut | Phase 4 | Open |
-| Q4 | Initial members to seed | Phase 3 | Open |
+| Q3 | Share links wanted, or cut | Phase 4 | **Answered: wanted** (owner, 2026-09-18, run-to-completion prompt). Phase 4 executes as written — design doc §6 responsibility 4, §phase-4-sharing |
+| Q4 | Initial members to seed | Phase 3 | **Answered** (owner, 2026-09-17, reaffirmed 2026-09-18): `djjay@vt.edu` with `role: owner`, `cbrown@vt.edu`. Those two only; no members are added |
 | Q5 | `site/` subdirectory or root layout | Phase 1 | Proposed in ADR-0001 (`site/` subdirectory); approved by merging PR #9 |
-| Q6 | Order of `agentic-kg` and `construction-ai-proposal` | Phase 5 | Open |
+| Q6 | Order of `agentic-kg` and `construction-ai-proposal` | Phase 5 | **Answered** (owner, 2026-09-18, run-to-completion prompt): **`agentic-kgis` first**, publishing as `source: kgis`, then `construction-ai-proposal`. `agentic-kgis` is substituted for `agentic-kg` because its website content already exists (`docs-site/` with a contract-valid `manifest.json`, item `kgis-docs`, `section: projects`, `format: html`, mount `/projects/kgis/kgis-docs/`, and a gated `docs-publish.yml` awaiting provisioning). `agentic-kg` becomes "later, optional" alongside the other unscheduled repos. Recorded as an ADR amending design doc §2 and §11 |
 
 ### Sequencing disagreements between the brief and design doc §11
 
@@ -463,7 +490,11 @@ Architect to reconcile. Details are in the CPO Phase 0 handoff.
 - **O4.** Brief §4 adds a stubbed `repository_dispatch` trigger to `build.yml` in Phase 1. §11 places the dispatch rebuild in Phase 2.
 - **O5.** §11 Phase 4 names share "list", but §6 defines no list route and the brief's route list has none.
 - **O6.** §11 Phase 6 both redirects from `djjay0131.github.io/website` and retires Pages. The old URL lives on GitHub Pages, so the redirects need a host after retirement. What "retire" means is undefined.
-- **O7.** No brief defines checkpoints or approval for Phases 4–6.
+- **O7. CLOSED (owner, 2026-09-18, run-to-completion prompt).** It read: "No brief
+  defines checkpoints or approval for Phases 4–6." Each of Phases 4–6 now closes with
+  a checkpoint the Lead Architect defines in `STATE.md` **before** the phase starts,
+  consisting of that phase's acceptance criteria verified live plus the run's security
+  gate. Checkpoints 5, 6 and 7 are defined in their phase sections above.
 
 ## ADR Candidates
 
