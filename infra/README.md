@@ -386,6 +386,58 @@ cannot already see, while making withdrawal unimplementable. The full argument,
 the exact grant and the recommended wording change are in
 `llm/sprints/2026-09-hub/handoffs/infra-phase-3.md` §Open question (a).
 
+### The third and fourth readers this module does NOT declare
+
+Cloud Storage adds four *legacy* bindings to every bucket at creation, and they
+are on the private bucket exactly as they are on the content bucket:
+
+| Role | Member |
+|---|---|
+| `roles/storage.legacyBucketOwner`, `roles/storage.legacyObjectOwner` | `projectEditor:<project>`, `projectOwner:<project>` |
+| `roles/storage.legacyBucketReader`, `roles/storage.legacyObjectReader` | `projectViewer:<project>` |
+
+**Uniform bucket-level access does not remove them.** That was established from
+the live policy rather than assumed: UBLA is `True` on `<project>-private` and
+`gcloud storage buckets get-iam-policy` still returns all four. UBLA disables
+object *ACLs*; these are ordinary IAM bindings in the bucket's policy.
+
+So `projectViewer` can read every private object — including the committee
+dossier — and nothing in this module mentions it. **Today that expands to
+nobody**: the project has no `roles/viewer` binding at all, and the owner holds
+`roles/owner`, which maps to `projectOwner`, not `projectViewer`. The exposure
+is therefore *latent*, not live, and it activates silently the first time anyone
+is granted project Viewer.
+
+Two consequences, both acted on rather than noted:
+
+- `scripts/check-private-bucket-iam.sh` now **fails** if any principal holds
+  `roles/viewer`, so the moment that grant happens it is loud rather than
+  invisible.
+- Removing the legacy reader bindings requires replacing the bucket's whole IAM
+  policy authoritatively (`google_storage_bucket_iam_policy`), because
+  `google_storage_bucket_iam_member` is additive and structurally cannot remove
+  a binding. That carries a real lockout risk — dropping the Owner/Editor pair
+  as well would remove the owner's own object access to the bucket — so it is an
+  **owner decision**, written up in
+  `llm/sprints/2026-09-hub/handoffs/infra-wave-0.md` item 5.
+
+### The gate's Identity Platform role
+
+`hub-gate` holds `google_project_iam_custom_role.gate_session_minter`
+(`gate-auth-role.tf`), **not** `roles/firebaseauth.admin`:
+
+| Permission | The call site that needs it |
+|---|---|
+| `firebaseauth.users.createSession` | `create_session_cookie` — the mint half of `POST /session` |
+| `firebaseauth.users.get` | both verify paths run `check_revoked=True`, which fetches the user record |
+
+The predefined role it replaced carried the whole Authentication surface,
+including deleting both members and rewriting the sign-in configuration, on an
+identity whose Cloud Run invoker is `allUsers` by design (ADR-0004). The
+permission set was verified against **this project** with
+`gcloud iam list-testable-permissions`, and custom-role eligibility the same way
+— see the header of `gate-auth-role.tf` for exactly what was checked.
+
 ### Manual steps, in order
 
 Continues from the Phase 2 runbook, and every apply follows the same
@@ -748,8 +800,47 @@ python3 infra/scripts/check_private_bucket_config.py
 
 Expected: `OK: private bucket declares uniform bucket-level access and enforced
 public access prevention, names no anonymous principal, and carries exactly two
-bindings …`. It needs no cloud access, so it belongs in CI on every pull request
-— see the handoff §Seam issues for the `build.yml` step the site stream owns.
+bindings …`. It needs no cloud access, so it runs on every push and every pull
+request in the `budget-guard` job — which is **already a required status check on
+`main`**, so every assertion in it binds from the moment it lands rather than
+waiting on a branch-protection change.
+
+It now also asserts the gate's Identity Platform role holds exactly
+`firebaseauth.users.createSession` and `firebaseauth.users.get`, and that
+`gate.tf` names no predefined Authentication role — so re-widening N-1 fails CI
+instead of passing review.
+
+Two further credential-free guards run in the same job:
+
+| Step | Asserts |
+|---|---|
+| `Check the executable bit on every tracked script` | every `*.sh` with a shebang, and every file invoked directly anywhere, is committed `100755`; every interpreted module is `100644` |
+| `Check the satellite boundary invariants are declared` | uniform bucket-level access on **both** buckets; `satellitePublisher` holds exactly its three permissions and never `storage.objects.list`; every satellite binding uses that custom role **with** a `startsWith` prefix condition; no satellite holds a project-level role |
+
+The executable-bit guard reads modes from the **index** (`git ls-files -s`) and
+file contents from the index blob, never from the working tree. `/mnt/c` is a
+DrvFs mount that reports every file `0777`, so anything stat-ing the filesystem
+would call a file committed `100644` executable — the exact defect the guard
+exists to catch, which cost a red CI in Phase 2.
+
+### Running the private sync in plan-only mode
+
+`private-sync` in `build.yml` is the one job that can destroy data. Its plan and
+apply steps used to be consecutive, so the delete list was only readable after
+the deletion. Setting the repository variable `PRIVATE_SYNC_PLAN_ONLY` to
+`true` skips the apply step and leaves the enumerated delete list in the log:
+
+```sh
+gh variable set PRIVATE_SYNC_PLAN_ONLY --body true   --repo djjay0131/website
+# run the workflow, read the delete list, then:
+gh variable delete PRIVATE_SYNC_PLAN_ONLY            --repo djjay0131/website
+```
+
+**Unset means apply, deliberately.** The condition is
+`vars.PRIVATE_SYNC_PLAN_ONLY != 'true'`, so an unset variable is `'' != 'true'`
+→ true → the sync runs exactly as before. Failing closed here would silently
+stop the private area updating and keep serving withdrawn content, which is
+worse than the failure it prevents.
 
 ## Monitoring and alerting
 
@@ -775,18 +866,50 @@ Three alert policies — site down, gate down, sign-in failing — each carrying
 the first page of the runbook; an alert that only says "something is wrong" restarts the
 very back-and-forth this exists to end.
 
-### After the first apply — two things that must be VERIFIED, not assumed
+### After the first apply — three things that must be VERIFIED, not assumed
 
-**1. Click the verification link.** Google emails `var.ops_email` a confirmation. Until it is
-clicked the channel exists, accepts every policy, and **delivers nothing**. That state looks
-exactly like "nothing is wrong".
+**1. Click the verification link. THIS IS STILL OUTSTANDING.** Google emails `var.ops_email` a
+confirmation. Until it is clicked the channel exists, accepts every policy, and **delivers
+nothing**. That state looks exactly like "nothing is wrong".
+
+As of 2026-09-18 the channel has **no `verificationStatus` field at all**, which means
+unverified: Google emailed `djjay@vt.edu` at 15:27:37Z and the link has not been clicked, so
+all three policies are silent. This is console work and an owner step:
+
+> Open <https://console.cloud.google.com/monitoring/alerting/notifications>, find **Hub ops
+> email**, and use **Send verification email** if the original has expired, then click the
+> link in the mail. If it never arrives, see the SMS channel below — the owner also reports
+> Firebase sign-in emails never arriving, and two symptoms pointing at one delivery problem
+> is why alerting no longer depends on email alone.
 
 ```bash
 gcloud alpha monitoring channels list --project <project> \
   --format='value(displayName,type,verificationStatus)'
 ```
 
-Expect `VERIFIED`. `UNVERIFIED` means every alert below is silent.
+Expect `VERIFIED`. `UNVERIFIED` — or the field being **absent**, which is how it presents
+before any verification attempt — means every alert below is silent.
+
+`gcloud alpha`/`beta` may not be installed. The same answer with no components, read-only:
+
+```bash
+curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  "https://monitoring.googleapis.com/v3/projects/<project>/notificationChannels"
+```
+
+**1b. The second channel, which does not depend on email.** Set `ops_sms_number` (E.164, e.g.
+`+15035550123`) and a `sms` channel is created beside the email one and attached to all three
+policies. It is **empty by default**, so nothing is created until the owner supplies a number.
+It verifies by a code sent *to the phone*, a path that shares nothing with email — which is
+the whole point, since email delivery is the thing under suspicion.
+
+Google's own caveat, recorded rather than glossed: SMS "isn't a fully reliable notification
+channel type, and it might not be available in certain regions", and Google recommends
+pairing it with another type. It is therefore a **second** channel beside email, never a
+replacement. Cloud Monitoring bills metrics ingestion, API calls, uptime checks and
+alerting-policy metric references — not notification delivery — so this line is **$0.00**.
+
+**2. Confirm each policy actually has the channel attached.**
 
 **2. Confirm each policy actually has the channel attached.**
 

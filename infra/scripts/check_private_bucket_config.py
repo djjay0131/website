@@ -61,6 +61,29 @@ EXPECTED_PRIVATE_BUCKET_BINDINGS = {
     "hub_deploy_private_sync": "private_sync_writer",
 }
 
+# The gate's Identity Platform role (Chief Reviewer N-1), asserted here for the
+# same reason as the two above: the permission list IS the boundary, and this
+# one is the boundary around SIGN-IN. Adding a permission is a one-word diff
+# that no test would otherwise catch.
+EXPECTED_GATE_ROLE_PERMISSIONS = {
+    "gate_session_minter": [
+        "firebaseauth.users.createSession",
+        "firebaseauth.users.get",
+    ],
+}
+
+# Predefined roles that must never be granted to the gate's runtime identity
+# again. roles/firebaseauth.admin was the widest grant in Phase 3 -- full
+# read/write over Authentication, including deleting both members and rewriting
+# the sign-in configuration. Narrowing it is only durable if re-widening it is
+# loud, and "add one predefined role back" is the quiet way it would return.
+FORBIDDEN_GATE_PROJECT_ROLES = [
+    "roles/firebaseauth.admin",
+    "roles/firebaseauth.editor",
+    "roles/editor",
+    "roles/owner",
+]
+
 FAILURES = []
 
 
@@ -198,6 +221,48 @@ def main():
             "use one of the two custom roles in private-roles.tf; a predefined role here "
             "would carry storage.objects.list.",
         )
+
+    # ------------------------------------------------------------------
+    # 6. The gate's Identity Platform role holds exactly its two permissions.
+    #
+    # firebaseauth.users.createSession mints the session cookie; users.get is
+    # what check_revoked=True needs. Anything else -- users.delete,
+    # configs.update, configs.getHashConfig -- is reachable from a request
+    # handler that serves the public internet (the gate's invoker is allUsers by
+    # design, ADR-0004), so the list is asserted rather than reviewed.
+    # ------------------------------------------------------------------
+    gate_role = read_without_comments("gate-auth-role.tf")
+    for resource_name, expected in EXPECTED_GATE_ROLE_PERMISSIONS.items():
+        found = permissions_of(gate_role, resource_name)
+        if found is None:
+            fail(
+                "infra/gate-auth-role.tf",
+                f'gate-auth-role.tf must declare resource "google_project_iam_custom_role" '
+                f'"{resource_name}". The gate must not fall back to a predefined '
+                f"Authentication role.",
+            )
+        elif sorted(found) != sorted(expected):
+            fail(
+                "infra/gate-auth-role.tf",
+                f"{resource_name} must grant exactly {sorted(expected)} -- got {sorted(found)}.",
+            )
+
+    # ------------------------------------------------------------------
+    # 7. No predefined Authentication role is granted to the gate again.
+    #
+    # Asserted against gate.tf as a whole rather than against one resource
+    # name, so re-adding the grant under any resource name fails.
+    # ------------------------------------------------------------------
+    gate_tf = read_without_comments("gate.tf")
+    for role in FORBIDDEN_GATE_PROJECT_ROLES:
+        if f'"{role}"' in gate_tf:
+            fail(
+                "infra/gate.tf",
+                f"gate.tf names the predefined role {role}. The gate holds "
+                f"google_project_iam_custom_role.gate_session_minter and nothing wider "
+                f"(Chief Reviewer N-1). {role} would return the ability to delete members "
+                f"or rewrite the sign-in configuration.",
+            )
 
     if FAILURES:
         print(f"\n{len(FAILURES)} private-bucket invariant(s) violated.")

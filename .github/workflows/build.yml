@@ -311,42 +311,145 @@ jobs:
             *) echo "::error file=${FILE}::budget check could not run (perl exit ${RC})."; exit 1 ;;
           esac
 
-      # Chief Reviewer S6. Every tracked *.sh beginning with a shebang must be
-      # committed executable. This repository is developed on a DrvFs mount that
-      # reports every file as 0777, so a 100644 script runs perfectly locally and
-      # fails on the runner with exit 126 -- which is exactly how sync-content.sh
-      # broke this workflow. The rule asks how a file declares itself, not how its
-      # path is spelled, so it has no false-positive class: a spelling-based scan
-      # produced twelve false hits against one real defect, and a noisy guard gets
-      # switched off.
-      - name: Check every shebang script is committed executable
+      # THE EXECUTABLE-BIT GUARD (Chief Reviewer S6; Phase 2's exit-126 defect).
+      #
+      # WHERE THE MODE COMES FROM, and this is the whole point of the check.
+      # Modes are read from the INDEX via `git ls-files -s`, and file contents
+      # from the index blob via `git cat-file -p :<path>`. NOTHING here stats the
+      # working tree. This repository is developed on /mnt/c, a DrvFs mount that
+      # reports every file as 0777, so `ls -l`, `stat` and anything else reading
+      # the filesystem says "executable" about a file that is committed 100644 --
+      # it runs perfectly locally and dies on the runner with exit 126. A guard
+      # that read the working tree would fall into the exact defect it exists to
+      # prevent. git is additionally invoked with -c core.fileMode=false so the
+      # mount cannot perturb the guard's own process.
+      #
+      # HOW FILES ARE CLASSIFIED: by how a file is REACHED, not how its path is
+      # spelled. That distinction is load-bearing. Eight tracked *.mjs files
+      # carry a shebang while committed 100644, and not one of them is a defect:
+      # every one is reached through `node …` or an ES `import`, never executed.
+      # A spelling-based scan flags all eight, because `import "./x.mjs"` and a
+      # shell invocation look identical to a grep. A guard that cries wolf gets
+      # switched off, and then the invariant is unprotected and nobody notices.
+      #
+      # THREE RULES, so the guard has signal in both directions:
+      #   A. a tracked *.sh beginning with a shebang must be 100755 (SEAM-9);
+      #   B. any tracked file INVOKED DIRECTLY anywhere must be 100755 -- direct
+      #      meaning it appears at a command position in a shell surface
+      #      (workflow `run:` blocks, *.sh files, package.json "scripts",
+      #      composite action.yml) and is NOT preceded by an interpreter;
+      #   C. a tracked shebang file that is neither *.sh nor directly invoked
+      #      must NOT be 100755 -- an executable bit on a module is a false
+      #      signal, and rule C is what keeps the classification honest rather
+      #      than letting everything drift to 755 to silence rule B.
+      #
+      # Comments are stripped from shell surfaces before rule B looks for an
+      # invocation, because prose like "# -> scripts/fetch-data.sh" is not a call
+      # site. The tradeoff is deliberate and one-directional: stripping can only
+      # cause rule B to miss a call site, never to invent one, and rule A still
+      # covers every *.sh unconditionally.
+      - name: Check the executable bit on every tracked script
         if: ${{ !cancelled() }}
         run: |
           python3 - <<'PY'
-          import subprocess, sys
-          out = subprocess.run(["git", "ls-tree", "-r", "HEAD"],
-                               capture_output=True, text=True, check=True).stdout
-          bad = []
-          for line in out.splitlines():
+          import json, re, subprocess, sys
+
+          INTERPRETERS = {
+              "node", "nodejs", "npx", "python", "python3", "py", "bash", "sh",
+              "dash", "zsh", "ksh", "perl", "ruby", "deno", "bun", "uv", "uvx",
+              "source", ".", "exec", "time", "env",
+          }
+
+          def git(*args):
+              return subprocess.run(["git", "-c", "core.fileMode=false", *args],
+                                    capture_output=True, text=True, check=True).stdout
+
+          # Modes from the INDEX. Never the working tree -- see the header.
+          modes = {}
+          for line in git("ls-files", "-s").splitlines():
               meta, path = line.split("\t", 1)
-              mode = meta.split()[0]
-              if not path.endswith(".sh"):
-                  continue
+              modes[path] = meta.split()[0]
+
+          def blob(path):
               try:
-                  with open(path, "rb") as fh:
-                      if fh.read(2) != b"#!":
-                          continue
-              except OSError:
-                  continue
-              if mode != "100755":
-                  bad.append((mode, path))
-          for mode, path in bad:
-              print(f"::error file={path}::{path} begins with a shebang but is committed "
-                    f"{mode}. Invoking it directly fails on Linux with exit 126. "
-                    f"Fix: git update-index --chmod=+x {path}")
-          if bad:
+                  return subprocess.run(["git", "cat-file", "-p", f":{path}"],
+                                        capture_output=True, check=True).stdout
+              except subprocess.CalledProcessError:
+                  return b""
+
+          shebang = {p for p in modes if blob(p)[:2] == b"#!"}
+
+          def strip_comments(text):
+              return re.sub(r"(?m)(?:^|\s)#[^\n]*", "", text)
+
+          # Only surfaces that EXECUTE things. Deliberately excludes *.mjs/*.js:
+          # an `import` is not an invocation, and scanning module source is what
+          # produces the eight false positives described above.
+          surfaces = []
+          for p in sorted(modes):
+              if (p.startswith(".github/workflows/") and p.endswith((".yml", ".yaml"))) \
+                 or p.endswith(("action.yml", "action.yaml", ".sh", "Dockerfile")):
+                  surfaces.append((p, strip_comments(blob(p).decode("utf-8", "replace"))))
+              elif p.endswith("package.json"):
+                  try:
+                      scripts = (json.loads(blob(p).decode("utf-8", "replace")) or {}).get("scripts")
+                  except ValueError:
+                      continue
+                  if isinstance(scripts, dict):
+                      surfaces.append((p, "\n".join(str(v) for v in scripts.values())))
+
+          TOKEN = re.compile(r"[^\s;&|()`'\"]+")
+
+          def direct_invocations(path):
+              base = path.rsplit("/", 1)[-1]
+              hits = []
+              for surface, text in surfaces:
+                  for line in text.splitlines():
+                      toks = TOKEN.findall(line)
+                      for i, tok in enumerate(toks):
+                          cand = tok.lstrip("$({").rstrip("\"'`,;)")
+                          if cand not in (path, "./" + path, base, "./" + base) \
+                             and not cand.endswith("/" + base):
+                              continue
+                          prev = (toks[i - 1] if i else "").strip("\"'`")
+                          if prev.rsplit("/", 1)[-1] in INTERPRETERS:
+                              continue  # `node x.mjs` / `bash x.sh` -- interpreted, not executed
+                          hits.append((surface, line.strip()))
+              return hits
+
+          failures = []
+          print(f"{'mode':7} {'kind':10} {'reached':14} path")
+          for path in sorted(shebang | {p for p in modes if modes[p] == "100755"}):
+              mode = modes[path]
+              hits = direct_invocations(path)
+              is_sh = path.endswith(".sh")
+              kind = "shell" if is_sh else ("shebang" if path in shebang else "plain")
+              reached = "executed" if hits else "interpreted"
+              print(f"{mode:7} {kind:10} {reached:14} {path}")
+              for surface, line in hits[:2]:
+                  print(f"{'':33}<- {surface}: {line[:80]}")
+
+              if is_sh and path in shebang and mode != "100755":
+                  failures.append((path, f"is a *.sh beginning with a shebang but is committed {mode}. "
+                                         f"Fix: git update-index --chmod=+x {path}"))
+              elif hits and mode != "100755":
+                  where = hits[0][0]
+                  failures.append((path, f"is invoked directly ({where}) but is committed {mode}. "
+                                         f"Running it fails on Linux with exit 126. "
+                                         f"Fix: git update-index --chmod=+x {path}"))
+              elif not is_sh and not hits and mode == "100755":
+                  failures.append((path, f"is committed 100755 but nothing invokes it directly -- it is "
+                                         f"reached through an interpreter or an import. An executable bit "
+                                         f"here is a false signal. Either invoke it directly, or fix with: "
+                                         f"git update-index --chmod=-x {path}"))
+
+          for path, message in failures:
+              print(f"::error file={path}::{path} {message}")
+          if failures:
+              print(f"\n{len(failures)} executable-bit violation(s).")
               sys.exit(1)
-          print("OK: every shebang-bearing *.sh is committed 100755.")
+          print(f"\nOK: {len(shebang)} shebang file(s) checked. Every *.sh and every directly "
+                f"invoked file is committed 100755; every interpreted module is committed 100644.")
           PY
 
       # Chief Reviewer S5, and the infra stream's own recommendation. These are the
@@ -377,34 +480,135 @@ jobs:
       - name: Check the private bucket's declared IAM (design doc 12.1)
         run: python3 infra/scripts/check_private_bucket_config.py
 
+      # THE SATELLITE-ROLE GUARD (Phase 2 infra recommendation; Chief Reviewer S5;
+      # ADR-0007 decisions 4 and 8).
+      #
+      # Every assertion here is about a breakage that is INVISIBLE -- nothing
+      # errors, nothing looks different, and the boundary is simply gone:
+      #
+      #   1. UBLA on BOTH buckets. This is the one that fails OPEN. With uniform
+      #      bucket-level access off, an IAM condition does not apply AT ALL, so
+      #      every satellite's prefix binding silently widens to the whole bucket
+      #      and object ACLs come back. Nothing reports an error anywhere. That is
+      #      the defect class this guard exists for.
+      #   2. satellite_publisher holds exactly create/delete/get and NEVER list.
+      #      storage.objects.list cannot be restricted to a prefix, so one
+      #      satellite holding it enumerates every other source -- in Phase 3, the
+      #      private ones.
+      #   3. No satellite binding may use a PREDEFINED role. Every predefined
+      #      Cloud Storage role that can read an object also carries
+      #      storage.objects.list, so swapping the custom role for
+      #      roles/storage.objectViewer would re-grant list while the permission
+      #      list in satellite-role.tf still read correctly. ADR-0007 decision 4
+      #      is explicit: not in this role, NOT IN ANY OTHER ROLE granted to a
+      #      satellite, conditioned or not.
+      #   4. Every satellite binding carries a prefix condition. An unconditioned
+      #      binding of the correct role still covers the whole bucket.
+      #   5. No satellite holds a project-level role at all.
+      #
+      # Credential-free: it reads the Terraform, not the live policy. The private
+      # bucket's own two-principal invariant is asserted by the step above
+      # (check_private_bucket_config.py); the live half is a Checkpoint procedure
+      # (infra/scripts/check-private-bucket-iam.sh).
       - name: Check the satellite boundary invariants are declared
         if: ${{ !cancelled() }}
         run: |
           python3 - <<'PY'
           import re, sys
-          fail = False
 
-          storage = re.sub(r"#[^\n]*", "", open("infra/storage.tf", encoding="utf-8").read())
-          if not re.search(r"\buniform_bucket_level_access\s*=\s*true\b", storage):
-              print("::error file=infra/storage.tf::google_storage_bucket.content must set "
-                    "uniform_bucket_level_access = true. Without it no IAM condition applies, "
-                    "and every satellite prefix binding covers the whole bucket "
-                    "(ADR-0007 decision 8).")
-              fail = True
+          failures = []
 
-          role = re.sub(r"#[^\n]*", "", open("infra/satellite-role.tf", encoding="utf-8").read())
-          block = re.search(r"permissions\s*=\s*\[(.*?)\]", role, re.S)
-          perms = sorted(re.findall(r'"([^"]+)"', block.group(1))) if block else []
+          def fail(path, message):
+              failures.append((path, message))
+
+          def source(path):
+              # Comments are stripped first: these files explain at length WHY
+              # storage.objects.list is absent, so matching raw text would pass
+              # on prose and assert nothing.
+              with open(path, encoding="utf-8") as fh:
+                  return re.sub(r"#[^\n]*", "", fh.read())
+
+          def blocks(text, resource_type):
+              """Yield (name, body) for each resource block, brace-matched."""
+              for match in re.finditer(r'resource\s+"%s"\s+"([A-Za-z0-9_]+)"\s*\{' % resource_type, text):
+                  depth, i = 1, match.end()
+                  while i < len(text) and depth:
+                      depth += (text[i] == "{") - (text[i] == "}")
+                      i += 1
+                  yield match.group(1), text[match.end():i - 1]
+
+          storage = source("infra/storage.tf")
+          private = source("infra/private-bucket.tf")
+          satellites = source("infra/satellites.tf")
+          role_file = source("infra/satellite-role.tf")
+
+          # 1. UBLA on BOTH buckets.
+          for path, text, resource in (
+              ("infra/storage.tf", storage, "google_storage_bucket.content"),
+              ("infra/private-bucket.tf", private, "google_storage_bucket.private"),
+          ):
+              if not re.search(r"\buniform_bucket_level_access\s*=\s*true\b", text):
+                  fail(path, f"{resource} must set uniform_bucket_level_access = true. Without it "
+                             f"no IAM condition applies, every prefix binding covers the whole "
+                             f"bucket, and object ACLs are re-enabled -- the boundary fails OPEN "
+                             f"with no error anywhere (ADR-0007 decision 8).")
+
+          # 2. The role holds exactly its three permissions.
+          perms = []
+          for name, body in blocks(role_file, "google_project_iam_custom_role"):
+              if name == "satellite_publisher":
+                  listed = re.search(r"permissions\s*=\s*\[(.*?)\]", body, re.S)
+                  perms = sorted(re.findall(r'"([^"]+)"', listed.group(1))) if listed else []
           want = ["storage.objects.create", "storage.objects.delete", "storage.objects.get"]
           if perms != want:
-              print(f"::error file=infra/satellite-role.tf::satellite_publisher must grant "
-                    f"exactly {want} -- got {perms}. storage.objects.list in particular cannot "
-                    f"be restricted to a prefix (ADR-0007 decision 4).")
-              fail = True
+              fail("infra/satellite-role.tf",
+                   f"satellite_publisher must grant exactly {want} -- got {perms}. "
+                   f"storage.objects.list in particular cannot be restricted to a prefix "
+                   f"(ADR-0007 decision 4).")
 
-          if fail:
+          # 3 and 4. Every content-bucket binding whose member is a satellite must
+          # use the custom role AND carry a prefix condition.
+          satellite_bindings = 0
+          for name, body in blocks(satellites, "google_storage_bucket_iam_member"):
+              if "google_service_account.satellite_publish" not in body:
+                  continue
+              satellite_bindings += 1
+              role_line = re.search(r"role\s*=\s*([^\n]+)", body)
+              role_value = role_line.group(1).strip() if role_line else "<none>"
+              if role_value != "google_project_iam_custom_role.satellite_publisher.name":
+                  fail("infra/satellites.tf",
+                       f'binding "{name}" grants a satellite the role {role_value}. A satellite may '
+                       f"hold ONLY google_project_iam_custom_role.satellite_publisher: every "
+                       f"predefined Cloud Storage role that can read an object also carries "
+                       f"storage.objects.list (ADR-0007 decision 4).")
+              if not re.search(r"\bcondition\s*\{", body) or "startsWith" not in body:
+                  fail("infra/satellites.tf",
+                       f'binding "{name}" has no prefix condition using startsWith. An '
+                       f"unconditioned binding of the correct role still covers the WHOLE content "
+                       f"bucket, not one sources/<source>/ prefix.")
+          if satellite_bindings == 0:
+              fail("infra/satellites.tf",
+                   "no google_storage_bucket_iam_member binding references "
+                   "google_service_account.satellite_publish. Either the satellite grant was "
+                   "removed, or it was renamed and this guard is now asserting nothing.")
+
+          # 5. No satellite holds a project-level role.
+          for path, text in (("infra/satellites.tf", satellites), ("infra/storage.tf", storage)):
+              for name, body in blocks(text, "google_project_iam_member"):
+                  if "google_service_account.satellite_publish" in body:
+                      fail(path, f'"{name}" grants a satellite a PROJECT-level role. A satellite '
+                                 f"holds no project role at all -- its only grant is the "
+                                 f"prefix-conditioned bucket binding (ADR-0007 decision 3).")
+
+          for path, message in failures:
+              print(f"::error file={path}::{message}")
+          if failures:
+              print(f"\n{len(failures)} satellite boundary invariant(s) violated.")
               sys.exit(1)
-          print("OK: UBLA declared, and the satellite role holds exactly its three permissions.")
+          print(f"OK: uniform bucket-level access is declared on BOTH buckets; satellite_publisher "
+                f"holds exactly {want} and never storage.objects.list; all {satellite_bindings} "
+                f"satellite binding(s) use that custom role with a startsWith prefix condition; "
+                f"and no satellite holds a project-level role.")
           PY
 
 
@@ -981,12 +1185,46 @@ jobs:
           PRIVATE_BUCKET: ${{ vars.GCP_PRIVATE_BUCKET }}
         run: node scripts/sync-private.mjs --bucket "${PRIVATE_BUCKET}"
 
+      # THE KILL SWITCH, and the only way the Part C withdrawal proof can be
+      # performed at all.
+      #
+      # The plan step above and this one used to be consecutive with nothing
+      # between them, so the deletion happened before anyone could read the
+      # enumerated delete list. That made the Chief Reviewer's Part C
+      # impossible as written -- "confirm the next dry run names exactly that
+      # item's objects and no others BEFORE the apply step runs" -- because by
+      # the time the plan was readable the objects were already gone. Nothing
+      # else in this job is a gate: the `environment:` key further down this
+      # file belongs to the GitHub Pages `deploy` job, not to private-sync, and
+      # must not be mistaken for protection that already exists.
+      #
+      # DEFAULT IS APPLY-ENABLED, deliberately. vars.PRIVATE_SYNC_PLAN_ONLY is
+      # unset in normal operation, and an unset variable makes this condition
+      # '' != 'true', which is TRUE -- so the sync runs exactly as before. A
+      # condition that failed closed here would silently stop the private area
+      # updating, and withdrawn content would keep being served: a worse
+      # failure than the one this prevents.
+      #
+      # To run plan-only: set the repository variable PRIVATE_SYNC_PLAN_ONLY to
+      # the string 'true', run the workflow, read the delete list the step
+      # above enumerates, then unset it and run again. No code change, which
+      # also makes this the kill switch for the single most dangerous mechanism
+      # in the system -- ADR-0010's own Risks call the destructive sync "the one
+      # place in this system where a build defect can remove data".
       - name: Sync the private output, pruning what this build did not produce
+        if: vars.PRIVATE_SYNC_PLAN_ONLY != 'true'
         working-directory: site
         env:
           GCS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
           PRIVATE_BUCKET: ${{ vars.GCP_PRIVATE_BUCKET }}
         run: node scripts/sync-private.mjs --bucket "${PRIVATE_BUCKET}" --apply
+
+      # Makes a plan-only run say so in the job log, rather than looking like a
+      # sync that quietly did nothing.
+      - name: Report that this was a plan-only run
+        if: vars.PRIVATE_SYNC_PLAN_ONLY == 'true'
+        run: |
+          echo "::notice::PRIVATE_SYNC_PLAN_ONLY is 'true', so the destructive sync was SKIPPED. The delete list enumerated by the dry run above was not applied. Unset the repository variable and re-run to apply it."
 
   # Same routes and body-size checks as the Pages smoke test, against the
   # Firebase host at base path "/".

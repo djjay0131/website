@@ -296,3 +296,14 @@ variable "ops_email" {
     error_message = "ops_email must be a single email address."
   }
 }
+
+variable "ops_sms_number" {
+  description = "Optional phone number in E.164 form (for example +15035550123) for the SECOND alert channel, which does not depend on email. Empty (the default) creates no SMS channel at all. Not a secret, but it is personal data: set it with TF_VAR_ops_sms_number or a git-ignored terraform.tfvars rather than committing it. Like the email channel it must be VERIFIED after the first apply -- Google sends a code by SMS and it is entered in the console -- and until then it accepts alerts and delivers nothing. Google's own caveat applies: SMS is not a fully reliable channel type and may be unavailable in some regions, which is why it is a second channel beside email rather than a replacement for it."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.ops_sms_number == "" || can(regex("^\\+[1-9][0-9]{7,14}$", var.ops_sms_number))
+    error_message = "ops_sms_number must be empty, or an E.164 number: a leading +, then 8 to 15 digits, with no spaces, dashes or parentheses."
+  }
+}

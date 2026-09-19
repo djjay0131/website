@@ -146,9 +146,9 @@ else
 fi
 echo
 
-echo "For information (not a failure): the legacy project-role bindings Cloud Storage"
-echo "creates automatically on every bucket. They mean project Viewer can read every"
-echo "object here. See the Phase 3 handoff, Risks."
+echo "The legacy project-role bindings Cloud Storage creates automatically on every"
+echo "bucket. They are not declared by this module and cannot be removed by adding"
+echo "IAM members to it -- only by replacing the bucket's whole IAM policy."
 echo "${POLICY}" | python3 -c '
 import json, sys
 policy = json.load(sys.stdin)
@@ -156,6 +156,48 @@ for binding in policy.get("bindings", []):
     if binding.get("role", "").startswith("roles/storage.legacy"):
         print("   ", binding["role"], "->", ", ".join(binding.get("members", [])))
 '
+echo
+
+# ---------------------------------------------------------------------------
+# 2b. WHAT projectViewer ACTUALLY EXPANDS TO. This is the check that turns a
+#     silent, latent exposure into a loud one.
+#
+# legacyBucketReader and legacyObjectReader are granted to the PLACEHOLDER
+# "projectViewer:<project>", which expands to every principal holding
+# roles/viewer on the project. On a bucket holding the committee dossier that
+# means: anyone granted project Viewer can read every private object, with no
+# change to this bucket's policy and nothing in this module mentioning them.
+#
+# Uniform bucket-level access does NOT remove these bindings -- established from
+# the live policy rather than assumed: UBLA is enforced on this bucket and the
+# legacy bindings are still present in the output printed above.
+#
+# So the control that is actually available is to grant project Viewer to
+# NOBODY, and to notice immediately if that ever changes. Today the expansion is
+# EMPTY: the project has no roles/viewer binding at all, and the owner holds
+# roles/owner, which maps to projectOwner, not projectViewer. This check
+# therefore passes today and goes red the moment someone is granted Viewer --
+# which is exactly the moment a human should decide whether that person should
+# be able to read the dossier.
+# ---------------------------------------------------------------------------
+VIEWERS="$(gcloud projects get-iam-policy "${PROJECT}" --format=json | python3 -c '
+import json, sys
+policy = json.load(sys.stdin)
+for binding in policy.get("bindings", []):
+    if binding.get("role") == "roles/viewer":
+        for member in binding.get("members", []):
+            print(member)
+' | sort)"
+
+if [ -z "${VIEWERS}" ]; then
+  pass "no principal holds roles/viewer on ${PROJECT}, so projectViewer expands to the empty set and the legacy reader bindings grant nobody anything"
+else
+  fail "the following principals hold roles/viewer on ${PROJECT} and can therefore READ EVERY PRIVATE OBJECT in gs://${BUCKET} through the automatic legacyObjectReader binding:"
+  echo "${VIEWERS}" | sed 's/^/    /'
+  echo "    Either remove roles/viewer from them, or replace this bucket's IAM"
+  echo "    policy authoritatively to drop the legacy reader bindings. See the"
+  echo "    Wave 0 infra handoff, item 5, for the decision and its tradeoff."
+fi
 echo
 
 # ---------------------------------------------------------------------------

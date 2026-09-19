@@ -222,3 +222,13 @@ output "private_bucket_iam_check_command" {
   description = "The live half of the roadmap's bucket IAM test (§12.1), ready to paste. The credential-free half runs on every push in the budget-guard job (a required check): python3 infra/scripts/check_private_bucket_config.py."
   value       = "PROJECT=${var.project_id} BUCKET=${google_storage_bucket.private.name} GATE_SA=${google_service_account.hub_gate.email} HUB_SA=${google_service_account.hub_deploy.email} bash infra/scripts/check-private-bucket-iam.sh"
 }
+
+output "gate_session_minter_role_id" {
+  description = "The custom role the gate holds instead of roles/firebaseauth.admin (N-1): exactly firebaseauth.users.createSession and firebaseauth.users.get. Read it back after apply with: gcloud iam roles describe gateSessionMinter --project <project id>."
+  value       = google_project_iam_custom_role.gate_session_minter.name
+}
+
+output "gate_auth_role_check_command" {
+  description = "Post-apply verification for the narrowed Identity Platform grant. The first command must print exactly the two permissions; the second must print NO row for roles/firebaseauth.admin. Sign-in itself cannot be proven by either -- that needs the live email-link sign-in in the Checkpoint runbook."
+  value       = "gcloud iam roles describe gateSessionMinter --project ${var.project_id} --format='value(includedPermissions)' && gcloud projects get-iam-policy ${var.project_id} --flatten='bindings[].members' --filter='bindings.members:${google_service_account.hub_gate.email}' --format='value(bindings.role)'"
+}

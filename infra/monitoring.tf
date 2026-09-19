@@ -42,6 +42,68 @@ resource "google_monitoring_notification_channel" "ops_email" {
 }
 
 # ---------------------------------------------------------------------------
+# THE SECOND CHANNEL, WHICH DOES NOT DEPEND ON EMAIL.
+#
+# WHY. On 2026-09-18 the email channel above had no verificationStatus field at
+# all, which means unverified: Google emailed the address at 15:27:37Z and until
+# that link is clicked all three policies accept events and deliver NOTHING.
+# The owner separately reports that Firebase sign-in emails never arrive. Two
+# independent symptoms pointing at one delivery problem is enough to stop
+# designing alerting that depends on email, so this channel exists to give the
+# chain a second, unrelated delivery path.
+#
+# WHY SMS AND NOT A WEBHOOK. A webhook channel is free in Cloud Monitoring but
+# is not free of a RECEIVER, and no receiver exists here at zero cost that the
+# owner already operates. pubsub has the same problem one layer down: it
+# delivers to a topic, and a topic is not a person. slack, pagerduty and
+# google_chat each need an account or a space this project does not have.
+# sms is GA in this project, needs no third party, and Cloud Monitoring's
+# pricing bills metrics ingestion, API calls, uptime checks and alerting-policy
+# metric references -- not notification delivery. Channel types available here
+# were read from the API rather than assumed:
+#   GET https://monitoring.googleapis.com/v3/projects/<project>/notificationChannelDescriptors
+# returns campfire(DEPRECATED), email, google_chat(BETA), hipchat(DEPRECATED),
+# pagerduty(BETA), pubsub, slack, sms, webhook_basicauth, webhook_tokenauth.
+#
+# ITS VERIFICATION PATH IS THE POINT: Google sends a code by SMS and the owner
+# enters it. That path shares nothing with email, so it still works if email
+# delivery is the thing that is broken.
+#
+# GOOGLE'S OWN CAVEAT, recorded rather than glossed: "SMS isn't a fully reliable
+# notification channel type, and it might not be available in certain regions",
+# and Google recommends pairing it with a different type. That is exactly what
+# this is -- a SECOND channel beside email, not a replacement for it. Both are
+# attached to every policy below.
+#
+# OFF BY DEFAULT. ops_sms_number is "" unless the owner sets it, because a
+# channel pointing at no number is worse than no channel: it looks like
+# redundancy and delivers nothing, which is the failure this whole file exists
+# to stop repeating.
+resource "google_monitoring_notification_channel" "ops_sms" {
+  count = var.ops_sms_number == "" ? 0 : 1
+
+  project      = var.project_id
+  display_name = "Hub ops SMS"
+  type         = "sms"
+
+  labels = {
+    number = var.ops_sms_number
+  }
+
+  force_delete = false
+}
+
+locals {
+  # Every policy attaches EVERY configured channel. The rule learned from the
+  # reference project was a policy whose channels were commented out; the rule
+  # learned here is that one channel is a single point of delivery failure.
+  alert_notification_channels = concat(
+    [google_monitoring_notification_channel.ops_email.id],
+    google_monitoring_notification_channel.ops_sms[*].id,
+  )
+}
+
+# ---------------------------------------------------------------------------
 # Is the public site answering at all?
 # ---------------------------------------------------------------------------
 resource "google_monitoring_uptime_check_config" "public_site" {
@@ -175,7 +237,7 @@ resource "google_monitoring_alert_policy" "site_down" {
     }
   }
 
-  notification_channels = [google_monitoring_notification_channel.ops_email.id]
+  notification_channels = local.alert_notification_channels
 
   documentation {
     mime_type = "text/markdown"
@@ -221,7 +283,7 @@ resource "google_monitoring_alert_policy" "gate_down" {
     }
   }
 
-  notification_channels = [google_monitoring_notification_channel.ops_email.id]
+  notification_channels = local.alert_notification_channels
 
   documentation {
     mime_type = "text/markdown"
@@ -277,7 +339,7 @@ resource "google_monitoring_alert_policy" "signin_failing" {
     }
   }
 
-  notification_channels = [google_monitoring_notification_channel.ops_email.id]
+  notification_channels = local.alert_notification_channels
 
   documentation {
     mime_type = "text/markdown"
