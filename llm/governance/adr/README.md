@@ -24,6 +24,7 @@ from `0000-template.md`.
 | [0010](0010-withdrawal-semantics.md) | Withdrawal semantics — the manifest is the authority, and a private withdrawal must actually stop serving | Accepted |
 | [0011](0011-two-srcdirs-not-a-visibility-filter.md) | The private build is a second `srcDir`, not a visibility filter | Accepted |
 | [0012](0012-dev-staging-in-a-separate-project.md) | Dev-staging lives in a separate GCP project | Proposed |
+| [0013](0013-unauthenticated-client-telemetry-endpoint.md) | The gate exposes an unauthenticated client-telemetry endpoint | Proposed |
 
 ## Lifecycle
 
