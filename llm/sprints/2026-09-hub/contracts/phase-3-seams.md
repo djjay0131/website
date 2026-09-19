@@ -33,7 +33,7 @@ phd-milestones ──publish──▶ gs://<content-bucket>/sources/phd-mileston
                             HUB_OUTPUT=private  →  site/dist-private
                                         │ destructive sync
                                         ▼
-                            gs://<private-bucket>/   ← gate SA is the ONLY reader
+                            gs://<private-bucket>/   ← exactly TWO principals (see below)
                                         │ streamed by the gate on /p/**
                                         ▼
                                     signed-in member

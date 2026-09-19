@@ -745,7 +745,7 @@ merges**. The gate did exactly what it exists to do.
 | 1 Private content off the public path | PASS | Proven by planting, not asserted — red three ways including a **title-only** plant that exercises the contents half alone |
 | 2 Private bucket | PASS (finding S-1) | UBLA `true` and PAP `enforced` read live; exactly two non-legacy principals; legacy bindings present and `roles/viewer` empty — both halves confirmed |
 | 3 The gate | **FAIL** | **Fix now.** `/session/end`'s CSRF check is bypassed **over real HTTP** by `Origin` + `X-Forwarded-Host` set to the same attacker value — also by a comma list, also by `Host` alone. Impact today is low (`OPTIONS` → 405, no ACAO, so browsers block it; a non-browser caller has no victim cookie) but **the property was asserted and is false**, the code itself records the Hosting header-provenance question as unsettled, and the same helper is slated to guard Phase 4's mint and revoke. Confirms and extends A-5 |
-| 4 Identity | **FAIL** | **Describes pre-merge state, which #53 resolves.** `firebaseauth.admin` is still bound live and `gateSessionMinter` does not exist; the read-only plan shows `2 to add, 0 to change, 1 to destroy`, destroying exactly that binding. An IAM binding is **not** on §8's stateful-resource list, so that destroy does not bar the apply — but I re-verify the plan immediately before applying. The "attempt the access and be refused" sub-test is **NOT TESTED**, not passed: every impersonation failed at the impersonation step, proving nothing either way |
+| 4 Identity | **FAIL** | **~~Describes pre-merge state, which #53 resolves.~~ MY DISPOSITION WAS WRONG — corrected 2026-09-19 on the Chief Reviewer's B-5.** #53 is **Terraform**: merging it changes nothing, only `apply` does — and I gated that apply behind D-3. So check 4 is not resolved by merging, and the public-deploy-identity half is not addressed by #53 **at all**, because item 3 was never implemented. Live: `hub-gate@` still holds `firebaseauth.admin`, `gateSessionMinter` returns NOT_FOUND, `hub-deploy@` still holds `privateSyncWriter`. Original note kept below.** `firebaseauth.admin` is still bound live and `gateSessionMinter` does not exist; the read-only plan shows `2 to add, 0 to change, 1 to destroy`, destroying exactly that binding. An IAM binding is **not** on §8's stateful-resource list, so that destroy does not bar the apply — but I re-verify the plan immediately before applying. The "attempt the access and be refused" sub-test is **NOT TESTED**, not passed: every impersonation failed at the impersonation step, proving nothing either way |
 | 5 Firestore | PASS + **NOT TESTED** (half) | Exactly **one** ruleset exists project-wide, so the #30 churn fix holds and #53 does not regress it |
 | 6 Supply chain | **FAIL** | **Fix now — #56.** `npm audit` reports 1 critical + 9 high, `astro` a **direct** dependency — and `site/package.json` has **no `devDependencies`**, so the `--omit=dev` in my own §7 checklist excludes nothing. Separately, `agentic-kgis` and `construction-ai-proposal` pin no action by SHA (Phase 5 items). `actionlint` and `pip-audit` clean |
 | 7 Static public site | **FAIL** | **Fix now, by ADR rather than removal.** `/client-events` is an unauthenticated Cloud Run rewrite present in neither the contract's rewrite list nor design doc §8, with no authorising ADR. My addition. Lowest severity of the four |
@@ -784,6 +784,64 @@ under a name-diff (three removals are renamed supersets); gate's 223→269 and 4
 confirmed; the exec-bit guard proven to read the **index** and not the filesystem in both
 directions, with the eight shebang `.mjs` files correctly not flagged. And it found
 `roadmap-truth`'s S10 **understated** — which is what produced #58.
+
+### From the `Chief Reviewer` — #48 Approve, the rest Request changes, §8 NOT met
+
+The last gate. Its verdict stands: **the §8 conditions are not met** and nothing merges.
+
+| # | Finding | Disposition |
+|---|---|---|
+| **B-1** | **`ADR-0004` decision 4 still read "the gate's service account is the private bucket's only reader"**, with zero references to ADR-0010 anywhere in the file | **Fixed in this commit — and it is the most serious documentation finding of the wave.** Design doc §6, roadmap :282, SEAM-1's prose and ADR-0010's own Related Documents were all amended when decision 5 landed; **the one artifact that outranks them was left contradicted.** Identical in shape to this reviewer's own Phase 3 B-1, at a node nobody checked. Restoring the clause would remove `hub-deploy` and **silently disable withdrawal** |
+| B-1b | **SEAM-1's ASCII diagram still said "ONLY reader"** — eight lines above the amendment declaring that unimplementable | **Fixed.** The prose and the picture contradicted each other inside one file. A reader skims the diagram |
+| B-1c | The design doc said `Last updated: 2026-09-10` while carrying four dated amendments | **Fixed** |
+| **B-2** | It **ran** #57's guard logic against both trees: `main` 3/3 PASS, `feat/infra-wave-0` 3 policies / **0** matches FAIL. *"Filing the issue did not remove the blocker."* | **Accepted, and the rebuke is fair.** I filed #57 and then published a merge order that lands a red `main` at step 3. **#57 must be fixed before #53 merges**, not tracked alongside it |
+| **B-3** | The CSRF bypass reproduced in three spellings — and **#47 ships a test asserting the vulnerable `X-Forwarded-Host` branch returns 200** (`test_signout.py:199–210`) | **Accepted; verified myself.** Merging #47 installs a **regression test defending the bug**. Its docstring is honest about the unsettled header question, but the effect is that whoever fixes the bypass sees that test go red and may "fix" the fix. The test must change with the code |
+| **B-4** | #53's new guard is vacuous three ways — `roles/viewer` empty, `roles/editor` populated and the actual path to the objects, and `check-private-bucket-iam.sh` referenced in `build.yml` **only inside a comment**. The README shipping with #53 presents it as the mitigation | **Accepted.** Already #55 and #58; this adds that **the PR documents a mitigation that does not run** |
+| **B-5** | My check-4 disposition is wrong in both halves | **Accepted — corrected above.** |
+| B-6 | #53's guard *pins* `hub_deploy_private_sync` as expected, so SEAM-10's split will turn a **required** check red | **Accepted.** Disclosed by design, but it raises the cost of the narrowing and belongs in SEAM-10's sequencing |
+| B-7 | **The run brief is not in the repository.** Five contracts and a BLOCKED verdict bind to "§8"; STATE's only §8 is merge sequencing | **Accepted, and it corroborates the Governance Audit's R-5 independently.** Two reviewers, arriving separately: *"every agent, me included, enforced a section none of us could read."* Recorded below as a standing gap |
+| B-8 | **SD-4 is not actually fixed** — nothing in `site/` calls `/session/end` | **Accepted, and it is my seam failure, not a stream failure.** The gate stream recommended the site add the control; I never routed the request. A handler and a rewrite with no caller is sign-out that does not exist |
+| B-9 | #56 and #57 appear nowhere under `llm/` | **Accepted; recorded now** |
+| B-10 | "No Security Tester or Skeptic Verifier dispositions exist in STATE.md at all" | **STALE — and I say so rather than accept it.** Both sections were committed at `661f0ab`; the reviewer read before that landed. Verified present. The second half of the finding (#56/#57) was correct and is B-9 |
+
+**What it confirmed rather than assumed, which is the part I most needed:** nothing was widened
+— the private bucket carries exactly two non-legacy principals in exactly the asserted roles,
+and `hub-deploy` still holds private-bucket write **because item 3 never happened**, not
+because anything grew. It checked the **content bucket itself** rather than the assertion about
+it, and found both required prefixes present with valid manifests — so **#48's `required: true`
+flip is safe**. And scope was **clean: all 32 files in scope, every contested file granted by a
+verbatim clause — the first scope-clean review this sprint.**
+
+It upheld the Skeptic Verifier on U-1/U-2 rather than overruling, and marked six audit items
+UNVERIFIABLE rather than passing them. It verified `handoff/research-hub` as the only copy of
+its commit and did **not** flag it, having fetched and pruned first.
+
+### Standing gap — the run brief is not in the repository
+
+Found independently by the Governance Auditor (R-5) and the Chief Reviewer (B-7).
+
+D5 grants gated merge and apply authority "when every condition in §8 holds". The orchestration
+brief in `llm/plans/` ends at **§7**. The §8 being enforced lives in the run-to-completion
+prompt, which is **not a repository artifact**. So the conditions governing every merge and
+every `terraform apply` in this run are **unauditable from the repository**: both reviewers
+could confirm my *stated* reading was honoured, not that it is correct.
+
+The §8 conditions as I have been applying them, recorded here so they are auditable:
+
+> A PR may be merged only when **all** hold: every required check green; Chief Reviewer verdict
+> Approve or Comment; the Security Tester handoff for the wave has **zero** fails; every Red
+> Team `succeeded` attack dispositioned and fixed; Skeptic Verifier reports no un-failable
+> guard; `governance-checks --layout` green; and the PR body carries the data, security and
+> privacy impact section. Merge with a merge commit; delete the branch.
+>
+> `terraform apply` may be run only when: it follows a merged PR; the plan was saved to a file,
+> reviewed, and contains **no destroy or replace of a stateful resource** (buckets, Firestore
+> database, Identity Platform config, the ruleset/release pair, service accounts, WIF
+> pools/providers, budget); the add/change list is pasted into STATE before the apply and the
+> result after it; and a second plan afterwards is clean.
+
+**This is a transcription, not a source.** It should become a repository document before the
+next wave, or the next audit will find the same gap.
 
 ### Environment note
 
