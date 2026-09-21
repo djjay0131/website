@@ -110,6 +110,21 @@ THE CHECKLIST — all must pass
   6. SUPPLY CHAIN
      Every action in every workflow across website, phd-milestones, agentic-kgis and
      construction-ai-proposal is pinned by full SHA.
+
+     SCOPE CORRECTED 2026-09-21 by the Lead Architect. The four repos named above
+     OMIT `cv`, which is a satellite holding a workloadIdentityUser binding pinned to
+     refs/heads/master and which carried 6 unpinned `uses:` occurrences. The omission
+     is a defect in THIS CONTRACT, not a failure of the tester against it -- run 3
+     audited the scope it was given. `cv` is in scope from now on.
+
+     ALSO IN SCOPE, and missed by every run so far because it is not a `uses:` line:
+     executable content fetched from a MUTABLE REF at run time. agentic-kgis's
+     docs-publish.yml curls contract/validate-manifest.mjs from
+     raw.githubusercontent.com/.../website/main/... into /tmp and then runs it with
+     node, on every push, ungated -- while the contract/publish@main action beside it
+     is gated behind workflow_dispatch and is currently unprovisioned. An audit that
+     greps `uses:` reports the DORMANT risk and misses the LIVE one. Grep for curl,
+     wget and raw.githubusercontent against a branch ref, not just `uses:`.
      actionlint clean.
      npm audit --omit=dev and uv pip audit (or pip-audit): no high or critical.
 
