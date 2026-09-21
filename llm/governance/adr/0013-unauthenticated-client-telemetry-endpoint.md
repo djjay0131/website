@@ -1,6 +1,6 @@
 # ADR-0013: The gate exposes an unauthenticated client-telemetry endpoint
 
-Status: Proposed
+Status: Accepted
 Date: 2026-09-19
 
 ## Context

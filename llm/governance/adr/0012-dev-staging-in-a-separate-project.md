@@ -1,6 +1,6 @@
 # ADR-0012: Dev-staging lives in a separate GCP project
 
-Status: Proposed
+Status: Accepted
 Date: 2026-09-18
 
 ## Context
