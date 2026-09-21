@@ -858,6 +858,35 @@ The §8 conditions as I have been applying them, recorded here so they are audit
 **This is a transcription, not a source.** It should become a repository document before the
 next wave, or the next audit will find the same gap.
 
+### From the `astro` upgrade — check 6 closed, and two corrections to me
+
+`astro` **6.4.8 → 7.3.3** on `feat/site-wave-0` (`1fb0bc2`). `npm audit` **3 findings → 0**,
+and both advisories are **fixed rather than accepted**, verified **by GHSA ID** against the
+post-upgrade audit JSON rather than inferred from a falling total: `GHSA-26w7-cxv4-gfx2`
+(AVIF RCE) and `GHSA-376h-93r7-7g6f` (base-path authorization bypass) are absent, as are both
+`sharp` advisories. The previous stream's three-row acceptance table is retired entirely.
+
+**This reverses my own earlier judgement, and the reversal is the point.** The earlier deferral
+was well reasoned against nine `high` findings. What survived triage was a **critical RCE and an
+authorization bypass in base-path handling** — on a site whose entire privacy boundary *is* a
+base path. That is a different class, and re-deferring it would have been treating a category
+as a count.
+
+| # | Finding | Disposition |
+|---|---|---|
+| U-1 | The `base` behaviour genuinely changed in 7 — **and the change *is* the advisory fix.** Base stripping now respects path-segment boundaries, so `/p-archive/…` is no longer treated as under `/p/` | **Accepted, and it strengthens rather than threatens ADR-0011.** Strictly *fewer* paths inside the base. Measured: the based-href set is identical across 6 and 7 but for one content-hashed CSS filename, with zero unbased root-absolute hrefs |
+| U-2 | `sharp` does **not** clear independently — `npm ls` shows one path, `astro → sharp`; it clears only via astro's tree (floor raised at 7.2.8) | **Accepted.** No override was added to manufacture a clean result |
+| U-3 | **The baseline I gave the stream was impossible.** I specified "230 passed / 1 skipped" against a 242-case suite; 230+1 ≠ 242 | **My error, corrected.** The true baseline is **241 passed / 1 skipped across 18 files**, identical before and after the upgrade — which is the comparison that actually matters. I had propagated a figure from an earlier handoff without checking it against the suite |
+| U-4 | `engines.node: ">=22.12.0"` is now **understated**: `undici@8.10.2` (non-optional, via `astro → unifont`) requires `>=22.19.0` | **Fix later — follow-up, one line.** CI runs 22.23.2 so it is unaffected. The stream correctly declined to narrow declared Node support on its own authority; that is a decision, not a detail |
+| U-5 | Astro 7's `compressHTML: 'jsx'` default is a silent rendering change | **Measured, not assumed.** Visible text identical on all 35 pages; emitted path sets identical at 155/155 public and 84/84 private. No override added, because the default is safe here |
+| U-6 | Verified on Node 24, then **re-ran everything on CI's Node 22.23.2** | **Accepted as the right discipline** — a green run on the wrong runtime proves nothing about CI. Identical results |
+| U-7 | `redirects:check` exits 1 | **Pre-existing at baseline**, caused by fixture project slugs, and absent from CI. Left alone deliberately rather than "fixed" into a false green |
+
+**Landing verified by property**, not by output: exactly one line changed (`^6.4.8 → ^7.3.3`),
+`npm ci` exit 0 with `astro 7.3.3` actually installed, audit 0/0/0/0, suite 241/1 matching the
+corrected baseline, and `js-yaml ^4.3.2` / `vitest ^4.1.11` preserved in the commit — the
+earlier stream's fixes were not reverted by the transplant.
+
 ### Environment note
 
 A stray `Error: claude native binary not installed` appeared once mid-pipeline during a commit.
