@@ -25,6 +25,7 @@ from `0000-template.md`.
 | [0011](0011-two-srcdirs-not-a-visibility-filter.md) | The private build is a second `srcDir`, not a visibility filter | Accepted |
 | [0012](0012-dev-staging-in-a-separate-project.md) | Dev-staging lives in a separate GCP project | Accepted |
 | [0013](0013-unauthenticated-client-telemetry-endpoint.md) | The gate exposes an unauthenticated client-telemetry endpoint | Accepted |
+| [0014](0014-satellites-call-the-publish-contract-at-a-moving-v1-tag.md) | Satellites call the publish contract at a moving `v1` tag | Accepted |
 
 ## Lifecycle
 

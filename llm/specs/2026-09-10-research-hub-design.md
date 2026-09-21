@@ -129,11 +129,16 @@ Satellite integration is one workflow step, using a reusable composite
 action published from the hub:
 
 ```yaml
-- uses: djjay0131/website/contract/publish@main
+- uses: djjay0131/website/contract/publish@v1
   with:
     dist: ./dist
     source: phd-milestones
 ```
+
+> Amended 2026-09-21 by ADR-0014: the ref is a moving `v1` tag the hub advances
+> deliberately, not `@main` and not a commit SHA. Propagation of hub-side contract
+> and security fixes is preserved; an arbitrary push to `main` no longer changes
+> what runs inside a satellite.
 
 The action: validates manifest against schema → uploads to
 `gs://<content-bucket>/sources/<source>/` (WIF auth, no keys). It does **not**

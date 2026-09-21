@@ -188,7 +188,7 @@ permissions:
   id-token: write        # required: the OIDC token exchanged through WIF
 
 steps:
-  - uses: djjay0131/website/contract/publish@main
+  - uses: djjay0131/website/contract/publish@v1
     with:
       dist: ./dist
       source: your-source-name
@@ -198,17 +198,27 @@ steps:
       bucket: ${{ vars.GCP_CONTENT_BUCKET }}
 ```
 
-### Why `@main` and not a pinned commit
+### Why `@v1` and not `@main` or a pinned commit
 
-You call the action at `djjay0131/website/contract/publish@main`, a moving reference, from a
-job holding `id-token: write`. That is deliberate: it means contract fixes reach every
-satellite without a pull request in each one, which matters when the fix is a security fix.
-The trade is real and worth stating plainly — **any push to the hub's `main` immediately
-changes what runs inside your workflow.** It is acceptable here because the hub and its
-satellites have one owner; it would not be acceptable for a third-party action, and it is the
-one place where the hub holds power over a satellite's runtime. If that ever stops being
-true, the answer is a moving `v1` tag the hub advances deliberately, not a commit SHA that
-would freeze every satellite on a stale contract.
+You call the action at `djjay0131/website/contract/publish@v1`, a moving reference the hub
+advances **deliberately**, from a job holding `id-token: write`. That ref is chosen so two
+properties hold at once: contract fixes reach every satellite without a pull request in each
+one — which matters when the fix is a security fix — and **no arbitrary push to the hub's
+`main` changes what runs inside your workflow.** Only advancing the tag does.
+
+This page previously specified `@main` and said that if the "any push changes your runtime"
+exposure ever became unacceptable, the answer would be "a moving `v1` tag the hub advances
+deliberately, not a commit SHA that would freeze every satellite on a stale contract." That
+is what this is. It was settled in **ADR-0014**, after Wave 0's supply-chain work pinned the
+contract to a commit SHA — the one thing that sentence ruled out — and an independent
+re-verification caught it.
+
+Breaking changes to the contract take `v2`; you migrate by choice. A commit SHA is still
+correct for **third-party** actions, where the hub and the action do not share an owner.
+
+Fetching `contract/validate-manifest.mjs` or `contract/manifest.schema.json` over HTTP? Use
+`v1` in those URLs too, or a contract fix reaches the action and not the validator beside
+it.
 
 The action validates your manifest, then uploads `dist/` to
 `gs://<bucket>/sources/<source>/`. It uploads file by file rather than recursively,
