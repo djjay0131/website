@@ -57,5 +57,10 @@ page:
 1. whether personal or personal-academic sites may display the marks at all; and
 2. if so, whether an affiliation statement is required and what it must say.
 
-Nothing here has been reviewed against those terms. The files were added on
-request; the compliance question is open and belongs to the site owner.
+The site owner states these marks are used with permission (recorded
+2026-09-21). That is the owner's assertion; this repository has not reviewed
+VT's brand policy and does not claim to have. The terms at
+<https://brand.vt.edu> still govern and this directory still grants no rights
+to them. Points 1 and 2 above stay the owner's to confirm if the usage
+changes -- in particular if the marks ever appear alongside anything that
+could read as institutional endorsement.
