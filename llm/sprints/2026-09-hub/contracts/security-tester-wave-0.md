@@ -111,11 +111,27 @@ THE CHECKLIST — all must pass
      Every action in every workflow across website, phd-milestones, agentic-kgis and
      construction-ai-proposal is pinned by full SHA.
 
-     SCOPE CORRECTED 2026-09-21 by the Lead Architect. The four repos named above
-     OMIT `cv`, which is a satellite holding a workloadIdentityUser binding pinned to
-     refs/heads/master and which carried 6 unpinned `uses:` occurrences. The omission
-     is a defect in THIS CONTRACT, not a failure of the tester against it -- run 3
-     audited the scope it was given. `cv` is in scope from now on.
+     SCOPE CORRECTED 2026-09-21 by the Lead Architect, then CORRECTED AGAIN the same
+     day. Do not read the four repo names above as the roster; they are wrong in both
+     directions and a hardcoded list is the defect.
+
+     THE AUTHORITATIVE ROSTER IS `var.satellites` IN infra/variables.tf, keyed by
+     source name. Today it holds exactly TWO entries:
+         cv              djjay0131/cv              default_branch = master
+         phd-milestones  djjay0131/phd-milestones  default_branch = main
+     Each entry carries the immutable repository_id and repository_owner_id that the
+     WIF provider condition matches, and default_branch is the ONLY branch whose runs
+     may publish -- which is also the ref an audit must measure against. Read the map;
+     do not transcribe it.
+
+     `cv` was missing from the list above and IS a satellite. `agentic-kgis` is gated
+     and unprovisioned, and `construction-ai-proposal` is not a satellite at all --
+     both were audited anyway, which is harmless, but neither is in the roster.
+
+     MEASURE AGAINST default_branch, NOT against whatever branch happens to be checked
+     out. My first correction gave a `cv` count taken from a checked-out feature branch
+     that was behind master and predated the contract/publish step entirely; acting on
+     it would have left the highest-value ref unpinned while reporting a clean result.
 
      ALSO IN SCOPE, and missed by every run so far because it is not a `uses:` line:
      executable content fetched from a MUTABLE REF at run time. agentic-kgis's
