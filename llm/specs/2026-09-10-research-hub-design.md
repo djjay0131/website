@@ -238,6 +238,26 @@ One GCP project under Jason's personal account. Terraform in `infra/`.
 Region `us-east1`. Blaze plan required (Hosting→Cloud Run rewrites);
 expected run rate $0–3/month plus domain renewal.
 
+> **Amended 2026-09-21.** The rewrite list above gained `/session/end` and
+> `/client-events`, and this note records why it was wrong for four days.
+>
+> **`/client-events`** was added during the 2026-09-18 observability work and authorised by
+> **ADR-0013** — whose own decision 2 says it "is added to the design doc §8 rewrite list."
+> That decision was written and **not carried out**, so §8 kept claiming four rewrites while
+> Hosting served five. The Wave 0 Security Tester found it, and check 7 is a FAIL precisely
+> because an unauthenticated route on the public path appeared in no authoritative list.
+>
+> **`/session/end`** is sign-out (SD-4), added by PR #48. Hosting's `"/session"` is a
+> **literal** and does not match it, which is why it needs its own entry rather than a glob —
+> globbing `/session` would silently route every future `/session/*` path to the gate.
+>
+> This is the second time in one wave that a downstream artifact was amended while the
+> document that outranks it was left stale: ADR-0004 decision 4 still read "the gate's service
+> account is the private bucket's only reader" five days after ADR-0010 decision 5 made that
+> unimplementable. The lesson is the same both times — **an ADR that says it amends design
+> authority has not amended anything until the edit is made**, and nothing mechanically checks
+> the difference.
+
 `firebase.json` (hub root):
 
 ```json
@@ -249,6 +269,8 @@ expected run rate $0–3/month plus domain renewal.
       { "source": "/p/**", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
       { "source": "/s/**", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
       { "source": "/session", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
+      { "source": "/session/end", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
+      { "source": "/client-events", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
       { "source": "/share/**", "run": { "serviceId": "hub-gate", "region": "us-east1" } }
     ],
     "headers": [

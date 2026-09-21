@@ -691,12 +691,27 @@ which is what actually establishes the template layer matches `main`.
 Derived from G-R1 and the SEAM-6 ordering note, so the order is decided before the gates
 report rather than improvised after:
 
-1. **#48 (site)** first, or simultaneously with #47 — it carries the `/session/end` rewrite.
-2. **#47 (gate)** — the handler. Merging it alone ships a sign-out that works only on the
-   `run.app` URL, which is useless to a member and passes every direct test.
-3. **#53 (infra)** — but **the apply is gated separately** by D-3 on #49: no narrowing until a
-   sign-in route is proven to deliver.
-4. **#45 (record)** last, so it can record what actually happened rather than what was planned.
+> **REVISED 2026-09-21, on the security re-run's check 7.** The order below put #45 last so it
+> could describe what actually happened. That is wrong, and the re-run found why: **ADR-0013
+> exists only on `admin/wave-0-preconditions`**, so #47, #48 and #53 each carry a
+> `/client-events` rewrite with **no authorising decision on their own branch**. Check 7 stays
+> FAIL for any order that lands code before the record. The record now merges **with or
+> before** the code — an unavoidable consequence of splitting the record PR from the code PRs,
+> and worth remembering the next time that split looks tidy.
+
+1. **#45 (record)** first, or simultaneously — it carries ADR-0012, ADR-0013, the §8 rewrite
+   amendment and every disposition. Without it the other three ship undecided changes.
+2. **#48 (site)** — it carries the `/session/end` rewrite **and** `GATE_ALLOWED_ORIGINS`'
+   consumer side.
+3. **#47 (gate)** — the handler. Merging it alone ships a sign-out that works only on the
+   `run.app` URL, useless to a member and passing every direct test. **Second constraint,
+   live-confirmed by the re-run:** `GATE_ALLOWED_ORIGINS` is *rendered by #53* but *read by
+   #47*, so #47 without #53 takes sign-out down — loudly, via the smoke test.
+4. **#53 (infra)** — and **merging it turns `main` red on two counts** until remediated:
+   `GCP_AUDITOR_SA`/`hub-auditor` do not exist yet, and the new live check correctly fails on
+   the unremediated `roles/editor` grant (#55). Both are the guards working, not breaking —
+   but they must be sequenced with the apply rather than discovered after it.
+   **The apply itself stays gated** by D-3 on #49.
 
 ### From the adversarial round — Red Team, Live Prober, Boundary Tester
 
