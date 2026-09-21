@@ -202,5 +202,121 @@
   {
     "from": "/website/writing/",
     "to": "/writing/"
+  },
+  {
+    "from": "/website/brand/vt/README.md",
+    "to": "/brand/vt/README.md"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-black.png",
+    "to": "/brand/vt/vt-horizontal-black.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-black.svg",
+    "to": "/brand/vt/vt-horizontal-black.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-full-color.png",
+    "to": "/brand/vt/vt-horizontal-full-color.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-full-color.svg",
+    "to": "/brand/vt/vt-horizontal-full-color.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-gray.png",
+    "to": "/brand/vt/vt-horizontal-gray.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-gray.svg",
+    "to": "/brand/vt/vt-horizontal-gray.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-maroon.png",
+    "to": "/brand/vt/vt-horizontal-maroon.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-maroon.svg",
+    "to": "/brand/vt/vt-horizontal-maroon.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-orange-white.png",
+    "to": "/brand/vt/vt-horizontal-orange-white.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-orange-white.svg",
+    "to": "/brand/vt/vt-horizontal-orange-white.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-orange.png",
+    "to": "/brand/vt/vt-horizontal-orange.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-orange.svg",
+    "to": "/brand/vt/vt-horizontal-orange.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-white.png",
+    "to": "/brand/vt/vt-horizontal-white.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-horizontal-white.svg",
+    "to": "/brand/vt/vt-horizontal-white.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-black.png",
+    "to": "/brand/vt/vt-vertical-black.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-black.svg",
+    "to": "/brand/vt/vt-vertical-black.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-full-color.png",
+    "to": "/brand/vt/vt-vertical-full-color.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-full-color.svg",
+    "to": "/brand/vt/vt-vertical-full-color.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-gray.png",
+    "to": "/brand/vt/vt-vertical-gray.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-gray.svg",
+    "to": "/brand/vt/vt-vertical-gray.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-maroon.png",
+    "to": "/brand/vt/vt-vertical-maroon.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-maroon.svg",
+    "to": "/brand/vt/vt-vertical-maroon.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-orange-white.png",
+    "to": "/brand/vt/vt-vertical-orange-white.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-orange-white.svg",
+    "to": "/brand/vt/vt-vertical-orange-white.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-orange.png",
+    "to": "/brand/vt/vt-vertical-orange.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-orange.svg",
+    "to": "/brand/vt/vt-vertical-orange.svg"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-white.png",
+    "to": "/brand/vt/vt-vertical-white.png"
+  },
+  {
+    "from": "/website/brand/vt/vt-vertical-white.svg",
+    "to": "/brand/vt/vt-vertical-white.svg"
   }
 ]
