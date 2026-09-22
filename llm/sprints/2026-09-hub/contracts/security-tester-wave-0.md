@@ -108,8 +108,24 @@ THE CHECKLIST — all must pass
      with a real token, not by reading rules.
 
   6. SUPPLY CHAIN
-     Every action in every workflow across website, phd-milestones, agentic-kgis and
-     construction-ai-proposal is pinned by full SHA.
+     Every THIRD-PARTY action in every workflow is pinned by full SHA.
+
+     ONE CARVE-OUT, ADR-0014 (2026-09-21): the hub's OWN publish contract is called at
+     the moving tag `djjay0131/website/contract/publish@v1`, and the two contract files
+     agentic-kgis fetches over HTTP (validate-manifest.mjs, manifest.schema.json) carry
+     `v1` in their URLs. That is pinned BY POLICY, not unpinned. A naive audit counting
+     any `uses:` without a 40-hex SHA will read `@v1` as a regression -- it is not.
+
+     WHY the carve-out exists, because the reasoning matters more than the rule: a SHA
+     on the hub's own contract severs the path by which a hub-side SECURITY fix reaches
+     every satellite without a PR in each one, and severs it SILENTLY -- nothing reports
+     that satellites have stopped receiving fixes until one is needed. A tag the hub
+     advances deliberately keeps propagation and still denies an arbitrary push to main
+     any power over satellite runtime. Third-party actions get no such carve-out: the
+     hub and those actions do not share an owner.
+
+     CHECK BOTH HALVES. `v1` must resolve to a commit whose contract/ tree is the one
+     the hub intends, and a satellite must not be left on `@main`.
 
      SCOPE CORRECTED 2026-09-21 by the Lead Architect, then CORRECTED AGAIN the same
      day. Do not read the four repo names above as the roster; they are wrong in both
