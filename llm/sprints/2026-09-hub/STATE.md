@@ -2101,3 +2101,170 @@ From the Phase 3 `gate` stream (2026-09-17):
   recorded above.
 - **Agents do not merge.** Draft PR → ready when DoD is met → stop at the
   checkpoint.
+
+## Wave 0 close-out attempt, 2026-09-21 — still BLOCKED, and why
+
+Wave 0 is **BLOCKED**. Two of the Security Tester's three FAILs are closed; one
+is closed only by the owner. Evidence for everything below is in the 42
+committed handoffs — this section records decisions and reasons, not a second
+copy of the evidence.
+
+### The three FAILs
+
+| Check | State | Closed by |
+|---|---|---|
+| 7 — static public site | **CLOSED.** ADR-0013 `Accepted`, index row with it, #45 CI `CLEAN`, `governance-checks` green | done |
+| 6 — supply chain | **STILL FAIL.** Pinning half closed 34 → 0; fails on F-1 | F-1 → issue #63 |
+| 4 — identity | **STILL FAIL.** `firebaseauth.admin` bound, `gateSessionMinter` `NOT_FOUND` | owner: `GCP_AUDITOR_SA` + apply |
+
+The tester's own words on check 7, which is why the fix landed as a commit and
+not as a plan: **"a plan is not a state."** It refused to pass check 7 on a
+merge order that had not happened.
+
+### Merge order — DISPUTED by the Merge Evaluator, and it was right
+
+Was `#45 → #48 → #47 → #53`. **Is `#45 → #48 → #53 → (verified apply) → #47`.**
+
+`GATE_ALLOWED_ORIGINS` is *rendered* by #53 and *read* by #47, but **merging #53
+renders nothing — only `terraform apply` writes it**. Merging #47 deploys
+immediately (`gcloud run services update`), then smoke-tests a sign-out
+expecting 200. The old order therefore rolled out a revision that 403s sign-out
+for every member on every origin, failed the job *after* rollout, and left the
+broken revision live.
+
+**T1 — upgraded from the evaluator's "risk" to a certainty by measurement.**
+Terraform renders the project-number origin
+`https://hub-gate-<project number>.<region>.run.app`; `status.url` returns
+`https://hub-gate-ywkmredngq-ue.a.run.app`; `gate.yml:229` sends the latter as
+`Origin`; `main.py:628` is exact frozenset membership. **They do not match.** So
+even the corrected order fails unless the apply passes:
+
+    -var='gate_extra_allowed_origins=["https://hub-gate-ywkmredngq-ue.a.run.app"]'
+
+The live gate carries **no** `GATE_ALLOWED_ORIGINS` today. `terraform.tfvars.example`
+does not mention the variable at all → issue **#62**.
+
+**`notify-recovery` reaches past its own signal.** `private-bucket-live-iam` is
+in `needs:` of both notify jobs and `notify-recovery` requires
+`!contains(needs.*.result, 'failure')`. While it is red, pipeline recovery is
+suppressed **globally** — the `ci-failure` issue can never auto-close, including
+for unrelated outages.
+
+### §8 deadlock, and the owner's decision
+
+§8 forbids merging while any check FAILs. Check 4 is fixed *by* the apply, and
+the apply follows #53 — so check 4 cannot clear before a merge, and no merge is
+allowed until it clears. **Owner decision, 2026-09-21: apply from the
+`feat/infra-wave-0` checkout first**, accepting that production briefly runs
+config from an unmerged branch. Sequence: set `GCP_AUDITOR_SA` (a **variable**,
+`vars.GCP_AUDITOR_SA`, `build.yml:817`) → apply with the extra origin → verify
+the boot line (`terraform output -raw gate_allowed_origins_check_command`) →
+merge #45 → #48 → #53 → #47.
+
+### ADR-0014 — a design-authority override I made and did not catch
+
+Closing check 6 I pinned `contract/publish` to a commit SHA in three
+repositories. `docs/satellites.md` §"Why `@main` and not a pinned commit" had
+deliberately chosen a moving ref so hub-side fixes reach every satellite with no
+PR in each — *"which matters when the fix is a security fix"* — and named the
+escape hatch as **"a moving `v1` tag the hub advances deliberately, not a commit
+SHA that would freeze every satellite on a stale contract."** I did the one
+thing that sentence rules out, by commit message, in four repos, live.
+
+ADR-0007 does **not** authorise it: its SHA-pinning language is decision 6,
+about `google-github-actions/upload-cloud-storage`, and never names
+`contract/publish`. This is a §10 hard stop (design-authority change larger than
+an ADR amendment); the path was stopped and put to the owner.
+
+**Owner chose the `v1` tag.** ADR-0014 `Accepted`. `v1` is an annotated tag at
+`f98a928` (whose `contract/` is identical to what the wave merges — all four
+branches change 0 files there). Live and verified:
+
+    cv              master e1e7721   phd-milestones main 73776a1
+    agentic-kgis    main   78e367e   (uses: + both raw.githubusercontent URLs)
+
+Decision 4 proven, not assumed: `raw.githubusercontent` serves both contract
+files at `v1` with HTTP 200, byte-identical to `f98a928`. And proven in
+production: `cv` run `35670024466` on `e1e7721` succeeded end to end, writing
+`sources/cv/manifest.json` at `2026-09-22T00:03:44Z` — a publish step can exit 0
+having uploaded nothing, so the object was checked, not the job.
+
+Check 6's contract now carries the carve-out **with its reasoning**: third-party
+actions require SHAs; the hub's own contract at `v1` is pinned *by policy*. The
+bare rule is what invited the override.
+
+### Supply chain: 34 → 0, and a vector no `uses:` audit sees
+
+`agentic-kgis` curled `contract/validate-manifest.mjs` from a **mutable branch
+ref** into `/tmp` and ran it with `node`, on every push, ungated — while the
+`contract/publish` action beside it was gated behind `workflow_dispatch` and
+unprovisioned. **The audit shape reported the dormant risk and missed the live
+one.** Now in check 6's scope.
+
+**The roster is `var.satellites` in `infra/variables.tf`, not a list of names**:
+exactly two — `cv` (`master`), `phd-milestones` (`main`) — each carrying the
+`default_branch` an audit must measure against. `agentic-kgis` is gated and
+unprovisioned; `construction-ai-proposal` is not a satellite at all.
+
+### Rulings recorded rather than left for run 4
+
+- **S-5** (issue **#61**): Hosting answers `/p/a%00.html` with 500 while
+  `*.run.app` returns the gate's 404, with no container log line. **Defect, not
+  a check-3 FAIL** — it leaks nothing (byte-identical 500s for real and absent
+  slugs), never reaches our code, and predates the wave. It does **not** satisfy
+  ADR-0004's "identical status" clause and that is not claimed. Escalates to a
+  FAIL if any body difference ever appears.
+- **F-1** (issue **#63**): `xu-cheng/latex-action` is a composite action running
+  `docker run ghcr.io/xu-cheng/texlive-full:latest` — a SHA pinning a wrapper
+  around a **mutable tag executed as root**. Verified blast radius: it runs in
+  `build`, while `id-token: write` and `contract/publish` are in `publish`, so
+  it is a poisoned-artifact path into `sources/cv/`, not a credential path.
+  Real, not a Wave 0 blocker.
+- **Reclassifications:** #60 L0 → **L2** (the delta denies `site/**`, and Steward
+  is INACTIVE — L0 was wrong twice over); #45 L2 → **L3** (its own body argued
+  "mixed classifies at the highest level" and then declared the lower one).
+
+### Guards of mine that failed today, and were caught
+
+Recorded because the pattern is the finding, not the individual bugs.
+
+1. An SVG check flagged all 14 assets for remote fetches — they were `xmlns`
+   **namespace identifiers**. A signal that fires on every input is not a signal.
+2. "The generator exists" stood in for "the output is generated" — replaced with
+   the CI log naming `✓ scripts/route-inventory.test.ts`, and confirming the
+   skipped case was the opt-in build check, not the map assertion.
+3. `git commit -m` in a double-quoted string let bash **execute a backticked
+   token**, leaving a message that misdescribed its own diff. Messages now go
+   through a file with `-F`.
+4. A verification grep counted a **retraction as the claim it retracts**.
+5. `cmd | sed && echo PASSED` tested **`sed`'s** exit status — it printed
+   "CHECK PASSED" over `error: corrupt patch`, twice, and would have blessed a
+   patch missing 3 of 9 hunks.
+6. `git grep` against a `symbolic-ref` fallback aimed at a **ref that does not
+   exist** in that clone and returned **empty instead of erroring**.
+
+**Two errors were caught by agents refusing my instructions, not following
+them**: the `cv` mis-scope (I aimed the pinning at a checked-out branch behind
+`master` whose workflow predated the `contract/publish` step — it would have
+reported a clean `6 → 0` while leaving the `id-token`-bearing ref mutable), and
+the ADR-0014 override. The second would have shipped.
+
+Also recorded: I staged the ADR-0013 flip **while the Security Tester was
+reading this worktree**, then reverted it. An uncommitted edit would have let
+check 7 improve against a state no branch had — the harness-supplies-what-
+production-lacks defect, authored by me.
+
+### Open, and owner-only
+
+- `GCP_AUDITOR_SA` — a **variable**, not a secret. The job **fails rather than
+  skips** while unset, deliberately (issue #58), and `build.yml:720` forbids
+  conditioning it.
+- The apply, the boot-line check, then the four merges.
+- Sign in as `djjay@vt.edu` to reach `/p/` — the only thing that closes **A1**.
+- Click the alert-channel verification link — all four policies deliver nothing
+  until it is clicked.
+- `cv` `fix/bibtexparser-pin` (`5ee7515`, forked at `0d27afb`) **would revert
+  every pin** if merged. No PR open. Rebase before use.
+- The astro-upgrade stream ran with **no contract** in `contracts/` — the only
+  Wave 0 stream without one. Recorded as a gap; **not** back-filled, because a
+  contract written after the fact never governed the work.
