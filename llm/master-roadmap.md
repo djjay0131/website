@@ -270,11 +270,11 @@ that the CV appears.
 
 ### Acceptance criteria
 
-- [ ] A seeded member signs in at `jason.cusati.us` and sees the milestone tracker and the committee dossier
+- [x] A seeded member signs in at `jason.cusati.us` and sees the milestone tracker and the committee dossier
 - [x] Signed out, a request for the tracker or dossier under `/p/` returns no private content
 - [ ] A signed-in account that is not on the allowlist gets the "not shared with you" page and no private content (§6)
 - [x] The same signed-out and non-member requests, sent straight to the `hub-gate` `*.run.app` URL, are refused the same way (ADR-0004)
-- [ ] A session minted through `jason.cusati.us` persists across page loads served through Hosting (ADR-0004 `__session` constraint)
+- [x] A session minted through `jason.cusati.us` persists across page loads served through Hosting (ADR-0004 `__session` constraint)
 - [ ] Every response under `/p/` carries `Cache-Control: private, no-store` (§6). Firebase Hosting marks rewrite responses `private` by default, and its CDN caches a gate response only if the gate itself sends `public` or `s-maxage` (ADR-0004).
 - [ ] A gate test asserts that no `/p/**` or `/s/**` response carries `public` or `s-maxage` in `Cache-Control` (ADR-0004)
 - [ ] The gate pytest suite passes in CI and covers session mint and verify, non-member rejection, and path-traversal rejection on `/p/` (§6)
