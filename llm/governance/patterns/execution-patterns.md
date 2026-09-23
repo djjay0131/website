@@ -57,7 +57,34 @@ justifies it.
 **Evidence (seed):** seed-repo blueprint phases were scoped as single
 coherent scaffolds — the shared-state shape parallel agents make riskier,
 in contrast to the disjoint doc scopes that made design parallelism safe.
-**This repo:** no evidence yet — onboarded 2026-09-14 (issue #7).
+
+**This repo (2026-09-19, sprint 2026-09-hub Wave 0 — the seeded lesson now
+has local evidence, and it is a confirmation).** Five implementation streams
+ran in parallel against one repository. Scope discipline itself held —
+zero cross-stream file edits across fourteen bounded contracts, and one
+stream refused a contract instruction of mine that would have crossed into
+another's tree. What did *not* hold was **atomicity**.
+
+The refinement this repo adds to the seeded lesson: the risk is not the
+number of agents, it is **splitting one change across two of them**. Three
+instances in one sprint, all the same shape:
+
+1. **SEAM-10** is atomic by its own specification — it states that two
+   existing guards "will fail until they are updated in the same commit" —
+   and was split *specify* / *implement* across two concurrent streams. The
+   wave's highest-risk IAM item shipped as `WAITING — nothing implemented`.
+2. **`PRIVATE_BUCKET` / `GATE_PRIVATE_BUCKET`** (Phase 3): two streams each
+   green while disagreeing about a variable name nothing checked.
+3. **`/session/end`** (Wave 0): the gate stream built the handler, the site
+   stream owned the Hosting rewrite, and nobody owned the *caller* — so a
+   route and a rewrite shipped with no UI invoking them. Sign-out that does
+   not exist.
+
+**Planning rule this yields:** before splitting work across streams, ask
+whether the change is *atomic* — whether any one part of it is false or
+inert without the others. If it is, one agent owns it end to end, however
+wide the surface. A contract that hands a stream half of an atomic change
+is a defect in the contract, not in the stream.
 
 ### 4. Infrastructure interruptions must not lose specialist output
 
@@ -94,6 +121,28 @@ promptly and stalled threads resumed from transcripts.
   (`llm/governance/governance-levels.md`).
 - **Restarting stalled specialists from scratch.** Restarts lose decisions
   made mid-thread and re-spend budget; resume from transcripts (lesson 4).
+
+- **Breaking a guard on an ambiguous anchor, and trusting the green.** To
+  prove a guard fires you must break the thing it protects — but if the
+  string you patch occurs more than once, you may break something else
+  entirely and read the resulting pass as proof the guard is sound, or the
+  resulting *absence* of a failure as proof it is un-failable. **Both
+  failure modes look exactly like diligence.**
+
+  **Evidence (this repo, 2026-09-19, three separate agents in one sprint):**
+  an infra stream's `sed` hit a *comment* at `storage.tf:15` while the real
+  assignment at `:87` stayed `true`, so breaking UBLA left the guard green —
+  and it was caught only by expecting red and getting green. A verifier then
+  anchored on a string occurring twice in `main.py`, patched the mint path
+  instead of sign-out, got `43 passed`, and was one step from reporting the
+  gate's most important assertion un-failable. A later tester verified its
+  edit had landed on the real line before trusting the result, and found the
+  guard sound.
+
+  **The rule:** assert the anchor is unique before you break on it —
+  literally, `assert text.count(anchor) == 1` — and after breaking, confirm
+  the *specific* test you expected to fail is the one that failed, by name.
+  A guard proven by a break you did not verify is not proven.
 
 ---
 

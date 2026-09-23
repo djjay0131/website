@@ -1,9 +1,18 @@
 # Research Hub — Design Authority Document
 
-Status: Approved for Phase 0–3 execution
-Last updated: 2026-09-10
+Status: Approved for Phase 0–6 execution *(amended 2026-09-18 by the owner in the
+run-to-completion prompt; it read "Approved for Phase 0–3 execution". Roadmap assumption
+R-A3, which rested on that wording, is retired with it.)*
+Last updated: 2026-09-19 *(the body carries dated amendments from 2026-09-16 onward — ADR-0008
+to §2 and §4, ADR-0010 decision 5 to §6, ADR-0011 to §5, and the owner's 2026-09-18 status
+change to Phases 0–6. This line read 2026-09-10 until the Wave 0 Chief Reviewer noticed a
+document amended four times still claiming to be untouched.)*
 Owner: Jason Cusati (project owner, sole human reviewer)
-Governance: agentic-governance v0.5 (pin in governance-delta.md)
+Governance: agentic-governance **v0.9.1** (pin in governance-delta.md) *(corrected 2026-09-19
+on the Wave 0 Governance Audit; this header still read v0.5, which the delta superseded when
+the pin moved to v0.9.0 by PR #22 and then to v0.9.1. The delta is authoritative for the pin;
+this line is a stale copy of it, which is exactly why policy is stated once and cited
+elsewhere.)*
 Path in repo: `llm/specs/2026-09-10-research-hub-design.md` (handoff branch `handoff/research-hub`)
 
 This is the design-authority document for the research hub. Per the
@@ -120,11 +129,16 @@ Satellite integration is one workflow step, using a reusable composite
 action published from the hub:
 
 ```yaml
-- uses: djjay0131/website/contract/publish@main
+- uses: djjay0131/website/contract/publish@v1
   with:
     dist: ./dist
     source: phd-milestones
 ```
+
+> Amended 2026-09-21 by ADR-0014: the ref is a moving `v1` tag the hub advances
+> deliberately, not `@main` and not a commit SHA. Propagation of hub-side contract
+> and security fixes is preserved; an arbitrary push to `main` no longer changes
+> what runs inside a satellite.
 
 The action: validates manifest against schema → uploads to
 `gs://<content-bucket>/sources/<source>/` (WIF auth, no keys). It does **not**
@@ -229,6 +243,26 @@ One GCP project under Jason's personal account. Terraform in `infra/`.
 Region `us-east1`. Blaze plan required (Hosting→Cloud Run rewrites);
 expected run rate $0–3/month plus domain renewal.
 
+> **Amended 2026-09-21.** The rewrite list above gained `/session/end` and
+> `/client-events`, and this note records why it was wrong for four days.
+>
+> **`/client-events`** was added during the 2026-09-18 observability work and authorised by
+> **ADR-0013** — whose own decision 2 says it "is added to the design doc §8 rewrite list."
+> That decision was written and **not carried out**, so §8 kept claiming four rewrites while
+> Hosting served five. The Wave 0 Security Tester found it, and check 7 is a FAIL precisely
+> because an unauthenticated route on the public path appeared in no authoritative list.
+>
+> **`/session/end`** is sign-out (SD-4), added by PR #48. Hosting's `"/session"` is a
+> **literal** and does not match it, which is why it needs its own entry rather than a glob —
+> globbing `/session` would silently route every future `/session/*` path to the gate.
+>
+> This is the second time in one wave that a downstream artifact was amended while the
+> document that outranks it was left stale: ADR-0004 decision 4 still read "the gate's service
+> account is the private bucket's only reader" five days after ADR-0010 decision 5 made that
+> unimplementable. The lesson is the same both times — **an ADR that says it amends design
+> authority has not amended anything until the edit is made**, and nothing mechanically checks
+> the difference.
+
 `firebase.json` (hub root):
 
 ```json
@@ -240,6 +274,8 @@ expected run rate $0–3/month plus domain renewal.
       { "source": "/p/**", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
       { "source": "/s/**", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
       { "source": "/session", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
+      { "source": "/session/end", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
+      { "source": "/client-events", "run": { "serviceId": "hub-gate", "region": "us-east1" } },
       { "source": "/share/**", "run": { "serviceId": "hub-gate", "region": "us-east1" } }
     ],
     "headers": [
