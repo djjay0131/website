@@ -2402,3 +2402,61 @@ reach for `0s` again. **#53's head moved `e776df3` → `63fc0d3` for this.**
 - The notification channel's `verificationStatus` is not reported as verified. All four
   policies are enabled with one channel each and may still deliver nothing. Owner-only.
 - #63 (`latex-action` wrapping a mutable `texlive-full:latest`) is untouched by this apply.
+
+## A1 — PROVEN LIVE, 2026-09-23
+
+The owner signed in. This is the criterion no agent could verify, and the one
+claim I repeatedly refused to make on the invalid-token 401.
+
+```
+21:29:35  POST /session  -> 200
+21:29:38  event=allow scope=session member=djjay@vt.edu      <- the MINT
+21:29:38..54  event=allow scope=private member=djjay@vt.edu  (x25)
+
+200  /p/_payload/phd-milestones/site/index.html      the milestone tracker
+200  /p/_payload/phd-milestones/site/committee.html  the committee dossier
+```
+
+**`firebaseauth.users.createSession` works under the narrowed `gateSessionMinter`
+role.** Zero `PERMISSION_DENIED`, zero 403 from the Admin SDK, zero ERROR-level
+lines in the window. That is what the role narrowing risked and what only a real
+sign-in could settle: an invalid token never reaches `createSession`, so the 401
+proved only that the gate reached the Admin SDK.
+
+Also confirmed in the same window: the **self-hosted fonts** are served from
+`/p/_astro/` (`ibm-plex-*`, `spectral-*`), so phd-milestones #2's fix is live and
+the private pages fetch nothing from Google. And `signout.*.js` is served, so
+SD-4's control is reachable by a member — the caller, not just the handler.
+
+### Roadmap
+
+- **A1 ticked.** Both documents served to the seeded member.
+- **A5 ticked.** One mint at 21:29:35, then page loads across two distinct
+  documents through 21:29:54, all `event=allow`. The session persisted.
+  *One inference stated plainly:* the gate log shows the `*.run.app` backend URL
+  because Hosting proxies to it, so the log alone does not name the browser's
+  host. ADR-0004's `__session` constraint and the `/p/` rewrite are what make
+  Hosting the path.
+
+### Still NOT verifiable without one more sign-in
+
+**A3, and the non-member half of A4.** Both are "a signed-in account that is NOT
+on the allowlist gets the not-shared-with-you page and no private content". The
+allowlist holds `djjay@vt.edu` and `cbrown@vt.edu` only, so the owner's own
+Google identity `djjay0131@gmail.com` is the ready-made non-member — signing in
+as it exercises exactly that path.
+
+### Checkpoint 4 (#52) — 2 of 5 blockers cleared
+
+| Blocker | State |
+|---|---|
+| A12 — gate auth role narrowed, sign-in still working | **CLOSED** (#49) |
+| S5 / #31 — Google sign-in unconfigured | **CLOSED**, stale |
+| A1 / A5 | **PROVEN** |
+| A3 + non-member A4 | needs one non-member sign-in |
+| A13 — phd-milestones prefix-boundary test never run | open (#50) |
+
+The "sharper problem" #52 raised — that A1 might be unverifiable by *anyone*
+because email delivery was suspect — **did not materialise.** Sign-in worked.
+The notification-channel question is therefore separate from sign-in, and
+narrower than #52 feared.
