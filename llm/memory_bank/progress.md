@@ -1,13 +1,29 @@
 # Progress
 
 Status: Draft
-Last updated: 2026-09-16
+Last updated: 2026-09-23
 Owner: Chief Architect
 
 What belongs here: what works, what is left, and known issues — recorded against
 merged reality, not plans.
 
 ## What works
+
+- **Sign-out**, as of 2026-09-23. `POST /session/end` clears `__session` and returns
+  200 on `jason.cusati.us` and on the `*.run.app` URL; a cross-origin POST is refused
+  403. The CSRF check compares `Origin` against a frozenset built at startup from
+  `GATE_ALLOWED_ORIGINS` and never from the request; unset, it refuses every caller
+  and fails closed.
+- **The gate runs on a narrowed identity.** `gateSessionMinter`
+  (`firebaseauth.users.createSession`, `firebaseauth.users.get`) and
+  `datastore.viewer`. The broad `roles/firebaseauth.admin` is removed.
+- **The private bucket's real exposure is closed.** `roles/editor` is empty
+  project-wide, so the automatic `projectEditor` legacy bindings expand to nobody.
+  `private-bucket-live-iam` runs hourly and on every push to `main`, and passes.
+- **Four alert policies** exist and are enabled, including "gate started
+  misconfigured". *(They deliver nothing until the notification channel is verified —
+  owner-only.)*
+
 
 - **https://jason.cusati.us** serves the site from Firebase Hosting (project `cusati-hub`),
   deployed on every push to `main` through WIF; no service-account keys exist.
