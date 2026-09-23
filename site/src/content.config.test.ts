@@ -16,9 +16,11 @@ import {
 } from "./content.config";
 import {
   CLAIMED_DATA_ITEMS,
+  CONTENT_PROVENANCE_FILE,
   DEFAULT_MANIFEST_VERSION,
   EXPECTED_SOURCES,
   KNOWN_MANIFEST_VERSIONS,
+  expectedSourcesEnforcement,
   findMissingExpectedSources,
   isKnownManifestVersion,
   manifestVersionOf,
@@ -48,6 +50,21 @@ function writeTree(files: Record<string, string>) {
   }
   return root;
 }
+
+/**
+ * The provenance marker a tree that CANNOT carry every declared source writes
+ * (scripts/fetch-data.sh, scripts/sync-local-data.sh). Spread into a tree that
+ * is deliberately single-source and is not about the expected-source set, so
+ * those tests keep testing what they were written to test rather than tripping
+ * over a required source they never meant to declare.
+ */
+const PARTIAL_TREE = {
+  [CONTENT_PROVENANCE_FILE]: JSON.stringify({ provenance: "test-partial", complete: false }),
+};
+
+/** A manifest withdrawing everything, for whichever source needs to be present. */
+const emptyManifest = (source: string, published = "2026-09-17T00:00:00Z") =>
+  JSON.stringify({ source, published, items: [] });
 
 // ---------------------------------------------------------------------------
 // The mirror is a mirror (SEAM-1)
@@ -199,49 +216,137 @@ describe("manifest_version is accepted, defaulted and vetted", () => {
 // The expected-source set (ADR-0010 decision 4, closing C27)
 // ---------------------------------------------------------------------------
 describe("a declared source whose prefix has entirely vanished is a fault", () => {
-  it("declares both satellites, with phd-milestones not yet required", () => {
+  it("declares both satellites, and BOTH are required since 2026-09-18", () => {
     expect(EXPECTED_SOURCES.map((e) => e.source)).toEqual(["cv", "phd-milestones"]);
     expect(EXPECTED_SOURCES.find((e) => e.source === "cv")?.required).toBe(true);
-    // Not yet: it cannot publish until Checkpoint 4, and a guard that fails
-    // every build until then would simply be deleted. Flipped at Checkpoint 4.
-    expect(EXPECTED_SOURCES.find((e) => e.source === "phd-milestones")?.required).toBe(false);
+    // Flipped on 2026-09-18, after the first successful publish at Checkpoint 4
+    // (2026-09-17). Left at false, a vanished prefix goes undetected for the one
+    // source C27 was written about -- the private one, whose silent
+    // disappearance empties the private area while every check reports success.
+    expect(EXPECTED_SOURCES.find((e) => e.source === "phd-milestones")?.required).toBe(true);
   });
 
-  it("reports a required source whose prefix is absent", () => {
+  it("reports EVERY required source whose prefix is absent", () => {
     const problems = findMissingExpectedSources([]);
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toMatch(/"cv" has no prefix at all/);
+    expect(problems).toHaveLength(2);
+    expect(problems.join("\n")).toMatch(/"cv" has no prefix at all/);
+    expect(problems.join("\n")).toMatch(/"phd-milestones" has no prefix at all/);
     expect(problems[0]).toMatch(/FAULT, not a withdrawal/);
   });
 
+  it("THE CONSEQUENCE OF THE FLIP: a tree with cv alone is now a fault", () => {
+    // This assertion is the whole point of required: true. Before 2026-09-18 it
+    // returned [], and a private prefix that vanished from the bucket produced a
+    // green build with an empty private area.
+    const problems = findMissingExpectedSources(["cv"]);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/"phd-milestones" has no prefix at all/);
+    expect(problems[0]).toMatch(/FAULT, not a withdrawal/);
+    expect(problems[0]).toMatch(/Found: cv\./);
+  });
+
   it("says nothing when every required source is present", () => {
-    expect(findMissingExpectedSources(["cv"])).toEqual([]);
     expect(findMissingExpectedSources(["cv", "phd-milestones"])).toEqual([]);
   });
 
   it("does NOT confuse a vanished prefix with a withdrawal (decision 2 vs 4)", () => {
     // Withdrawing everything still means publishing a manifest with an empty
-    // items array. That is legitimate and must keep passing.
+    // items array. That is legitimate and must keep passing -- so this tree
+    // carries BOTH required sources, and every item of each is withdrawn.
     const root = writeTree({
-      "cv/manifest.json": JSON.stringify({
-        source: "cv",
-        published: "2026-09-16T09:15:00Z",
-        items: [],
-      }),
+      "cv/manifest.json": emptyManifest("cv", "2026-09-16T09:15:00Z"),
+      "phd-milestones/manifest.json": emptyManifest("phd-milestones"),
     });
     expect(() => loadSources(root)).not.toThrow();
+    expect(loadSources(root).map((l) => l.source)).toEqual(["cv", "phd-milestones"]);
     expect(loadSources(root)[0].manifest.items).toEqual([]);
   });
 
-  it("FAILS loadSources when a required source's whole prefix is gone", () => {
+  it("FAILS loadSources when a required source's whole prefix is gone (cv)", () => {
     const root = writeTree({
-      "phd-milestones/manifest.json": JSON.stringify({
-        source: "phd-milestones",
-        published: "2026-09-17T00:00:00Z",
-        items: [],
-      }),
+      "phd-milestones/manifest.json": emptyManifest("phd-milestones"),
     });
     expect(() => loadSources(root)).toThrow(/expected published sources are missing/);
+    expect(() => loadSources(root)).toThrow(/"cv" has no prefix at all/);
+  });
+
+  it("FAILS loadSources when the PRIVATE source's whole prefix is gone", () => {
+    // The build-level half of the flip, and the case C27 was written for: the
+    // tree is otherwise perfectly valid, so nothing else in the pipeline
+    // notices. It must stop the build before the private sync can prune the
+    // private area down to nothing (ADR-0010 decisions 3 and 5).
+    const root = writeTree({
+      "cv/manifest.json": emptyManifest("cv", "2026-09-16T09:15:00Z"),
+    });
+    expect(() => loadSources(root)).toThrow(HubContentError);
+    expect(() => loadSources(root)).toThrow(/expected published sources are missing/);
+    expect(() => loadSources(root)).toThrow(/"phd-milestones" has no prefix at all/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WHICH TREES THE CHECK APPLIES TO (the provenance marker)
+// ---------------------------------------------------------------------------
+describe("the expected-source check applies to trees that could be complete", () => {
+  it("ENFORCES when the tree carries no marker at all — fail-closed", () => {
+    const { enforce, reason } = expectedSourcesEnforcement(null);
+    expect(enforce).toBe(true);
+    expect(reason).toMatch(/absent or unrecognised marker enforces/);
+  });
+
+  it("ENFORCES on a marker that does not say complete: false", () => {
+    expect(expectedSourcesEnforcement({}).enforce).toBe(true);
+    expect(expectedSourcesEnforcement({ provenance: "bucket", complete: true }).enforce).toBe(true);
+    // Not a boolean false, so not an exemption. Only the explicit value exempts.
+    expect(expectedSourcesEnforcement({ complete: undefined }).enforce).toBe(true);
+    expect(expectedSourcesEnforcement(undefined).enforce).toBe(true);
+  });
+
+  it("does NOT enforce when the producer declared the tree incomplete", () => {
+    const { enforce, reason } = expectedSourcesEnforcement({
+      provenance: "cv-release",
+      complete: false,
+    });
+    expect(enforce).toBe(false);
+    expect(reason).toMatch(/cv-release/);
+  });
+
+  it("lets the cv-release fallback tree build, and fails the same tree without it", () => {
+    // The two halves together. Identical trees -- cv alone, no phd-milestones --
+    // and the ONLY difference is the marker the producer wrote. Every
+    // pull-request build reads the fallback path (a PR cannot authenticate to
+    // the content bucket), so without this the flip would fail every PR.
+    const files = { "cv/manifest.json": emptyManifest("cv", "2026-09-16T09:15:00Z") };
+    expect(() => loadSources(writeTree(files))).toThrow(/"phd-milestones" has no prefix at all/);
+    expect(() =>
+      loadSources(
+        writeTree({
+          ...files,
+          [CONTENT_PROVENANCE_FILE]: JSON.stringify({
+            provenance: "cv-release",
+            complete: false,
+            syncedAt: "2026-09-18T00:00:00.000Z",
+            objectCount: 14,
+          }),
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("enforces again on a bucket-provenance tree, which CAN be complete", () => {
+    const root = writeTree({
+      "cv/manifest.json": emptyManifest("cv", "2026-09-16T09:15:00Z"),
+      [CONTENT_PROVENANCE_FILE]: JSON.stringify({ provenance: "bucket", complete: true }),
+    });
+    expect(() => loadSources(root)).toThrow(/"phd-milestones" has no prefix at all/);
+  });
+
+  it("enforces on an unreadable marker, rather than treating it as an exemption", () => {
+    const root = writeTree({
+      "cv/manifest.json": emptyManifest("cv", "2026-09-16T09:15:00Z"),
+      [CONTENT_PROVENANCE_FILE]: "{not json",
+    });
+    expect(() => loadSources(root)).toThrow(/"phd-milestones" has no prefix at all/);
   });
 });
 
@@ -348,6 +453,7 @@ describe("loadSources — the code path the build takes", () => {
 
   it("loads a valid tree, keyed by the bucket prefix", () => {
     const root = writeTree({
+      ...PARTIAL_TREE,
       "cv/manifest.json": JSON.stringify({
         source: "cv",
         published: "2026-09-16T09:15:00Z",
@@ -372,13 +478,17 @@ describe("loadSources — the code path the build takes", () => {
   it("FAILS THE BUILD on a manifest the JSON Schema rejects", () => {
     for (const name of invalidFixtures) {
       const raw = readJson(path.join(INVALID_DIR, name));
-      const root = writeTree({ [`${raw.source ?? "cv"}/manifest.json`]: JSON.stringify(raw) });
+      const root = writeTree({
+        ...PARTIAL_TREE,
+        [`${raw.source ?? "cv"}/manifest.json`]: JSON.stringify(raw),
+      });
       expect(() => loadSources(root), name).toThrow(HubContentError);
     }
   });
 
   it("FAILS on a manifest whose source is not the prefix it was published under", () => {
     const root = writeTree({
+      ...PARTIAL_TREE,
       "cv/manifest.json": JSON.stringify({
         source: "phd-milestones",
         published: "2026-09-16T09:15:00Z",
@@ -389,17 +499,18 @@ describe("loadSources — the code path the build takes", () => {
   });
 
   it("FAILS on a source directory with no manifest", () => {
-    const root = writeTree({ "cv/academic.pdf": "%PDF-1.4" });
+    const root = writeTree({ ...PARTIAL_TREE, "cv/academic.pdf": "%PDF-1.4" });
     expect(() => loadSources(root)).toThrow(/has no manifest\.json/);
   });
 
   it("FAILS on a manifest that is not valid JSON", () => {
-    const root = writeTree({ "cv/manifest.json": "{not json" });
+    const root = writeTree({ ...PARTIAL_TREE, "cv/manifest.json": "{not json" });
     expect(() => loadSources(root)).toThrow(/is not valid JSON/);
   });
 
   it("accepts an empty items array — the only way a source withdraws everything", () => {
     const root = writeTree({
+      ...PARTIAL_TREE,
       "cv/manifest.json": JSON.stringify({ source: "cv", published: "2026-09-16T09:15:00Z", items: [] }),
     });
     expect(loadSources(root)[0].manifest.items).toEqual([]);

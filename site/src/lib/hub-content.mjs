@@ -165,9 +165,16 @@ export function isKnownManifestVersion(version) {
 // opposite of what decision 4 is for. So each entry carries the phase from which
 // its absence is a fault, and `phd-milestones` starts declared-but-not-required.
 //
-// >>> CHECKPOINT 4 ACTION: once phd-milestones has published successfully, flip
-// >>> its `required` to true. Until then its absence is expected, and after then
-// >>> its absence is exactly the fault ADR-0010 decision 4 exists to catch.
+// CHECKPOINT 4 ACTION, DONE 2026-09-18. `phd-milestones` published successfully
+// at Checkpoint 4 (2026-09-17): its manifest and its payload files are under
+// sources/phd-milestones/ in the content bucket. So its `required` is now true,
+// and C27 is closed for the one source it was written for. Leaving it at `false`
+// after the first publish is exactly the hole decision 4 exists to catch: a
+// vanished prefix that nothing reports.
+//
+// WHICH TREES THE CHECK APPLIES TO is a separate question, answered by the
+// provenance marker below. See that section: the cv-release fallback tree cannot
+// carry this source at all, and enforcing there would fail every pull request.
 export const EXPECTED_SOURCES = [
   {
     source: "cv",
@@ -177,13 +184,13 @@ export const EXPECTED_SOURCES = [
   },
   {
     source: "phd-milestones",
-    required: false,
+    required: true,
     since: "Checkpoint 4",
     note:
-      "Satellite #2, the private one (SEAM-7). Declared now so the set is complete and " +
-      "reviewable; not yet required, because it cannot publish until Checkpoint 4 and a " +
-      "guard that fails every build in the meantime would simply be deleted. Flip to " +
-      "required: true once it has published (ADR-0010 decision 4).",
+      "Satellite #2, the private one (SEAM-7). HAS PUBLISHED: first successful publish at " +
+      "Checkpoint 4, 2026-09-17, and flipped to required: true on 2026-09-18. Its absence " +
+      "is now a FAULT rather than a bootstrap state -- the private area silently emptying " +
+      "is the consequence C27 names (ADR-0010 decision 4 and its 2026-09-17 amendment).",
   },
 ];
 
@@ -207,4 +214,77 @@ export function findMissingExpectedSources(presentSources, options = {}) {
         `items array (ADR-0010 decisions 2 and 4). Either the sync did not complete, or the ` +
         `prefix was deleted. Found: ${[...present].sort().join(", ") || "(no sources at all)"}.`,
     );
+}
+
+// --- Where the synced tree came from (ADR-0010 decision 4, second half) ------
+//
+// The check above asks "has a declared source's whole prefix vanished?". That
+// question only has a meaningful answer for a tree that COULD have carried every
+// declared source. It cannot be asked of the cv-release fallback tree, which
+// scripts/fetch-data.sh builds from a GitHub release and which carries `cv` and
+// nothing else BY CONSTRUCTION -- there is no other source in that release, and
+// there is no bucket in the picture.
+//
+// That path is not an edge case. A pull_request run carries refs/pull/<n>/merge
+// and the deploy binding admits only refs/heads/main (infra/wif.tf), so a PR
+// CANNOT authenticate to the content bucket and EVERY pull-request build takes
+// the fallback. Enforcing the check there would have failed every pull request
+// from the moment `phd-milestones` became required -- the same bootstrap
+// pathology ADR-0010 decision 4's amendment exists to avoid ("a guard that fails
+// every build from the day it lands is removed within a day"), one step further
+// down the road. The fix is not to weaken the guard; it is to ask it only where
+// its answer means something.
+//
+// So the PRODUCER of the tree records how the tree was produced, at the tree's
+// root, and this module decides from that. The precedent is the private build
+// receipt (scripts/private-build.mjs, .hub-private-build.json): a later step that
+// must not guess is handed a fact by the step that knew it.
+//
+// It is a FILE and not an environment variable on purpose. It travels with the
+// tree it describes, it is written and read entirely within site/**, and it is
+// therefore not a cross-stream variable that nothing checks -- the defect shape
+// Phase 3 already paid for once (infra rendered PRIVATE_BUCKET, the gate read
+// GATE_PRIVATE_BUCKET). scripts/sync-content.sh rebuilds the destination from
+// scratch before writing it, so a marker can never outlive the tree it describes.
+
+/** Written by scripts/sync-content.sh at the root of the synced tree. */
+export const CONTENT_PROVENANCE_FILE = ".hub-content-source.json";
+
+/**
+ * Does the required-source check apply to a tree with this provenance?
+ *
+ * FAIL-CLOSED. An absent, unreadable or unrecognised marker ENFORCES. A tree is
+ * exempt only when its own producer said, in so many words, that it cannot be
+ * complete. Silence never exempts anything: the failure mode of the opposite
+ * default is a guard that quietly stops running and still reports success.
+ *
+ * @param {{provenance?: string, complete?: boolean} | null | undefined} provenance
+ * @returns {{enforce: boolean, reason: string}}
+ */
+export function expectedSourcesEnforcement(provenance) {
+  if (provenance && provenance.complete === false) {
+    const name =
+      typeof provenance.provenance === "string" && provenance.provenance !== ""
+        ? provenance.provenance
+        : "(unnamed)";
+    return {
+      enforce: false,
+      reason:
+        `the synced tree declares provenance "${name}" with complete: false, meaning its ` +
+        `producer cannot supply every declared source (the cv-release fallback carries "cv" ` +
+        `alone). The expected-source check would report a fault that is a property of the ` +
+        `transport, not of the bucket, so it does not apply to this tree.`,
+    };
+  }
+  const name =
+    provenance && typeof provenance.provenance === "string" && provenance.provenance !== ""
+      ? provenance.provenance
+      : "(no marker)";
+  return {
+    enforce: true,
+    reason:
+      `the synced tree's provenance is ${name}, which is treated as able to carry every ` +
+      `declared source. An absent or unrecognised marker enforces deliberately: only a ` +
+      `producer's explicit "complete: false" exempts a tree.`,
+  };
 }

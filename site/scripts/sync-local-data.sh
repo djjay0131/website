@@ -110,6 +110,11 @@ CV_ABS="$CV_ABS" PREFIX="$PREFIX" node -e '
   fs.writeFileSync(path.join(prefix, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 '
 
-./scripts/sync-content.sh --from "$STAGE" --link
+# --partial for the same reason as fetch-data.sh: a cv checkout is one source,
+# and the hub also requires phd-milestones (ADR-0010 decision 4), which is
+# private and reachable only through the content bucket. Local development must
+# not require a credential for that bucket (site-phase-2.md D6), so this tree
+# declares that it cannot be complete instead of failing every local build.
+./scripts/sync-content.sh --from "$STAGE" --link --provenance local-cv-checkout --partial
 
 echo "[sync] linked the cv checkout at $CV_ABS through the publishing contract"
