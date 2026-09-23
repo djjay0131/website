@@ -448,6 +448,7 @@ them is to be re-asked.
 | D6 | **Phases 4–6 each close with a checkpoint** the Lead Architect defines in this file **before** the phase starts: that phase's roadmap acceptance criteria verified live, plus the run's security gate. **Closes roadmap O7.** Checkpoints 5, 6 and 7 are written into the roadmap |
 | D7 | **`research` and `projects` stay separate sections.** The owner considered merging them and declined; the section enum is unchanged. The Projects page title, currently "Selected Projects & Research", becomes **"Projects"**. Research keeps the digests |
 | D8 | **Private by default — the hub owns the publish decision.** An item is public only if **both** its satellite manifest says `visibility: public` **and** the hub's committed publish allowlist names its `(source, slug)`. Everything else renders only in the private build, behind sign-in. The manifest's `visibility` becomes a *request*; the hub is the authority — which is what §12.3 ("satellites are untrusted") always implied. **Recorded as an ADR amending design doc §4 and §5, and ADR-0011's `srcDir` model as needed** |
+| D9 | **Apply `feat/infra-wave-0` BEFORE it merges (owner, 2026-09-22).** Breaks the §8 deadlock recorded below: check 4 is fixed *by* the apply, and the apply follows #53, so check 4 could not clear before a merge and no merge was permitted until it cleared. The owner accepts that production briefly runs config from an unmerged branch. Sequence: apply → set `GCP_AUDITOR_SA` → mark ready → merge #45 → #48 → #53 → #47 |
 
 **D8 — the day-one allowlist, exactly.** `cv/academic`, `cv/research-professional`,
 `cv/sde-long`, `cv/cv-data` (the data item the public CV pages render from), `kgis/kgis-docs`,
@@ -2268,3 +2269,95 @@ production-lacks defect, authored by me.
 - The astro-upgrade stream ran with **no contract** in `contracts/` — the only
   Wave 0 stream without one. Recorded as a gap; **not** back-filled, because a
   contract written after the fact never governed the work.
+
+## Wave 0 apply — executed 2026-09-23, under D9
+
+### Run-brief amendment, recorded as an assumption (owner, 2026-09-22)
+
+**A §7 security check that is fixed by the apply of the PR under review does not block that
+PR's merge; it blocks the next wave until the apply is verified live.** Nothing else in §7 or
+§8 changes. This is what resolves the deadlock: check 4's FAIL was the *absence* of the
+narrowing that #53 applies.
+
+### I did NOT follow §1's worktree instruction, and following it would have been destructive
+
+The unblock brief says to apply from a fresh worktree:
+
+    git worktree add /tmp/wave0-infra e776df3 && cd /tmp/wave0-infra/infra
+    terraform init -input=false
+
+**This module has no backend block.** `infra/versions.tf` line 25 states it outright: "No
+backend block: Phase 1 uses local state." State is a LOCAL file at
+`infra/terraform.tfstate` — serial 95, **59 resources** — kept out of git by
+`infra/.gitignore`.
+
+`terraform init` in a fresh worktree would therefore have initialised **empty state** and
+planned to **create all 59 already-live resources**, including both buckets, the Firestore
+database and the Identity Platform config. That is the run brief's "stateful replace" hard
+stop, reached by following the instructions.
+
+**What I did instead:** staged #53's `.tf` files into the real `infra/` directory where the
+state lives, planned and applied there, then restored `infra/` to a verified md5 manifest
+(20/20). `terraform.tfstate` legitimately changed; `terraform.tfvars` and
+`.terraform.lock.hcl` did not.
+
+### The apply was already partially done, so §1's expected plan did not match
+
+The 2026-09-21 session applied 7 of 8 creates, the destroy and the Cloud Run update, then
+failed on one resource. So this run's plan was **1 to add, 0 to change, 0 to destroy** — and
+the `0 to change` is itself evidence there had been no drift.
+
+### One real defect in #53, found by the apply failing on it
+
+    Error: Error creating AlertPolicy: googleapi: Error 400: Field
+    alert_policy.conditions[0].condition_threshold.evaluation_missing_data had an invalid
+    value of "EVALUATION_MISSING_DATA_INACTIVE": Conditions setting evaluation_missing_data
+    must have a non-zero duration.
+
+`monitoring.tf` paired `duration = "0s"` with `evaluation_missing_data`. Fixed to `300s`,
+matching the alignment period and every other policy in the file — including `signin_failing`,
+the same shape (a fault counter with `evaluation_missing_data = INACTIVE`). The API error is
+recorded beside the fix, because the next person to write "any occurrence is a fault" will
+reach for `0s` again. **#53's head moved `e776df3` → `63fc0d3` for this.**
+
+### Results
+
+| Step | Result |
+|---|---|
+| `plan` | `Plan: 1 to add, 0 to change, 0 to destroy.` 0 destroy/replace lines anywhere |
+| Hard-stop sweep | 0 across buckets, Firestore, Identity Platform, firebaserules, WIF pools, budget, service accounts |
+| `apply` | exit 0, **0 Error lines** |
+| `plan` again | `No changes. Your infrastructure matches the configuration.` (`-detailed-exitcode` = 0) |
+
+### Verified live
+
+| Check | Result |
+|---|---|
+| Gate runtime roles | `gateSessionMinter` + `datastore.viewer`; `firebaseauth.admin` **0 occurrences** |
+| `gateSessionMinter` grants | exactly `firebaseauth.users.createSession`, `firebaseauth.users.get` |
+| `GATE_ALLOWED_ORIGINS` | all three origins, including the `ywkmredngq` spelling T1 requires |
+| Alert policies | **4** (was 3); `Hub — gate started misconfigured` enabled, 1 channel |
+| `event=misconfigured` | none in 7 days |
+| `GCP_AUDITOR_SA` | set to `hub-auditor@cusati-hub.iam.gserviceaccount.com` |
+
+### Two §2 checks that are NOT satisfied, stated rather than glossed
+
+1. **The boot line does not show `allowed_origins`.** The brief requires it to. It cannot yet:
+   the *deployed* image is `origin/main`, which has **0** references to `GATE_ALLOWED_ORIGINS`
+   anywhere in `gate/`. The code that parses and logs the set ships in **#47**. The variable is
+   correctly on the service — verified directly — but nothing can print it until #47 deploys.
+   **Deferred to the #47 deploy, not passed.**
+
+2. **Sign-in minting is unproven.** I proved the weaker of the brief's two options: `POST
+   /session` with an invalid token returns **401 identically on both transports**, the gate
+   logged `event=deny scope=session reason=invalid_id_token`, and there are **zero**
+   `PERMISSION_DENIED`/403/permission lines. That shows the gate reached the Admin SDK and
+   refused cleanly under the narrowed role. It does **not** show minting works: token
+   verification uses public keys and no IAM, and `createSession` is reached only after a valid
+   token. **Only the owner signing in closes this — it is A1.**
+
+### Still open
+
+- The notification channel's `verificationStatus` is not reported as verified. All four
+  policies are enabled with one channel each and may still deliver nothing. Owner-only.
+- #63 (`latex-action` wrapping a mutable `texlive-full:latest`) is untouched by this apply.
