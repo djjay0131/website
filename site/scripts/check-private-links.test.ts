@@ -82,6 +82,70 @@ describe("classifyLink judges a link by where it RESOLVES, not by its first char
     expect(classifyLink("//evil.invalid/y.png", home, BASE).kind).toBe("off-origin");
   });
 
+  // ---------------------------------------------------------------------
+  // 2026-09-23: this guard turned `main` red and was RIGHT about one of the two
+  // things it found and WRONG about the other.
+  //
+  //   <link href="https://fonts.googleapis.com/...">   a real leak, fixed at
+  //                                                    source in phd-milestones #2
+  //   <a href="https://graduateschool.vt.edu/...">     an ordinary citation in a
+  //                                                    milestone tracker
+  //
+  // The browser fetches the first without the member doing anything, so it tells
+  // a third party that a member opened a private page. The second is followed
+  // only on a click. Failing the build on citations makes the private area unable
+  // to hold a normal document and protects nobody.
+  //
+  // These tests exist so the NARROWING cannot silently become a weakening: every
+  // sub-resource shape must still be caught, and the no-tag default must stay
+  // strict.
+  // ---------------------------------------------------------------------
+  describe("off-origin is judged by WHAT CARRIES the link", () => {
+    const OFF = "https://evil.invalid/x";
+
+    it("still FAILS an off-origin stylesheet — the exact shape that turned main red", () => {
+      expect(
+        classifyLink("https://fonts.googleapis.com/css2?family=Spectral", home, BASE, "link").kind,
+      ).toBe("off-origin");
+    });
+
+    it("still FAILS an off-origin script, image, iframe, source, embed and object", () => {
+      for (const tag of ["script", "img", "iframe", "source", "embed", "object", "track", "video"]) {
+        expect(classifyLink(OFF, home, BASE, tag).kind, `tag <${tag}>`).toBe("off-origin");
+      }
+    });
+
+    it("still FAILS a protocol-relative sub-resource", () => {
+      expect(classifyLink("//evil.invalid/y.png", home, BASE, "img").kind).toBe("off-origin");
+    });
+
+    it("ALLOWS an outbound anchor, which the member must click", () => {
+      const v = classifyLink("https://graduateschool.vt.edu/x.html", home, BASE, "a");
+      expect(v.kind).toBe("outbound");
+      expect(v.why).toMatch(/clicks it/);
+    });
+
+    it("allows <area> too, which is an anchor by another name", () => {
+      expect(classifyLink(OFF, home, BASE, "area").kind).toBe("outbound");
+    });
+
+    it("IS STRICT BY DEFAULT: no tag means sub-resource, so the exemption must be asked for", () => {
+      expect(classifyLink(OFF, home, BASE).kind).toBe("off-origin");
+      expect(classifyLink(OFF, home, BASE, undefined).kind).toBe("off-origin");
+    });
+
+    it("does not let an anchor escape the BASE check — outbound is only about other ORIGINS", () => {
+      // Same origin, wrong place: an <a> gets no exemption from issue #27.
+      expect(classifyLink("/elsewhere/", home, BASE, "a").kind).toBe("outside-base");
+      expect(classifyLink("../../elsewhere/", home, BASE, "a").kind).toBe("outside-base");
+    });
+
+    it("is case-insensitive about the tag, because HTML is", () => {
+      expect(classifyLink(OFF, home, BASE, "A").kind).toBe("outbound");
+      expect(classifyLink(OFF, home, BASE, "LINK").kind).toBe("off-origin");
+    });
+  });
+
   it("catches an off-origin font or stylesheet link — the regression the satellite just removed", () => {
     expect(classifyLink("https://fonts.googleapis.com/css2?family=Spectral", deep, BASE).kind).toBe(
       "off-origin",
@@ -150,7 +214,9 @@ describe("the script fails the build on each new shape", () => {
   });
 
   it("FAILS on an absolute off-origin link (F-1 shape 2)", () => {
-    dist = tree({ "index.html": '<a href="https://evil.invalid/x">x</a>' });
+    // F-1 was found on an off-origin font <link>, so the fixture is a
+    // SUB-RESOURCE. An <a> to the same host is navigation, covered separately.
+    dist = tree({ "index.html": '<link href="https://evil.invalid/x">' });
     const result = run(dist);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("evil.invalid");
@@ -197,7 +263,12 @@ describe("findBadLinks names the file, the link and the reason", () => {
   let dist: string;
   beforeEach(() => {
     dist = tree({
-      "index.html": '<a href="https://evil.invalid/x">x</a><a href="/p/">ok</a>',
+      // The BAD one is a sub-resource; the anchor beside it is outbound and must
+      // be reported as allowed rather than dropped in silence.
+      "index.html":
+        '<img src="https://evil.invalid/x">' +
+        '<a href="https://graduateschool.vt.edu/policy.html">cite</a>' +
+        '<a href="/p/">ok</a>',
     });
   });
   afterEach(() => fs.rmSync(dist, { recursive: true, force: true }));
@@ -208,5 +279,14 @@ describe("findBadLinks names the file, the link and the reason", () => {
     expect(bad[0].link).toBe("https://evil.invalid/x");
     expect(bad[0].kind).toBe("off-origin");
     expect(path.basename(bad[0].file)).toBe("index.html");
+  });
+
+  it("reports the outbound anchor as ALLOWED rather than dropping it silently", () => {
+    const bad = findBadLinks(dist, BASE);
+    // @ts-expect-error -- non-enumerable companion, deliberately off the array shape
+    const out = bad.outbound as Array<{ link: string; tag: string }>;
+    expect(out).toHaveLength(1);
+    expect(out[0].link).toBe("https://graduateschool.vt.edu/policy.html");
+    expect(out[0].tag).toBe("a");
   });
 });
