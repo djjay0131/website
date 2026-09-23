@@ -77,25 +77,66 @@ contexts on `main` are still only `governance-checks` and `budget-guard`.
 
 ## Current position
 
-**Wave 0 of the run-to-completion — BLOCKED under §8** (issue #44, 2026-09-19).
+**Wave 0 of the run-to-completion — MERGED** (issue #44). Apply provenance: commit
+`63fc0d3` on `feat/infra-wave-0`, applied 2026-09-23; `main` at `01bc7cd`, green on
+all three workflows.
 
-*(Corrected 2026-09-19 on the Governance Audit's check 7. This section read "Phase 3 — Private
-area. IN PROGRESS (issue #24, branch `feat/private-area`)" — naming a **closed** issue, a
-**merged** PR and a **deleted** branch as current, two phases out of date. The audit is right
-that a record describing intent rather than merged reality is the S-6/A-3 recurrence.)*
+Phases 0–3 are merged and deployed. The owner authorised a run to the end of Phase 6
+on 2026-09-18 (D1–D8), and on 2026-09-22 authorised applying before merging (D9),
+which is what broke the §8 deadlock.
 
-Phases 0–3 are **merged and deployed**; Checkpoint 4 was executed but is **NOT passed** (#52).
-The owner authorised a run to the end of Phase 6 on 2026-09-18 (D1–D8).
+### What merged, in order, each watched before the next
 
-**Wave 0 status.** All ten stream and review handoffs are in. Four PRs open, all draft, all
-green on both required contexts: **#45** the record (L3), **#47** gate sign-out, **#48** site,
-**#53** infra. **Nothing merges**: the Security Tester reports 4 FAILs and §8 makes one
-sufficient to block. Open blockers: #54, #55, #56, #57, #58, plus the `/session/end` CSRF
-defect and an ADR for `/client-events`.
+| PR | What | `main` after |
+|---|---|---|
+| **#45** | the record: D1–D9, ADR-0012/0013/0014, the §8 amendment | `5cc7a96` green |
+| **#48** | site: astro 6→7, SD-4's caller, the extended link guard | `0108fa8` **RED** |
+| **#65** | the link guard narrowed to judge a link by what carries it | `33fba45` green |
+| **#53** | infra: the auth-role narrowing, `GATE_ALLOWED_ORIGINS`, monitoring | `da763a9` **RED** |
+| **#67** | nobody holds `roles/editor` (#55) | `7619aa2` green |
+| **#47** | gate sign-out | `01bc7cd` green |
 
-**Merge order when it unblocks** — #48 before or with #47 (the `/session/end` rewrite and its
-handler are split across them), then #53, then #45. #53's **apply** is separately gated by D-3
-until a sign-in route is proven to deliver.
+Two of those reds were guards catching real faults on their first run against real
+data, which is the outcome the wave was built for — see below.
+
+### Verified live, after the last merge
+
+- The gate's boot line reads
+  `allowed_origins=https://hub-gate-410552878319.us-east1.run.app,https://hub-gate-ywkmredngq-ue.a.run.app,https://jason.cusati.us`
+  — **both** spellings, which is the §2 check that could not be satisfied until #47
+  deployed the code that parses them. Zero `event=misconfigured`.
+- **Sign-out works**: same-origin `POST /session/end` returns **200 on both
+  transports**, cross-origin returns **403**. **SD-4 is closed.**
+- The gate's own deploy assertions passed on their first real run anywhere:
+  `/_health` 200, signed-out `/p/` 404, `/session/end` cleared `__session`,
+  cross-origin refused 403.
+- The gate holds only `gateSessionMinter` (`firebaseauth.users.createSession`,
+  `firebaseauth.users.get`) and `datastore.viewer`. `firebaseauth.admin` is gone.
+- `roles/editor` is **empty project-wide**; `private-bucket-live-iam` passes with
+  zero FAIL lines; `notify-recovery` runs again, so pipeline recovery is no longer
+  suppressed.
+
+### T1 — predicted, and the apply is what prevented it
+
+Terraform renders the project-number `*.run.app` origin; `status.url` returns the
+**hash** spelling; `gate.yml` smoke-tests sign-out with `Origin: ${URL}` from
+`status.url`; `main.py:628` is exact frozenset membership. Without
+`gate_extra_allowed_origins` passed at apply time, #47's own deploy smoke test would
+have 403'd a legitimate sign-out **after** rollout. It passed instead. Issue **#62**
+tracks the `terraform.tfvars.example` omission that hid the variable.
+
+### Still open
+
+- **A1 is owner-only** and unchanged: sign in as `djjay@vt.edu` and reach `/p/`.
+  Minting is still unproven — an invalid token never reaches `createSession`, so the
+  401 proved only that the gate reaches the Admin SDK without a permission error.
+- The notification channel is still not reported verified; four policies are enabled
+  and may deliver nothing.
+- **#63** (`latex-action` wrapping a mutable `texlive-full:latest`) — untouched.
+- **#61** (S-5 Hosting 500 on `/p/` null-byte paths) — Wave 3.
+- **#60** (VT brand assets) is green and unmerged; Wave 0c.
+- `cv` `fix/bibtexparser-pin` still forks from a pre-pin base and would revert the
+  SHA pins if merged.
 
 ## Done
 

@@ -271,17 +271,17 @@ that the CV appears.
 ### Acceptance criteria
 
 - [ ] A seeded member signs in at `jason.cusati.us` and sees the milestone tracker and the committee dossier
-- [ ] Signed out, a request for the tracker or dossier under `/p/` returns no private content
+- [x] Signed out, a request for the tracker or dossier under `/p/` returns no private content
 - [ ] A signed-in account that is not on the allowlist gets the "not shared with you" page and no private content (§6)
-- [ ] The same signed-out and non-member requests, sent straight to the `hub-gate` `*.run.app` URL, are refused the same way (ADR-0004)
+- [x] The same signed-out and non-member requests, sent straight to the `hub-gate` `*.run.app` URL, are refused the same way (ADR-0004)
 - [ ] A session minted through `jason.cusati.us` persists across page loads served through Hosting (ADR-0004 `__session` constraint)
 - [ ] Every response under `/p/` carries `Cache-Control: private, no-store` (§6). Firebase Hosting marks rewrite responses `private` by default, and its CDN caches a gate response only if the gate itself sends `public` or `s-maxage` (ADR-0004).
 - [ ] A gate test asserts that no `/p/**` or `/s/**` response carries `public` or `s-maxage` in `Cache-Control` (ADR-0004)
 - [ ] The gate pytest suite passes in CI and covers session mint and verify, non-member rejection, and path-traversal rejection on `/p/` (§6)
 - [ ] The leak check runs on every deploy, and a deliberate test run shows it failing the build when a private slug appears in any path or file content under `site/dist-public` (§12.1)
-- [ ] The bucket IAM test runs on every deploy and fails if the private bucket grants public access, or holds any binding other than exactly two: the gate's runtime identity with `storage.objects.get`, and `hub-deploy` with the four permissions a destructive sync needs. An anonymous request for a private object is refused (§12.1). *(Amended 2026-09-17: the original clause said "any reader other than the gate's service account", which ADR-0010 decision 5 makes unimplementable — a destructive sync must list and delete, and list is a read. The clause predates the ADR. Equality over two principals is also more testable than a negative. SEAM-1 carries the reasoning.)*
+- [x] The bucket IAM test runs on every deploy and fails if the private bucket grants public access, or holds any binding other than exactly two: the gate's runtime identity with `storage.objects.get`, and `hub-deploy` with the four permissions a destructive sync needs. An anonymous request for a private object is refused (§12.1). *(Amended 2026-09-17: the original clause said "any reader other than the gate's service account", which ADR-0010 decision 5 makes unimplementable — a destructive sync must list and delete, and list is a read. The clause predates the ADR. Equality over two principals is also more testable than a negative. SEAM-1 carries the reasoning.)*
 - [ ] No page on the public site lists, links or names a private item, and private navigation exists only in the private build (ADR-0005)
-- [ ] The gate's service account can read only the private bucket and Firestore (brief §4; ADR-0004)
+- [x] The gate's service account can read only the private bucket and Firestore (brief §4; ADR-0004)
 - [ ] `phd-milestones` is private on GitHub, and a recorded test shows its publish identity cannot write outside `sources/phd-milestones/` (§12.3)
 - [ ] The gate deploy authenticates through WIF only, with no JSON key (§12.2)
 - [ ] The Governance Audit result for Phases 0–3 is recorded on the PR

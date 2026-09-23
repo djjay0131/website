@@ -1,7 +1,7 @@
 # Active Context
 
 Status: Draft
-Last updated: 2026-09-16
+Last updated: 2026-09-23
 Owner: Chief Architect
 
 What belongs here: the current focus, the current stop point, and next steps —
@@ -9,52 +9,43 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
-- Sprint `2026-09-hub`: **Phase 3 — Private area is MERGED and DEPLOYED** (issue #24,
-  PR #25, plus PR #29 for the Checkpoint 4 wiring). The Chief Reviewer's verdict was
-  *Request changes* on two documentary findings; both were fixed before merge.
-  **Checkpoint 4 has been executed**: 29 cloud resources created, the gate deployed to
-  Cloud Run, `phd-milestones` published for the first time, and 81 objects synced to the
-  private bucket with 0 deletions. The members' allowlist holds `djjay@vt.edu` (owner) and
-  `cbrown@vt.edu`, those two only.
-- **Sign in at `https://jason.cusati.us/signin/` using the "Send link" form as
-  `djjay@vt.edu`.** The Google button will fail until the OAuth provider is configured in
-  the console (issue #31), and the owner's Google identity `djjay0131@gmail.com` is not on
-  the allowlist in any case.
-- **CLOSED since Checkpoint 4** *(corrected 2026-09-19 on the Wave 0 Governance Audit, which
-  found this line listing two closed issues as open — the S-6/A-3 recurrence of a record
-  describing intent rather than merged reality)*: **#27** (private-area link base — fixed,
-  merged, verified by `check:private-links`) and **#30** (`terraform apply` idempotency — fixed
-  by PR #35; the Firestore ruleset and its release now refresh with no diff, verified in the
-  Wave 0 preconditions).
-- **Still open: #31** — Google sign-in provider not configured. Console-only; owner action.
-- Sprint `2026-09-hub`: **Phase 2 — Publishing contract is COMPLETE.** Checkpoint 3 passed
-  2026-09-16/17; the hub serves the CV through the contract. (issue #16,
-  PR #17, branch `feat/publishing-contract`). Reviewed — Chief Reviewer verdict *Comment,
-  nothing blocking the merge*. All six required checks green.
-- Phase 1 — Foundation is complete. PR #12 merged 2026-09-15; Checkpoint 2 verified live the
-  same day. The Email and Privacy pages merged (PR #15) and are live at `/email/` and
-  `/privacy/`.
-- The hub is live at **https://jason.cusati.us** on Firebase Hosting, deployed from `main`
-  through Workload Identity Federation; `https://research.cusati.us` 301-redirects to it
-  (paths preserved). GitHub Pages still serves until Phase 6.
-- **Checkpoint 3 is part done.** On the owner's authorisation the Lead Architect deleted
-  `cv`'s `WEBSITE_DISPATCH_PAT` secret and `WEBSITE_REPO` variable, applied `infra/` from a
-  clean checkout at `91b7a39` (9 added, 0 changed, 0 destroyed), set the Actions variables in
-  both repositories, and ran the prefix-boundary proofs — 9 of 9 as expected, under a
-  temporary impersonation grant that was removed and verified removed.
-  **Do not re-apply and do not re-delete: both are done.** Evidence: `STATE.md`
-  §Checkpoint 3 execution record.
-- **Stop point (rewritten 2026-09-19; the previous text was two phases stale, still describing
-  Checkpoint 3's PAT revocation and merge order as the current stop).** The owner authorised a
-  run to the end of Phase 6 on 2026-09-18 (D1–D8), including **gated** merge and apply
-  authority. **Wave 0 is BLOCKED under §8**: the Security Tester returned 4 FAILs and the Chief
-  Reviewer returned *§8 conditions NOT met*, so nothing merges. Blockers: #54, #55, #56, #57,
-  #58, the `/session/end` CSRF defect, and an ADR for `/client-events`.
-- **Owner-only, outstanding:** #31 (Google OAuth, console); verifying the alert notification
-  channel, without which all three policies deliver nothing; and whether to flip
-  `cv/anthropic-fellow` to `visibility: private` in the `cv` satellite as a stopgap, since it is
-  publicly reachable on five origins against decision D8.
-- Orchestration state: `llm/sprints/2026-09-hub/STATE.md`.
+- Sprint `2026-09-hub`: **Wave 0 of the run-to-completion is MERGED** (issue #44).
+  `main` is at `01bc7cd` and green on all three workflows. Apply provenance:
+  `63fc0d3`, applied 2026-09-23.
+- Merged in order, each `main` run watched before the next: **#45** (the record,
+  D1–D9, ADR-0012/0013/0014) → **#48** (astro 6→7, SD-4's caller) → **#65** (link
+  guard narrowed) → **#53** (auth-role narrowing, `GATE_ALLOWED_ORIGINS`) → **#67**
+  (`roles/editor` emptied, #55) → **#47** (gate sign-out).
+- **Sign-out is live.** Same-origin `POST /session/end` returns 200 on both
+  transports, cross-origin 403. SD-4 is closed.
+- **The gate is narrowed.** It holds only `gateSessionMinter` (two permissions) and
+  `datastore.viewer`; `roles/firebaseauth.admin` is gone. `roles/editor` is empty
+  project-wide, so the private bucket's legacy `projectEditor` path grants nobody
+  anything.
+
+## The one thing only the owner can do
+
+**A1 remains open, and it is the last criterion no agent can verify.**
+
+Sign in at **https://jason.cusati.us/signin/ as `djjay@vt.edu`** and reach `/p/`.
+
+- Both providers now work: `google.com` is configured and **enabled**, and
+  email-link (`signIn.email.enabled`) is **true**. Verified 2026-09-23 — this is
+  what lifted D-3, and it makes issue #31 stale.
+- **The identity matters more than the method.** The allowlist holds `djjay@vt.edu`
+  and `cbrown@vt.edu`, those two only. The machine's Google identity
+  `djjay0131@gmail.com` is **deliberately not a member** — signing in as it will
+  correctly get the "not shared with you" page. If `djjay@vt.edu` is not a Google
+  account, use the "Send link" form.
+
+**Why this cannot be delegated.** Session *minting* is still unproven. An invalid
+token never reaches `createSession`, so the 401 that was verified shows only that
+the gate reaches the Admin SDK without a permission error under the narrowed role.
+A real sign-in is the only thing that exercises `firebaseauth.users.createSession`
+on the new `gateSessionMinter` role.
+
+Also owner-only: the **alert-channel verification link**. Four policies are enabled
+and may deliver nothing until it is clicked.
 
 ## Decisions on record
 
