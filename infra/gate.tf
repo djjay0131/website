@@ -18,6 +18,44 @@ locals {
   # exactly that failure, which breaks the PUBLIC site's deploy, not just the
   # private area.
   gate_service_name = "hub-gate"
+  # THE CSRF ACCEPTED-ORIGIN SET (gate handoff gate-wave-0-fixes.md; issue #54).
+  #
+  # The gate's CSRF check used to compare Origin against Host and
+  # X-Forwarded-Host -- every value in the comparison supplied by the request,
+  # so it proved nothing and three forged spellings were demonstrated over real
+  # HTTP. Its replacement compares Origin against a frozenset built at startup
+  # from GATE_ALLOWED_ORIGINS, and there is NO header fallback: unset means
+  # /session/end refuses every request, loudly (ERROR event=misconfigured at
+  # boot, reason=no_allowed_origins_configured on each refusal). The variable is
+  # load-bearing, not optional, and routing it is infra's half of that fix.
+  #
+  # BOTH origins, because ADR-0004 puts the invoker at allUsers: the same code
+  # must be correct on the site domain AND on the service's own *.run.app URL.
+  # One without the other passes one transport's tests and refuses every real
+  # sign-out on the other.
+  #
+  # CONSTRUCTED FROM THE PROJECT NUMBER, NOT FROM .uri. The obvious spelling,
+  # google_cloud_run_v2_service.gate.uri, is a SELF-REFERENCE: the service's own
+  # env block cannot read the service's own computed URL, and Terraform refuses
+  # the configuration. check_private_bucket_config.py asserts that this file
+  # never reaches for it.
+  #
+  # var.redirect_domains is deliberately excluded: those hosts answer a 301 to
+  # var.domain, so a browser never has one as its origin when it POSTs. If that
+  # ever changes they must be added.
+  #
+  # VERIFY AFTER THE FIRST APPLY rather than assuming. If this service predates
+  # Cloud Run's current URL scheme its host may be the older
+  # <service>-<hash>-<regioncode>.a.run.app spelling -- and this project has
+  # BOTH spellings live (the Wave 0 live probe reached the gate on
+  # hub-gate-<hash>-ue.a.run.app as well as on the project-number form). The
+  # gate prints the set it parsed verbatim in its boot line, so one look
+  # confirms it: terraform output -raw gate_allowed_origins_check_command.
+  # var.gate_extra_allowed_origins exists for exactly that case.
+  gate_allowed_origins = join(",", concat([
+    "https://${var.domain}",
+    "https://${local.gate_service_name}-${data.google_project.hub.number}.${var.region}.run.app",
+  ], var.gate_extra_allowed_origins))
 }
 
 # ---------------------------------------------------------------------------
@@ -64,24 +102,28 @@ locals {
 #    database in this project, so "project-level" and "this database" coincide
 #    today; if a second database is ever added, this grant reaches it.
 #
-# 3. roles/firebaseauth.admin (project), "Full read/write access to
-#    Authentication resources" (Firebase, "Firebase IAM roles"). This is the one
-#    role in this file that is wider than I would like, and it is here for a
-#    specific, checkable reason: minting the session cookie. The Admin SDK's
-#    createSessionCookie is Identity Toolkit's
-#    SessionManagementService.CreateSessionCookie, whose permission is
-#    firebaseauth.users.createSession -- a permission no narrower PREDEFINED role
-#    was found to carry.
-#    Verifying an ID token and verifying a session cookie need NO IAM at all:
+# 3. google_project_iam_custom_role.gate_session_minter (project), holding
+#    exactly firebaseauth.users.createSession and firebaseauth.users.get. See
+#    gate-auth-role.tf for the permission-by-permission reasoning and the
+#    primary-source check behind it.
+#
+#    THIS REPLACED roles/firebaseauth.admin (Chief Reviewer N-1), which was the
+#    widest grant in Phase 3: full read/write over Authentication, including
+#    deleting users, rewriting the sign-in configuration, and reading the
+#    password hash config. The gate does none of those.
+#
+#    ONE CORRECTION TO WHAT THIS COMMENT USED TO SAY, because it was wrong in a
+#    way that would have produced a role too narrow to work. It claimed
+#    "verifying an ID token and verifying a session cookie need NO IAM at all:
 #    both are signature checks against Google's public certificates, done
-#    offline. So this grant exists solely for the mint step.
-#    THE INTENDED TIGHTENING, for Checkpoint 4: confirm with
-#    `gcloud iam list-testable-permissions //cloudresourcemanager.googleapis.com/projects/<project>`
-#    that firebaseauth.users.createSession is custom-role eligible, and if it is,
-#    replace this with a custom role holding exactly that one permission -- the
-#    same move Phase 2 made for the satellite role, and for the same reason. It
-#    is written up in the handoff as an open item rather than left as a silent
-#    over-grant.
+#    offline", and concluded the grant existed solely for the mint step. The
+#    signature check is indeed offline -- but BOTH verify paths in
+#    gate/app/auth.py run with check_revoked=True (GATE_CHECK_REVOKED defaults
+#    to True in gate/app/config.py), and a revocation check is NOT offline: the
+#    Admin SDK fetches the user record to compare tokensValidAfterTime, which
+#    needs firebaseauth.users.get. A custom role holding createSession alone --
+#    exactly what the old comment proposed -- would mint cookies successfully
+#    and then fail on every subsequent request that verified one.
 #
 # DELIBERATELY NOT GRANTED (the deploy.tf precedent -- state the omissions):
 # - Any role on the CONTENT bucket. The gate never reads satellite sources; it
@@ -115,9 +157,14 @@ resource "google_project_iam_member" "hub_gate_firestore" {
   member  = google_service_account.hub_gate.member
 }
 
-resource "google_project_iam_member" "hub_gate_auth_admin" {
+# Narrowed from roles/firebaseauth.admin (N-1). The resource name is
+# deliberately NOT "hub_gate_auth_admin" any more: the old name would keep
+# describing a grant that no longer exists, and a rename makes the change
+# visible in the plan as a create + destroy of the binding rather than an
+# in-place role swap nobody reads.
+resource "google_project_iam_member" "hub_gate_session_minter" {
   project = var.project_id
-  role    = "roles/firebaseauth.admin"
+  role    = google_project_iam_custom_role.gate_session_minter.name
   member  = google_service_account.hub_gate.member
 }
 
@@ -221,6 +268,14 @@ resource "google_cloud_run_v2_service" "gate" {
       env {
         name  = "GOOGLE_CLOUD_PROJECT"
         value = var.project_id
+      }
+
+      # The accepted-origin set for the CSRF check. See local.gate_allowed_origins
+      # above for why it is constructed rather than read from the service's uri,
+      # and why it must name both transports.
+      env {
+        name  = "GATE_ALLOWED_ORIGINS"
+        value = local.gate_allowed_origins
       }
     }
   }

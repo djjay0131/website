@@ -61,6 +61,44 @@ EXPECTED_PRIVATE_BUCKET_BINDINGS = {
     "hub_deploy_private_sync": "private_sync_writer",
 }
 
+# The gate's Identity Platform role (Chief Reviewer N-1), asserted here for the
+# same reason as the two above: the permission list IS the boundary, and this
+# one is the boundary around SIGN-IN. Adding a permission is a one-word diff
+# that no test would otherwise catch.
+EXPECTED_GATE_ROLE_PERMISSIONS = {
+    "gate_session_minter": [
+        "firebaseauth.users.createSession",
+        "firebaseauth.users.get",
+    ],
+}
+
+# The read-only auditor role (issue #58, infra/auditor.tf). It exists so the
+# LIVE half of the bucket IAM test has an identity that can run it at all, and
+# the property that makes a third identity acceptable is a NEGATIVE one: it
+# holds no storage.objects.* permission, so it cannot read, list, write or
+# delete a single private object -- it can only read the policy that says who
+# can. A negative property is exactly what erodes silently, one plausible
+# permission at a time, so it is asserted here rather than reviewed.
+EXPECTED_AUDITOR_ROLE_PERMISSIONS = {
+    "private_bucket_auditor": [
+        "resourcemanager.projects.getIamPolicy",
+        "storage.buckets.get",
+        "storage.buckets.getIamPolicy",
+    ],
+}
+
+# Predefined roles that must never be granted to the gate's runtime identity
+# again. roles/firebaseauth.admin was the widest grant in Phase 3 -- full
+# read/write over Authentication, including deleting both members and rewriting
+# the sign-in configuration. Narrowing it is only durable if re-widening it is
+# loud, and "add one predefined role back" is the quiet way it would return.
+FORBIDDEN_GATE_PROJECT_ROLES = [
+    "roles/firebaseauth.admin",
+    "roles/firebaseauth.editor",
+    "roles/editor",
+    "roles/owner",
+]
+
 FAILURES = []
 
 
@@ -199,6 +237,171 @@ def main():
             "would carry storage.objects.list.",
         )
 
+    # ------------------------------------------------------------------
+    # 6. The gate's Identity Platform role holds exactly its two permissions.
+    #
+    # firebaseauth.users.createSession mints the session cookie; users.get is
+    # what check_revoked=True needs. Anything else -- users.delete,
+    # configs.update, configs.getHashConfig -- is reachable from a request
+    # handler that serves the public internet (the gate's invoker is allUsers by
+    # design, ADR-0004), so the list is asserted rather than reviewed.
+    # ------------------------------------------------------------------
+    gate_role = read_without_comments("gate-auth-role.tf")
+    for resource_name, expected in EXPECTED_GATE_ROLE_PERMISSIONS.items():
+        found = permissions_of(gate_role, resource_name)
+        if found is None:
+            fail(
+                "infra/gate-auth-role.tf",
+                f'gate-auth-role.tf must declare resource "google_project_iam_custom_role" '
+                f'"{resource_name}". The gate must not fall back to a predefined '
+                f"Authentication role.",
+            )
+        elif sorted(found) != sorted(expected):
+            fail(
+                "infra/gate-auth-role.tf",
+                f"{resource_name} must grant exactly {sorted(expected)} -- got {sorted(found)}.",
+            )
+
+    # ------------------------------------------------------------------
+    # 7. No predefined Authentication role is granted to the gate again.
+    #
+    # Asserted against gate.tf as a whole rather than against one resource
+    # name, so re-adding the grant under any resource name fails.
+    # ------------------------------------------------------------------
+    gate_tf = read_without_comments("gate.tf")
+    for role in FORBIDDEN_GATE_PROJECT_ROLES:
+        if f'"{role}"' in gate_tf:
+            fail(
+                "infra/gate.tf",
+                f"gate.tf names the predefined role {role}. The gate holds "
+                f"google_project_iam_custom_role.gate_session_minter and nothing wider "
+                f"(Chief Reviewer N-1). {role} would return the ability to delete members "
+                f"or rewrite the sign-in configuration.",
+            )
+
+    # ------------------------------------------------------------------
+    # 8. The read-only auditor role (issue #58, auditor.tf).
+    #
+    # A THIRD identity now exists in this project because the live half of the
+    # §12.1 test had nothing that could run it: hub-deploy holds object
+    # permissions only and cannot read a bucket policy or the project policy.
+    # What makes a third identity acceptable is a NEGATIVE property -- it holds
+    # no storage.objects.* permission of any kind, so it can read the policy
+    # that says who may reach a private object, and never the object.
+    #
+    # Both assertions below are made on purpose, and the second is not
+    # redundant with the first in the way that matters: the equality check
+    # fails on ANY drift, while the storage.objects.* check names WHY a
+    # particular drift is unacceptable. "auditor gained storage.objects.list"
+    # must not be reported as "the list differs".
+    # ------------------------------------------------------------------
+    if not (INFRA / "auditor.tf").exists():
+        fail(
+            "infra/auditor.tf",
+            "auditor.tf is missing. It declares the read-only identity that the "
+            "private-bucket-live-iam job authenticates as; without it the live half "
+            "of the §12.1 bucket IAM test cannot run at all, which is issue #58.",
+        )
+    else:
+        auditor = read_without_comments("auditor.tf")
+        for resource_name, expected in EXPECTED_AUDITOR_ROLE_PERMISSIONS.items():
+            found = permissions_of(auditor, resource_name)
+            if found is None:
+                fail(
+                    "infra/auditor.tf",
+                    f'auditor.tf must declare resource "google_project_iam_custom_role" '
+                    f'"{resource_name}". The auditor must not fall back to a predefined '
+                    f"role: roles/iam.securityReviewer reads every resource type in the "
+                    f"project where three permissions are needed.",
+                )
+                continue
+            if sorted(found) != sorted(expected):
+                fail(
+                    "infra/auditor.tf",
+                    f"{resource_name} must grant exactly {sorted(expected)} -- got "
+                    f"{sorted(found)}.",
+                )
+            object_permissions = sorted(
+                p for p in found if p.startswith("storage.objects.")
+            )
+            if object_permissions:
+                fail(
+                    "infra/auditor.tf",
+                    f"{resource_name} grants {object_permissions}. The auditor reads "
+                    f"POLICIES, never content: it must hold no storage.objects.* "
+                    f"permission at all. storage.objects.list in particular would let a "
+                    f"CI identity enumerate private object names, which SEAM-1 withholds "
+                    f"even from the gate.",
+                )
+
+    # ------------------------------------------------------------------
+    # 9. The gate's CSRF accepted-origin set is actually rendered (#54).
+    #
+    # This is a CROSS-STREAM CONTRACT, and Phase 3 already paid for getting one
+    # wrong: infra rendered PRIVATE_BUCKET while the gate read
+    # GATE_PRIVATE_BUCKET, and the revision failed at startup at integration
+    # time because neither stream runs the other's code. The gate now reads
+    # GATE_ALLOWED_ORIGINS, has NO header fallback, and refuses every
+    # /session/end request when it is unset -- so the name is asserted here, by
+    # the stream that renders it, rather than discovered on a deploy.
+    #
+    # Also asserted: that gate.tf never reaches for
+    # google_cloud_run_v2_service.gate.uri. It is the obvious way to spell the
+    # service's own URL and it is a self-reference cycle Terraform refuses --
+    # a plan-time failure this credential-free check can catch at review time.
+    # ------------------------------------------------------------------
+    gate_env = gate_tf  # comments already stripped above
+
+    if "google_cloud_run_v2_service.gate.uri" in gate_env:
+        fail(
+            "infra/gate.tf",
+            "gate.tf references google_cloud_run_v2_service.gate.uri. Inside the "
+            "service's own env block that is a SELF-REFERENCE and Terraform refuses "
+            "the configuration; GATE_ALLOWED_ORIGINS is constructed from "
+            "local.gate_service_name, data.google_project.hub.number and var.region "
+            "for that reason.",
+        )
+
+    origins_block = re.search(
+        r'env\s*\{[^{}]*?name\s*=\s*"GATE_ALLOWED_ORIGINS"[^{}]*?\}',
+        gate_env,
+        re.S,
+    )
+    if not origins_block:
+        fail(
+            "infra/gate.tf",
+            'the gate service must render an env block named exactly '
+            '"GATE_ALLOWED_ORIGINS" (gate handoff gate-wave-0-fixes.md). The gate '
+            "builds its CSRF accepted-origin set from it at startup and has no "
+            "header fallback: without it, POST /session/end refuses EVERY request "
+            "and no member can sign out.",
+        )
+    else:
+        value = origins_block.group(0)
+        if "local.gate_allowed_origins" not in value:
+            fail(
+                "infra/gate.tf",
+                "GATE_ALLOWED_ORIGINS must take its value from "
+                "local.gate_allowed_origins, so the same string is what the "
+                "gate_allowed_origins output prints for post-apply verification "
+                "against the gate's boot log.",
+            )
+        for needed, why in (
+            ("var.domain", "the site domain"),
+            (
+                "run.app",
+                "the service's own *.run.app URL -- ADR-0004 puts the invoker at "
+                "allUsers, so the check must hold on both transports",
+            ),
+        ):
+            if needed not in gate_env:
+                fail(
+                    "infra/gate.tf",
+                    f"the accepted-origin set must name {needed} ({why}). One origin "
+                    f"without the other passes one transport's tests and refuses "
+                    f"every real sign-out on the other.",
+                )
+
     if FAILURES:
         print(f"\n{len(FAILURES)} private-bucket invariant(s) violated.")
         return 1
@@ -207,7 +410,9 @@ def main():
         "OK: private bucket declares uniform bucket-level access and enforced public "
         "access prevention, names no anonymous principal, and carries exactly two "
         "bindings -- the gate (storage.objects.get) and the hub's sync "
-        "(create/delete/get/list)."
+        "(create/delete/get/list). The CI auditor role holds exactly "
+        "projects.getIamPolicy, buckets.get and buckets.getIamPolicy, and no "
+        "storage.objects.* permission of any kind."
     )
     return 0
 
