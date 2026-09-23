@@ -443,7 +443,17 @@ resource "google_monitoring_alert_policy" "gate_misconfigured" {
       # up unable to do its job.
       comparison      = "COMPARISON_GT"
       threshold_value = 0
-      duration        = "0s"
+
+      # Sharp edge 3, found by the 2026-09-21 apply FAILING on it: duration must
+      # be NON-ZERO when evaluation_missing_data is set. The API refuses the pair:
+      #   "Field ...evaluation_missing_data had an invalid value of
+      #    EVALUATION_MISSING_DATA_INACTIVE: Conditions setting
+      #    evaluation_missing_data must have a non-zero duration."
+      # 300s matches the alignment period and every other policy in this file,
+      # including signin_failing, which is the same shape: a fault counter with
+      # evaluation_missing_data = INACTIVE. One aligned DELTA point above zero
+      # spans a full alignment window, so "any occurrence is a fault" still holds.
+      duration = "300s"
 
       aggregations {
         alignment_period = "300s"
