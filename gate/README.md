@@ -12,6 +12,7 @@ Phase 3 builds §6 responsibilities 1–3, and only those:
 | Route | Purpose |
 |---|---|
 | `POST /session` | Verify a Firebase ID token, mint a 14-day session cookie |
+| `POST /session/end` | Sign out: clear `__session`. Origin-checked; identical whether or not a session existed |
 | `GET /p/{path}` | Verify the session, check the allowlist, stream the object |
 | `GET /_health` | Deploy verification; reveals nothing. **Not** `/healthz`: that path never reaches the container on Cloud Run (Google's frontend answers it), verified at Checkpoint 4. |
 
@@ -37,6 +38,70 @@ Every authorisation test therefore runs twice — see `tests/conftest.py`
 (every cookie but `__session` stripped) and as a direct request. A check that
 holds only behind Hosting is not a check.
 
+## Signing out
+
+`POST /session/end` clears `__session`. Before it existed there was no way out
+of a 14-day `HttpOnly` session — only the browser could forget it — so a member
+on a shared machine could not end their own session (STATE, SD-4).
+
+Three things about it are easy to get wrong, and each has a test in
+`tests/test_signout.py`:
+
+**The clear must match the mint attribute for attribute.** A browser keys a
+cookie on name, domain and path, so a `Set-Cookie` that differs in `Path`, or
+that omits `Secure`, `HttpOnly` or `SameSite`, can be stored as a *second*
+cookie and leave the session exactly where it was. The response still says 200
+and the log still says the member signed out. `app/main.py` defines the
+attributes once, in `SESSION_COOKIE_ATTRS`, and both paths use it; the test
+parses both headers and compares them anyway.
+
+**It is Origin-checked, against a set the request cannot influence.**
+`SameSite=Lax` is not a CSRF defence for this: Lax still sends the cookie on a
+top-level POST that a cross-site page triggers. The gate compares `Origin`
+against `GATE_ALLOWED_ORIGINS` and refuses anything else, including a POST with
+no `Origin` at all.
+
+The set is **configured, not derived**. An earlier version built it from the
+`Host` and `X-Forwarded-Host` headers of the request being checked — so both
+sides of the comparison came from the caller, and three spellings of a forged
+sign-out were demonstrated over real HTTP. On the direct `*.run.app` URL the
+invoker is `allUsers`, so the caller controls every header and that check was
+worth nothing there. The reasoning behind it was that a configured list is a
+fourth place to keep in step and the first to go stale fails closed on the real
+domain; the trade is backwards. Failing closed on sign-out is a visible
+nuisance a member can work around by clearing cookies. Failing open is silent.
+
+Because the invoker is `allUsers`, the variable must name **both** origins the
+gate answers on — the site's domain and the service's own `*.run.app` URL.
+**Unset means every sign-out is refused**, with an `event=misconfigured` line at
+boot and `reason=no_allowed_origins_configured` on each refusal. There is no
+fallback to header comparison, because a fallback is the same defect under a
+better name; `gate.yml`'s deploy smoke test asserts a same-origin sign-out
+returns 200, so an unset variable fails the deploy rather than quietly
+disarming the check.
+
+A forged sign-out is only a nuisance; the check lives here because Phase 4's
+mint and revoke need the same one and the stakes there are not a nuisance.
+
+**It answers identically whether or not a session existed.** It never reads the
+cookie — no verification, no lookup, nothing to time — so it is not an
+existence oracle, which is the rule `/p/**` already follows.
+
+It does **not** revoke the session server-side. Clearing the cookie ends the
+session in that browser; "sign out everywhere" needs the uid, which needs the
+cookie verified, which is work done for an anonymous caller. That belongs with
+Phase 4's session work, where `GATE_CHECK_REVOKED` already makes revocation
+bite on every request.
+
+A client calls it same-origin, which is what makes the browser send `Origin`:
+
+```js
+await fetch("/session/end", { method: "POST", credentials: "same-origin" });
+```
+
+`/session/end` needs a Firebase Hosting rewrite to reach the gate through the
+site's domain, in the same shape as `/session`.
+
 ## Caching
 
 Every response carries `Cache-Control: private, no-store`, applied by
@@ -56,6 +121,37 @@ paths, backslashes, NUL and control characters are refused as a consequence of
 that rule rather than as a list of spellings someone has to keep complete.
 Validation happens *after* authentication and authorisation, so an anonymous
 caller never reaches it and never causes a bucket lookup.
+
+## What it never says
+
+## Client telemetry, and why its values are scrubbed twice
+
+`POST /client-events` is unauthenticated **by design** and stays that way: it
+exists to receive a report from a browser that has *failed* to obtain a session,
+so requiring a credential would defeat it (ADR-0013). Its protections are caps
+and scrubbing rather than identity.
+
+`_clean_client_value()` strips non-printable characters, so no caller can forge
+a separate log *line*. That was not enough. Both log-based metrics in
+`infra/monitoring.tf` match a **substring of `textPayload` anywhere in the
+line**, so a value of `event=deny` inside an ordinary field made the denials
+metric count a denial that never happened — demonstrated against production. So
+a client-supplied string may not contain the gate's own `event=` grammar
+anywhere: the trace id, the event name, the field names and the field values are
+all checked.
+
+Such a report is **not dropped**. Dropping it silently is the same blindness
+this endpoint exists to end, and it would tell the caller which payloads vanish.
+It is counted, reclassified so the caller cannot choose which metric its report
+lands in, and emitted with the offending text neutralised:
+
+```
+INFO gate event=client_grammar_rejected trace=t-1 smuggled=1 reported=probe note=event-deny
+```
+
+`smuggled=` is the count, `reported=` is what the caller called it, and the line
+matches neither metric filter. A steady trickle is browser noise; a sustained
+stream is someone working on the metrics.
 
 ## What it never says
 
@@ -79,6 +175,7 @@ Set by Cloud Run; the infra stream owns the service's env block.
 | `GATE_SESSION_DAYS` | `14` | Session lifetime; 14 is Firebase's maximum |
 | `GATE_CHECK_REVOKED` | `true` | Check revocation on every request |
 | `GATE_LOG_OBJECT_PATHS` | `false` | Log object paths (a private slug) |
+| `GATE_ALLOWED_ORIGINS` | *(empty — sign-out refuses everything)* | Comma-separated `https://host[:port]` origins the CSRF check accepts. Must name the site domain **and** the service's `*.run.app` URL |
 
 There is **no credential to configure**. The gate runs as its own service
 account and obtains tokens from the metadata server through Application Default

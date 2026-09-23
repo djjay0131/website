@@ -7,9 +7,20 @@ about it working and more about it not becoming a liability.
 import json
 import logging
 
+from conftest import through_the_gates_own_handler
+
 
 def _post(client, payload, **kw):
     return client.post("/client-events", content=json.dumps(payload).encode(), **kw)
+
+
+def _written(client, payload):
+    """Post a batch and return what the gate's OWN handler wrote.
+
+    NOT caplog. Four assertions in this file still use it and are blind to a
+    missing handler (recorded as G-4); nothing below adds a fifth.
+    """
+    return through_the_gates_own_handler(lambda: _post(client, payload))
 
 
 def test_accepts_anonymous_because_failures_happen_before_sign_in(client):
@@ -93,6 +104,137 @@ def test_caps_the_number_of_events_it_will_log(client, caplog):
         _post(client, {"events": [{"event": f"e{i}", "fields": {}} for i in range(200)]})
     logged = [r for r in caplog.records if "event=client_e" in r.getMessage()]
     assert len(logged) <= 20
+
+
+# ---------------------------------------------------------------------------
+# Metric forgery (#54). The endpoint is unauthenticated BY DESIGN and stays so --
+# it exists to hear from a browser that has FAILED to sign in, so requiring a
+# credential would defeat it (ADR-0013). What is closed here is narrower: both
+# log-based metrics match a SUBSTRING of textPayload anywhere in the line, so a
+# client-supplied value carrying `event=` can make a metric count an event that
+# never happened. Demonstrated against production.
+# ---------------------------------------------------------------------------
+
+
+def test_a_field_value_cannot_smuggle_the_denials_metric_trigger(client):
+    """The exact payload that made production count a denial that never happened.
+
+    `note=event=deny` survives _clean_client_value() -- correctly, since it has
+    no newline and no space -- and the denials metric matches `event=deny`
+    anywhere in the line. From an endpoint that performs no authorisation at all.
+    """
+    written = _written(
+        client,
+        {"trace_id": "t-forge", "events": [{"event": "probe", "fields": {"note": "event=deny"}}]},
+    )
+
+    assert "event=deny" not in written, "an anonymous caller just forged a denial"
+    assert "event=client_grammar_rejected" in written
+
+
+def test_a_field_value_cannot_smuggle_the_signin_failure_metric_trigger(client):
+    written = _written(
+        client,
+        {
+            "trace_id": "t-forge",
+            "events": [{"event": "probe", "fields": {"failure_class": "event=client_signin_failed"}}],
+        },
+    )
+
+    assert "event=client_signin_failed" not in written
+    assert "event=client_grammar_rejected" in written
+
+
+def test_the_trace_id_cannot_smuggle_it_either(client):
+    """The trace id is client-supplied too, and it is on every line of the batch."""
+    written = _written(
+        client,
+        {"trace_id": "event=deny", "events": [{"event": "probe", "fields": {}}]},
+    )
+
+    assert "event=deny" not in written
+    assert "event=client_grammar_rejected" in written
+
+
+def test_the_event_name_cannot_smuggle_it_either(client):
+    written = _written(client, {"trace_id": "t-forge", "events": [{"event": "x event=deny"}]})
+
+    assert "event=deny" not in written
+
+
+def test_case_does_not_get_it_past(client):
+    """`EVENT=deny` is the same forgery with the shift key held down."""
+    written = _written(
+        client,
+        {"trace_id": "t-forge", "events": [{"event": "probe", "fields": {"note": "EVENT=deny"}}]},
+    )
+
+    assert "EVENT=deny" not in written
+    assert "event=deny" not in written.lower().replace("event=client_grammar_rejected", "")
+
+
+def test_a_rejected_report_is_counted_and_kept_not_dropped(client):
+    """Dropping it silently is the same blindness in a different costume.
+
+    This endpoint exists because browser-side failures were invisible. A report
+    discarded for looking suspicious is invisible too -- and the caller would
+    learn which payloads vanish. So it is counted, reclassified, and emitted with
+    the offending text neutralised, which is what an operator reads in Cloud
+    Logging.
+    """
+    written = _written(
+        client,
+        {
+            "trace_id": "t-forge",
+            "events": [{"event": "probe", "fields": {"note": "event=deny", "why": "event=allow"}}],
+        },
+    )
+
+    assert "smuggled=2" in written, written
+    assert "reported=probe" in written
+    # The content survives, neutralised, so the report is still diagnostic.
+    assert "note=event-deny" in written
+    assert "why=event-allow" in written
+
+
+def test_a_smuggled_signin_failure_is_not_counted_as_a_signin_failure(client):
+    """Reclassification is the point: the caller does not choose its metric.
+
+    A report that tries to smuggle the grammar is not trustworthy as a sign-in
+    failure either, so it does not get to land in the sign-in-failure metric by
+    naming itself `signin_failed`.
+    """
+    written = _written(
+        client,
+        {
+            "trace_id": "t-forge",
+            "events": [{"event": "signin_failed", "fields": {"note": "event=deny"}}],
+        },
+    )
+
+    assert "event=client_signin_failed" not in written
+    assert "event=client_grammar_rejected" in written
+    assert "reported=signin_failed" in written
+
+
+def test_an_honest_report_is_untouched_and_still_reaches_the_metric(client):
+    """The regression guard for the two above: ordinary reports must be unaffected.
+
+    Asserted through the gate's own handler rather than caplog, so it also fails
+    if the gate cannot log at all -- which is the state that made both metrics
+    dead on arrival for 48 hours.
+    """
+    written = _written(
+        client,
+        {
+            "trace_id": "t-ok",
+            "events": [{"event": "signin_failed", "fields": {"failure_class": "popup_blocked"}}],
+        },
+    )
+
+    assert "event=client_signin_failed" in written
+    assert "failure_class=popup_blocked" in written
+    assert "client_grammar_rejected" not in written
 
 
 def test_serves_nothing_and_leaks_no_headers(client):
