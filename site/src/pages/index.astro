@@ -14,13 +14,17 @@ const base = import.meta.env.BASE_URL;
 
 <Base title="Jason Cusati">
   <div class="hero">
-    {meta.include_photo && (
-      <img
-        src={`${base}photo_jason_1.jpeg`}
-        alt={`Photo of ${meta.name}`}
-        class="hero-photo"
-      />
-    )}
+    {/* The research emblem replaces the portrait (owner decision, 2026-09-24).
+        It is an original SVG in the VT colour family: no university mark and
+        no HokieBird, because the Office of Licensing and Trademarks declined
+        the request to use them. Colours are not trademarks; the marks are. */}
+    <img
+      src={`${base}emblem/research-emblem.svg`}
+      alt=""
+      class="hero-emblem"
+      width="200"
+      height="200"
+    />
     <div class="hero-text">
       <h1>{meta.name}</h1>
       <p class="subtitle">{summary?.text}</p>
@@ -50,11 +54,9 @@ const base = import.meta.env.BASE_URL;
     padding: 2rem 0;
   }
 
-  .hero-photo {
-    width: 140px;
-    height: 140px;
-    border-radius: 50%;
-    object-fit: cover;
+  .hero-emblem {
+    width: 200px;
+    height: 200px;
     flex-shrink: 0;
   }
 
