@@ -32,6 +32,14 @@
     "to": "/email/"
   },
   {
+    "from": "/website/emblem/research-emblem.png",
+    "to": "/emblem/research-emblem.png"
+  },
+  {
+    "from": "/website/emblem/research-emblem.svg",
+    "to": "/emblem/research-emblem.svg"
+  },
+  {
     "from": "/website/favicon.ico",
     "to": "/favicon.ico"
   },
