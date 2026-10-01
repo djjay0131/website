@@ -75,8 +75,13 @@ resource "google_iam_workload_identity_pool_provider" "satellite" {
   project                            = var.project_id
   workload_identity_pool_id          = google_iam_workload_identity_pool.satellites.workload_identity_pool_id
   workload_identity_pool_provider_id = "github-${each.key}"
-  display_name                       = "GitHub: ${each.value.repository}"
-  description                        = "OIDC tokens from ${each.value.repository} only, publishing as source ${each.key}."
+  # A provider display name is capped at 32 characters. "GitHub: <owner>/<repo>"
+  # exceeds that for a long repo name (djjay0131/agentic-kg-research is 38), so
+  # fall back to the source key for those and leave the shorter existing ones
+  # untouched. Display name is cosmetic; the attribute_condition below is the
+  # security boundary and is unchanged.
+  display_name = length("GitHub: ${each.value.repository}") <= 32 ? "GitHub: ${each.value.repository}" : "GitHub: ${each.key}"
+  description  = "OIDC tokens from ${each.value.repository} only, publishing as source ${each.key}."
 
   # attribute.repository_id_ref is the attribute the binding below matches. Its
   # mapping must stay exactly this expression: see the pool invariant above.
