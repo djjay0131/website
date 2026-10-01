@@ -134,7 +134,7 @@ tracks the `terraform.tfvars.example` omission that hid the variable.
   and may deliver nothing.
 - **#63** (`latex-action` wrapping a mutable `texlive-full:latest`) — untouched.
 - **#61** (S-5 Hosting 500 on `/p/` null-byte paths) — Wave 3.
-- **#60** (VT brand assets) is green and unmerged; Wave 0c.
+- ~~#60 (VT brand assets)~~ — **closed 2026-10-01**: Licensing declined the VT marks (owner, 2026-09-24). See §Repository hygiene, 2026-10.
 - `cv` `fix/bibtexparser-pin` still forks from a pre-pin base and would revert the
   SHA pins if merged.
 
@@ -490,6 +490,9 @@ them is to be re-asked.
 | D7 | **`research` and `projects` stay separate sections.** The owner considered merging them and declined; the section enum is unchanged. The Projects page title, currently "Selected Projects & Research", becomes **"Projects"**. Research keeps the digests |
 | D8 | **Private by default — the hub owns the publish decision.** An item is public only if **both** its satellite manifest says `visibility: public` **and** the hub's committed publish allowlist names its `(source, slug)`. Everything else renders only in the private build, behind sign-in. The manifest's `visibility` becomes a *request*; the hub is the authority — which is what §12.3 ("satellites are untrusted") always implied. **Recorded as an ADR amending design doc §4 and §5, and ADR-0011's `srcDir` model as needed** |
 | D9 | **Apply `feat/infra-wave-0` BEFORE it merges (owner, 2026-09-22).** Breaks the §8 deadlock recorded below: check 4 is fixed *by* the apply, and the apply follows #53, so check 4 could not clear before a merge and no merge was permitted until it cleared. The owner accepts that production briefly runs config from an unmerged branch. Sequence: apply → set `GCP_AUDITOR_SA` → mark ready → merge #45 → #48 → #53 → #47 |
+| D10 | **Satellite order and scope (owner, 2026-09-25, #72).** `agentic-kgis` is satellite 3 (public, source `kgis`), then `agentic-kg-research` satellite 4 (private, for the team). `construction-ai-proposal` later; `agentic-kg` optional. Answers design doc §10 Q6 |
+| D11 | **Apply authority for the satellites run: the harness applies under D9** (owner, 2026-09-25; the brief's stated default, left unfilled) |
+| D12 | **Team members for the private area — PENDING.** The brief's placeholder was not filled. Gates only Wave 2's onboarding step; no allowlist entry is made until the owner names them |
 
 **D8 — the day-one allowlist, exactly.** `cv/academic`, `cv/research-professional`,
 `cv/sde-long`, `cv/cv-data` (the data item the public CV pages render from), `kgis/kgis-docs`,
@@ -2460,3 +2463,94 @@ The "sharper problem" #52 raised — that A1 might be unverifiable by *anyone*
 because email delivery was suspect — **did not materialise.** Sign-in worked.
 The notification-channel question is therefore separate from sign-in, and
 narrower than #52 feared.
+
+## Wave 1 (#72) boundary proofs, 2026-10-01 — recorded before any `kgis` publish
+
+The prefix boundary for satellite 3, and A13 for `phd-milestones`, in one impersonation
+window. **24 of 25 executed and passed; the 25th did not execute.**
+
+### How, and the three harnesses that came before it
+
+The Checkpoint 3 method was `gcloud storage cp --impersonate-service-account`. **It no
+longer works and its failures look like proofs.** Today's `gcloud` (547) reads bucket
+metadata before uploading — `storage.buckets.get` — which `satellitePublisher` correctly
+lacks, so the CLI stops before attempting the write:
+
+    does not have permission to access b instance [cusati-hub-content]
+
+Every "refused" result from that harness is a *bucket* refusal, not a prefix proof. The
+real publish path never makes that call: `upload-cloud-storage` uploads object by object
+(ADR-0007 decision 6). Run 1 also had a silenced `grant()` and a 2-minute canary shorter
+than IAM propagation; its canary aborted rather than report false passes. Run 2 hit the
+bucket-metadata wall. **Run 3 uses the Storage JSON API directly**, which exercises only
+object permissions — the ones the publish path uses — and distinguishes **403** (refused:
+a proof) from **401** (bad token: void). Tokens never printed. A per-account token canary
+gated every test; grants were revoked by trap on exit, interrupt or termination.
+
+### Results
+
+| Id | Identity | Action | Expected | HTTP |
+|---|---|---|---|---|
+| K1–K4 | kgis | create, overwrite, read, delete in `sources/kgis/` | succeed | 200 / 200 / 200 / 204 |
+| K5 | kgis | create `sources/cv/` | refuse | 403 |
+| K6 | kgis | create `sources/phd-milestones/` (private source) | refuse | 403 |
+| K7 | kgis | create `sources/kgis-evil/` (trailing slash) | refuse | 403 |
+| K8 | kgis | create at bucket root | refuse | 403 |
+| K9 | kgis | read another source's `manifest.json` | refuse | 403 |
+| **K10** | kgis | list the bucket | refuse | **NOT EXECUTED** |
+| K11 | kgis | list its own prefix | refuse | 403 |
+| C0 | cv | create, then delete, in `sources/cv/` (control) | succeed | 200 / 204 |
+| C1, C2 | cv | create / list `sources/kgis/` | refuse | 403 / 403 |
+| P1 | phd-milestones | create `sources/kgis/` | refuse | 403 |
+| **P2–P5** | phd-milestones | create, overwrite, read, delete in its prefix | succeed | 200 / 200 / 200 / 204 |
+| **P6–P8** | phd-milestones | create `sources/cv/`, `-evil/`, list own prefix | refuse | 403 / 403 / 403 |
+
+`satellitePublisher` = `storage.objects.create;storage.objects.delete;storage.objects.get`.
+
+**K10 did not execute** — `line 33: $3: unbound variable`: an empty argument passed
+unquoted vanished in word-splitting. It is **not** recorded as passed. The permission it
+targets, `storage.objects.list`, is the one K11 and C2 executed and saw refused, and it is
+absent from the role — so the property is covered, but covered is not the same as tested.
+
+**C0 matters as much as the refusals.** Without a control write proving `cv`'s token
+reaches storage, its 403s on `sources/kgis/` would prove nothing.
+
+After the run: only `roles/iam.workloadIdentityUser` remains on all three accounts — every
+temporary `serviceAccountTokenCreator` grant is gone — and no test object remains.
+
+**A13 is proven** (P2–P8): `phd-milestones` is private on GitHub and its publish identity
+cannot write outside `sources/phd-milestones/`. #50 closes on this record.
+
+## Repository hygiene, 2026-10
+
+Run 2026-10-01 under the owner's pre-authorised hygiene brief. Every claim in that brief was
+re-verified against the API first; two did not survive.
+
+**Branches deleted, PRs closed**
+
+| Branch | Last SHA | PR | Why |
+|---|---|---|---|
+| `assets/vt-brand-logos` | `ed2e62e` | #60 | Licensing declined the VT marks (owner, 2026-09-24); emblem instead (#71) |
+| `fellowship-sprint-notebook` | `5f50589` | #3 | pre-`site/` layout; the four notebook pages are recoverable from the SHA |
+| `fix/derive-education-assertion` | `a05cb30` | #5 | pre-`site/`; the assertion is already enforced in `cv` at `tools/tests/test_resolver.py:96` |
+| `gh-pages` in `agentic-kg-research` | `09402b1` | — | Pages verified **not** enabled (API 404) before deleting |
+
+**Kept and changed:** #70 stays a draft; its README now records the denial (`773a6a3`).
+`agentic-kg-research` #2 merged: "do not run `quarto publish gh-pages`".
+
+**Issues.** Closed #44 (Wave 0 merged). #55 was already closed by #67. #52 and #51 stay
+open. Labels added: `security-privacy` on #61, `implementation` on #62 (#54 and #59 already
+had theirs).
+
+**What the brief did not anticipate**
+
+- **#56 was NOT closed.** `npm audit --omit=dev` on `main` reports **4 high** today
+  (`@grpc/grpc-js` GHSA-f596-whhp-79r4 and GHSA-m9gg-hp2v-232j, through `firebase`), after
+  reaching 0 with the astro upgrade. New advisories, not a regression in our code — the
+  recurrence #59 predicted, because audit runs in no workflow.
+- **The applied `kgis` roster existed only in a working tree.** A `terraform apply` from
+  `main` would have destroyed the four live `kgis` resources. Committed to
+  `feat/satellite-kgis` as `a68feea`.
+- **A4 was over-ticked by me in #68**, on its signed-out half alone. Corrected.
+- **The site stream died mid-run** on a billing error, leaving uncommitted partial work in
+  `site/` on `feat/satellite-kgis`. Not committed; it needs review before it is.

@@ -1,7 +1,7 @@
 # Research Hub — Master Roadmap
 
 Status: Draft
-Last updated: 2026-09-15
+Last updated: 2026-10-01
 Owner: Chief Product Officer
 
 ## Purpose
@@ -252,39 +252,39 @@ that the CV appears.
 
 ### Scope
 
-- [ ] Gate service (FastAPI) handling sessions, the member allowlist, and serving `/p/**` (§6 responsibilities 1–3)
-- [ ] Gate pytest suite for sessions, non-members and `/p/` path traversal (§6)
-- [ ] Cloud Run service `hub-gate` in `us-east1` with minimum 0 instances (§6, §8)
-- [ ] Gate image build and deploy workflow `.github/workflows/gate.yml`, with images in Artifact Registry keeping the last 5 (§8, §9; R-A4)
-- [ ] Identity Platform with Google and email-link sign-in (§8)
-- [ ] Firestore in Native mode (§8)
-- [ ] Private bucket with uniform access and no public access (§8)
-- [ ] Two-output build (`HUB_OUTPUT=public|private`), with `site/dist-private` synced to the private bucket (§5; ADR-0005)
-- [ ] Post-build leak check (§5)
-- [ ] Bucket IAM test on every deploy (§12.1; ADR-0005)
-- [ ] `/p/**` and `/session` rewrites routed to `hub-gate` (§8, §11)
-- [ ] Sign-in page that exchanges a Firebase ID token for a session (§6; brief §4)
-- [ ] `phd-milestones` created as a private repository from the tarball, with a publish workflow and manifest marking both items `visibility: private`, `section: phd` (§2, §11)
-- [ ] Member seed script, run by the owner, seeding the §10 Q4 members with `role: owner` for Jason (§6, §11; brief §4)
-- [ ] Chief Reviewer Governance Audit across Phases 0–3 (brief §4)
+- [x] Gate service (FastAPI) handling sessions, the member allowlist, and serving `/p/**` (§6 responsibilities 1–3) — *roadmap-truth Wave 0 S1*
+- [x] Gate pytest suite for sessions, non-members and `/p/` path traversal (§6) — *roadmap-truth Wave 0 S2*
+- [x] Cloud Run service `hub-gate` in `us-east1` with minimum 0 instances (§6, §8) — *roadmap-truth Wave 0 S3*
+- [x] Gate image build and deploy workflow `.github/workflows/gate.yml`, with images in Artifact Registry keeping the last 5 (§8, §9; R-A4) — *roadmap-truth Wave 0 S4*
+- [x] Identity Platform with Google and email-link sign-in (§8) — *roadmap-truth Wave 0 S5 was FALSE; Google provider configured and enabled, verified live 2026-09-23 (#31 closed)*
+- [x] Firestore in Native mode (§8) — *roadmap-truth Wave 0 S6*
+- [x] Private bucket with uniform access and no public access (§8) — *roadmap-truth Wave 0 S7*
+- [x] Two-output build (`HUB_OUTPUT=public|private`), with `site/dist-private` synced to the private bucket (§5; ADR-0005) — *roadmap-truth Wave 0 S8*
+- [x] Post-build leak check (§5) — *roadmap-truth Wave 0 S9*
+- [x] Bucket IAM test on every deploy (§12.1; ADR-0005) — *roadmap-truth Wave 0 S10 was qualified; the live half now runs on every push to main and hourly (#53, #58, #67)*
+- [x] `/p/**` and `/session` rewrites routed to `hub-gate` (§8, §11) — *roadmap-truth Wave 0 S11*
+- [x] Sign-in page that exchanges a Firebase ID token for a session (§6; brief §4) — *roadmap-truth Wave 0 S12*
+- [x] `phd-milestones` created as a private repository from the tarball, with a publish workflow and manifest marking both items `visibility: private`, `section: phd` (§2, §11) — *roadmap-truth Wave 0 S13*
+- [x] Member seed script, run by the owner, seeding the §10 Q4 members with `role: owner` for Jason (§6, §11; brief §4) — *roadmap-truth Wave 0 S14*
+- [x] Chief Reviewer Governance Audit across Phases 0–3 (brief §4) — *roadmap-truth Wave 0 S15*
 
 ### Acceptance criteria
 
 - [x] A seeded member signs in at `jason.cusati.us` and sees the milestone tracker and the committee dossier
 - [x] Signed out, a request for the tracker or dossier under `/p/` returns no private content
-- [ ] A signed-in account that is not on the allowlist gets the "not shared with you" page and no private content (§6)
-- [x] The same signed-out and non-member requests, sent straight to the `hub-gate` `*.run.app` URL, are refused the same way (ADR-0004)
+- [ ] A signed-in account that is not on the allowlist gets the "not shared with you" page and no private content (§6) — *needs one non-member sign-in — #72*
+- [ ] The same signed-out and non-member requests, sent straight to the `hub-gate` `*.run.app` URL, are refused the same way (ADR-0004) — *signed-out half TRUE; the non-member half is untested — #72 (ticked in #68 on the signed-out half alone; corrected 2026-10-01)*
 - [x] A session minted through `jason.cusati.us` persists across page loads served through Hosting (ADR-0004 `__session` constraint)
-- [ ] Every response under `/p/` carries `Cache-Control: private, no-store` (§6). Firebase Hosting marks rewrite responses `private` by default, and its CDN caches a gate response only if the gate itself sends `public` or `s-maxage` (ADR-0004).
-- [ ] A gate test asserts that no `/p/**` or `/s/**` response carries `public` or `s-maxage` in `Cache-Control` (ADR-0004)
-- [ ] The gate pytest suite passes in CI and covers session mint and verify, non-member rejection, and path-traversal rejection on `/p/` (§6)
-- [ ] The leak check runs on every deploy, and a deliberate test run shows it failing the build when a private slug appears in any path or file content under `site/dist-public` (§12.1)
+- [x] Every response under `/p/` carries `Cache-Control: private, no-store` (§6). Firebase Hosting marks rewrite responses `private` by default, and its CDN caches a gate response only if the gate itself sends `public` or `s-maxage` (ADR-0004). — *roadmap-truth Wave 0 A6 (qualified)*
+- [ ] A gate test asserts that no `/p/**` or `/s/**` response carries `public` or `s-maxage` in `Cache-Control` (ADR-0004) — *deferred to Phase 4 (#51): the `/s/**` half cannot exist before sharing*
+- [x] The gate pytest suite passes in CI and covers session mint and verify, non-member rejection, and path-traversal rejection on `/p/` (§6) — *roadmap-truth Wave 0 A8*
+- [x] The leak check runs on every deploy, and a deliberate test run shows it failing the build when a private slug appears in any path or file content under `site/dist-public` (§12.1) — *roadmap-truth Wave 0 A9*
 - [x] The bucket IAM test runs on every deploy and fails if the private bucket grants public access, or holds any binding other than exactly two: the gate's runtime identity with `storage.objects.get`, and `hub-deploy` with the four permissions a destructive sync needs. An anonymous request for a private object is refused (§12.1). *(Amended 2026-09-17: the original clause said "any reader other than the gate's service account", which ADR-0010 decision 5 makes unimplementable — a destructive sync must list and delete, and list is a read. The clause predates the ADR. Equality over two principals is also more testable than a negative. SEAM-1 carries the reasoning.)*
-- [ ] No page on the public site lists, links or names a private item, and private navigation exists only in the private build (ADR-0005)
+- [x] No page on the public site lists, links or names a private item, and private navigation exists only in the private build (ADR-0005) — *roadmap-truth Wave 0 A11*
 - [x] The gate's service account can read only the private bucket and Firestore (brief §4; ADR-0004)
-- [ ] `phd-milestones` is private on GitHub, and a recorded test shows its publish identity cannot write outside `sources/phd-milestones/` (§12.3)
-- [ ] The gate deploy authenticates through WIF only, with no JSON key (§12.2)
-- [ ] The Governance Audit result for Phases 0–3 is recorded on the PR
+- [x] `phd-milestones` is private on GitHub, and a recorded test shows its publish identity cannot write outside `sources/phd-milestones/` (§12.3) — *recorded test: STATE §Wave 1 boundary proofs, 2026-10-01 (#72) — P2–P8*
+- [x] The gate deploy authenticates through WIF only, with no JSON key (§12.2) — *roadmap-truth Wave 0 A14*
+- [x] The Governance Audit result for Phases 0–3 is recorded on the PR — *roadmap-truth Wave 0 A15*
 
 ### Not in this phase
 
@@ -306,7 +306,7 @@ Checkpoint 4 (brief §4, §5). The owner applies Terraform, merges, runs the
 seed script, signs in, and sees the tracker and dossier. This is the last
 checkpoint the brief defines.
 
-- [ ] Checkpoint 4 passed and recorded in `STATE.md`
+- [ ] Checkpoint 4 passed and recorded in `STATE.md` — *not yet: A3 and A4 outstanding — #72, #52*
 
 ---
 
