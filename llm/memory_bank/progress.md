@@ -50,6 +50,11 @@ merged reality, not plans.
 
 ## Done, most recent first
 
+- **Wave 2 (`agentic-kg-research`, private) provisioned and published** 2026-10-01 —
+  infra PR #77 (satellite 4, boundary-proven including reverse legs), satellite #3
+  published 61 objects, hub private-sync 139 uploaded / 0 deleted with no `dist-public`
+  trace; leak-check false positive FP-1 found by CI and fixed (PR #79). Member view awaits
+  the owner's D12 seed.
 - **Wave 1 (`kgis`) complete** 2026-10-01 — site stream + records PR #74 (Chief Reviewer
   Approve); K10 boundary proof passed; #54 metric forgery fixed (Red Team disproved the
   earlier value-only fix); `agentic-kgis` publish un-gated (its PR #53), first publish

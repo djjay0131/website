@@ -2691,3 +2691,102 @@ A1/A5 are proven; A7 is recorded deferred (#51).
   (ADR candidate); `kgis` forgotten-flip detector (Dissenter D3 — now moot, it is required).
 - **Governance:** L2; contracts and handoffs `*-wave-1.md`; governance checks 4/4 PASS; the
   completion brief is on `main`.
+
+## Wave 2 (#72) — satellite 4 `agentic-kg-research`, private (2026-10-01)
+
+`agentic-kg-research` is the private research store (Quarto site, 281-source catalog). It is
+satellite 4 under D10, source `agentic-kg-research`, one `html` item `research-store`,
+`section: research`, `visibility: private`.
+
+### Infra — applied, boundary-proven
+
+`infra` PR #77 (merged `d512b22`) added the roster entry read from the GitHub API
+(repository_id 1384242888, owner 5666389, branch main, `private: true`). Two applies were
+needed and both are recorded honestly:
+
+1. First plan **4 to add**, but the provider step failed: the display name
+   `GitHub: djjay0131/agentic-kg-research` is **38 characters** and a WIF provider display
+   name is capped at 32. The SA, impersonation binding and bucket binding had already been
+   created before the failure.
+2. Fix (`satellites.tf`): fall back to the source key when `GitHub: <owner>/<repo>` exceeds
+   32, leaving the three existing providers unchanged. Second plan **1 to add, 0 change,
+   0 destroy**; applied; second plan **No changes**.
+
+The provider is `.../workloadIdentityPools/satellites/providers/github-agentic-kg-research`.
+Repo variables set: `GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_PUBLISH_SA`
+(`publish-agentic-kg-research@...`), `GCP_CONTENT_BUCKET`.
+
+**Boundary proof (temporary impersonation grant, removed and verified removed):**
+
+| Id | Action | HTTP |
+|---|---|---|
+| CTRL-A | research GET own-prefix absent object | **404** (token valid) |
+| forward | research create / overwrite / read / delete in its prefix | **200/200/200/204** |
+| refuse | research create `sources/kgis/`, `sources/agentic-kg-research-evil/`, bucket root; read `sources/cv/manifest.json` | **403** ×4 |
+| list | research list bucket and own prefix | **403/403** |
+| **reverse** | **cv** read / write / list the private prefix | **403/403/403** |
+| **reverse** | **kgis** read / write the private prefix | **403/403** |
+
+No `storage.objects.list` on the new role; only the WIF `workloadIdentityUser` binding
+remains after the run.
+
+### Satellite and hub
+
+`agentic-kg-research` PR #3 added `manifest.json` and a Quarto publish workflow (renders,
+stages the manifest at `_site/manifest.json`, validates against the hub contract at `v1`,
+publishes through `contract/publish@v1`). Its first CI run failed on a wrong
+`quarto-actions/setup` ref (the `v1` tag predates the `setup/` layout); pinned to the `v2`
+SHA. The PR run validated with publish skipped; the merge to `main` published **61 objects**
+under `sources/agentic-kg-research/`, verified in the bucket.
+
+The hub `build-and-deploy` on `main` then **failed the leak check** — and this is the wave's
+most valuable finding:
+
+- **FP-1 — the leak check false-positived on a bare payload filename.** The private item's
+  `path` is `index.html`; the public KGIS payload links to its own `index.html`; the
+  unqualified `payload-path` needle reported **13 LEAKS in a clean build**. Fixed in PR #79:
+  the `payload-path` needle is now **source-qualified** (`source/path`), with two regression
+  tests. The check caught it before deploy, which is the guard working — against the wrong
+  needle.
+
+After the fix, the `main` build succeeded end to end: public leak check PASS; private build
+rendered 3 private items / 139 files; link check PASS; **private-sync 139 uploaded, 0 to
+DELETE**; deploy and smoke tests green.
+
+**Verified live (public boundary):**
+
+```
+404  /research/agentic-kg-research/research-store/        (public route does not exist)
+404  /p/research/agentic-kg-research/research-store/      (signed-out gate)
+  0  occurrences in /sitemap-0.xml and on /research/
+170  objects in gs://cusati-hub-private/
+```
+
+### Wave 2 exit — provisionable parts MET, member view owner-blocked
+
+- Met: satellite provisioned and boundary-proven; published; `dist-public` carries no trace;
+  private-sync delete list empty on the first multi-source run; signed-out `/p/` 404.
+- **Not met (owner-only):** the signed-in member view. Owner decision **D12 is still
+  PENDING** — the owner has not named the team — so the Firestore member seed has not run.
+  The seed command, when the owner has the names, is:
+  `node infra/scripts/seed-members.mjs` (per the Phase 3 seed; see STATE §Checkpoint 4).
+  Until then, `agentic-kg-research` is **not** in `EXPECTED_SOURCES`; its prefix is not yet
+  required.
+
+### A second leak-check normalization gap (recorded)
+
+FP-1 showed the check is brittle around generic strings. The Red Team's Wave 1 finding (an
+entity/zero-width-encoded private title evades it) and FP-1 point the same way: the check is
+a careful grep, not a render-aware guard. ADR candidate stands.
+
+### Five-line status (Wave 2)
+
+- **State:** satellite 4 provisioned, boundary-proven, and published; hub syncs it into the
+  private bucket with no public trace; member view awaits the owner's D12 seed.
+- **What to review:** the two-apply roster record; the boundary proof's reverse legs; the
+  leak-check qualification fix (PR #79).
+- **What only the owner can do:** name the D12 team and run the member seed; then one
+  non-member and one member sign-in for Checkpoint 4 / Wave 2 exit.
+- **Open questions:** `html` asset-set declaration; a render-aware leak check.
+- **Governance:** L2; PRs #77 (infra), #79 (leak check), agentic-kg-research #3; governance
+  checks green.
