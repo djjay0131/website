@@ -92,21 +92,30 @@ function main() {
     maxBuffer: 32 * 1024 * 1024,
   });
 
+  // --report is a HARD guarantee that this cannot fail the build, not merely a
+  // hope that it exits 0 on the happy path. An audit that cannot run (no network,
+  // a broken toolchain) must not turn an unrelated PR red while the guard is
+  // report-only. Without --report, the same failures are exit 2.
+  const fail = (message) => {
+    console.error(message);
+    process.exit(report ? 0 : 2);
+  };
+
   let audit;
   try {
     audit = JSON.parse(run.stdout);
   } catch {
-    console.error("check-npm-audit: npm audit did not return JSON; it could not run.");
-    console.error(run.stderr?.trim() || `exit ${run.status}`);
-    process.exit(2);
+    fail(
+      "check-npm-audit: npm audit did not return JSON; it could not run. " +
+        (run.stderr?.trim() || `exit ${run.status}`),
+    );
   }
 
   let baseline = { accepted: [] };
   try {
     baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8"));
   } catch {
-    console.error(`check-npm-audit: cannot read ${path.relative(process.cwd(), BASELINE_PATH)}`);
-    process.exit(2);
+    fail(`check-npm-audit: cannot read ${path.relative(process.cwd(), BASELINE_PATH)}`);
   }
 
   const { advisories, known, novel, counts } = classify(audit, baseline);

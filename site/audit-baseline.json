@@ -18,7 +18,8 @@
   ],
   "generated": "2026-10-01",
   "tool": "npm audit --omit=dev",
-  "counts": { "critical": 0, "high": 4 },
+  "$counts_mean": "npm audit reports these per PACKAGE; the accepted list below is per unique ADVISORY. Four package-level highs resolve to two unique advisories (@grpc/grpc-js), reachable only via firebase.",
+  "counts": { "critical": 0, "high_packages": 4, "unique_advisories": 2 },
   "accepted": [
     {
       "id": "GHSA-m9gg-hp2v-232j",

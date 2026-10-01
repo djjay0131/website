@@ -999,6 +999,10 @@ jobs:
       # records the accepted set with a reachability argument; the graduation
       # path to failing on a DELTA against it is in #59.
       - name: Dependency audit (report-only; see #56, #59)
+        # Belt and braces. `--report` already exits 0 on every path, including an
+        # audit that cannot run; continue-on-error means even an unexpected crash
+        # of the step cannot fail the deploying job while the guard is report-only.
+        continue-on-error: true
         run: node scripts/check-npm-audit.mjs --report
 
       # Checkout comes first: auth writes its credentials file into the

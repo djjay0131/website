@@ -47,8 +47,14 @@ THE WIP COMMIT (9e7408a) — REVIEW, DO NOT TRUST
 FILE CONTRACT
   You may modify, and nothing else:
       site/**
-  Do not modify: infra/**, gate/**, contract/**, .github/workflows/**, llm/**, docs/**,
+      .github/workflows/build.yml   (ITEM 4 only: the report-only audit step)
+  Do not modify: infra/**, gate/**, contract/**, any other workflow, docs/**,
   firebase.json, or any other repository.
+
+  AMENDED 2026-10-01, before merge, on the Wave 1 Dissenter's D8. The first draft
+  forbade `.github/workflows/**` while ITEM 4 required the audit step in
+  build.yml; the wave made that edit without reconciling the two. The allow is
+  now explicit and scope-limited to the one workflow file ITEM 4 needs.
 
 ITEM 1 — `kgis` IS EXPECTED BUT NOT REQUIRED
   Add to EXPECTED_SOURCES: source "kgis", required: false, since "Wave 1 (satellite 3)",
