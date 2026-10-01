@@ -176,7 +176,14 @@ export function stagingPlanFor(sourcesDir, items) {
 }
 
 function addFile(staged, sourcesDir, source, relFromPrefix) {
-  const from = path.join(sourcesDir, source, relFromPrefix);
+  const prefixRoot = path.resolve(sourcesDir, source);
+  const from = path.resolve(prefixRoot, relFromPrefix);
+  // DEFENCE IN DEPTH. The Zod mirror in src/content.config.ts already rejects a
+  // `path` containing `..` before any manifest reaches this function, and that is
+  // the real gate. This containment check means the staging step does not silently
+  // rely on it: a value that somehow arrives unvalidated cannot walk out of the
+  // source prefix and stage an arbitrary file. It FAILS CLOSED by skipping.
+  if (from !== prefixRoot && !from.startsWith(prefixRoot + path.sep)) return;
   if (!fs.existsSync(from)) return;
   const to = path.posix.join(PAYLOAD_ROOT, source, relFromPrefix);
   if (!staged.has(to)) staged.set(to, { from, source });

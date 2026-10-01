@@ -75,3 +75,30 @@ describe("collectPublicItems builds a section index from manifests (D7)", () => 
     expect(collectPublicItems(path.join(os.tmpdir(), "absent-frame-sources"))).toEqual([]);
   });
 });
+
+describe("staging is contained to the source prefix", () => {
+  // Defence in depth: the Zod mirror rejects a `path` with `..` before this runs,
+  // but the staging step must not rely on that. A path that escapes the prefix is
+  // skipped rather than resolved. (Found by the Wave 1 Security Tester.)
+  it("does not stage a file reached by `..`", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "escape-"));
+    try {
+      fs.mkdirSync(path.join(root, "kgis"), { recursive: true });
+      fs.mkdirSync(path.join(root, "outside"), { recursive: true });
+      fs.writeFileSync(path.join(root, "kgis", "real.html"), "<p>ok</p>");
+      fs.writeFileSync(path.join(root, "outside", "secret.html"), "SHOULD NOT TRAVEL");
+      const plan = stagingPlanFor(root, [
+        {
+          source: "kgis",
+          slug: "x",
+          section: "projects",
+          format: "html",
+          path: "../outside/secret.html",
+        },
+      ]);
+      expect(plan, JSON.stringify(plan)).toEqual([]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
