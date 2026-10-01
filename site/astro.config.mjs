@@ -36,6 +36,7 @@ import { resolveSiteEnv, withBase } from './scripts/site-env.mjs';
 import { LEGACY_REDIRECTS, isExcludedFromSitemap } from './scripts/site-routes.mjs';
 import { resolveHubOutput } from './scripts/site-output.mjs';
 import { privateBuild } from './scripts/private-build.mjs';
+import { publicBuild } from './scripts/public-build.mjs';
 
 const { site, base } = resolveSiteEnv(process.env);
 const { outDir, isPrivate } = resolveHubOutput(process.env);
@@ -49,9 +50,11 @@ export default defineConfig({
   // The sitemap is a PUBLIC-ONLY derived output (ADR-0005 Consequences: every
   // build-time output generated from collections must come from the public build
   // only). A sitemap of the private area would be a list of private URLs.
+  // publicBuild() stages the payload bytes of the public framed items
+  // (scripts/public-build.mjs); the private build's twin is privateBuild().
   integrations: isPrivate
     ? [privateBuild()]
-    : [sitemap({ filter: (page) => !isExcludedFromSitemap(page, base) })],
+    : [sitemap({ filter: (page) => !isExcludedFromSitemap(page, base) }), publicBuild()],
   // The legacy GitHub Pages redirects are public routes and have no meaning in
   // the private output.
   redirects: isPrivate

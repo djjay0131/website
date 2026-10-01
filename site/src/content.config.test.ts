@@ -216,14 +216,27 @@ describe("manifest_version is accepted, defaulted and vetted", () => {
 // The expected-source set (ADR-0010 decision 4, closing C27)
 // ---------------------------------------------------------------------------
 describe("a declared source whose prefix has entirely vanished is a fault", () => {
-  it("declares both satellites, and BOTH are required since 2026-09-18", () => {
-    expect(EXPECTED_SOURCES.map((e) => e.source)).toEqual(["cv", "phd-milestones"]);
+  it("declares all three satellites; cv and phd-milestones are required since 2026-09-18", () => {
+    expect(EXPECTED_SOURCES.map((e) => e.source)).toEqual(["cv", "phd-milestones", "kgis"]);
     expect(EXPECTED_SOURCES.find((e) => e.source === "cv")?.required).toBe(true);
     // Flipped on 2026-09-18, after the first successful publish at Checkpoint 4
     // (2026-09-17). Left at false, a vanished prefix goes undetected for the one
     // source C27 was written about -- the private one, whose silent
     // disappearance empties the private area while every check reports success.
     expect(EXPECTED_SOURCES.find((e) => e.source === "phd-milestones")?.required).toBe(true);
+  });
+
+  it("declares kgis (satellite 3) as expected but NOT yet required", () => {
+    // Wave 1 registers the source before its first publish is relied on. Required
+    // from day one would fail every build whose tree lacks it -- the pull-request
+    // fallback always does -- which is the bootstrap pathology ADR-0010 decision
+    // 4's amendment names. It flips to true after a verified publish, as
+    // phd-milestones did.
+    const kgis = EXPECTED_SOURCES.find((e) => e.source === "kgis");
+    expect(kgis?.required).toBe(false);
+    expect(kgis?.since).toBe("Wave 1 (satellite 3)");
+    // So a tree carrying only the two required sources is still not a fault.
+    expect(findMissingExpectedSources(["cv", "phd-milestones"])).toEqual([]);
   });
 
   it("reports EVERY required source whose prefix is absent", () => {
