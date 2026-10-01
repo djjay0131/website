@@ -36,6 +36,12 @@ merged reality, not plans.
 - **The content bucket's prefix boundary** holds for `cv` (`STATE.md` §Checkpoint 3):
   a satellite can create, overwrite, read and delete inside its own prefix and is
   refused every write outside it and every `list`, including of its own prefix.
+- **`kgis` is live** (`https://jason.cusati.us/projects/kgis/kgis-docs/`). Published
+  from `agentic-kgis` through the contract on a push to its `main` (75 objects), then
+  synced from the bucket by the hub with no commit to `website`. The frame, its
+  `/_payload/kgis/` payload and its CSS/JS all serve 200. `kgis` is `required: true`.
+- **The dependency audit runs in CI** (report-only, #56/#59) with a recorded baseline
+  (`site/audit-baseline.json`); a new advisory is reported, not silently ignored.
 - **Four alert policies** are enabled, including "gate started misconfigured" — but
   deliver nothing until the notification channel is verified (owner-only).
 - Governance adopted (agentic-governance v0.9); `main` requires `governance-checks` and
@@ -44,6 +50,10 @@ merged reality, not plans.
 
 ## Done, most recent first
 
+- **Wave 1 (`kgis`) complete** 2026-10-01 — site stream + records PR #74 (Chief Reviewer
+  Approve); K10 boundary proof passed; #54 metric forgery fixed (Red Team disproved the
+  earlier value-only fix); `agentic-kgis` publish un-gated (its PR #53), first publish
+  live; `required: true` PR #75; Phase 5 criterion 1 ticked.
 - **Emblem home page** (#71, 2026-09-25), after Licensing declined the VT marks.
 - **A1 proven live** (#69, 2026-09-23): member sign-in through the narrowed role.
 - **Wave 0 merged** 2026-09-23 — #45, #48, #65, #53, #67, #47, close-out #68. Applied
@@ -53,12 +63,13 @@ merged reality, not plans.
 
 ## What is left
 
-- **Satellites run (#72)**: satellite 3 `kgis` (public), then satellite 4
-  `agentic-kg-research` (private, for the team). Phase 3 bookkeeping rides with it:
-  the `phd-milestones` prefix proofs (A13) and the non-member sign-in (A3, A4).
-- **Checkpoint 4 is not passed** (#52) until A3, A4 and A13 are recorded.
+- **Satellites run (#72)**: satellite 3 `kgis` is done; satellite 4
+  `agentic-kg-research` (private, for the team) is Wave 2.
+- **Checkpoint 4 is not passed** (#52) until the owner's non-member sign-in records A3
+  and A4. A13 is closed (the `phd-milestones` prefix proofs ran, K10 included).
 - **Wave 0b (#46)**: private by default — the hub owns the publish decision. Not started.
-- Phases 4–6 of `llm/master-roadmap.md`.
+- Phases 4–6 of `llm/master-roadmap.md` (sharing, satellite remainder, Phase 6), plus
+  the branding wave (0c).
 
 ## Known issues
 
@@ -67,18 +78,20 @@ Every open issue, once:
 - #21 `sync-content.sh` needs curl ≥ 7.76 and misreports the failure as a bucket error.
 - #42 Backlog: a traffic-analysis page now that structured logging exists.
 - #46 Wave 0b — private by default.
-- #50 Phase 3 A13: the `phd-milestones` prefix-boundary test has not been recorded.
 - #51 Phase 3 criterion 7 is half-unsatisfiable; deferred to Phase 4.
-- #52 Checkpoint 4 is not passed.
-- #54 Log-based metrics are forgeable by an anonymous caller through `POST /client-events`.
-- #56 `npm audit --omit=dev`: **4 high** on `main` as of 2026-10-01 (`@grpc/grpc-js`
-  via `firebase`), after reaching 0 with the astro 7.3.3 upgrade.
+- #52 Checkpoint 4 is not passed — needs the owner's non-member sign-in for A3/A4.
+- #56 `npm audit --omit=dev`: **4 high** (`@grpc/grpc-js` via `firebase`) remain, now
+  recorded in `site/audit-baseline.json` with a reachability argument and reported in CI.
 - #57 The alert-channel guard asserts a string shape.
-- #59 `npm audit` runs in no workflow, which is why #56 recurred unnoticed.
+- #59 `npm audit` is wired report-only; the decision whether it ever blocks is open.
 - #61 Hosting answers `/p/` null-byte paths with 500 while `run.app` returns the gate's 404.
-- #62 `terraform.tfvars.example` omits `gate_extra_allowed_origins`.
 - #63 SHA-pinned `latex-action` wraps a mutable `texlive-full:latest` run as root.
-- #72 Satellite 3 — `agentic-kgis` publishes as source `kgis`.
+- #72 Satellites run: Wave 1 (`kgis`) done; Wave 2 (`agentic-kg-research`) next.
+
+Closed on this wave's evidence: **#50** (A13 ran; K10 the last proof), **#54** (metric
+forgery fixed — the Red Team disproved the earlier value-only fix, assembled-pair
+neutralisation added), **#62** (tfvars.example documents `gate_extra_allowed_origins`,
+landed in `a68feea`).
 
 Not tracked as issues, recorded in `STATE.md`: the residual exposure from Incident A1
 (the owner declined the GitHub purge), and the standing rule that no satellite identity
