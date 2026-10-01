@@ -188,6 +188,20 @@ variable "satellites" {
       repository_owner_id = "5666389"
       default_branch      = "main"
     }
+    # Satellite 4 (D10, 2026-10-01). PRIVATE repository, PRIVATE item: its Quarto
+    # site is served only in the private build, behind the gate, and never on the
+    # public path. The grant is the same custom role with the same startsWith
+    # condition; the private/public distinction lives in the manifest's
+    # visibility and the hub's render, not in the satellite's IAM.
+    #
+    # Both ids read from the GitHub REST API on 2026-10-01, not copied from a
+    # brief. Confirmed private: true at that time.
+    agentic-kg-research = {
+      repository          = "djjay0131/agentic-kg-research"
+      repository_id       = "1384242888"
+      repository_owner_id = "5666389"
+      default_branch      = "main"
+    }
   }
 
   validation {
