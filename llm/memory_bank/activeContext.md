@@ -27,21 +27,28 @@ what a contributor needs to pick up work today.
     un-gated `docs-publish.yml`; the first publish (75 objects) propagated to a live
     `https://jason.cusati.us/projects/kgis/kgis-docs/` with no commit to `website`.
     `kgis` is now `required: true` (PR #75). **Phase 5 criterion 1 is ticked.**
-  - **Wave 2 (`agentic-kg-research`, private) is next.**
+  - **Wave 2 (`agentic-kg-research`, private) is DONE 2026-10-01, except the member view.**
+    Infra PR #77 provisioned satellite 4 (two applies: a 32-char display-name limit, then
+    clean); the boundary proof passed including the reverse legs; the satellite (#3)
+    published 61 objects; the hub syncs it into the private bucket with no `dist-public`
+    trace (private-sync 139 uploaded, 0 deleted). The new leak-check false positive FP-1
+    (a bare `index.html` payload path) was found by CI and fixed in PR #79. **The member
+    view is owner-blocked on D12** (the team is unnamed), so the Firestore seed has not run.
 - **Checkpoint 4 (#52) is still NOT passed**: A3 and the non-member half of A4 need the
   owner's non-member sign-in. A12/A13/S5 are closed, A1/A5 proven, A7 deferred (#51).
 - **Wave 0b (#46)**, private by default, is not started.
 
 ## Stop point
 
-Wave 2 start: `agentic-kg-research` as a private satellite under `/p/`, with the D12
-team seed (owner runs it). Checkpoint 4 waits on the owner.
+The owner's D12 team names and the sign-ins (member + non-member) that close Wave 2 and
+Checkpoint 4. Site-only work can continue meanwhile.
 
 ## Next
 
-1. **#72 Wave 2** — `agentic-kg-research` as a private item for the team.
-2. **Wave 0b (#46)** — private by default and the publish allowlist.
-3. **Wave 0c (branding)**, then Waves 3–5 (sharing, satellites remainder, Phase 6).
+1. **Wave 0b (#46)** — private by default and the publish allowlist.
+2. **Wave 0c (branding)** — needs the branding design spec (D14); no `llm/plans/…branding`
+   file exists, so this is a gap to raise with the owner.
+3. **Waves 3–5** (sharing, satellite remainder, Phase 6).
 
 ## What only the owner can do
 
