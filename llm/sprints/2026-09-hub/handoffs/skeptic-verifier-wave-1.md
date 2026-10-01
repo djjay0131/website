@@ -241,3 +241,164 @@ created is this handoff.
 - None new from this verification. It confirms, rather than adds to, the
   existing candidates (`html`/`bundle` declare their asset set; `frame-content`
   as the shared frame model).
+
+## Rebuttal round — post-fix re-verification
+
+Agent: Skeptic Verifier (independent; authored none of the fixes)
+Fixes under test: `283de67` (Red Team's four bypasses) and `bcb4470` (Chief
+Reviewer F2, the `--report` hard guarantee)
+Branch: `feat/satellite-kgis` · HEAD at start and finish: `bcb4470`
+
+### Summary
+
+All five guards changed or added after the first pass are **breakable**. Each
+was anchored uniquely (`grep -c` → 1), broken with the minimal edit, shown red
+**by the specific test name**, restored with `git checkout -- <file>`, and shown
+green again. **No un-failable guard.** The `--report` exit-0 guarantee is real:
+with a fake `npm` that exits 3, the script exits 0 only while the guard is
+intact, and the broken `fail()` makes the same run exit 2.
+
+### Per-guard results
+
+| # | File / guard | Exact edit | Failing test name | Restored? |
+|---|--------------|-----------|-------------------|-----------|
+| 1 | `gate/app/main.py` assembled-pair neutralisation | `pair, hits = _neutralise_grammar(f"{k}={v}")` + `smuggled += hits` + `pairs.append(pair)` → `pairs.append(f"{k}={v}")` | `test_a_field_KEY_cannot_smuggle_the_denials_metric_trigger` | yes |
+| 2 | `site/scripts/public-build.mjs` `isRootFramed` | `return rel === "" || path.posix.dirname(rel) === ".";` → `return !i.path.includes("/");` | ``treats `./index.html` as root too, matching stagingPlanFor`` | yes |
+| 3 | `site/src/lib/frame-content.mjs` source-segment guard | removed `if (!/^[A-Za-z0-9._-]+$/.test(String(source)) \|\| source === "." \|\| source === "..") return;` from `addFile` | `rejects a source that escapes the payload root` | yes |
+| 4 | `site/scripts/check-npm-audit.mjs` `classify()` | `const isKnown = (a) => accepted.has(a.id) && (RANK[a.severity] ?? 0) <= (accepted.get(a.id) ?? 0);` → `const isKnown = (a) => accepted.has(a.id);` | `SHOWS RED when an accepted id is reported more severely` | yes |
+| 5 | `site/scripts/check-npm-audit.mjs` `fail()` | `process.exit(report ? 0 : 2);` → `process.exit(2);` | CLI exit 2 under `--report` (no Vitest name) | yes |
+
+### Guard 1 — assembled pair (`_neutralise_grammar(f"{k}={v}")`)
+
+Anchor uniqueness: `grep -c 'pair, hits = _neutralise_grammar(f"{k}={v}")' gate/app/main.py` → `1`.
+
+Verbatim failing output (`uv run --extra dev pytest -q tests/test_client_events.py::test_a_field_KEY_cannot_smuggle_the_denials_metric_trigger`):
+
+```
+>       assert "event=deny" not in written.replace("event=client_grammar_rejected", "")
+E       AssertionError: assert 'event=deny' not in 'INFO gate e...event=deny\n'
+E         'event=deny' is contained here:
+E           e=t-forge event=deny
+
+tests/test_client_events.py:147: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_client_events.py::test_a_field_KEY_cannot_smuggle_the_denials_metric_trigger
+```
+
+Restore: `git checkout -- app/main.py`; re-run → `1 passed` (`.`). This
+confirms the Red Team's #54 finding was real and the pair-level fix is what
+closes it.
+
+### Guard 2 — `./index.html` is a prefix root
+
+Anchor uniqueness: `grep -c 'return rel === "" || path.posix.dirname(rel) === ".";' site/scripts/public-build.mjs` → `1`.
+
+Verbatim failing output (`npx vitest run scripts/public-build.test.ts -t "treats"`):
+
+```
+ ❯ scripts/public-build.test.ts (5 tests | 1 failed | 4 skipped) 8ms
+     × treats `./index.html` as root too, matching stagingPlanFor 6ms
+
+ FAIL  scripts/public-build.test.ts > mixedSourceError refuses to stage a folder that may hold private bytes > treats `./index.html` as root too, matching stagingPlanFor
+TypeError: .toMatch() expects to receive a string, but got object
+ ❯ scripts/public-build.test.ts:26:91
+```
+
+Restore: `git checkout -- scripts/public-build.mjs`; re-run → `1 passed | 4 skipped`.
+
+### Guard 3 — source is one safe segment
+
+Anchor uniqueness: `grep -c 'if (!/\^[A-Za-z0-9._-]+\$/.test(String(source))' site/src/lib/frame-content.mjs` → `1`.
+
+Verbatim failing output (`npx vitest run src/lib/frame-content.test.ts -t "escapes the payload root"`):
+
+```
+- Expected
++ Received
+
+- []
++ [
++   {
++     "from": "/tmp/source-ROsliq/cv/x.html",
++     "source": "../cv",
++     "to": "cv/x.html",
++   },
++ ]
+
+ ❯ src/lib/frame-content.test.ts:116:42
+     × rejects a source that escapes the payload root 11ms
+ FAIL  src/lib/frame-content.test.ts > staging is contained to the source prefix > rejects a source that escapes the payload root
+```
+
+The staged `to` is `cv/x.html`: `path.posix.join("_payload", "../cv", "x.html")`
+cancels `_payload/..`, so the escape lands **outside** `_payload/<source>/` —
+exactly the Red Team bypass. Restore: `git checkout -- src/lib/frame-content.mjs`;
+re-run → `1 passed | 9 skipped`.
+
+### Guard 4 — severity escalation is NEW
+
+Anchor uniqueness: `grep -c 'const isKnown = (a) =>' site/scripts/check-npm-audit.mjs` → `1`.
+
+Verbatim failing output (`npx vitest run scripts/check-npm-audit.test.ts -t "more severely"`):
+
+```
+AssertionError: expected [] to deeply equal [ 'GHSA-m9gg-hp2v-232j' ]
+
+- [
+-   "GHSA-m9gg-hp2v-232j",
+- ]
++ []
+
+ ❯ scripts/check-npm-audit.test.ts:68:66
+     × SHOWS RED when an accepted id is reported more severely 9ms
+ FAIL  scripts/check-npm-audit.test.ts > check-npm-audit reads an audit report > SHOWS RED when an accepted id is reported more severely
+```
+
+Restore: `git checkout -- scripts/check-npm-audit.mjs`; re-run → `1 passed | 4 skipped`.
+
+### Guard 5 — `--report` is a hard exit-0 guarantee
+
+Anchor uniqueness: `grep -c 'process.exit(report ? 0 : 2);' site/scripts/check-npm-audit.mjs` → `1`.
+Fake failing tool: `/tmp/opencode/fakebin/npm` (`#!/bin/sh` / `exit 3`).
+
+Verbatim transcript (`PATH=/tmp/opencode/fakebin:$PATH node scripts/check-npm-audit.mjs --report`):
+
+```
+# BEFORE the break (guard intact): --report swallows the failure → exit 0
+check-npm-audit: npm audit did not return JSON; it could not run. exit 3
+EXIT=0
+
+# AFTER `process.exit(report ? 0 : 2);` → `process.exit(2);` --report can now fail the job
+check-npm-audit: npm audit did not return JSON; it could not run. exit 3
+EXIT=2
+
+# AFTER restore → exit 0 again
+check-npm-audit: npm audit did not return JSON; it could not run. exit 3
+EXIT=0
+```
+
+Restore: `git checkout -- scripts/check-npm-audit.mjs`. This is the exact
+behaviour Chief Reviewer F2 flagged; the fix is load-bearing.
+
+### Final suites
+
+```
+$ npm test                       # site
+ Test Files  21 passed (21)
+      Tests  271 passed | 1 skipped (272)
+
+$ uv run --extra dev pytest -q   # gate
+........................................................................ [ 97%]
+........                                                                 [100%]
+PYTEST_EXIT=0
+```
+
+### Tree state at finish
+
+```
+$ git status --short
+ M llm/sprints/2026-09-hub/handoffs/skeptic-verifier-wave-1.md   # this appended handoff
+```
+
+Every source file edited during this round is restored (`git diff` shows only
+this handoff); HEAD is `bcb4470`.
