@@ -32,7 +32,9 @@
 //
 //   qualified-id   "<source>/<slug>"                       e.g. phd-milestones/milestones
 //   route          "/<section>/<source>/<slug>/"           the URL the hub would serve it at
-//   payload-path   the item's declared `path`               e.g. site/index.html (see note)
+//   payload-path   the item's declared `path`, QUALIFIED by source, e.g.
+//                  phd-milestones/site/index.html           (a bare `index.html`
+//                  is not a needle: every static site has one — see needlesFor)
 //   source         the source name                          e.g. phd-milestones
 //   slug           the bare slug                            e.g. milestones
 //   title          the item's title, raw and HTML-escaped
@@ -166,7 +168,15 @@ export function needlesFor(item) {
     if (item.section) add("route", `/${item.section}/${item.source}/${item.slug}/`, false);
   }
   add("source", item.source, true);
-  if (item.path) add("payload-path", item.path, false);
+  // The payload path is a needle only when QUALIFIED by its source. A bare
+  // filename such as `index.html` is not a trace of any particular private item —
+  // every static site has one — and matching it made a CLEAN public build fail:
+  // the KGIS payload's own navigation links to `index.html` were reported as a
+  // leak of agentic-kg-research's item on the first multi-source run (CI,
+  // 2026-10-01). The qualified form `source/path` names the file's home, which is
+  // what a leak of the payload would preserve. Content (title/summary/route)
+  // remains the primary guard.
+  if (item.path) add("payload-path", `${item.source}/${item.path}`, false);
 
   for (const [kind, value] of [["title", item.title], ["summary", item.summary]]) {
     if (typeof value !== "string" || value.length < TITLE_MIN_LENGTH) continue;

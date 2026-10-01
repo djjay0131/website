@@ -219,6 +219,45 @@ describe("needles and their limits are declared, not implied", () => {
     expect(weakNeedleWarnings([item])[0]).toMatch(/shorter than 8 characters/);
   });
 
+  it("does NOT treat a bare `index.html` payload path as a needle", () => {
+    // Found by the hub's own leak check on the first multi-source run (CI,
+    // 2026-10-01): agentic-kg-research's item has path `index.html`, and the
+    // public KGIS payload links to its own `index.html`, which a bare path
+    // needle reported as a leak. The payload path is qualified by source now.
+    const item = {
+      source: "agentic-kg-research",
+      slug: "research-store",
+      section: "research",
+      path: "index.html",
+      title: "A private research store",
+      summary: "Private research synthesis on LLMs and knowledge graphs.",
+    };
+    const dist = tree({ "_payload/kgis/index.html": '<a href="index.html">Home</a>' });
+    try {
+      expect(findLeaks(dist, [item]).filter((l) => l.kind === "payload-path")).toEqual([]);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("still catches a source-qualified payload path", () => {
+    const item = {
+      source: "agentic-kg-research",
+      slug: "research-store",
+      section: "research",
+      path: "index.html",
+      title: "A private research store",
+      summary: "Private research synthesis on LLMs and knowledge graphs.",
+    };
+    const dist = tree({ "leaked/agentic-kg-research/index.html": "<p>x</p>" });
+    try {
+      // The `agentic-kg-research` path segment is a PATH match on the source.
+      expect(findLeaks(dist, [item]).some((l) => l.where === "path")).toBe(true);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
   it("matches a binary file by PATH only, which is a stated limit", () => {
     const dist = fs.mkdtempSync(path.join(os.tmpdir(), "leak-bin-"));
     try {
