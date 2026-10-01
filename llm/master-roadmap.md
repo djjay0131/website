@@ -377,13 +377,13 @@ mint, list and revoke; and every `/s/**` and `/share/**` response carrying
   validation already exist and are exercised by the build; only the rendering is outstanding.
   Closes STATE C26.)*
 
-- [ ] `agentic-kg` as satellite #3, with a public project page from its `docs/` (§2, §11)
+- [x] `agentic-kg` as satellite #3, with a public project page from its `docs/` (§2, §11) — *D4/D10 substitute `agentic-kgis` as source `kgis`; live 2026-10-01 at /projects/kgis/kgis-docs/ (see the acceptance criterion below).*
 - [ ] `construction-ai-proposal` as satellite #4, with a public project page (§2, §11)
 - [ ] Project index (§11)
 
 ### Acceptance criteria
 
-- [ ] A docs change pushed to `agentic-kg`, with no commit to `website`, updates its project page on `jason.cusati.us`
+- [x] A docs change pushed to `agentic-kg`, with no commit to `website`, updates its project page on `jason.cusati.us` — *DONE for `agentic-kgis`, which D4/D10 substitute for `agentic-kg`: `agentic-kgis` PR #53 un-gated `docs-publish.yml`, its push to `main` published 75 objects (run 36939276461), and the hub synced + deployed (run 36939339279) to a live `200 /projects/kgis/kgis-docs/` with its payload and assets. A docs push propagates with no commit to `website`.*
 - [ ] A change pushed to `construction-ai-proposal`, with no commit to `website`, updates its project page on `jason.cusati.us`
 - [ ] The project index lists both projects from their manifests, without a hand-maintained entry per project
 - [ ] A recorded test shows each new satellite identity cannot write outside its own `sources/<source>/` prefix (§12.3)
