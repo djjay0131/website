@@ -19,6 +19,15 @@ describe("mixedSourceError refuses to stage a folder that may hold private bytes
     expect(error).toMatch(/prefix root/);
   });
 
+  it("treats `./index.html` as root too, matching stagingPlanFor", () => {
+    // The first guard used `!path.includes("/")`, which missed `./index.html` --
+    // schema-legal, resolved to the prefix root by stagingPlanFor (Wave 1 Red
+    // Team). The rule must be derived the same way in both places.
+    expect(mixedSourceError([privateItem, { ...publicRoot, path: "./index.html" }], "m")).toMatch(
+      /mixes visibility/,
+    );
+  });
+
   it("allows a private item plus a framed item in a NAMED subdirectory", () => {
     // The named-directory rule filters withdrawn documents and does not walk the
     // whole prefix, so the ambiguity does not arise.

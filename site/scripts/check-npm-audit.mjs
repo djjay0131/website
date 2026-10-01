@@ -55,14 +55,28 @@ export function collectAdvisories(audit) {
   return [...out.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
-/** Split an audit report into the accepted advisories and the new ones. */
+/** Severity ordering, so an ESCALATION is distinguishable from the accepted set. */
+const SEVERITY_RANK = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
+
+/**
+ * Split an audit report into the accepted advisories and the new ones.
+ *
+ * Matching is (id, severity), not id alone. An id is accepted at a SEVERITY; if
+ * the same advisory is later reported more severely, that is a new finding, not
+ * a known one. (Wave 1 Red Team: id-only matching reported a severity escalation
+ * green.)
+ */
 export function classify(audit, baseline) {
-  const acceptedIds = new Set((baseline?.accepted ?? []).map((a) => a.id));
+  const accepted = new Map(
+    (baseline?.accepted ?? []).map((a) => [a.id, SEVERITY_RANK[a.severity] ?? SEVERITY_RANK.high]),
+  );
   const advisories = collectAdvisories(audit);
+  const isKnown = (a) =>
+    accepted.has(a.id) && (SEVERITY_RANK[a.severity] ?? 0) <= (accepted.get(a.id) ?? 0);
   return {
     advisories,
-    known: advisories.filter((a) => acceptedIds.has(a.id)),
-    novel: advisories.filter((a) => !acceptedIds.has(a.id)),
+    known: advisories.filter(isKnown),
+    novel: advisories.filter((a) => !isKnown(a)),
     counts: audit?.metadata?.vulnerabilities ?? {},
   };
 }

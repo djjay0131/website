@@ -37,13 +37,17 @@ const FRAMED_FORMATS = new Set(["html", "bundle"]);
  */
 export function mixedSourceError(items, name) {
   const hasPrivate = items.some((i) => i?.visibility === "private");
-  const hasRootFramed = items.some(
-    (i) =>
-      i?.visibility === "public" &&
-      FRAMED_FORMATS.has(i.format) &&
-      typeof i.path === "string" &&
-      !i.path.includes("/"),
-  );
+  // ROOT means the same thing stagingPlanFor means by it: the containing
+  // directory is the source prefix root. Using `!path.includes("/")` missed
+  // `./index.html`, which the schema permits and which stagingPlanFor resolves
+  // to the whole prefix (Wave 1 Red Team). Derive it from dirname instead.
+  const isRootFramed = (i) => {
+    if (i?.visibility !== "public" || !FRAMED_FORMATS.has(i.format)) return false;
+    if (typeof i.path !== "string") return false;
+    const rel = i.path.replace(/^\/+/, "").replace(/\/+$/, "");
+    return rel === "" || path.posix.dirname(rel) === ".";
+  };
+  const hasRootFramed = items.some(isRootFramed);
   if (!(hasPrivate && hasRootFramed)) return null;
   return (
     `source "${name}" mixes visibility: it has a private item AND a public ` +

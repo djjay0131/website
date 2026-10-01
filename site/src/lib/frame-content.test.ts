@@ -101,4 +101,21 @@ describe("staging is contained to the source prefix", () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("rejects a source that escapes the payload root", () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), "source-"));
+    try {
+      const sources = path.join(base, "sources");
+      const sibling = path.join(base, "cv");
+      fs.mkdirSync(sources, { recursive: true });
+      fs.mkdirSync(sibling, { recursive: true });
+      fs.writeFileSync(path.join(sibling, "x.html"), "<p>private-ish</p>");
+      const plan = stagingPlanFor(sources, [
+        { source: "../cv", slug: "x", section: "projects", format: "html", path: "x.html" },
+      ]);
+      expect(plan, JSON.stringify(plan)).toEqual([]);
+    } finally {
+      fs.rmSync(base, { recursive: true, force: true });
+    }
+  });
 });

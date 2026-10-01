@@ -42,8 +42,29 @@ describe("check-npm-audit reads an audit report", () => {
   it("SHOWS RED on an advisory outside the baseline", () => {
     // The guard is only a guard if a new advisory is visibly different from an
     // accepted one. Drop one id from the baseline and it must surface as NEW.
-    const thin = { accepted: [{ id: "GHSA-m9gg-hp2v-232j" }] };
+    const thin = { accepted: [{ id: "GHSA-m9gg-hp2v-232j", severity: "high" }] };
     const { novel } = classify(audit, thin);
     expect(novel.map((a) => a.id)).toEqual(["GHSA-f596-whhp-79r4"]);
+  });
+
+  it("SHOWS RED when an accepted id is reported more severely", () => {
+    // Accepted at high; now critical. That is a new finding, not a known one
+    // (Wave 1 Red Team: id-only matching called this green).
+    const escalated = {
+      metadata: audit.metadata,
+      vulnerabilities: {
+        "@grpc/grpc-js": {
+          severity: "critical",
+          via: [
+            {
+              name: "@grpc/grpc-js",
+              severity: "critical",
+              url: "https://github.com/advisories/GHSA-m9gg-hp2v-232j",
+            },
+          ],
+        },
+      },
+    };
+    expect(classify(escalated, baseline).novel.map((a) => a.id)).toEqual(["GHSA-m9gg-hp2v-232j"]);
   });
 });

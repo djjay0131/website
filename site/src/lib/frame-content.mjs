@@ -176,6 +176,11 @@ export function stagingPlanFor(sourcesDir, items) {
 }
 
 function addFile(staged, sourcesDir, source, relFromPrefix) {
+  // A source name is one safe path segment. The schema pattern already enforces
+  // this, but the staging step must not depend on it: `source: "../cv"` would
+  // otherwise place `to` outside `_payload/<source>/`. Fail closed. (Wave 1 Red
+  // Team, defence in depth.)
+  if (!/^[A-Za-z0-9._-]+$/.test(String(source)) || source === "." || source === "..") return;
   const prefixRoot = path.resolve(sourcesDir, source);
   const from = path.resolve(prefixRoot, relFromPrefix);
   // DEFENCE IN DEPTH. The Zod mirror in src/content.config.ts already rejects a
