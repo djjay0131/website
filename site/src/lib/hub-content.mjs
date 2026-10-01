@@ -192,6 +192,19 @@ export const EXPECTED_SOURCES = [
       "is now a FAULT rather than a bootstrap state -- the private area silently emptying " +
       "is the consequence C27 names (ADR-0010 decision 4 and its 2026-09-17 amendment).",
   },
+  {
+    source: "kgis",
+    required: false,
+    since: "Wave 1 (satellite 3)",
+    note:
+      "Satellite #3 (D4/D10), the public documentation source: agentic-kgis publishes " +
+      "docs-site/ under source: kgis. NOT YET PUBLISHED, so required is false -- the same " +
+      "bootstrap position phd-milestones began in. A source expected from day one would " +
+      "fail every build whose tree lacks it, and the pull-request fallback tree always " +
+      "does, which is the bootstrap pathology ADR-0010 decision 4's amendment names. It " +
+      "flips to required: true after a verified first publish, exactly as phd-milestones " +
+      "did at Checkpoint 4.",
+  },
 ];
 
 /**

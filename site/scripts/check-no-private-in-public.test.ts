@@ -40,8 +40,8 @@ describe("collectPrivateItems reads the committed fixture", () => {
     expect(items.map((i) => `${i.source}/${i.slug}`).sort()).toEqual([
       // Wave 1: a PRIVATE `projects` item, planted so the public /projects/
       // index has a private item in its own section to leave out.
-      "construction-ai-proposal/cost-model-draft",
       "phd-milestones/committee-dossier",
+      "phd-milestones/internal-notes",
       "phd-milestones/milestones",
     ]);
     // cv publishes five PUBLIC items and kgis one; none of them is private.

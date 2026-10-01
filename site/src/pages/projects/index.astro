@@ -2,20 +2,49 @@
 import SectionIndex from "../../layouts/SectionIndex.astro";
 import { loadContentPool } from "../../lib/cv-data";
 import { mdToHtml } from "../../lib/md";
-import { CV_CONTENT_DIR } from "../../lib/hub-content.mjs";
+import { CV_CONTENT_DIR, SOURCES_DIR } from "../../lib/hub-content.mjs";
+import { collectPublicItems } from "../../lib/frame-content.mjs";
 import path from "node:path";
 
-// Synced from the content bucket (SEAM-5); the resolver is unchanged.
+// The Projects index has two sources, both first-class (D7, Wave 1):
+//
+//   1. the CV's own project entries, synced from the content bucket (SEAM-5),
+//      rendered first-party at /projects/<id>;
+//   2. every PUBLIC item a satellite publishes with `section: projects`, listed
+//      from its manifest with no hand-maintained entry. `cv` is excluded because
+//      its items are the CV variants, rendered by /cv/ and /resumes/.
+//
+// Only html/bundle items get a link: those are the formats this build routes to
+// a frame at /<section>/<source>/<slug>/. An item in another format is listed
+// without a link rather than pointing at a 404.
 const pool = loadContentPool(path.resolve(CV_CONTENT_DIR));
 const projects = Object.values(pool.projects);
 const base = import.meta.env.BASE_URL;
 
-const items = projects.map((p) => ({
-  title: p.name,
-  href: `${base}projects/${p.id}`,
-  summaryHtml: mdToHtml(p.summary),
-  links: p.github ? [{ href: p.github, label: "View on GitHub", external: true }] : [],
-}));
+const FRAMED_FORMATS = new Set(["html", "bundle"]);
+const satellite = collectPublicItems(path.resolve(SOURCES_DIR), {
+  section: "projects",
+  excludeSources: ["cv"],
+});
+
+const items = [
+  ...projects.map((p) => ({
+    title: p.name,
+    href: `${base}projects/${p.id}`,
+    summaryHtml: mdToHtml(p.summary),
+    links: p.github ? [{ href: p.github, label: "View on GitHub", external: true }] : [],
+  })),
+  ...satellite.map((item) => ({
+    title: item.title,
+    href: FRAMED_FORMATS.has(item.format)
+      ? `${base}${item.section}/${item.source}/${item.slug}/`
+      : undefined,
+    date: item.date,
+    meta: item.source,
+    summary: item.summary,
+    links: [],
+  })),
+];
 ---
 
 <SectionIndex

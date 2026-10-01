@@ -2554,3 +2554,92 @@ had theirs).
 - **A4 was over-ticked by me in #68**, on its signed-out half alone. Corrected.
 - **The site stream died mid-run** on a billing error, leaving uncommitted partial work in
   `site/` on `feat/satellite-kgis`. Not committed; it needs review before it is.
+
+## Wave 1 (#72) — site stream finished, K10 closed, hardening wired (2026-10-01)
+
+Branch `feat/satellite-kgis`. Record PR opens from it; the completion brief
+(`llm/plans/2026-10-01-completion-brief.md`) is committed here so every contract can cite it
+by path (closes audit B-7/R-5).
+
+### The WIP commit `9e7408a` — dispositioned, not trusted
+
+| WIP edit | Decision |
+|---|---|
+| `site/astro.config.mjs` `publicBuild()` import | **KEEP.** Right intent, broken only because the module was missing. `scripts/public-build.mjs` now exists. |
+| `site/src/content.config.test.ts` expects `kgis` | **KEEP.** The production change was the missing half; `EXPECTED_SOURCES` now carries `kgis`. |
+| `check-no-private-in-public.test.ts` expects `construction-ai-proposal/cost-model-draft` | **DISCARD the source, keep the intent.** Wave 4 satellite, no fixture. Planted `phd-milestones/internal-notes` (`section: projects`, private) instead. |
+
+### What landed in the site stream
+
+- `kgis` in `EXPECTED_SOURCES`, `required: false`, `since: "Wave 1 (satellite 3)"`.
+- `site/src/lib/frame-content.mjs`: the shared, public-safe frame model (route, payload URL,
+  staging plan, `collectPublicItems`). `src-private/lib/private-content.mjs` is now a thin
+  re-export, so the one-way import arrow `private-structure.test.ts` pins still holds.
+- `/projects/` lists public `section: projects` manifest items from the manifest alone and
+  omits the private one.
+- The public `html` frame at `/<section>/<source>/<slug>/` plus `scripts/public-build.mjs`
+  payload staging. A root-level `index.html` stages the whole prefix (a built site's folder);
+  a named subdirectory still skips withdrawn documents (ADR-0010 decision 1).
+- Hardening: `scripts/check-npm-audit.mjs` + `site/audit-baseline.json`, run REPORT-ONLY in
+  `build.yml` (#56/#59). The four accepted `@grpc/grpc-js` findings carry a reachability
+  argument; no patched `firebase` is reachable and `audit fix --force` proposes a downgrade.
+- #54 (forgeable metrics) is already fixed on `main` (`3f1a58a`, `_neutralise_grammar`) and
+  the gate suite is green; verified this wave, not re-implemented.
+
+Evidence: `npm test` 263 passed / 1 skipped; `content:fixture` + `build:public` green
+(27 pages, 3 payload files staged, `/projects/kgis/kgis-docs/` emitted); `build:private`
+green (4 payload files, 3 private items, 87 paths checked); leak check PASS (163 files).
+Handoff: `handoffs/site-wave-1.md`.
+
+### K10 — the 25th boundary proof, now executed and PASSED
+
+`publish-kgis` holds no `storage.objects.list`. Storage JSON API, under a temporary
+`serviceAccountTokenCreator` grant removed on exit and verified removed:
+
+| Id | Action | HTTP |
+|---|---|---|
+| CTRL-A | GET own-prefix absent object | **404** (token valid, get in-prefix) |
+| CTRL-B | GET `sources/cv/manifest.json` | **403** |
+| **K10** | list the bucket | **403** |
+| K10b | list own prefix | **403** |
+
+Transcript and the removal proof: `handoffs/boundary-tester-wave-1.md`.
+
+### Checkpoint 4 (#52) after this wave
+
+| Blocker | State |
+|---|---|
+| A12 — gate auth role narrowed | **CLOSED** (#49) |
+| S5 / #31 | **CLOSED**, stale |
+| A13 — phd-milestones prefix boundary | **CLOSED** (#50); K10 completes the set |
+| A1 / A5 | **PROVEN** |
+| A3 + non-member A4 | **still needs one NON-member sign-in** (`djjay0131@gmail.com`) |
+| A7 | **recorded DEFERRED** to Phase 4 (#51) |
+
+Checkpoint 4 is **not** recorded passed: A3 and the non-member half of A4 need the owner's
+Google identity to sign in, which is a hard stop (a real sign-in is owner-only).
+
+### Wave 1 exit — not yet met
+
+- **Not done, owner/satellite side:** repo variables on `agentic-kgis` (`GCP_PROJECT_ID`,
+  `GCP_WIF_PROVIDER`, `GCP_PUBLISH_SA`, `GCP_CONTENT_BUCKET`); un-gating `docs-publish.yml`
+  from `workflow_dispatch` to a docs-push trigger; first publish; live verification at
+  `/projects/kgis/kgis-docs/`; then `required: true`. A first publish is the trigger for
+  Phase 5 criterion 1, which stays unchecked until a real docs push propagates with no hub
+  commit (roadmap boxes flip only on live evidence).
+- **Adversarial round and Chief Reviewer** for this wave: contracts authored; handoffs land
+  under `handoffs/*-wave-1.md` before the PR is marked ready.
+
+### Five-line status (Wave 1)
+
+- **State:** site stream merged into the branch and green locally; K10 passed; #54 verified
+  fixed; audit wired report-only. Awaiting the adversarial round, Chief Reviewer, satellite
+  provisioning and the first publish.
+- **What to review:** the WIP disposition; the shared `frame-content.mjs` refactor and the
+  one-way structural test; the prefix-root staging rule; the report-only audit.
+- **What only the owner can do:** set the four `agentic-kgis` repo variables; run the
+  non-member sign-in for A3/A4; confirm the notification channel.
+- **Open questions:** `html` asset-set declaration (ADR candidate); whether audit ever
+  blocks on a delta (#59).
+- **Governance:** L2; contracts `site-wave-1.md`, `boundary-tester-wave-1.md`; governance
+  checks 4/4 PASS; brief committed in this PR.
