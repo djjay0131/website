@@ -45,6 +45,12 @@ billing_account = "000000-000000-000000"
 #     repository_owner_id = "5666389"
 #     default_branch      = "main"
 #   }
+#   agentic-kg-research = {
+#     repository          = "djjay0131/agentic-kg-research"
+#     repository_id       = "1384242888"
+#     repository_owner_id = "5666389"
+#     default_branch      = "main"
+#   }
 # }
 #
 # SETTING THIS AT ALL REPLACES THE WHOLE MAP. A tfvars value does not merge with
