@@ -2650,27 +2650,44 @@ Transcript and the removal proof: `handoffs/boundary-tester-wave-1.md`.
 Checkpoint 4 is **not** recorded passed: A3 and the non-member half of A4 need the owner's
 Google identity to sign in, which is a hard stop (a real sign-in is owner-only).
 
-### Wave 1 exit — not yet met
+### Wave 1 exit — MET 2026-10-01 (`kgis` is live)
 
-- **Not done, owner/satellite side:** repo variables on `agentic-kgis` (`GCP_PROJECT_ID`,
-  `GCP_WIF_PROVIDER`, `GCP_PUBLISH_SA`, `GCP_CONTENT_BUCKET`); un-gating `docs-publish.yml`
-  from `workflow_dispatch` to a docs-push trigger; first publish; live verification at
-  `/projects/kgis/kgis-docs/`; then `required: true`. A first publish is the trigger for
-  Phase 5 criterion 1, which stays unchecked until a real docs push propagates with no hub
-  commit (roadmap boxes flip only on live evidence).
-- **Adversarial round and Chief Reviewer** for this wave: contracts authored; handoffs land
-  under `handoffs/*-wave-1.md` before the PR is marked ready.
+The four `agentic-kgis` repo variables were already set on 2026-09-25. The un-gate
+(`agentic-kgis` PR #53) merged 2026-10-01; the push to `main` ran `docs-publish.yml`
+(run 36939276461, **success**), publishing 75 objects under `sources/kgis/`. The hub
+`build-and-deploy` dispatch (run 36939339279, **success**) synced the bucket and deployed.
+
+**Verified live, not inferred:**
+
+```
+200  /projects/kgis/kgis-docs/            frame; <h1>KGIS Documentation</h1>
+     src="/_payload/kgis/index.html"      the frame iframes the staged payload
+200  /_payload/kgis/index.html            <title>KGIS Documentation</title>
+200  /_payload/kgis/assets/stylesheets/main.ec1eaa64.min.css
+200  /_payload/kgis/assets/javascripts/bundle.d7400e89.min.js
+     /projects/  lists "KGIS Documentation" at /projects/kgis/kgis-docs/
+     /sitemap-0.xml contains /projects/kgis/kgis-docs/
+     build-info.json: content_source "bucket", built_from_sha 27f4443 (main)
+```
+
+So **a docs push propagates with no commit to `website`** — the content arrives through the
+bucket, exactly the Phase 5 criterion. `kgis` flipped to `required: true` on this evidence
+(next commit / PR). Roadmap `phase-5-satellites` criterion 1 is ticked on this transcript.
+
+**Checkpoint 4 (#52) — still not passed.** A3 and the non-member half of A4 need the owner's
+non-member sign-in (`djjay0131@gmail.com`); that is a hard stop. A12, A13 and S5 are closed;
+A1/A5 are proven; A7 is recorded deferred (#51).
 
 ### Five-line status (Wave 1)
 
-- **State:** site stream merged into the branch and green locally; K10 passed; #54 verified
-  fixed; audit wired report-only. Awaiting the adversarial round, Chief Reviewer, satellite
-  provisioning and the first publish.
-- **What to review:** the WIP disposition; the shared `frame-content.mjs` refactor and the
-  one-way structural test; the prefix-root staging rule; the report-only audit.
-- **What only the owner can do:** set the four `agentic-kgis` repo variables; run the
-  non-member sign-in for A3/A4; confirm the notification channel.
-- **Open questions:** `html` asset-set declaration (ADR candidate); whether audit ever
-  blocks on a delta (#59).
-- **Governance:** L2; contracts `site-wave-1.md`, `boundary-tester-wave-1.md`; governance
-  checks 4/4 PASS; brief committed in this PR.
+- **State:** site stream and records merged to `main` (PR #74, Chief Reviewer Approve);
+  `kgis` live and `required: true`; K10 passed; #54 corrected and fixed; audit report-only.
+  Wave 1 exit met except the owner sign-in that Checkpoint 4 needs.
+- **What to review:** the `kgis` live URLs above; the WIP disposition; the shared
+  `frame-content.mjs` refactor; the prefix-root staging rule; the report-only audit.
+- **What only the owner can do:** the non-member sign-in for A3/A4 (Checkpoint 4); confirm
+  the notification channel; decide whether audit ever blocks on a delta (#59).
+- **Open questions:** `html` asset-set declaration (ADR candidate); normalized leak check
+  (ADR candidate); `kgis` forgotten-flip detector (Dissenter D3 — now moot, it is required).
+- **Governance:** L2; contracts and handoffs `*-wave-1.md`; governance checks 4/4 PASS; the
+  completion brief is on `main`.

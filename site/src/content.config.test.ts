@@ -216,7 +216,7 @@ describe("manifest_version is accepted, defaulted and vetted", () => {
 // The expected-source set (ADR-0010 decision 4, closing C27)
 // ---------------------------------------------------------------------------
 describe("a declared source whose prefix has entirely vanished is a fault", () => {
-  it("declares all three satellites; cv and phd-milestones are required since 2026-09-18", () => {
+  it("declares all three satellites, all required as of Wave 1", () => {
     expect(EXPECTED_SOURCES.map((e) => e.source)).toEqual(["cv", "phd-milestones", "kgis"]);
     expect(EXPECTED_SOURCES.find((e) => e.source === "cv")?.required).toBe(true);
     // Flipped on 2026-09-18, after the first successful publish at Checkpoint 4
@@ -224,42 +224,44 @@ describe("a declared source whose prefix has entirely vanished is a fault", () =
     // source C27 was written about -- the private one, whose silent
     // disappearance empties the private area while every check reports success.
     expect(EXPECTED_SOURCES.find((e) => e.source === "phd-milestones")?.required).toBe(true);
+    // kgis flipped on 2026-10-01, after its first publish was verified live
+    // (https://jason.cusati.us/projects/kgis/kgis-docs/). The bootstrap position
+    // -- declared but not required -- existed only until that evidence did.
+    expect(EXPECTED_SOURCES.find((e) => e.source === "kgis")?.required).toBe(true);
+    expect(EXPECTED_SOURCES.find((e) => e.source === "kgis")?.since).toBe("Wave 1 (satellite 3)");
   });
 
-  it("declares kgis (satellite 3) as expected but NOT yet required", () => {
-    // Wave 1 registers the source before its first publish is relied on. Required
-    // from day one would fail every build whose tree lacks it -- the pull-request
-    // fallback always does -- which is the bootstrap pathology ADR-0010 decision
-    // 4's amendment names. It flips to true after a verified publish, as
-    // phd-milestones did.
-    const kgis = EXPECTED_SOURCES.find((e) => e.source === "kgis");
-    expect(kgis?.required).toBe(false);
-    expect(kgis?.since).toBe("Wave 1 (satellite 3)");
-    // So a tree carrying only the two required sources is still not a fault.
-    expect(findMissingExpectedSources(["cv", "phd-milestones"])).toEqual([]);
+  it("THE WAVE 1 FLIP: a tree missing kgis is now a fault", () => {
+    // Before the flip this returned [] for a tree of cv + phd-milestones. Now a
+    // vanished kgis prefix is reported like any other required source.
+    const problems = findMissingExpectedSources(["cv", "phd-milestones"]);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/"kgis" has no prefix at all/);
   });
 
   it("reports EVERY required source whose prefix is absent", () => {
     const problems = findMissingExpectedSources([]);
-    expect(problems).toHaveLength(2);
+    expect(problems).toHaveLength(3);
     expect(problems.join("\n")).toMatch(/"cv" has no prefix at all/);
     expect(problems.join("\n")).toMatch(/"phd-milestones" has no prefix at all/);
+    expect(problems.join("\n")).toMatch(/"kgis" has no prefix at all/);
     expect(problems[0]).toMatch(/FAULT, not a withdrawal/);
   });
 
   it("THE CONSEQUENCE OF THE FLIP: a tree with cv alone is now a fault", () => {
     // This assertion is the whole point of required: true. Before 2026-09-18 it
     // returned [], and a private prefix that vanished from the bucket produced a
-    // green build with an empty private area.
+    // green build with an empty private area. kgis joined on 2026-10-01.
     const problems = findMissingExpectedSources(["cv"]);
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toMatch(/"phd-milestones" has no prefix at all/);
+    expect(problems).toHaveLength(2);
+    expect(problems.join("\n")).toMatch(/"phd-milestones" has no prefix at all/);
+    expect(problems.join("\n")).toMatch(/"kgis" has no prefix at all/);
     expect(problems[0]).toMatch(/FAULT, not a withdrawal/);
     expect(problems[0]).toMatch(/Found: cv\./);
   });
 
   it("says nothing when every required source is present", () => {
-    expect(findMissingExpectedSources(["cv", "phd-milestones"])).toEqual([]);
+    expect(findMissingExpectedSources(["cv", "phd-milestones", "kgis"])).toEqual([]);
   });
 
   it("does NOT confuse a vanished prefix with a withdrawal (decision 2 vs 4)", () => {
@@ -268,10 +270,11 @@ describe("a declared source whose prefix has entirely vanished is a fault", () =
     // carries BOTH required sources, and every item of each is withdrawn.
     const root = writeTree({
       "cv/manifest.json": emptyManifest("cv", "2026-09-16T09:15:00Z"),
+      "kgis/manifest.json": emptyManifest("kgis"),
       "phd-milestones/manifest.json": emptyManifest("phd-milestones"),
     });
     expect(() => loadSources(root)).not.toThrow();
-    expect(loadSources(root).map((l) => l.source)).toEqual(["cv", "phd-milestones"]);
+    expect(loadSources(root).map((l) => l.source)).toEqual(["cv", "kgis", "phd-milestones"]);
     expect(loadSources(root)[0].manifest.items).toEqual([]);
   });
 

@@ -194,16 +194,17 @@ export const EXPECTED_SOURCES = [
   },
   {
     source: "kgis",
-    required: false,
+    required: true,
     since: "Wave 1 (satellite 3)",
     note:
       "Satellite #3 (D4/D10), the public documentation source: agentic-kgis publishes " +
-      "docs-site/ under source: kgis. NOT YET PUBLISHED, so required is false -- the same " +
-      "bootstrap position phd-milestones began in. A source expected from day one would " +
-      "fail every build whose tree lacks it, and the pull-request fallback tree always " +
-      "does, which is the bootstrap pathology ADR-0010 decision 4's amendment names. It " +
-      "flips to required: true after a verified first publish, exactly as phd-milestones " +
-      "did at Checkpoint 4.",
+      "docs-site/ under source: kgis. HAS PUBLISHED: first publish 2026-10-01 through " +
+      "docs-publish.yml (run 36939276461), verified live at " +
+      "https://jason.cusati.us/projects/kgis/kgis-docs/ (frame 200, payload and assets " +
+      "200). Flipped to required: true on 2026-10-01, after the verified publish, exactly " +
+      "as phd-milestones did at Checkpoint 4. A vanished kgis prefix is now a FAULT, not " +
+      "a bootstrap state. The pull-request fallback tree is exempt by its provenance " +
+      "marker (ADR-0010 decision 4's amendment), so this does not fail PRs.",
   },
 ];
 
