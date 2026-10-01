@@ -9,37 +9,39 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
-- **Phases 0–3 are merged and deployed.** `main` is at `693da98`.
+- **Phases 0–3 are merged and deployed.** `main` is at `a930718` (after PR #75).
 - **Wave 0 merged 2026-09-23** (#45, #48, #65, #53, #67, #47; close-out #68). Applied
   from `feat/infra-wave-0` at `63fc0d3` before merge, under owner decision D9. Sign-out
   is live; the gate runs on the narrowed `gateSessionMinter` role; `roles/editor` is
   empty project-wide.
 - **A1 proven live 2026-09-23** (#69): the owner signed in, the gate minted a session
   under the narrowed role, and both private documents were served.
-- **Emblem home page live** from #71 (2026-09-25).
-- **Licensing declined the Virginia Tech marks** (owner, 2026-09-24). What it decided:
-  no VT mark is served anywhere; the home page uses an original emblem; #60 (the VT
-  logo files) is closed; #70 (badge concepts, which use the marks) stays a draft and
-  unserved.
-- **Satellites run #72 opened 2026-09-25** — satellite 3 `kgis`, then satellite 4
-  `agentic-kg-research`. State as of 2026-10-01: the four `kgis` cloud resources are
-  applied and committed on `feat/satellite-kgis`; the satellite's repository variables
-  are set; the boundary proofs are being recorded; nothing has been published and the
-  hub-side PR is not open.
+- **Emblem home page live** from #71 (2026-09-25). **Licensing declined the VT marks**
+  (owner, 2026-09-24): no VT mark is served; #60 is closed; #70 stays a draft.
+- **Satellites run #72** — satellite 3 `kgis`, then satellite 4 `agentic-kg-research`.
+  - **Wave 1 (`kgis`) is DONE 2026-10-01.** The site stream was finished and the
+    record PR #74 merged; the completion brief is on `main`. K10, the 25th boundary
+    proof, passed. The Red Team found (and the wave fixed) an incomplete #54 metric
+    fix, a `./index.html` guard miss, a staging source-escape and an audit
+    severity-escalation gap; Chief Reviewer **Approve**. `agentic-kgis` PR #53
+    un-gated `docs-publish.yml`; the first publish (75 objects) propagated to a live
+    `https://jason.cusati.us/projects/kgis/kgis-docs/` with no commit to `website`.
+    `kgis` is now `required: true` (PR #75). **Phase 5 criterion 1 is ticked.**
+  - **Wave 2 (`agentic-kg-research`, private) is next.**
+- **Checkpoint 4 (#52) is still NOT passed**: A3 and the non-member half of A4 need the
+  owner's non-member sign-in. A12/A13/S5 are closed, A1/A5 proven, A7 deferred (#51).
 - **Wave 0b (#46)**, private by default, is not started.
 
 ## Stop point
 
-Satellites run #72, Wave 1 (`kgis`), before its first real publish: the prefix
-boundary must be recorded in STATE first.
+Wave 2 start: `agentic-kg-research` as a private satellite under `/p/`, with the D12
+team seed (owner runs it). Checkpoint 4 waits on the owner.
 
 ## Next
 
-1. **#72 Wave 1** — record the `kgis` and `phd-milestones` boundary proofs, finish the
-   site stream, switch `agentic-kgis` to publish on push, first publish, Live Prober,
-   close-out.
-2. **#72 Wave 2** — `agentic-kg-research` as a private item for the team.
-3. **Wave 0b (#46).**
+1. **#72 Wave 2** — `agentic-kg-research` as a private item for the team.
+2. **Wave 0b (#46)** — private by default and the publish allowlist.
+3. **Wave 0c (branding)**, then Waves 3–5 (sharing, satellites remainder, Phase 6).
 
 ## What only the owner can do
 
