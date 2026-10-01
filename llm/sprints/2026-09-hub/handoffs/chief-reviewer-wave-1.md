@@ -292,3 +292,118 @@ not block the merge through branch protection; it fails the workflow and the dep
 - (New) a log-based metric trigger is matched against the **assembled** log line, not per
   field (`#54`; `main.py:541-543`).
 - (From F6) the Dissenter's handoff is part of the wave's Definition of Done, not optional.
+
+## Rebuttal review — 2026-10-01
+
+Reviewer: Chief Reviewer (same independent role; authored none of the fixes)
+Branch `feat/satellite-kgis` · original review at `283de67` · **re-verified at HEAD `12d2f48`**
+Base `main` (`c02596d`) · Target: the Wave 1 record PR
+
+### Summary
+
+**Verdict: Approve. No remaining Fix-now finding.** Both original Fix-now findings are fixed
+and verified at HEAD, the Red Team's four bypasses have real by-name regression tests that the
+Skeptic re-verified, the Dissenter's blocker (D1) is resolved by committing the fixes, and the
+previously-missing evidence handoffs are committed. The residual Fix-later items (F4 leak-check
+encoding limit, F5 audit id-collision beyond severity, F8 directory-listing side effect) are
+recorded and do not block the record PR. F3 (post-adversarial verification), F6 (missing
+Dissenter) and F7 (untracked handoffs) are closed.
+
+Approval is for the **code and records** of the record PR. It is not a statement that Wave 1's
+**live exit** is met; that sequence remains the owner/satellite work STATE lists.
+
+### F1 — STATE #54 correction: now honest
+
+- `STATE.md` replaces the old "#54 … already fixed on main … verified this wave, not
+  re-implemented" with a **CORRECTED** entry: main's `3f1a58a` neutralised each field KEY and
+  VALUE; the Red Team disproved it (`{"event":"deny"}` joins to `event=deny`); fixed in this
+  wave by neutralising the **assembled pair** (`gate/app/main.py`, `283de67`), with a
+  regression test; and it states plainly **"the earlier 'verified fixed' line was wrong."**
+- It adds a **Wave 1 adversarial-round dispositions table** (RT-1…RT-5, ST-1, CR-1, CR-2),
+  each with a Fix-now/Fix-later disposition and the commit.
+- Evidence: `git show HEAD:llm/sprints/2026-09-hub/STATE.md` carries the correction; the stale
+  claim is gone. This is honest — it names the error in the first person and claims no more
+  than was done.
+- **Note (not blocking):** the RT-5 disposition says the leak check "already states the
+  raw-text limit." The file's LIMITS list covers binary, metadata-less prose and prose slugs,
+  and its header says it "greps bytes", but it does **not** enumerate the entity/zero-width/
+  JSON-spelling gap specifically. The disposition is still honest because it says
+  "Fix later — recorded, not fixed"; only that phrase is generous.
+
+### F2 — report-only audit: fixed and independently reproduced
+
+- `check-npm-audit.mjs` now funnels every inability-to-run path through
+  `const fail = (message) => { console.error(message); process.exit(report ? 0 : 2); }`
+  (parse failure and baseline-read failure both call it).
+- `build.yml` adds `continue-on-error: true` to the audit step as belt-and-braces.
+- Reproduced exactly as specified with a fake failing `npm`:
+  - `PATH=/tmp/opencode/fakebin:$PATH node scripts/check-npm-audit.mjs --report` → **EXIT=0**
+  - without `--report` → **EXIT=2**
+- The contract's item 4 ("must NOT be able to fail the build yet") now holds on **every**
+  path, including an audit that cannot run.
+
+### Red Team's four fixes — real tests, verified by name
+
+From `git show 283de67`, `git show bcb4470`, and the Skeptic's appended "Rebuttal round"
+(`skeptic-verifier-wave-1.md:245-381`). Each guard was anchored uniquely, broken minimally,
+shown red **by test name**, and restored:
+
+| Guard | Test that fails when removed | Verified |
+|---|---|---|
+| #54 assembled-pair neutralisation | `test_a_field_KEY_cannot_smuggle_the_denials_metric_trigger` | gate, verbatim red transcript |
+| `mixedSourceError` `./index.html` root | ``treats `./index.html` as root too, matching stagingPlanFor`` | site, red |
+| `addFile` source-segment guard | `rejects a source that escapes the payload root` | site, red |
+| audit severity escalation | `SHOWS RED when an accepted id is reported more severely` | site, red |
+| `--report` hard exit-0 (`fail()`) | exit 2 under `--report` when `fail()` is broken (no Vitest name) | CLI, red |
+
+All four test names exist at HEAD (grep-confirmed). My own HEAD run: site **271 passed / 1
+skipped**; gate **296 passed**; `build:public` 27 pages and 3 payload files; `build:private`
+green (87 paths checked); leak check PASS (163 files); governance **4/4 PASS**.
+
+### Newly committed records
+
+`git status --porcelain` is **clean**; eight Wave 1 handoffs are tracked, including
+`dissenter-wave-1.md`, `red-team-wave-1.md`, `security-tester-wave-1.md`,
+`regression-tester-wave-1.md`, `skeptic-verifier-wave-1.md` and this one.
+`contracts/site-wave-1.md` FILE CONTRACT now allows `.github/workflows/build.yml` for ITEM 4
+only (Dissenter D8); `projects/index.astro` cites the roadmap Phase-5 criterion and notes the
+D8/allowlist deferral to Wave 0b (D4/D5); `audit-baseline.json` states package vs advisory
+units (`high_packages: 4`, `unique_advisories: 2`, Dissenter D6). The Dissenter's D1 block —
+that the CR fixes were uncommitted at `283de67` — is resolved: they are in `bcb4470`.
+
+### Remaining findings (none Fix-now)
+
+| # | Class | Status at HEAD |
+|---|---|---|
+| F4 | Fix later | Leak check still evades an entity/ZWSP/JSON-encoded private title; formally dispositioned RT-5 "recorded, not fixed". Latent; not a live exposure. |
+| F5 | Fix later | Audit baseline still id-keyed beyond severity (reused-id/`via`-string cases); latent until #59 graduates. |
+| F8 | Note | `stagingPlanFor` directory-listing side effect on a crafted, schema-unreachable `path`; nothing is staged. |
+| n1 | Note | STATE RT-5 wording ("already states the raw-text limit") is slightly generous (F1 note). |
+| n2 | Note | Dissenter D2 (prefix-root withdrawn sibling), D3 (forgotten `kgis` flip), D7 (all-private fixture) are correctly recorded as Fix later / ADR candidates, not silently closed. |
+
+### §7 merge conditions at `12d2f48`
+
+| Condition | State |
+|---|---|
+| Required checks green | **Holds locally** — governance 4/4; site 271/1; gate 296; both builds + leak check green. CI run status not verifiable here (no `gh`); no code now contradicts it. Confirm on the PR. |
+| Chief Reviewer approve/comment | **Approve** (this rebuttal). |
+| Security Tester zero FAIL | PASS 7 · FAIL 0 at `bf396a6`; the four fixes it informed are re-verified by the Skeptic at `bcb4470`. **Holds.** |
+| Skeptic Verifier no un-failable guard | 6/6 first pass **plus 5/5 rebuttal**, break → red by name → restore. **Holds.** |
+| Governance checks green | **Holds** (4/4 PASS). |
+| Brief committed | **Holds** (`llm/plans/2026-10-01-completion-brief.md` in the tree). |
+| PR body on template, Governance Level first, data/security/privacy answered | **Unverifiable here**; must be checked on the PR itself. |
+| Stateful-resource apply rule (no destroy/replace; four live `kgis` resources safe) | **Holds** — no plan/apply this wave; roster `a68feea` is on-branch so a merged `main` includes rather than destroys them. |
+
+### Wave 1 EXIT criteria still unmet — and correctly recorded as unmet
+
+I confirm each at HEAD; none blocks the record PR:
+
+- **No `kgis` live publish** — `/projects/kgis/kgis-docs/` is fixture-only; Phase 5 criterion 1 unchecked.
+- **No owner sign-in for A3/A4** — the non-member half needs `djjay0131@gmail.com`; Checkpoint 4 not passed.
+- **No apply this wave** — no Terraform plan/apply; `agentic-kgis` repo variables unset; `docs-publish.yml` still `workflow_dispatch`-gated.
+- **`kgis` still `required: false`** — with no forgotten-flip detector (Dissenter D3, recorded).
+
+`STATE.md` §Wave 1 exit (`:2622`+) and the five-line status record all of these, and the record
+does not tick any criterion on inference. Verdict: **Approve.**
+
+— Chief Reviewer, Wave 1, rebuttal round.

@@ -2609,9 +2609,18 @@ check PASS (163 files). Handoff: `handoffs/site-wave-1.md`.
 | CR-1 | The "report-only" audit could still exit 2 and fail the deploying job | **Fix now — this commit.** `--report` now exits 0 on every path (proved with a fake failing `npm`); `continue-on-error: true` on the step |
 | CR-2 | STATE misrecorded #54 as fixed | **Fix now — this edit** |
 
-Every Red Team bypass was reproduced by the independent agent, fixed, and re-tested. A
-re-verification of the fixes by the Skeptic Verifier follows; the Chief Reviewer's
-Request-changes verdict is then re-run as the rebuttal.
+Every Red Team bypass was reproduced by the independent agent, fixed, and re-tested. The
+Skeptic Verifier re-verified each fixed guard by breaking it and showing the specific test
+fail by name (five guards, no un-failable one). On the rebuttal round the **Chief Reviewer
+returned Approve with no remaining Fix-now finding**; the two original Fix-now items (the
+#54 STATE misrecord and the report-only audit's exit-2 path) are verified fixed. Reviewers'
+handoffs: `handoffs/{security-tester,red-team,skeptic-verifier,regression-tester,dissenter,chief-reviewer}-wave-1.md`.
+
+Findings recorded, not fixed (non-blocking): leak-check evasion of an encoded/zero-width
+private title (Fix later; ADR candidate for a normalized check); withdrawn sibling `.html`
+re-staged by the prefix-root rule (Dissenter D2; ADR candidate); `kgis required: false` has
+no forgotten-flip detector (D3); the index's independence from the D8 allowlist (D5) is
+Wave 0b's to complete.
 
 ### K10 — the 25th boundary proof, now executed and PASSED
 
