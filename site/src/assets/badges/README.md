@@ -5,10 +5,10 @@ renamed by their content. Not imported by any page: this directory is under
 site/src/assets, not site/public, so nothing here is served.
 
 Every image uses the Virginia Tech mark and the HokieBird likeness. Both are
-registered trademarks (STATE.md 2026-09-17; branding plan section 4). Nothing here may
-be rendered on the public site until the Office of Licensing and Trademarks reply
-requested on 2026-09-22 is on the record in llm/governance/adr/. The same gate
-applies to site/public/brand/vt (PR #60).
+registered trademarks (STATE.md 2026-09-17; branding plan section 4). The Office of
+Licensing and Trademarks declined their use (owner, 2026-09-24), so these stay
+unserved and must never be rendered on the public site. PR #60 (the VT logo
+files) was closed for the same reason; the home page uses an original emblem (#71).
 
 - vt-badge-book-sunrise-sports: VT over an open book, mountains and sun, five sports
   icons, "Research drives a brighter game".
