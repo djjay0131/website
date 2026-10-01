@@ -2554,3 +2554,123 @@ had theirs).
 - **A4 was over-ticked by me in #68**, on its signed-out half alone. Corrected.
 - **The site stream died mid-run** on a billing error, leaving uncommitted partial work in
   `site/` on `feat/satellite-kgis`. Not committed; it needs review before it is.
+
+## Wave 1 (#72) — site stream finished, K10 closed, hardening wired (2026-10-01)
+
+Branch `feat/satellite-kgis`. Record PR opens from it; the completion brief
+(`llm/plans/2026-10-01-completion-brief.md`) is committed here so every contract can cite it
+by path (closes audit B-7/R-5).
+
+### The WIP commit `9e7408a` — dispositioned, not trusted
+
+| WIP edit | Decision |
+|---|---|
+| `site/astro.config.mjs` `publicBuild()` import | **KEEP.** Right intent, broken only because the module was missing. `scripts/public-build.mjs` now exists. |
+| `site/src/content.config.test.ts` expects `kgis` | **KEEP.** The production change was the missing half; `EXPECTED_SOURCES` now carries `kgis`. |
+| `check-no-private-in-public.test.ts` expects `construction-ai-proposal/cost-model-draft` | **DISCARD the source, keep the intent.** Wave 4 satellite, no fixture. Planted `phd-milestones/internal-notes` (`section: projects`, private) instead. |
+
+### What landed in the site stream
+
+- `kgis` in `EXPECTED_SOURCES`, `required: false`, `since: "Wave 1 (satellite 3)"`.
+- `site/src/lib/frame-content.mjs`: the shared, public-safe frame model (route, payload URL,
+  staging plan, `collectPublicItems`). `src-private/lib/private-content.mjs` is now a thin
+  re-export, so the one-way import arrow `private-structure.test.ts` pins still holds.
+- `/projects/` lists public `section: projects` manifest items from the manifest alone and
+  omits the private one.
+- The public `html` frame at `/<section>/<source>/<slug>/` plus `scripts/public-build.mjs`
+  payload staging. A root-level `index.html` stages the whole prefix (a built site's folder);
+  a named subdirectory still skips withdrawn documents (ADR-0010 decision 1).
+- Hardening: `scripts/check-npm-audit.mjs` + `site/audit-baseline.json`, run REPORT-ONLY in
+  `build.yml` (#56/#59). The four accepted `@grpc/grpc-js` findings carry a reachability
+  argument; no patched `firebase` is reachable and `audit fix --force` proposes a downgrade.
+- #54 (forgeable metrics). **CORRECTED by this wave's Red Team.** `main`'s `3f1a58a`
+  neutralised `event=` in each field KEY and VALUE, and I first recorded it as fixed. The
+  Red Team disproved that: a field `{"event": "deny"}` has neither half containing `event=`,
+  but the assembled pair is exactly `event=deny`, so the denials metric still counted it.
+  Fixed in this wave by neutralising the ASSEMBLED pair (`gate/app/main.py`, commit
+  `283de67`), with a regression test that fails by name. This is the honest record; the
+  earlier "verified fixed" line was wrong.
+
+Evidence: `npm test` 271 passed / 1 skipped; gate `296 passed`; `content:fixture` +
+`build:public` green (27 pages, 3 payload files staged, `/projects/kgis/kgis-docs/`
+emitted); `build:private` green (4 payload files, 3 private items, 87 paths checked); leak
+check PASS (163 files). Handoff: `handoffs/site-wave-1.md`.
+
+### Wave 1 adversarial round — findings and dispositions
+
+| # | Finding | Disposition |
+|---|---|---|
+| RT-1 | **Metric forgery #54 NOT fixed**: key/value join recreates `event=deny` | **Fix now — `283de67`.** Neutralise the assembled pair; regression test added. STATE corrected above |
+| RT-2 | `mixedSourceError` missed `./index.html` (schema-legal, resolves to the prefix root) | **Fix now — `283de67`.** Root derived from `path.dirname`, same as `stagingPlanFor`; test added |
+| RT-3 | `stagingPlanFor` did not contain `to` for a crafted `source` (`../cv`) | **Fix now — `283de67`.** `addFile` rejects a source that is not one safe segment; test added |
+| RT-4 | Audit baseline id-keyed, so a severity escalation reports green | **Fix now — `283de67`.** `classify()` matches `(id, severity)`; test added |
+| RT-5 | Leak check evades an entity/zero-width/JSON-encoded private title | **Fix later — recorded, not fixed.** The check is "necessary, not sufficient" (ADR-0005) and already states the raw-text limit; entity-decoding a grep invites false positives. ADR candidate: a DOM-aware or normalized check. Not an active exposure: satellite titles are escaped by the renderer, so this needs raw-HTML control of dist-public |
+| ST-1 | Security Tester latent risk: staging did no containment of its own | **Fix now — `4c6e2c5`.** `addFile` containment; non-vacuous test |
+| CR-1 | The "report-only" audit could still exit 2 and fail the deploying job | **Fix now — this commit.** `--report` now exits 0 on every path (proved with a fake failing `npm`); `continue-on-error: true` on the step |
+| CR-2 | STATE misrecorded #54 as fixed | **Fix now — this edit** |
+
+Every Red Team bypass was reproduced by the independent agent, fixed, and re-tested. The
+Skeptic Verifier re-verified each fixed guard by breaking it and showing the specific test
+fail by name (five guards, no un-failable one). On the rebuttal round the **Chief Reviewer
+returned Approve with no remaining Fix-now finding**; the two original Fix-now items (the
+#54 STATE misrecord and the report-only audit's exit-2 path) are verified fixed. Reviewers'
+handoffs: `handoffs/{security-tester,red-team,skeptic-verifier,regression-tester,dissenter,chief-reviewer}-wave-1.md`.
+
+Findings recorded, not fixed (non-blocking): leak-check evasion of an encoded/zero-width
+private title (Fix later; ADR candidate for a normalized check); withdrawn sibling `.html`
+re-staged by the prefix-root rule (Dissenter D2; ADR candidate); `kgis required: false` has
+no forgotten-flip detector (D3); the index's independence from the D8 allowlist (D5) is
+Wave 0b's to complete.
+
+### K10 — the 25th boundary proof, now executed and PASSED
+
+`publish-kgis` holds no `storage.objects.list`. Storage JSON API, under a temporary
+`serviceAccountTokenCreator` grant removed on exit and verified removed:
+
+| Id | Action | HTTP |
+|---|---|---|
+| CTRL-A | GET own-prefix absent object | **404** (token valid, get in-prefix) |
+| CTRL-B | GET `sources/cv/manifest.json` | **403** |
+| **K10** | list the bucket | **403** |
+| K10b | list own prefix | **403** |
+
+Transcript and the removal proof: `handoffs/boundary-tester-wave-1.md`.
+
+### Checkpoint 4 (#52) after this wave
+
+| Blocker | State |
+|---|---|
+| A12 — gate auth role narrowed | **CLOSED** (#49) |
+| S5 / #31 | **CLOSED**, stale |
+| A13 — phd-milestones prefix boundary | **CLOSED** (#50); K10 completes the set |
+| A1 / A5 | **PROVEN** |
+| A3 + non-member A4 | **still needs one NON-member sign-in** (`djjay0131@gmail.com`) |
+| A7 | **recorded DEFERRED** to Phase 4 (#51) |
+
+Checkpoint 4 is **not** recorded passed: A3 and the non-member half of A4 need the owner's
+Google identity to sign in, which is a hard stop (a real sign-in is owner-only).
+
+### Wave 1 exit — not yet met
+
+- **Not done, owner/satellite side:** repo variables on `agentic-kgis` (`GCP_PROJECT_ID`,
+  `GCP_WIF_PROVIDER`, `GCP_PUBLISH_SA`, `GCP_CONTENT_BUCKET`); un-gating `docs-publish.yml`
+  from `workflow_dispatch` to a docs-push trigger; first publish; live verification at
+  `/projects/kgis/kgis-docs/`; then `required: true`. A first publish is the trigger for
+  Phase 5 criterion 1, which stays unchecked until a real docs push propagates with no hub
+  commit (roadmap boxes flip only on live evidence).
+- **Adversarial round and Chief Reviewer** for this wave: contracts authored; handoffs land
+  under `handoffs/*-wave-1.md` before the PR is marked ready.
+
+### Five-line status (Wave 1)
+
+- **State:** site stream merged into the branch and green locally; K10 passed; #54 verified
+  fixed; audit wired report-only. Awaiting the adversarial round, Chief Reviewer, satellite
+  provisioning and the first publish.
+- **What to review:** the WIP disposition; the shared `frame-content.mjs` refactor and the
+  one-way structural test; the prefix-root staging rule; the report-only audit.
+- **What only the owner can do:** set the four `agentic-kgis` repo variables; run the
+  non-member sign-in for A3/A4; confirm the notification channel.
+- **Open questions:** `html` asset-set declaration (ADR candidate); whether audit ever
+  blocks on a delta (#59).
+- **Governance:** L2; contracts `site-wave-1.md`, `boundary-tester-wave-1.md`; governance
+  checks 4/4 PASS; brief committed in this PR.

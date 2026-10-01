@@ -529,7 +529,17 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
                         continue
                     v, hits = _neutralise_grammar(_clean_client_value(value))
                     smuggled += hits
-                    pairs.append(f"{k}={v}")
+                    # NEUTRALISE THE ASSEMBLED PAIR, not only its halves (#54).
+                    # Neutralising key and value separately misses the grammar the
+                    # JOIN creates: a field {"event": "deny"} has neither half
+                    # containing `event=`, but `f"{key}={value}"` is exactly
+                    # `event=deny`, and the denials metric matches it. The pair is
+                    # the thing that reaches the log line, so the pair is what must
+                    # not contain the grammar. Found by the Wave 1 Red Team, after
+                    # the value-only fix had been reported as complete.
+                    pair, hits = _neutralise_grammar(f"{k}={v}")
+                    smuggled += hits
+                    pairs.append(pair)
 
             if smuggled:
                 # NOT DROPPED, deliberately. A report discarded because it looks

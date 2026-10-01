@@ -1,0 +1,41 @@
+{
+  "$comment": [
+    "The accepted npm-audit findings for site/, recorded explicitly so a NEW finding is",
+    "distinguishable from the set already reasoned about (#56, #59). scripts/check-npm-audit.mjs",
+    "compares `npm audit --omit=dev --json` against this file. It runs REPORT-ONLY in CI today:",
+    "an audit goes red because the world changed, not because someone changed the code, and a",
+    "guard that stops unrelated merges gets suppressed (which is how audits stop meaning",
+    "anything). The graduation path is in #59: report first, then fail on a DELTA against this",
+    "baseline. Adding an entry here is an explicit act of acceptance, not a suppression file.",
+    "",
+    "REACHABILITY. `site/package.json` declares 13 dependencies and no devDependencies, so",
+    "`--omit=dev` excludes nothing: every finding below is a production dependency of the built",
+    "site. The accepted set is reachable only through `firebase`, and the site uses firebase's",
+    "browser Auth SDK on the sign-in page. The condition that keeps this acceptable is:",
+    "static build, no SSR, no Node server runtime, and no Firestore/gRPC calls at build or",
+    "request time. If that stops being true, these findings become reachable and this baseline",
+    "is void."
+  ],
+  "generated": "2026-10-01",
+  "tool": "npm audit --omit=dev",
+  "$counts_mean": "npm audit reports these per PACKAGE; the accepted list below is per unique ADVISORY. Four package-level highs resolve to two unique advisories (@grpc/grpc-js), reachable only via firebase.",
+  "counts": { "critical": 0, "high_packages": 4, "unique_advisories": 2 },
+  "accepted": [
+    {
+      "id": "GHSA-m9gg-hp2v-232j",
+      "package": "@grpc/grpc-js",
+      "severity": "high",
+      "path": "firebase > @firebase/firestore > @grpc/grpc-js",
+      "summary": "getAuthContext can return unauthorized certificates as though they were authorized",
+      "reason": "No patched version is reachable: firebase@12.19.0 (latest) still resolves @grpc/grpc-js <=1.13.5, and `npm audit fix --force` proposes a DOWNGRADE to firebase@9.14.0. The vulnerable code is the gRPC transport, which the browser Auth SDK does not use."
+    },
+    {
+      "id": "GHSA-f596-whhp-79r4",
+      "package": "@grpc/grpc-js",
+      "severity": "high",
+      "path": "firebase > @firebase/firestore > @grpc/grpc-js",
+      "summary": "The server transmits some error messages thrown by method handlers to the client in status messages",
+      "reason": "Same dependency and path as the other @grpc/grpc-js advisory; only a gRPC server is affected, and the hub runs no gRPC server."
+    }
+  ]
+}

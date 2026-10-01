@@ -39,7 +39,20 @@ billing_account = "000000-000000-000000"
 #     repository_owner_id = "5666389"
 #     default_branch      = "main"
 #   }
+#   kgis = {
+#     repository          = "djjay0131/agentic-kgis"
+#     repository_id       = "1295802912"
+#     repository_owner_id = "5666389"
+#     default_branch      = "main"
+#   }
 # }
+#
+# SETTING THIS AT ALL REPLACES THE WHOLE MAP. A tfvars value does not merge with
+# the default, so if you uncomment it you must list EVERY satellite or the ones
+# you leave out are destroyed -- their service account, provider and prefix
+# grant. The live roster lives in variables.tf's default, where it is committed
+# and reviewable; that is also what the security checklist reads. Uncomment here
+# only to override, and then keep it complete.
 
 # Phase 3. All four have working defaults; uncomment only to change.
 #
@@ -59,3 +72,20 @@ billing_account = "000000-000000-000000"
 #
 # Cloud Run maximum instances for the gate. The minimum is fixed at 0 in code.
 # gate_max_instance_count = 3
+#
+# EXTRA CSRF ORIGINS THE GATE ACCEPTS (issue #62). Empty is the intended state,
+# and this was undocumented here until the omission nearly caused an outage.
+#
+# Terraform renders GATE_ALLOWED_ORIGINS from the site domain and the
+# PROJECT-NUMBER *.run.app URL, because a service's env block cannot read its own
+# computed uri without a self-reference cycle. But `gcloud run services describe
+# hub-gate --format 'value(status.url)'` may return the OLDER
+# <service>-<hash>-<regioncode>.a.run.app spelling -- and gate.yml smoke-tests
+# sign-out with an Origin taken from exactly that. The comparison in the gate is
+# exact set membership, so a mismatch 403s a LEGITIMATE sign-out, after rollout.
+#
+# On this project both spellings are live, so the hash form must be passed:
+# gate_extra_allowed_origins = ["https://hub-gate-ywkmredngq-ue.a.run.app"]
+#
+# Confirm what the service actually serves before adding one:
+#   terraform output -raw gate_allowed_origins_check_command

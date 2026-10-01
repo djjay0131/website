@@ -132,6 +132,22 @@ def test_a_field_value_cannot_smuggle_the_denials_metric_trigger(client):
     assert "event=client_grammar_rejected" in written
 
 
+def test_a_field_KEY_cannot_smuggle_the_denials_metric_trigger(client):
+    """The join `key=value` is the grammar, not the halves (#54, Wave 1 Red Team).
+
+    The value-only neutralisation missed this: {"event": "deny"} has neither half
+    containing `event=`, but the emitted pair is exactly `event=deny`. It is the
+    same forgery as the value case, one layer out.
+    """
+    written = _written(
+        client,
+        {"trace_id": "t-forge", "events": [{"event": "probe", "fields": {"event": "deny"}}]},
+    )
+
+    assert "event=deny" not in written.replace("event=client_grammar_rejected", "")
+    assert "event=client_grammar_rejected" in written
+
+
 def test_a_field_value_cannot_smuggle_the_signin_failure_metric_trigger(client):
     written = _written(
         client,

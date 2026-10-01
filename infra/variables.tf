@@ -173,6 +173,21 @@ variable "satellites" {
       repository_owner_id = "5666389"
       default_branch      = "main"
     }
+    # Satellite 3 (D10, 2026-09-25). PUBLIC repository, public item: its MkDocs
+    # site lands at /projects/kgis/kgis-docs/. Public or private changes nothing
+    # about the prefix boundary -- the grant is the same custom role with the same
+    # startsWith condition, which is the point of the for_each design.
+    #
+    # Both ids read from the GitHub REST API on 2026-09-25, not copied from a
+    # brief: a wrong repository_id makes the provider condition unsatisfiable and
+    # the satellite can never authenticate, which looks like a credentials problem
+    # and is not one.
+    kgis = {
+      repository          = "djjay0131/agentic-kgis"
+      repository_id       = "1295802912"
+      repository_owner_id = "5666389"
+      default_branch      = "main"
+    }
   }
 
   validation {

@@ -24,6 +24,17 @@
       "date": "2026-09-17",
       "summary": "Invented fixture standing in for the private committee dossier.",
       "tags": ["phd", "committee"]
+    },
+    {
+      "slug": "internal-notes",
+      "title": "Internal Project Notes (fixture)",
+      "section": "projects",
+      "format": "html",
+      "path": "site/internal.html",
+      "visibility": "private",
+      "date": "2026-09-17",
+      "summary": "Invented fixture standing in for a private PROJECT item, planted so the public /projects/ index proves it leaves a private item in its own section out.",
+      "tags": ["phd"]
     }
   ]
 }

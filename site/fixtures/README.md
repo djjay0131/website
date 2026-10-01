@@ -1,15 +1,21 @@
 # Offline content fixture
 
 A tree shaped exactly like the content bucket (`sources/<source>/…`, SEAM-2),
-holding **invented** content for two sources: `cv` (public) and `phd-milestones` (two
-**private** items).
+holding **invented** content for three sources: `cv` (public), `phd-milestones`
+(three **private** items) and `kgis` (one public framed `html` item).
 
 The `phd-milestones` entries exist so the leak check can be exercised against private
 content that does not exist in the bucket yet — `npm run demo:leak-check` needs a private
-slug to inject, and `leak-check-self-test` in CI runs exactly that on every push. Their
-prose is invented and their titles are marked `(fixture)`, but their **slugs and source
-name are the real ones**, deliberately: a guard proves nothing unless it is exercised
-against the needle values it will really search for.
+slug to inject, and `leak-check-self-test` in CI runs exactly that on every push. One of
+them, `internal-notes`, is deliberately in the `projects` section: it is the private item
+the public `/projects/` index must leave out, and the leak check must catch if it does not.
+Their prose is invented and their titles are marked `(fixture)`, but their **slugs and
+source name are the real ones**, deliberately: a guard proves nothing unless it is
+exercised against the needle values it will really search for.
+
+The `kgis` entry is the Wave 1 satellite-3 fixture: a root `index.html` plus a sibling
+`assets/style.css`, so the public framed-item path (staging the whole prefix, iframing it
+from `/_payload/kgis/`) is exercised end to end with no bucket.
 
 ```sh
 ./scripts/sync-content.sh --from fixtures/content

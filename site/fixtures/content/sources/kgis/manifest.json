@@ -1,0 +1,18 @@
+{
+  "source": "kgis",
+  "manifest_version": "1",
+  "published": "2026-10-01T00:00:00Z",
+  "items": [
+    {
+      "slug": "kgis-docs",
+      "title": "KGIS Documentation (fixture)",
+      "section": "projects",
+      "format": "html",
+      "path": "index.html",
+      "visibility": "public",
+      "date": "2026-10-01",
+      "summary": "Invented fixture standing in for the KGIS docs site: a root index.html that loads a sibling stylesheet, published by satellite 3 under source: kgis.",
+      "tags": ["kgis", "knowledge-graph"]
+    }
+  ]
+}

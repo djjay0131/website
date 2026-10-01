@@ -35,14 +35,17 @@ const PRIVATE_ITEM = {
 };
 
 describe("collectPrivateItems reads the committed fixture", () => {
-  it("finds both private items, and no public one", () => {
+  it("finds all three private items, and no public one", () => {
     const items = collectPrivateItems(FIXTURE_SOURCES);
     expect(items.map((i) => `${i.source}/${i.slug}`).sort()).toEqual([
+      // Wave 1: a PRIVATE `projects` item, planted so the public /projects/
+      // index has a private item in its own section to leave out.
       "phd-milestones/committee-dossier",
+      "phd-milestones/internal-notes",
       "phd-milestones/milestones",
     ]);
-    // cv publishes five PUBLIC items; none of them is private.
-    expect(items.every((i) => i.source === "phd-milestones")).toBe(true);
+    // cv publishes five PUBLIC items and kgis one; none of them is private.
+    expect(items.some((i) => i.source === "cv" || i.source === "kgis")).toBe(false);
   });
 
   it("returns nothing when no content has been synced", () => {
@@ -244,7 +247,7 @@ describe("the CLI", () => {
       encoding: "utf8",
     });
     expect(run.status, run.stderr).toBe(0);
-    expect(run.stdout).toContain("2 private item(s) to look for");
+    expect(run.stdout).toContain("3 private item(s) to look for");
     expect(run.stdout).toContain("PASS");
   });
 
