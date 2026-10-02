@@ -50,6 +50,9 @@ merged reality, not plans.
 
 ## Done, most recent first
 
+- **Checkpoint 4 PASSED** 2026-10-02 — the owner signed in as `family@cusati.us`
+  (non-member; refused, "nothing has been shared with you") and `djjay@vt.edu` (member;
+  saw the private area). A3/A4 proven; #52 closed.
 - **Wave 2 (`agentic-kg-research`, private) provisioned and published** 2026-10-01 —
   infra PR #77 (satellite 4, boundary-proven including reverse legs), satellite #3
   published 61 objects, hub private-sync 139 uploaded / 0 deleted with no `dist-public`
@@ -84,7 +87,7 @@ Every open issue, once:
 - #42 Backlog: a traffic-analysis page now that structured logging exists.
 - #46 Wave 0b — private by default.
 - #51 Phase 3 criterion 7 is half-unsatisfiable; deferred to Phase 4.
-- #52 Checkpoint 4 is not passed — needs the owner's non-member sign-in for A3/A4.
+- #52 Closed 2026-10-02 — Checkpoint 4 passed on the owner's two sign-ins.
 - #56 `npm audit --omit=dev`: **4 high** (`@grpc/grpc-js` via `firebase`) remain, now
   recorded in `site/audit-baseline.json` with a reachability argument and reported in CI.
 - #57 The alert-channel guard asserts a string shape.
