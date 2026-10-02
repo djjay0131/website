@@ -50,15 +50,16 @@ merged reality, not plans.
 
 ## Done, most recent first
 
-- **Wave 0b (private by default) implemented** 2026-10-02 on
-  `feat/private-by-default`, **not merged** — `site/publish-allowlist.json` is now the
-  authority (D8, ADR-0016); `effectiveVisibility()` is the one computation; the public
-  build stores only effectively-public items, the private build every item; the leak
-  check's private set is every non-allowlisted item; `check-publish-allowlist` is wired
-  into both build jobs. `cv/anthropic-fellow` is gone from `dist-public`; Firebase 302s
-  its historical URLs. Local evidence green (291 tests, builds, leak check, allowlist
-  guard, contrast, governance 4/4). Adversarial round + security gate + live
-  verification are the next step.
+- **Wave 0b (private by default) DONE and LIVE** 2026-10-02 (PRs #86, #88, #89; merge
+  `ebf777d`) — `site/publish-allowlist.json` is the authority (D8, ADR-0016);
+  `effectiveVisibility()` is the one computation; the public build stores only
+  effectively-public items; the members' area lists every item (private framed under
+  `/p/`, public linked out); the leak check's private set is every non-allowlisted
+  item; `check-publish-allowlist` is wired into both build jobs. `cv/anthropic-fellow`
+  is gone from `dist-public`; Firebase 302s its historical URLs to `/signin/`. The
+  adversarial round ran (Red Team found the A5 name-vs-bytes bypass, dispositioned as a
+  recorded owner decision; Security Tester green; Chief Reviewer Approve). Verified
+  live on both hosts. One owner sign-in click outstanding.
 - **D12 answered** 2026-10-02 — the private-area team is the D3 pair; the Firestore seed
   remains owner-run.
 - **Checkpoint 4 PASSED** 2026-10-02 — the owner signed in as `family@cusati.us`
@@ -86,10 +87,10 @@ merged reality, not plans.
   `agentic-kg-research` (private, for the team) is Wave 2.
 - **Checkpoint 4 is not passed** (#52) until the owner's non-member sign-in records A3
   and A4. A13 is closed (the `phd-milestones` prefix proofs ran, K10 included).
-- **Wave 0b (#46)**: implemented on `feat/private-by-default`; adversarial round,
-  security gate, merge and live verification remain.
-- Phases 4–6 of `llm/master-roadmap.md` (sharing, satellite remainder, Phase 6), plus
-  the branding wave (0c, unblocked: spec + ADR-0015 exist).
+- **Wave 0c (branding)** is next: spec + ADR-0015 are on `main` (#85); start at the
+  build streams (`site`: band header, footer, home page, tokens, shared chrome).
+- Phases 4–6 of `llm/master-roadmap.md` (Waves 3–5: sharing, satellite remainder,
+  Phase 6).
 
 ## Known issues
 
