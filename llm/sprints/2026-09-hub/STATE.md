@@ -2837,3 +2837,76 @@ gs://cusati-hub-private/index.html   -> contains "LLM + Knowledge Graphs — res
 So the item is reachable to the signed-in member whose session is proven; Wave 2's exit is
 met in substance, and one owner click on that URL closes it observably. It is recorded as
 "reachable, not yet requested" rather than claimed as seen.
+
+## D12 — answered (owner, 2026-10-02)
+
+The owner reports **D12 answered**. The private-area team was already on the record as
+**D3** (`djjay@vt.edu`, `cbrown@vt.edu`); D12 only filled the brief's own placeholder for
+the same list. This unblocks Wave 2's onboarding step in substance; the Firestore member
+**seed is still owner-run** (hard stop, §9), and the item URL to click is
+`https://jason.cusati.us/p/research/agentic-kg-research/research-store/`.
+
+## Wave 0b — private by default, implemented, NOT merged (2026-10-02)
+
+Branch `feat/private-by-default`. Owner decision **D8** is now implemented in code, and
+recorded durably as **ADR-0016** (design doc §4 and §5 amended to point at it). The
+`cv/anthropic-fellow` exposure (finding A-6: public on five origins) is closed in the
+build: it is not emitted anywhere in `dist-public`.
+
+### What changed
+
+- **`site/publish-allowlist.json`** — committed, 14 entries: the four day-one `cv` items,
+  `kgis/kgis-docs`, and the first-party `hub/…` research digest routes. This file is now
+  the hub's only authority on what is public.
+- **`site/src/lib/hub-content.mjs`** — `effectiveVisibility()` is the single computation
+  combining the manifest *request* with the allowlist *decision*; `parsePublishAllowlist`,
+  `readPublishAllowlist`, `findAllowlistConflicts` (condition A) and
+  `findStaleAllowlistEntries` (condition B) live beside it.
+- **`src/content.config.ts` (shared loader)** — tags every entry with
+  `effective_visibility`; the **public** output stores only effectively-public items, the
+  **private** output stores every item (SEAM-B4).
+- **Consumers re-pointed at effective visibility** — the `/projects/` and CV section
+  indexes (`collectPublicItems`), `cv/index`, `resumes/index`, `cv/[variant]`, the framed
+  item route, `public-build` staging, and `stage-public-assets`. The CV variant list is
+  filtered, so the private variant defined inside the shared `cv-data` payload cannot leak
+  through the directory listing (SEAM-B3).
+- **The leak check** — private set is now every non-allowlisted item (SEAM-B6). A source
+  name shorter than 4 characters is not a bare needle (`cv` occurs in every `/cv/…` link);
+  its qualified-id, route and payload-path needles still bind.
+- **`check-publish-allowlist.mjs`** (new, wired into both build jobs) — condition A always
+  fails; condition B fails in `pr` mode and warns in `deploy` mode, so a satellite rename
+  cannot halt deploy or withdrawal. A whole absent source prefix is NOT condition B (the
+  expected-source check owns it).
+- **`firebase.json`** — `/pdfs/anthropic-fellow.pdf` and `/cv/anthropic-fellow[/**]` 302 to
+  `/signin/` on the canonical origin.
+- **Docs** — `docs/satellites.md` and `contract/README.md` now state plainly that
+  `visibility` is a request and the allowlist is the decision. No schema change (SEAM-B7).
+
+### Evidence (all local, 2026-10-02)
+
+```
+npm test                        291 passed, 1 skipped (23 files)
+npm run build:public            26 pages; no "anthropic-fellow" in any path or byte;
+                                absent from sitemap-0.xml; /cv/ lists three variants
+npm run check:no-private-in-public  PASS — 4 effectively-private items
+npm run check:publish-allowlist     PASS — 14 entries, 0 conflicts, 0 stale (mode pr)
+npm run build:private           9 pages; receipt privateItemCount: 4, renderedItemCount: 8
+npm run check:private-links     PASS — 13 pages
+npm run contrast                52 pairs, 0 below AA
+npm run demo:leak-check         PASS — the guard failed on the injected leak
+governance-checks --layout      4 of 4 PASS
+```
+
+### What is NOT done, stated rather than glossed
+
+- **The adversarial round has not run.** Red Team, Dissenter, Skeptic Verifier, Security
+  Tester, Boundary/Regression testers and Chief Reviewer for Wave 0b are outstanding. The
+  wave is **not merged** and pushed as a branch/PR only.
+- **No live verification yet** — nothing has deployed; the canonical host still serves the
+  old build until this merges.
+- **The GitHub Pages residual.** The allowlist governs both hosts' `dist-public`, so a
+  redeploy removes the fellowship CV from Pages too; a *historical* Pages URL becomes 404
+  (never 200). Phase 6 retires Pages. Recorded per SEAM-B9's "say so explicitly".
+- **The first-party `hub` allowlist entries are documentation, not enforcement** — first-
+  party pages are committed, so no satellite can introduce one. A route-level guard is an
+  ADR candidate (`contracts/site-wave-0b.md`, handoff Recommendation 1).

@@ -6,6 +6,9 @@
 // fact. Plain JavaScript on purpose: .ts modules and .mjs build scripts both
 // import it (the scripts/site-env.mjs precedent).
 
+import fs from "node:fs";
+import path from "node:path";
+
 /** Bucket prefix every source publishes under (SEAM-2). Never varied. */
 export const BUCKET_PREFIX = "sources/";
 
@@ -100,8 +103,10 @@ export const PUBLIC_PHOTO_PATH = "public/photo_jason_1.jpeg";
  * check below asks the question directly, so the guarantee survives the next
  * satellite and the next format (ADR-0005; design doc §12.1).
  */
-export function publicAssetPathFor(item, source) {
-  if (item?.visibility !== "public") return null;
+export function publicAssetPathFor(item, source, allowlist) {
+  // EFFECTIVE visibility (D8): a pdf the manifest calls public but the allowlist
+  // does not list must NOT be staged into public/ -- staging is deployment.
+  if (effectiveVisibility(item, source, allowlist) !== "public") return null;
   if (source === CV_SOURCE && item.format === "pdf" && item.section === "cv") {
     return `${PUBLIC_PDF_DIR}/${item.slug}.pdf`;
   }
@@ -301,4 +306,239 @@ export function expectedSourcesEnforcement(provenance) {
       `declared source. An absent or unrecognised marker enforces deliberately: only a ` +
       `producer's explicit "complete: false" exempts a tree.`,
   };
+}
+
+// --- The publish allowlist (D8; SEAM-B1, SEAM-B2, SEAM-B5) -------------------
+//
+// Owner decision D8 (2026-09-18): an item is public only if BOTH its satellite
+// manifest says `visibility: public` AND this committed allowlist names its
+// (source, slug). The manifest's `visibility` becomes a REQUEST; the hub is the
+// AUTHORITY -- which is what design doc §12.3 ("satellites are untrusted") always
+// implied.
+//
+// ONE DECLARATION, ONE COMPUTATION. `effectiveVisibility()` below is the only
+// place the two inputs are combined (SEAM-B2). Every consumer -- the collection
+// loader, the section indexes, the CV pages, the staging plans, the leak check --
+// reads the result from here; none may re-derive it or read `item.visibility`
+// directly.
+//
+// The file is `site/publish-allowlist.json`. It is committed, it is the only way
+// to make something public, and no satellite holds the credential to edit it
+// (ADR-0007 decision 2). First-party hub pages use `source: "hub"` and their
+// route path as the slug, so the same file covers both.
+
+/** The committed allowlist, relative to site/ and published beside it. */
+export const PUBLISH_ALLOWLIST_FILENAME = "publish-allowlist.json";
+
+/**
+ * site/publish-allowlist.json, resolved against the build's working directory.
+ *
+ * NOT `new URL(..., import.meta.url)`: Astro bundles this module into the
+ * prerender output, where `import.meta.url` points inside `dist-public/` and the
+ * allowlist is not there (the first build after this landed read the wrong path
+ * and threw). Every entry point -- `npm run build:*`, the guard scripts and the
+ * tests -- runs with site/ as the working directory, which is the same anchor
+ * astro.config.mjs and the scripts already use.
+ */
+export const PUBLISH_ALLOWLIST_PATH = path.resolve(process.cwd(), PUBLISH_ALLOWLIST_FILENAME);
+
+/** The only allowlist schema this hub understands. */
+export const ALLOWLIST_VERSION = 1;
+
+/** The pseudo-source first-party hub pages use in the allowlist. */
+export const HUB_SOURCE = "hub";
+
+/** The source pattern, mirrored from the manifest schema. */
+const SOURCE_PATTERN = /^[a-z][a-z0-9-]{0,38}$/;
+/** A satellite slug, as the manifest schema defines it. */
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** A hub route slug: one or more slug segments joined by "/". */
+const HUB_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
+
+export class PublishAllowlistError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "PublishAllowlistError";
+  }
+}
+
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The `(source, slug)` key the allowlist is indexed by. */
+export function allowlistKey(source, slug) {
+  return `${source}/${slug}`;
+}
+
+/**
+ * Validate and normalise a parsed allowlist document.
+ *
+ * Throws PublishAllowlistError on anything malformed. A malformed allowlist must
+ * never be silently read as "nothing is allowed" or "everything is allowed": the
+ * first empties the public site, the second publishes everything. Both are
+ * worse than a stopped build.
+ *
+ * @param {unknown} raw
+ * @param {string} [origin] for error messages
+ * @returns {{version: number, entries: {source: string, slug: string}[], keys: Set<string>, hub: Set<string>}}
+ */
+export function parsePublishAllowlist(raw, origin = PUBLISH_ALLOWLIST_FILENAME) {
+  if (!isPlainObject(raw)) {
+    throw new PublishAllowlistError(`the publish allowlist (${origin}) must be a JSON object.`);
+  }
+  if (raw.version !== ALLOWLIST_VERSION) {
+    throw new PublishAllowlistError(
+      `the publish allowlist (${origin}) declares version ${JSON.stringify(raw.version)}; ` +
+        `this hub understands version ${ALLOWLIST_VERSION} only. A version bump is a hub change ` +
+        `(ADR candidate), not a satellite one.`,
+    );
+  }
+  if (!Array.isArray(raw.items)) {
+    throw new PublishAllowlistError(
+      `the publish allowlist (${origin}) must carry an "items" array of {source, slug} pairs.`,
+    );
+  }
+  const entries = [];
+  const keys = new Set();
+  raw.items.forEach((entry, index) => {
+    if (!isPlainObject(entry)) {
+      throw new PublishAllowlistError(`the publish allowlist (${origin}) items[${index}] must be an object.`);
+    }
+    const { source, slug } = entry;
+    if (typeof source !== "string" || !SOURCE_PATTERN.test(source)) {
+      throw new PublishAllowlistError(
+        `the publish allowlist (${origin}) items[${index}].source ${JSON.stringify(source)} is not a ` +
+          `valid source name (it must match ${SOURCE_PATTERN}).`,
+      );
+    }
+    const pattern = source === HUB_SOURCE ? HUB_SLUG_PATTERN : SLUG_PATTERN;
+    if (typeof slug !== "string" || !pattern.test(slug)) {
+      throw new PublishAllowlistError(
+        `the publish allowlist (${origin}) items[${index}].slug ${JSON.stringify(slug)} is not valid ` +
+          `for source "${source}" (it must match ${pattern}).`,
+      );
+    }
+    const key = allowlistKey(source, slug);
+    if (keys.has(key)) {
+      throw new PublishAllowlistError(
+        `the publish allowlist (${origin}) names ${JSON.stringify(key)} more than once. ` +
+          `A duplicate is bookkeeping drift; remove one.`,
+      );
+    }
+    keys.add(key);
+    entries.push({ source, slug });
+  });
+  return {
+    version: ALLOWLIST_VERSION,
+    entries,
+    keys,
+    hub: new Set(entries.filter((e) => e.source === HUB_SOURCE).map((e) => e.slug)),
+  };
+}
+
+/**
+ * Read and validate the committed allowlist.
+ *
+ * @param {string | URL} [filePath]
+ * @returns {ReturnType<typeof parsePublishAllowlist>}
+ */
+export function readPublishAllowlist(filePath = PUBLISH_ALLOWLIST_PATH) {
+  const shown = filePath instanceof URL ? filePath.pathname : String(filePath);
+  let raw;
+  try {
+    raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    throw new PublishAllowlistError(
+      `the publish allowlist (${shown}) could not be read as JSON: ${error.message}. The public ` +
+        `build has no authority to publish without it, so this is fatal rather than a default.`,
+    );
+  }
+  return parsePublishAllowlist(raw, shown);
+}
+
+/** True when the allowlist names (source, slug). */
+export function isAllowlisted(allowlist, source, slug) {
+  if (!allowlist || !(allowlist.keys instanceof Set)) return false;
+  return allowlist.keys.has(allowlistKey(source, slug));
+}
+
+/**
+ * THE ONE COMPUTATION OF EFFECTIVE VISIBILITY (SEAM-B2).
+ *
+ * public   iff item.visibility === "public" AND the allowlist names (source, slug)
+ * private  otherwise
+ *
+ * @param {{visibility?: string, slug?: string} | null | undefined} item
+ * @param {string} source
+ * @param {ReturnType<typeof parsePublishAllowlist>} allowlist
+ * @returns {"public" | "private"}
+ */
+export function effectiveVisibility(item, source, allowlist) {
+  if (!item || item.visibility !== "public") return "private";
+  return isAllowlisted(allowlist, source, item.slug) ? "public" : "private";
+}
+
+/**
+ * SEAM-B5 CONDITION A — the allowlist cannot override a satellite's own privacy.
+ *
+ * An allowlist entry that names an item whose manifest says `visibility: private`
+ * is a hard failure. This keeps the model honest: the hub decides what BECOMES
+ * public, never what stops being private.
+ *
+ * @param {readonly {source: string, manifest: {items?: unknown[]}}[]} sources
+ * @param {ReturnType<typeof parsePublishAllowlist>} allowlist
+ * @returns {string[]}
+ */
+export function findAllowlistConflicts(sources, allowlist) {
+  const problems = [];
+  for (const { source, manifest } of sources) {
+    for (const item of manifest?.items ?? []) {
+      if (item?.visibility !== "private") continue;
+      if (!isAllowlisted(allowlist, source, item.slug)) continue;
+      problems.push(
+        `the allowlist names ("${source}", "${item.slug}"), but that item's manifest says ` +
+          `visibility: private. An allowlist entry is a decision to publish, and it can never ` +
+          `override a satellite's own request for privacy (SEAM-B5 condition A). Remove the ` +
+          `entry, or ask the satellite to publish it as public.`,
+      );
+    }
+  }
+  return problems;
+}
+
+/**
+ * SEAM-B5 CONDITION B — allowlist entries naming a (source, slug) that no
+ * manifest carries.
+ *
+ * The caller decides the consequence by context: a hard failure on the hub's own
+ * pull requests, a loud warning on the deploy build. See
+ * scripts/check-publish-allowlist.mjs for why (a satellite's ordinary rename must
+ * not hand it a kill switch on the hub's deploy or on the withdrawal path).
+ *
+ * Hub entries are exempt: they name first-party routes, not manifest items.
+ *
+ * @param {readonly {source: string, manifest: {items?: unknown[]}}[]} sources
+ * @param {ReturnType<typeof parsePublishAllowlist>} allowlist
+ * @returns {{source: string, slug: string}[]}
+ */
+export function findStaleAllowlistEntries(sources, allowlist) {
+  const presentItems = new Set();
+  const presentSources = new Set();
+  for (const { source, manifest } of sources) {
+    presentSources.add(source);
+    for (const item of manifest?.items ?? []) {
+      presentItems.add(allowlistKey(source, item.slug));
+    }
+  }
+  return allowlist.entries.filter((entry) => {
+    if (entry.source === HUB_SOURCE) return false;
+    // A WHOLE SOURCE that is absent is not this guard's business: the
+    // expected-source check (ADR-0010 decision 4) owns a vanished prefix, and on
+    // a pull request the cv-release fallback tree carries `cv` alone by
+    // construction. Flagging `kgis/kgis-docs` stale there would fail every PR for
+    // a missing prefix, which is the wrong guard reporting the wrong thing.
+    if (!presentSources.has(entry.source)) return false;
+    return !presentItems.has(allowlistKey(entry.source, entry.slug));
+  });
 }

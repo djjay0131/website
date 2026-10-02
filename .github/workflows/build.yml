@@ -1091,6 +1091,15 @@ jobs:
       - name: Check no private content reached the public build (GitHub Pages variant)
         run: npm run check:no-private-in-public
 
+      # D8 / SEAM-B5. The allowlist is the hub's sole authority on what is
+      # public; a conflict with a satellite manifest always fails, and a stale
+      # entry fails on a pull request but only warns on the deploy build (a
+      # satellite rename must not be a kill switch on deploy or on withdrawal).
+      - name: Check the publish allowlist (GitHub Pages variant)
+        run: |
+          MODE=${{ github.event_name == 'pull_request' && 'pr' || 'deploy' }}
+          node scripts/check-publish-allowlist.mjs --mode "$MODE"
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
@@ -1210,6 +1219,15 @@ jobs:
       # against the full set of private items the private one rendered.
       - name: Check no private content reached the public build
         run: npm run check:no-private-in-public
+
+      # D8 / SEAM-B5, the Firebase variant. Same mode rule as the Pages job:
+      # conflict always fails; a stale entry fails on a PR and only warns on the
+      # deploy build, so a satellite's ordinary rename cannot halt deploy or
+      # withdrawal.
+      - name: Check the publish allowlist
+        run: |
+          MODE=${{ github.event_name == 'pull_request' && 'pr' || 'deploy' }}
+          node scripts/check-publish-allowlist.mjs --mode "$MODE"
 
       # Only the deploy path consumes the artifacts; a pull request stores none.
       - name: Upload Firebase Hosting artifact

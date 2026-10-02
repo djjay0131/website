@@ -17,7 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SOURCES_DIR } from "../src/lib/hub-content.mjs";
+import { SOURCES_DIR, effectiveVisibility, readPublishAllowlist } from "../src/lib/hub-content.mjs";
 import { stagingPlanFor } from "../src/lib/frame-content.mjs";
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -71,6 +71,7 @@ export function publicBuild(options = {}) {
     hooks: {
       "astro:build:done": async ({ dir, logger }) => {
         const outDir = fileURLToPath(dir);
+        const allowlist = readPublishAllowlist();
 
         const items = [];
         if (fs.existsSync(sourcesDir)) {
@@ -88,14 +89,24 @@ export function publicBuild(options = {}) {
             const all = manifest?.items ?? [];
             const name = manifest.source ?? source;
 
+            // EFFECTIVE visibility (D8; SEAM-B2). The mixed-source guard and the
+            // staging loop must both judge on what the hub DECIDED, not on what
+            // the manifest requested: an item the manifest calls public but the
+            // allowlist does not list is private, and staging its bytes would be
+            // exactly the leak the allowlist exists to prevent.
+            const effective = all.map((item) => ({
+              ...item,
+              visibility: effectiveVisibility(item, name, allowlist),
+            }));
+
             // FAIL CLOSED ON A MIXED SOURCE WITH A PREFIX-ROOT FOLDER. See
             // mixedSourceError: the hub cannot tell which bytes of a built-site
             // folder are private, so it refuses rather than guesses. The leak check
             // is a backstop, not a licence to stage private bytes.
-            const mixed = mixedSourceError(all, name);
+            const mixed = mixedSourceError(effective, name);
             if (mixed) throw new Error(mixed);
 
-            for (const item of all) {
+            for (const item of effective) {
               if (item?.visibility !== "public") continue;
               if (!FRAMED_FORMATS.has(item.format)) continue;
               items.push({ ...item, source: name });

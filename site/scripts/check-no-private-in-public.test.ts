@@ -35,17 +35,25 @@ const PRIVATE_ITEM = {
 };
 
 describe("collectPrivateItems reads the committed fixture", () => {
-  it("finds all three private items, and no public one", () => {
+  it("finds every EFFECTIVELY private item — manifest-private OR not allowlisted (D8)", () => {
     const items = collectPrivateItems(FIXTURE_SOURCES);
     expect(items.map((i) => `${i.source}/${i.slug}`).sort()).toEqual([
-      // Wave 1: a PRIVATE `projects` item, planted so the public /projects/
-      // index has a private item in its own section to leave out.
+      // D8 / SEAM-B3 / SEAM-B6: cv/anthropic-fellow's manifest says PUBLIC, but
+      // the committed allowlist deliberately omits it, so it is private. This is
+      // the content-only leak (a variant defined inside the shared cv-data
+      // payload) that the old manifest-only filter could not see.
+      "cv/anthropic-fellow",
+      // A PRIVATE `projects` item, planted so the public /projects/ index has a
+      // private item in its own section to leave out.
       "phd-milestones/committee-dossier",
       "phd-milestones/internal-notes",
       "phd-milestones/milestones",
     ]);
-    // cv publishes five PUBLIC items and kgis one; none of them is private.
-    expect(items.some((i) => i.source === "cv" || i.source === "kgis")).toBe(false);
+    // The allowlisted cv items and kgis' one item stay public.
+    const keys = items.map((i) => `${i.source}/${i.slug}`);
+    expect(keys).not.toContain("cv/academic");
+    expect(keys).not.toContain("cv/cv-data");
+    expect(keys).not.toContain("kgis/kgis-docs");
   });
 
   it("returns nothing when no content has been synced", () => {
@@ -286,7 +294,7 @@ describe("the CLI", () => {
       encoding: "utf8",
     });
     expect(run.status, run.stderr).toBe(0);
-    expect(run.stdout).toContain("3 private item(s) to look for");
+    expect(run.stdout).toContain("4 private item(s) to look for");
     expect(run.stdout).toContain("PASS");
   });
 

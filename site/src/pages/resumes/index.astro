@@ -1,11 +1,20 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { loadVariantSummaries } from "../../lib/cv-data";
-import { CV_VARIANTS_DIR } from "../../lib/hub-content.mjs";
+import { CV_VARIANTS_DIR, SOURCES_DIR } from "../../lib/hub-content.mjs";
+import { collectPublicItems } from "../../lib/frame-content.mjs";
 import path from "node:path";
 
 // Synced from the content bucket (SEAM-5); the resolver is unchanged.
-const variants = loadVariantSummaries(path.resolve(CV_VARIANTS_DIR));
+// Filtered by effective visibility (D8; SEAM-B3): the fellowship variant is
+// defined inside the shared cv-data payload, so the allowlisted `cv` PDF items
+// are the authority on which variants may be listed.
+const visible = new Set(
+  collectPublicItems(path.resolve(SOURCES_DIR), { section: "cv" }).map((i) => i.slug),
+);
+const variants = loadVariantSummaries(path.resolve(CV_VARIANTS_DIR)).filter((v) =>
+  visible.has(v.slug),
+);
 const base = import.meta.env.BASE_URL;
 ---
 

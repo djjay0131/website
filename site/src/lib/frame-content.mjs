@@ -19,6 +19,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { effectiveVisibility, readPublishAllowlist } from "./hub-content.mjs";
 
 /** Where an item's payload bytes are served from, in both outputs. */
 export const PAYLOAD_ROOT = "_payload";
@@ -225,13 +226,19 @@ function walk(dir, rel = "") {
  * malformed manifest with a useful message. The validator still runs later and
  * still fails the build.
  *
+ * VISIBILITY IS EFFECTIVE, NOT DECLARED (D8; SEAM-B2). A manifest's
+ * `visibility: public` is only a request; this lists an item only when the
+ * committed publish allowlist agrees. Reading the raw field here was Wave 1's
+ * Dissenter finding D5 and this is the fix.
+ *
  * @param {string} sourcesDir
- * @param {{section?: string, excludeSources?: readonly string[]}} [options]
+ * @param {{section?: string, excludeSources?: readonly string[], allowlist?: unknown}} [options]
  * @returns {{source: string, slug: string, title: string, section: string,
  *   format: string, path: string, date?: string, summary?: string}[]}
  */
 export function collectPublicItems(sourcesDir, options = {}) {
   if (!fs.existsSync(sourcesDir)) return [];
+  const allowlist = options.allowlist ?? readPublishAllowlist();
   const exclude = new Set(options.excludeSources ?? []);
   const items = [];
   for (const source of fs.readdirSync(sourcesDir).sort()) {
@@ -252,8 +259,9 @@ export function collectPublicItems(sourcesDir, options = {}) {
     } catch {
       continue;
     }
+    const name = typeof manifest.source === "string" ? manifest.source : source;
     for (const item of manifest?.items ?? []) {
-      if (item?.visibility !== "public") continue;
+      if (effectiveVisibility(item, name, allowlist) !== "public") continue;
       if (options.section && item.section !== options.section) continue;
       items.push({
         source: typeof manifest.source === "string" ? manifest.source : source,

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "items": [
+    { "source": "cv", "slug": "academic" },
+    { "source": "cv", "slug": "research-professional" },
+    { "source": "cv", "slug": "sde-long" },
+    { "source": "cv", "slug": "cv-data" },
+    { "source": "kgis", "slug": "kgis-docs" },
+    { "source": "hub", "slug": "research/soa-agentic-se" },
+    { "source": "hub", "slug": "research/soa-agentic-se/agentic-harnesses" },
+    { "source": "hub", "slug": "research/soa-agentic-se/agentic-harnesses/synthesis" },
+    { "source": "hub", "slug": "research/soa-agentic-se/agentic-harnesses/sources" },
+    { "source": "hub", "slug": "research/soa-agentic-se/agentic-harnesses/consensus" },
+    { "source": "hub", "slug": "research/soa-agentic-se/agentic-memory" },
+    { "source": "hub", "slug": "research/soa-agentic-se/agentic-memory/synthesis" },
+    { "source": "hub", "slug": "research/soa-agentic-se/agentic-memory/sources" },
+    { "source": "hub", "slug": "research/soa-agentic-se/agentic-memory/consensus" }
+  ]
+}

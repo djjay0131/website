@@ -38,11 +38,15 @@ import {
   SOURCES_DIR,
   claimFor,
   CONTENT_PROVENANCE_FILE,
+  effectiveVisibility,
   expectedSourcesEnforcement,
+  findAllowlistConflicts,
   findMissingExpectedSources,
   isKnownManifestVersion,
   manifestVersionOf,
+  readPublishAllowlist,
 } from "./lib/hub-content.mjs";
+import { resolveHubOutput } from "../scripts/site-output.mjs";
 
 // --- Fixed sets (schema `enum`; SEAM-1) -------------------------------------
 
@@ -385,6 +389,10 @@ export function loadSources(sourcesDir: string): LoadedSource[] {
 export const entrySchema = itemSchema.safeExtend({
   source: z.string().regex(re(PATTERNS.source)),
   published: z.string().regex(re(PATTERNS.published)),
+  // D8 / SEAM-B2. `visibility` is the satellite's REQUEST; this is the hub's
+  // DECISION, computed once in hub-content.mjs's effectiveVisibility(). Every
+  // consumer reads this field, never the raw one.
+  effective_visibility: z.enum(VISIBILITY),
 });
 
 const sources = defineCollection({
@@ -397,12 +405,33 @@ const sources = defineCollection({
     // second one. content.config.test.ts asserts it against the real fixtures.
     load: async ({ store, parseData }) => {
       store.clear();
-      for (const { source, manifest } of loadSources(path.resolve(SOURCES_DIR))) {
+      const { isPrivate } = resolveHubOutput(process.env);
+      const allowlist = readPublishAllowlist();
+      const sources = loadSources(path.resolve(SOURCES_DIR));
+
+      // SEAM-B5 condition A: the allowlist must never override a satellite's own
+      // privacy. A conflict fails the build in BOTH outputs -- it is a defect in
+      // the hub's bookkeeping either way.
+      const conflicts = findAllowlistConflicts(sources, allowlist);
+      if (conflicts.length > 0) {
+        throw new HubContentError(
+          `the publish allowlist conflicts with a satellite manifest:\n${conflicts.map((c) => `  ${c}`).join("\n")}`,
+        );
+      }
+
+      for (const { source, manifest } of sources) {
         for (const item of manifest.items) {
+          const effective = effectiveVisibility(item, source, allowlist);
+          // SEAM-B4: the PUBLIC build stores only effectively-public items, so
+          // no page, index, sitemap or frame route can reach a private one even
+          // by omission. The PRIVATE build stores every item -- a member sees
+          // public and private alike in one place -- and tags each with its
+          // effective visibility.
+          if (!isPrivate && effective !== "public") continue;
           const id = `${source}/${item.slug}`;
           const data = await parseData({
             id,
-            data: { ...item, source, published: manifest.published },
+            data: { ...item, source, published: manifest.published, effective_visibility: effective },
           });
           store.set({ id, data });
         }

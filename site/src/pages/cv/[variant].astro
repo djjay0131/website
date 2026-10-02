@@ -3,12 +3,20 @@ import Base from "../../layouts/Base.astro";
 import { loadCV, listVariants } from "../../lib/cv-data";
 import { parseBib } from "../../lib/bib";
 import { mdToHtml } from "../../lib/md";
-import { CV_BIB_PATH, CV_DATA_ROOT, CV_VARIANTS_DIR } from "../../lib/hub-content.mjs";
+import { CV_BIB_PATH, CV_DATA_ROOT, CV_VARIANTS_DIR, SOURCES_DIR } from "../../lib/hub-content.mjs";
+import { collectPublicItems } from "../../lib/frame-content.mjs";
 import path from "node:path";
 
 // Synced from the content bucket (SEAM-5); the resolver is unchanged.
+//
+// D8 / SEAM-B3: a variant page is emitted only when the allowlist publishes its
+// `cv` PDF item. The private fellowship variant then has NO route at all -- not a
+// page that renders empty -- so `/cv/anthropic-fellow` 404s in the public build.
 export function getStaticPaths() {
-  const variants = listVariants(path.resolve(CV_VARIANTS_DIR));
+  const visible = new Set(
+    collectPublicItems(path.resolve(SOURCES_DIR), { section: "cv" }).map((i) => i.slug),
+  );
+  const variants = listVariants(path.resolve(CV_VARIANTS_DIR)).filter((v) => visible.has(v));
   return variants.map((v) => ({ params: { variant: v } }));
 }
 

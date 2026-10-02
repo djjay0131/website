@@ -29,6 +29,7 @@ import {
   PUBLIC_PHOTO_PATH,
   SOURCES_DIR,
   publicAssetPathFor,
+  readPublishAllowlist,
 } from "../src/lib/hub-content.mjs";
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -42,6 +43,10 @@ const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 export function stagePublicAssets(sourcesDir, siteRoot = SITE_ROOT) {
   const staged = [];
   const removed = [];
+  // Effective visibility decides what may be staged (D8): a manifest-public PDF
+  // the allowlist omits must not be copied into public/ (and must be removed
+  // from a build where it used to be).
+  const allowlist = readPublishAllowlist();
 
   // Rebuilt every run: a PDF whose item was withdrawn must stop being served.
   const pdfDir = path.join(siteRoot, PUBLIC_PDF_DIR);
@@ -65,8 +70,9 @@ export function stagePublicAssets(sourcesDir, siteRoot = SITE_ROOT) {
       // by src/content.config.ts. Staging must not pre-empt it with a worse one.
       continue;
     }
+    const name = typeof manifest.source === "string" ? manifest.source : source;
     for (const item of manifest?.items ?? []) {
-      const target = publicAssetPathFor(item, source);
+      const target = publicAssetPathFor(item, name, allowlist);
       if (!target || typeof item.path !== "string") continue;
       const from = path.join(sourcesDir, source, item.path);
       if (!fs.existsSync(from)) continue;

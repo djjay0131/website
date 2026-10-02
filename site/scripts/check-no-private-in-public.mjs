@@ -76,13 +76,26 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SOURCES_DIR } from "../src/lib/hub-content.mjs";
+import { SOURCES_DIR, effectiveVisibility, readPublishAllowlist } from "../src/lib/hub-content.mjs";
 import { OUTPUT_DIRS } from "./site-output.mjs";
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Titles/summaries shorter than this are too generic to be safe needles. */
 export const TITLE_MIN_LENGTH = 8;
+
+/**
+ * A source name at least this long is a safe BARE needle. Shorter names are not.
+ *
+ * SEAM-B6 widens the private set to everything the allowlist omits, which now
+ * includes `cv/anthropic-fellow`. The bare source needle for it would be "cv",
+ * and "cv" occurs delimiter-bounded in every `/cv/…` link and `cv-data` path in
+ * a perfectly clean public build. A guard that fails a clean build is removed
+ * within a week, so a short source name is carried by its qualified-id,
+ * route and payload-path needles instead, exactly as short titles and summaries
+ * already are.
+ */
+export const SOURCE_MIN_LENGTH = 4;
 
 /** Extensions read as text. Anything else is matched by path only. */
 export const TEXT_EXTENSIONS = new Set([
@@ -106,7 +119,13 @@ export function htmlEscape(value) {
 }
 
 /**
- * Every `visibility: private` item across every synced manifest.
+ * Every EFFECTIVELY private item across every synced manifest (D8; SEAM-B6).
+ *
+ * An item is private unless BOTH its manifest says `visibility: public` AND the
+ * committed publish allowlist names its (source, slug). This is the widened,
+ * correct private set: it catches `cv/anthropic-fellow`, whose manifest says
+ * public but which the allowlist deliberately omits -- the one content-only leak
+ * with no matching path that the old manifest-only filter could not see.
  *
  * Deliberately does NOT use src/content.config.ts's validating loader: this
  * check must still run, and still find private items, when a manifest is
@@ -114,9 +133,10 @@ export function htmlEscape(value) {
  * in the public output", and a broken manifest is not a reason to skip that.
  *
  * @param {string} sourcesDir
+ * @param {ReturnType<typeof readPublishAllowlist>} [allowlist]
  * @returns {{source: string, slug: string, title?: string, summary?: string, path?: string, section?: string}[]}
  */
-export function collectPrivateItems(sourcesDir) {
+export function collectPrivateItems(sourcesDir, allowlist = readPublishAllowlist()) {
   if (!fs.existsSync(sourcesDir)) return [];
   const items = [];
   for (const source of fs.readdirSync(sourcesDir).sort()) {
@@ -136,8 +156,9 @@ export function collectPrivateItems(sourcesDir) {
     } catch {
       continue;
     }
+    const name = typeof manifest.source === "string" ? manifest.source : source;
     for (const item of manifest?.items ?? []) {
-      if (item?.visibility !== "private") continue;
+      if (effectiveVisibility(item, name, allowlist) !== "private") continue;
       items.push({
         source: typeof manifest.source === "string" ? manifest.source : source,
         slug: String(item.slug ?? ""),
@@ -167,7 +188,9 @@ export function needlesFor(item) {
     add("slug", item.slug, true);
     if (item.section) add("route", `/${item.section}/${item.source}/${item.slug}/`, false);
   }
-  add("source", item.source, true);
+  if (typeof item.source === "string" && item.source.length >= SOURCE_MIN_LENGTH) {
+    add("source", item.source, true);
+  }
   // The payload path is a needle only when QUALIFIED by its source. A bare
   // filename such as `index.html` is not a trace of any particular private item —
   // every static site has one — and matching it made a CLEAN public build fail:

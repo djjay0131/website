@@ -165,8 +165,25 @@ a transient failure into silent deletion.
 ### Private items
 
 `visibility: private` items never reach the public site. They go bucket → build →
-private bucket, and are served only behind the hub's sign-in gate. The hub build
-fails if a private item appears in public output.
+private bucket, and are served only behind the hub's sign-in gate.
+
+**`visibility` is a request; the hub's allowlist is the decision.** Since Wave 0b, an
+item is public only if **both** its manifest says `visibility: public` **and** the hub's
+committed `site/publish-allowlist.json` names its `(source, slug)`. Everything else —
+including an item you published as `public` that the hub has not allowlisted — renders
+only in the private build, behind sign-in. The hub is the authority because satellites
+are untrusted: a satellite must not be able to make its own content public by asserting
+it. Two consequences worth knowing:
+
+- **Publishing is a two-step process.** A first publish is private until the hub owner
+  adds the item to the allowlist. Tell the owner which `(source, slug)` you expect to be
+  public, and expect the live site to lag the first publish by one allowlist commit.
+- **An allowlist entry can never make a `private` item public.** If the allowlist names
+  an item whose manifest says `private`, the hub build fails. It decides what *becomes*
+  public, never what stops being private.
+
+The hub build fails if an effectively private item appears in public output, and the
+private build shows members public and private items alike in one place.
 
 **Enforce your own visibility.** The hub runs a leak check that fails its build if a private
 item reaches the public output — but that is the hub's backstop, not your permission to be
