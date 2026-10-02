@@ -3030,3 +3030,29 @@ the wave's public and private outputs are otherwise verified live.
 
 **Wave 0b exit: MET** (public and private boundaries verified live; one owner
 sign-in click outstanding, recorded rather than assumed).
+
+## Wave 0c — branding, build stream (2026-10-02, in progress)
+
+Branch `feat/branding`, draft **PR #91**. Spec + ADR-0015 were already on `main`
+(#85), so this wave started at the build streams, per the owner. Contract:
+`contracts/site-wave-0c.md`; handoff: `handoffs/site-wave-0c.md`.
+
+**Landed (green locally):** theme-invariant `--color-band`/`--color-on-band`/
+`--rule-orange` and `--vt-orange-text`; `--tracker-petrol` removed;
+`tokens.test.ts` carve-out widened by name with VT-ramp positive tests;
+`contrast.mjs` 56 pairs / 0 below AA; shared `SiteBand`/`SiteFooter`/`SiteIcon`
+used by both layouts; the home page per spec §2; `footer.json` and
+`research-portfolio.json`; the portrait is no longer staged and `og:image` is
+`/og-card.png`; SectionIndex/ItemPage/signin/`/p/**` chrome; SPEC Amendment 6
+(`---` → em dash). `npm test` 295 passed / 1 skipped; public 26 pages; leak
+check and allowlist guard PASS; private build + links PASS; governance 4/4.
+
+**Deliberate spec amendment:** `--vt-orange-text` is `#c34600`, not `#c64600`:
+the branded value measures 4.48:1 (0.02 below AA), and spec §5 itself requires
+0 below AA. Same-family nearest compliant shade; owner may overrule. Spec §5
+amended.
+
+**Open:** `research/index.astro` is not yet driven by `research-portfolio.json`
+(the plan expects it; the spec is silent). The a11y-tester and adversarial
+rounds for Wave 0c have not run, and the owner-drafted wording (role line,
+department, Elsewhere links) needs confirmation. Nothing to merge until then.
