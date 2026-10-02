@@ -10,10 +10,15 @@ import { getCollection } from "astro:content";
 import PrivateBase from "../layouts/PrivateBase.astro";
 import { routeFor } from "../lib/private-content.mjs";
 
-// SEAM-B4: the private build renders EVERY section and shows the member public
-// and private items alike, in one place. `format: data` items are build inputs,
-// not documents, so they have no page here (they were never framed).
-const items = (await getCollection("sources", ({ data }) => data.format !== "data"))
+// The private area lists the member's private items across EVERY section (not
+// only /phd/). Public items are NOT duplicated here: they live on the public
+// site, and staging their payloads into the private bucket made
+// `check:private-links` fail on a public satellite's off-origin and absolute
+// links (KGIS docs). SEAM-B4 is amended accordingly: members see every private
+// item in one place, and reach the public ones on the public site.
+const items = (
+  await getCollection("sources", ({ data }) => data.effective_visibility === "private")
+)
   .map((entry) => entry.data)
   .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug < b.slug ? -1 : 1));
 

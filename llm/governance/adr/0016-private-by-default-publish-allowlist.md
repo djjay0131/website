@@ -63,10 +63,15 @@ amends design doc §4 and §5.
    must not reintroduce it at a higher level.
 
 3. **The public build stores only effectively-public items; the private build
-   stores every item.** The shared collection loader (`src/content.config.ts`,
-   re-exported by `src-private/content.config.ts`) tags every entry with
-   `effective_visibility` and, in the public output, omits the rest. The private
-   output renders public and private items alike in one place (SEAM-B4).
+   stores every item but renders the private set.** The shared collection loader
+   (`src/content.config.ts`, re-exported by `src-private/content.config.ts`) tags
+   every entry with `effective_visibility` and, in the public output, omits the
+   rest. The private output renders every **private** item across every section
+   and its navigation reaches them; public items are not duplicated into the
+   private output — they stay on the public site. (Amended 2026-10-02 after the
+   first `main` deploy failed `check:private-links`: staging a public satellite's
+   payload into the private bucket exported its off-origin and absolute links
+   under `/p/` and served public bytes through the gate.)
 
 4. **The leak check's private set is every non-allowlisted item**, not only the
    items whose manifest says `private` (SEAM-B6). This is a strictly larger and

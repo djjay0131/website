@@ -126,10 +126,20 @@ signed in.
 
 ## SEAM-B4 — What each build renders
 
-- **Private build** renders **every section**, not only `/phd/`, with the members' navigation.
-  A member signed in sees everything, public and private alike, in one place.
+- **Private build** renders **every private item, across every section**, not only
+  `/phd/`, with the members' navigation. Public items are **not** duplicated into the
+  private output; they remain on the public site.
 - **Public build** renders **only** allowlisted items, and **never names a non-allowlisted
   one** — not in a link, a list, a count, a title, an OG tag or a sitemap entry.
+
+> **Amended 2026-10-02 (post-merge deploy failure).** The first implementation read
+> "public and private alike" literally and staged public items into the private
+> bucket. On the real `main` deploy, `check:private-links` failed: the public KGIS
+> docs (MkDocs) carry off-origin `fonts.googleapis.com`/`gstatic.com` links and
+> absolute `/projects/kgis/...` links, which cannot resolve under `/p/` — and
+> serving public bytes through the gate is itself wrong. The private build now
+> stages only effectively-private items; a member reaches public items on the
+> public site. The every-**section** requirement is unchanged.
 
 This extends ADR-0011's two-`srcDir` model rather than replacing it. The private build's
 `srcDir` now covers all sections; the router isolation stays exactly as ADR-0011 specifies,

@@ -11,10 +11,13 @@ import PrivateBase from "../layouts/PrivateBase.astro";
 import { payloadUrlFor, routeFor } from "../lib/private-content.mjs";
 
 export async function getStaticPaths() {
-  // SEAM-B4: every section, public and private alike; data items are build
-  // inputs with no framed document, so they are not routed.
-  const items = (await getCollection("sources", ({ data }) => data.format !== "data"))
-    .map((entry) => entry.data);
+  // Only effectively-private items are framed under /p/. Public items are
+  // served by the public build; duplicating their payloads here broke
+  // `check:private-links` on public satellites and serves public bytes through
+  // the gate. SEAM-B4 amended: every private item, across every section.
+  const items = (
+    await getCollection("sources", ({ data }) => data.effective_visibility === "private")
+  ).map((entry) => entry.data);
 
   return items.map((item) => ({
     params: { itemPath: `${item.section}/${item.source}/${item.slug}` },
