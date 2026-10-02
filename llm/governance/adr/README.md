@@ -27,6 +27,7 @@ from `0000-template.md`.
 | [0013](0013-unauthenticated-client-telemetry-endpoint.md) | The gate exposes an unauthenticated client-telemetry endpoint | Accepted |
 | [0014](0014-satellites-call-the-publish-contract-at-a-moving-v1-tag.md) | Satellites call the publish contract at a moving `v1` tag | Accepted |
 | [0015](0015-branding-no-portrait-band-and-mark-rule.md) | Branding — no portrait, maroon band as a token, no VT mark without permission | Accepted |
+| [0016](0016-private-by-default-publish-allowlist.md) | Private by default — the hub's publish allowlist is the authority | Accepted |
 
 ## Lifecycle
 

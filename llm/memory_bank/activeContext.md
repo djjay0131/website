@@ -41,27 +41,39 @@ what a contributor needs to pick up work today.
 - **Wave 2's research store is reachable to the member** (route, payload and index entry in
   the private bucket) but was not the page the member opened; one click on
   `https://jason.cusati.us/p/research/agentic-kg-research/research-store/` closes it.
-- **Wave 0b (#46)**, private by default, is not started. **Wave 0c is blocked** on the
-  missing D14 branding plan (`llm/plans/…branding` does not exist).
+- **Wave 0b (#46)**, private by default, is **implemented on `feat/private-by-default`**
+  and **NOT merged** (2026-10-02). `site/publish-allowlist.json` is the authority;
+  `effectiveVisibility()` is the one computation; the public build stores only
+  effectively-public items and the private build every item; the leak check's
+  private set is every non-allowlisted item; `check-publish-allowlist` is wired into
+  both build jobs. `cv/anthropic-fellow` is gone from `dist-public`; Firebase 302s
+  its historical URLs to `/signin/`. Local evidence is green (291 tests, builds,
+  leak check, allowlist guard, contrast, governance 4/4). **Adversarial round,
+  security gate and live verification are outstanding, so it is not merged.**
+- **Wave 0c is unblocked**: the D14 branding plan is committed at
+  `llm/plans/2026-09-19-branding-plan.md` and the spec + ADR-0015 exist
+  (`llm/specs/2026-10-01-branding-design.md`).
 
 ## Stop point
 
-Waves 1 and 2 are complete and Checkpoint 4 is passed. The next non-owner work is Wave 0b.
-The owner can optionally open
+Wave 0b is implemented and awaiting its adversarial round and security gate. The next
+non-owner work is to run that round on `feat/private-by-default`, then merge and verify
+live. The owner can still open
 `https://jason.cusati.us/p/research/agentic-kg-research/research-store/` to see the Wave 2
 item directly.
 
 ## Next
 
-1. **Wave 0b (#46)** — private by default and the publish allowlist (site-only).
+1. **Wave 0b adversarial round + security gate**, then merge and verify live.
 2. **Waves 3–5** (sharing, satellite remainder, Phase 6).
-3. **Wave 0c (branding)** is blocked: the D14 branding plan file does not exist.
+3. **Wave 0c (branding)** — spec and ADR-0015 are in; ready after 0b lands.
 
 ## What only the owner can do
 
-- **Name the team for the private area** (D12, design doc §10 Q4 amended): who joins
-  `djjay@vt.edu` and `cbrown@vt.edu` on the allowlist, keyed by the email each signs in
-  with. Wave 2's onboarding step waits on it.
+- **Run the Firestore member seed** (D12 is answered; the list is the D3 pair
+  `djjay@vt.edu` and `cbrown@vt.edu`): the seed itself is owner-run per §9. Then one
+  click on `https://jason.cusati.us/p/research/agentic-kg-research/research-store/`
+  closes Wave 2's member view.
 - **One non-member sign-in** closes A3 and the non-member half of A4. `djjay0131@gmail.com`
   is deliberately not a member, so signing in as it should get the "not shared with
   you" page.
@@ -77,9 +89,12 @@ item directly.
   seeded, two: `djjay@vt.edu` (owner), `cbrown@vt.edu` (D3). **Q5** the app lives under
   `site/` (ADR-0001). **Q6** satellite order: `agentic-kgis` 3, `agentic-kg-research` 4
   (D10, owner, 2026-09-25, #72).
-- ADRs 0001–0014, all Accepted: `llm/governance/adr/`. The most recent: ADR-0012
-  (dev-staging in a separate project), ADR-0013 (the unauthenticated client-telemetry
-  endpoint), ADR-0014 (satellites call the contract at a moving `v1` tag).
+- ADRs 0001–0016, all Accepted: `llm/governance/adr/`. The most recent: ADR-0014
+  (satellites call the contract at a moving `v1` tag), ADR-0015 (branding — no
+  portrait, maroon band token, no VT mark), ADR-0016 (private by default — the
+  publish allowlist is the authority; amends design doc §4–§5).
+- **D12 is answered (owner, 2026-10-02):** the private-area team is the D3 pair; the
+  Firestore seed is owner-run.
 - Roadmap: `llm/master-roadmap.md`.
 
 ## Open

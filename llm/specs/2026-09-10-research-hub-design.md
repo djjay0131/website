@@ -117,6 +117,12 @@ to dist/), `visibility` ∈ {`public`, `private`}, `date` (ISO), optional
 `summary`, `tags`. `data` was added 2026-09-16 by ADR-0008; a `data` item also
 carries `schema_version`.
 
+> Amended 2026-10-02 by ADR-0016 (owner decision D8): `visibility` is a
+> **request**, not the publication decision. An item is public only when a
+> satellite manifest says `public` **and** the hub's committed
+> `site/publish-allowlist.json` names its `(source, slug)`. The hub is the
+> authority because §12.3 treats satellites as untrusted.
+
 | Format | Satellite ships | Hub does |
 |---|---|---|
 | md / mdx | Markdown + frontmatter | Renders in site chrome; indexed by search |
@@ -165,9 +171,15 @@ Eleventy (untyped collections), FastAPI+Jinja for the public site (runtime
 rendering; FastAPI is the gate only).
 
 Two outputs from one source tree: `astro build` with an env var
-`HUB_OUTPUT=public|private` that filters collections by visibility, run
-twice in CI. A post-build check greps `public/` for any private slug and
-fails the job on a hit.
+`HUB_OUTPUT=public|private`, run twice in CI. A post-build check greps the
+public output for any trace of an effectively private item and fails the job on
+a hit.
+
+> Amended 2026-10-02 by ADR-0016 (D8). The public build filters on **effective**
+> visibility — the manifest's request AND the hub's committed publish allowlist —
+> and the private build renders public and private items alike. The post-build
+> check's private set is every non-allowlisted item, not only the ones whose
+> manifest says `private`. The `srcDir` split of ADR-0011 is unchanged.
 
 Design system: carry over the palette and type already used on the
 tracker and dossier — Spectral (display), IBM Plex Sans (body), IBM Plex

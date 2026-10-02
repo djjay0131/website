@@ -100,7 +100,7 @@ it (SEAM-2).
 | `section` | yes | One of `research`, `projects`, `writing`, `cv`, `phd`. |
 | `format` | yes | One of `md`, `mdx`, `html`, `pdf`, `bundle`, `data`. |
 | `path` | yes | Relative to `dist/`. No absolute path, no `..` segment, no backslash, no control character, and nothing that leaves `dist/` through a symlink. |
-| `visibility` | yes | `public` or `private`. `private` is a Phase 3 capability; until then publish only `public` items. |
+| `visibility` | yes | `public` or `private`. **A request, not the decision.** Since Wave 0b an item is public only when the hub's committed `site/publish-allowlist.json` also names its `(source, slug)`; a `public` item the hub has not allowlisted renders only behind sign-in. An allowlist entry can never make a `private` item public (the hub build fails on that conflict). |
 | `date` | yes | `YYYY-MM-DD`. |
 | `summary` | no | 1–500 characters. |
 | `tags` | no | Up to 20 unique slug-shaped tags. |

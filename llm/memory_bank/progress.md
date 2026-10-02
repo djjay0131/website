@@ -50,6 +50,17 @@ merged reality, not plans.
 
 ## Done, most recent first
 
+- **Wave 0b (private by default) implemented** 2026-10-02 on
+  `feat/private-by-default`, **not merged** — `site/publish-allowlist.json` is now the
+  authority (D8, ADR-0016); `effectiveVisibility()` is the one computation; the public
+  build stores only effectively-public items, the private build every item; the leak
+  check's private set is every non-allowlisted item; `check-publish-allowlist` is wired
+  into both build jobs. `cv/anthropic-fellow` is gone from `dist-public`; Firebase 302s
+  its historical URLs. Local evidence green (291 tests, builds, leak check, allowlist
+  guard, contrast, governance 4/4). Adversarial round + security gate + live
+  verification are the next step.
+- **D12 answered** 2026-10-02 — the private-area team is the D3 pair; the Firestore seed
+  remains owner-run.
 - **Checkpoint 4 PASSED** 2026-10-02 — the owner signed in as `family@cusati.us`
   (non-member; refused, "nothing has been shared with you") and `djjay@vt.edu` (member;
   saw the private area). A3/A4 proven; #52 closed.
@@ -75,9 +86,10 @@ merged reality, not plans.
   `agentic-kg-research` (private, for the team) is Wave 2.
 - **Checkpoint 4 is not passed** (#52) until the owner's non-member sign-in records A3
   and A4. A13 is closed (the `phd-milestones` prefix proofs ran, K10 included).
-- **Wave 0b (#46)**: private by default — the hub owns the publish decision. Not started.
+- **Wave 0b (#46)**: implemented on `feat/private-by-default`; adversarial round,
+  security gate, merge and live verification remain.
 - Phases 4–6 of `llm/master-roadmap.md` (sharing, satellite remainder, Phase 6), plus
-  the branding wave (0c).
+  the branding wave (0c, unblocked: spec + ADR-0015 exist).
 
 ## Known issues
 

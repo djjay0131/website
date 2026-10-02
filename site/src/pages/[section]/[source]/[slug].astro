@@ -23,7 +23,7 @@ export async function getStaticPaths() {
   const entries = await getCollection(
     "sources",
     ({ data }) =>
-      data.visibility === "public" &&
+      data.effective_visibility === "public" &&
       data.source !== "cv" &&
       framedFormats.has(data.format),
   );

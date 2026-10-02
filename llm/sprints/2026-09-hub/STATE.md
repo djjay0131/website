@@ -2837,3 +2837,129 @@ gs://cusati-hub-private/index.html   -> contains "LLM + Knowledge Graphs — res
 So the item is reachable to the signed-in member whose session is proven; Wave 2's exit is
 met in substance, and one owner click on that URL closes it observably. It is recorded as
 "reachable, not yet requested" rather than claimed as seen.
+
+## D12 — answered (owner, 2026-10-02)
+
+The owner reports **D12 answered**. The private-area team was already on the record as
+**D3** (`djjay@vt.edu`, `cbrown@vt.edu`); D12 only filled the brief's own placeholder for
+the same list. This unblocks Wave 2's onboarding step in substance; the Firestore member
+**seed is still owner-run** (hard stop, §9), and the item URL to click is
+`https://jason.cusati.us/p/research/agentic-kg-research/research-store/`.
+
+## Wave 0b — private by default, implemented, NOT merged (2026-10-02)
+
+Branch `feat/private-by-default`. Owner decision **D8** is now implemented in code, and
+recorded durably as **ADR-0016** (design doc §4 and §5 amended to point at it). The
+`cv/anthropic-fellow` exposure (finding A-6: public on five origins) is closed in the
+build: it is not emitted anywhere in `dist-public`.
+
+### What changed
+
+- **`site/publish-allowlist.json`** — committed, 14 entries: the four day-one `cv` items,
+  `kgis/kgis-docs`, and the first-party `hub/…` research digest routes. This file is now
+  the hub's only authority on what is public.
+- **`site/src/lib/hub-content.mjs`** — `effectiveVisibility()` is the single computation
+  combining the manifest *request* with the allowlist *decision*; `parsePublishAllowlist`,
+  `readPublishAllowlist`, `findAllowlistConflicts` (condition A) and
+  `findStaleAllowlistEntries` (condition B) live beside it.
+- **`src/content.config.ts` (shared loader)** — tags every entry with
+  `effective_visibility`; the **public** output stores only effectively-public items, the
+  **private** output stores every item (SEAM-B4).
+- **Consumers re-pointed at effective visibility** — the `/projects/` and CV section
+  indexes (`collectPublicItems`), `cv/index`, `resumes/index`, `cv/[variant]`, the framed
+  item route, `public-build` staging, and `stage-public-assets`. The CV variant list is
+  filtered, so the private variant defined inside the shared `cv-data` payload cannot leak
+  through the directory listing (SEAM-B3).
+- **The leak check** — private set is now every non-allowlisted item (SEAM-B6). A source
+  name shorter than 4 characters is not a bare needle (`cv` occurs in every `/cv/…` link);
+  its qualified-id, route and payload-path needles still bind.
+- **`check-publish-allowlist.mjs`** (new, wired into both build jobs) — condition A always
+  fails; condition B fails in `pr` mode and warns in `deploy` mode, so a satellite rename
+  cannot halt deploy or withdrawal. A whole absent source prefix is NOT condition B (the
+  expected-source check owns it).
+- **`firebase.json`** — `/pdfs/anthropic-fellow.pdf` and `/cv/anthropic-fellow[/**]` 302 to
+  `/signin/` on the canonical origin.
+- **Docs** — `docs/satellites.md` and `contract/README.md` now state plainly that
+  `visibility` is a request and the allowlist is the decision. No schema change (SEAM-B7).
+
+### Evidence (all local, 2026-10-02)
+
+```
+npm test                        291 passed, 1 skipped (23 files)
+npm run build:public            26 pages; no "anthropic-fellow" in any path or byte;
+                                absent from sitemap-0.xml; /cv/ lists three variants
+npm run check:no-private-in-public  PASS — 4 effectively-private items
+npm run check:publish-allowlist     PASS — 14 entries, 0 conflicts, 0 stale (mode pr)
+npm run build:private           9 pages; receipt privateItemCount: 4, renderedItemCount: 8
+npm run check:private-links     PASS — 13 pages
+npm run contrast                52 pairs, 0 below AA
+npm run demo:leak-check         PASS — the guard failed on the injected leak
+governance-checks --layout      4 of 4 PASS
+```
+
+**CI caught a real leak the local run could not see, and that is the wave's most valuable
+find.** On the first PR run both build jobs failed `check:no-private-in-public` on
+`build-info.json`: the CI-generated cv-release fingerprint listed every release asset,
+including `anthropic-fellow.pdf`, which is now effectively private. The check behaved
+exactly as designed — a content-only trace with no matching path. Fixed in `e360ce4` by
+hashing the sorted asset list before it is written to the public `build-info.json`
+(`cv_fingerprint` is now a SHA-256; change detection is unchanged, and no item is named).
+This is the same class as Wave 2's FP-1, in the opposite direction: a guard finding a real
+leak rather than a false positive. After the fix, all PR checks pass (`build`,
+`build-firebase`, `leak-check-self-test`, `contract-tests`, `governance-checks`,
+`budget-guard`, `check`, `deploy-tools`).
+
+**PR:** https://github.com/djjay0131/website/pull/86 (draft). It must not merge until the
+Wave 0b adversarial round, security gate and live verification pass.
+
+### Adversarial round (2026-10-02)
+
+Contracts: `contracts/{red-team,skeptic-verifier,dissenter,security-tester,chief-reviewer}-wave-0b.md`.
+Handoffs beside them under `handoffs/`.
+
+- **Red Team** — 8 attacks / 10 cases. **9 REFUSED, 1 BYPASS (A5).** Casing, Unicode,
+  path-dot/traversal, `(source,slug)` collision, the `cv-data` residue canary and the
+  historical URLs are all refused with cited code paths. The bypass: the allowlist binds a
+  **name, not bytes** — a hostile `cv` manifest can point the allowlisted `academic` slug at
+  `anthropic-fellow.pdf` and the hub stages the private PDF at `/pdfs/academic.pdf` with
+  every guard green. Also Fix-later: raw consumers (`collectPublicItems`, staging, the leak
+  check) parse manifests without the slug-pattern guard, so only the Zod loader stops a
+  forged `hub` slash-slug item.
+- **Skeptic Verifier** — made the widened leak check red by planting a manifest-derived
+  marker on the fellowship item (caught by title), made the allowlist guard's conditions A
+  and B red and restored them, and confirmed a bare `cv` is not a needle while
+  `cv/anthropic-fellow` still is. Every guard is fail-able. The only non-fail-able case is
+  an arbitrary string that is not manifest-derived — a detection-coverage limit, not a
+  bypass.
+- **Dissenter** — five design objections; all dispositioned below.
+- **Security Tester** — gate **GREEN, 0 FAIL** across the six scoped checks (public-path
+  cleanliness red→green, allowlist A/B both modes, effective-visibility-only, historical
+  URLs, `firebase.json` unchanged in kind, private build links). One non-blocking stale
+  comment fixed.
+- **Chief Reviewer** — **Request changes**, solely documentary/mechanical: the round fixes
+  were uncommitted and the A5 residual was not recorded. Both are now closed (this commit;
+  ADR-0016 "Known residual"; seam amendments).
+
+### Dispositions (Lead Architect)
+
+| Finding | Source | Disposition |
+|---|---|---|
+| **A5 — allowlist binds a name, not bytes** | Red Team | **Fix later, High; owner decision required.** Pre-existing content-integrity gap in the manifest contract; not fixable by a name/path guard without either content hashes (blocked by SEAM-B7) or SEAM-B3 option 2 in the `cv` satellite. Recorded in ADR-0016 "Known residual". D8 must not be described as protecting an allowlisted item's *contents*. |
+| Raw consumers trust unvalidated manifest JSON | Red Team | **Fix later.** Real today only as defense-in-depth; the Zod loader fails the build in every current path. Add a shared pattern guard before Wave 5's RSS/search/OG consumers. |
+| `hub/*` entries declarative, not enforcement | Dissenter 1 | **Reconciled**: ADR-0016 decision 1 and SEAM-B1 amended to say so explicitly; first-party routes depend on the ADR-0011 structural guarantee. First-party route guard = ADR candidate. |
+| No reconciliation of public requests vs allowlist | Dissenter 2 | **Note.** By design; the allowlist is the authority and condition B covers the reverse. A request-not-allowlisted warning is optional clutter (`anthropic-fellow` would warn forever). |
+| De-allowlisting demotes, does not withdraw | Dissenter 3 | **Fixed (docs)**: stated in ADR-0016 decision 1 and `docs/satellites.md`. |
+| Deploy warning was a bare `console.warn` | Dissenter 4 | **Fixed**: emits `::warning` under GitHub Actions. |
+| Pages 404, not 410/sign-in | Dissenter 5 | **Recorded residual** (below). |
+| Stale comment at `projects/index.astro` | Security Tester | **Fixed.** |
+| Render-aware leak check | Skeptic Verifier | **Fix later / ADR candidate** (carried from Waves 1–2). |
+
+### What is NOT done, stated rather than glossed
+
+- **No live verification yet** — nothing has deployed; the canonical host still serves the
+  old build until this merges. The owner's post-merge check is below.
+- **The GitHub Pages residual.** The allowlist governs both hosts' `dist-public`, so a
+  redeploy removes the fellowship CV from Pages too; a *historical* Pages URL becomes 404
+  (never 200), not the 410/sign-in SEAM-B9 names. Phase 6 retires Pages. Recorded per
+  SEAM-B9's "say so explicitly".
+- **A5 residual (High):** see the disposition table and ADR-0016.
