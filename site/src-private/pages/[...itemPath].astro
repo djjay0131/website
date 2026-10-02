@@ -8,29 +8,30 @@
 // own relative links and stylesheet resolve exactly as they do in the satellite.
 import { getCollection } from "astro:content";
 import PrivateBase from "../layouts/PrivateBase.astro";
-import { payloadUrlFor, routeFor } from "../lib/private-content.mjs";
+import { memberHref, payloadUrlFor } from "../lib/private-content.mjs";
 
 export async function getStaticPaths() {
-  // Only effectively-private items are framed under /p/. Public items are
-  // served by the public build; duplicating their payloads here broke
-  // `check:private-links` on public satellites and serves public bytes through
-  // the gate. SEAM-B4 amended: every private item, across every section.
-  const items = (
-    await getCollection("sources", ({ data }) => data.effective_visibility === "private")
-  ).map((entry) => entry.data);
+  // Only effectively-private items get a frame under /p/. The nav is built from
+  // EVERY item (SEAM-B4: the member sees everything; public items link out).
+  const all = (await getCollection("sources", ({ data }) => data.format !== "data")).map(
+    (entry) => entry.data,
+  );
+  const privateItems = all.filter((item) => item.effective_visibility === "private");
 
-  return items.map((item) => ({
+  return privateItems.map((item) => ({
     params: { itemPath: `${item.section}/${item.source}/${item.slug}` },
-    props: { item, all: items },
+    props: { item, all },
   }));
 }
 
 const { item, all } = Astro.props;
 const base = import.meta.env.BASE_URL;
+const site = Astro.site?.toString() ?? "";
 const nav = all
   .slice()
   .sort((a, b) => (a.title < b.title ? -1 : 1))
-  .map((i) => ({ href: routeFor(i, base), label: i.title }));
+  .map((i) => ({ href: memberHref(i, { base, site }), label: i.title }))
+  .filter((n: { href: string | null; label: string }) => n.href !== null);
 const payload = payloadUrlFor(item, base);
 ---
 
