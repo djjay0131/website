@@ -181,6 +181,9 @@ it. Two consequences worth knowing:
 - **An allowlist entry can never make a `private` item public.** If the allowlist names
   an item whose manifest says `private`, the hub build fails. It decides what *becomes*
   public, never what stops being private.
+- **Removing an entry demotes, it does not withdraw.** Dropping `(source, slug)` from
+  the allowlist makes the item private (signed-in members still see it); to take it off
+  the site entirely, remove it from your manifest (ADR-0010).
 
 The hub build fails if an effectively private item appears in public output, and the
 private build shows members public and private items alike in one place.

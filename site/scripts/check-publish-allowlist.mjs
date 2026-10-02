@@ -146,11 +146,17 @@ if (isMain) {
     } else {
       console.warn(header);
       for (const entry of stale) {
-        console.warn(
+        const message =
           `  ${entry.source}/${entry.slug} names no item in any manifest. A satellite rename is ` +
-            `ordinary content editing and must NOT stop the hub deploying or withdrawing, so the ` +
-            `deploy build continues -- but this entry is now doing nothing.`,
-        );
+          `ordinary content editing and must NOT stop the hub deploying or withdrawing, so the ` +
+          `deploy build continues -- but this entry is now doing nothing.`;
+        console.warn(message);
+        // A bare console.warn scrolls away. SEAM-B5 requires the deploy warning
+        // "must not decay into ignore"; an annotation makes it a visible,
+        // un-suppressible mark on the run (Dissenter objection 4).
+        if (process.env.GITHUB_ACTIONS === "true") {
+          console.log(`::warning title=Stale publish allowlist entry::${entry.source}/${entry.slug} names no item`);
+        }
       }
     }
   }

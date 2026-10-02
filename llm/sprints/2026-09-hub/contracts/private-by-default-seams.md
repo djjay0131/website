@@ -62,6 +62,15 @@ non-negotiable says we do not extend.
 **A satellite can never edit it.** It lives in the hub, and no satellite holds a GitHub
 credential for the hub (ADR-0007 decision 2). That is the whole enforcement story.
 
+> **Amended 2026-10-02 (Wave 0b implementation + Dissenter/Chief Reviewer).** The
+> `hub/*` entries are **declarative, not enforcing**. They record intended public
+> first-party routes and are exempt from the stale check; they are not a build
+> gate, because first-party pages are compiled from committed `site/src/pages/**`
+> and no satellite can introduce one (the ADR-0011 structural guarantee). "The
+> only way to publish" is literal for **satellite items**; for first-party routes
+> the guarantee is structural. A route-level guard is an ADR candidate. Recorded
+> in ADR-0016 decision 1.
+
 ## SEAM-B2 — Effective visibility is computed in exactly one place
 
 `site/src/lib/hub-content.mjs` computes **effective visibility** and every consumer reads it
@@ -173,6 +182,14 @@ The leak check's private-slug set becomes **every non-allowlisted item**, first-
 pages included — not only the items whose manifest says `private`.
 
 That is a strictly larger set than today's, and it is the set that matches the new rule.
+
+> **Amended 2026-10-02 (Wave 0b implementation).** "First-party hub pages included"
+> is not representable in this check: it operates on **manifest items**, and
+> first-party pages are not manifest items — they are compiled from committed
+> `site/src/pages/**` (ADR-0011). The widened set is every non-allowlisted
+> **manifest item**, which is strictly larger than the old one and is what catches
+> `cv/anthropic-fellow`. A first-party-route guard is an ADR candidate (ADR-0016
+> decision 1).
 
 ## SEAM-B7 — Documentation, and no schema change
 

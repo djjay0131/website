@@ -38,6 +38,22 @@ amends design doc §4 and §5.
    contains its `(source, slug)`. First-party hub pages use `source: "hub"` and
    their route path as the slug, so one file covers both.
 
+   **`hub/*` entries are declarative, not enforcing.** They record which
+   first-party routes are intended to be public, and the guard exempts them from
+   the stale check. They are not a build gate, because first-party pages are
+   compiled from committed `site/src/pages/**` and no satellite can introduce
+   one — the structural guarantee of ADR-0011 (a router that is never shown a
+   file cannot emit it). A route-level guard ("every emitted first-party route is
+   allowlisted") is an ADR candidate; until it exists, do not read the `hub/*`
+   entries as proof that a first-party page was checked.
+
+   **Removing an entry demotes, it does not withdraw.** Taking `(source, slug)`
+   out of the allowlist makes an item private — members-only — it does NOT stop
+   it being served to signed-in members, because the private build renders every
+   item (decision 3). To withdraw an item entirely, remove it from the satellite
+   manifest (ADR-0010). A de-allowlisting that is expected to take a page off the
+   site is a misunderstanding the hub cannot detect.
+
 2. **Effective visibility is computed in exactly one place.**
    `effectiveVisibility()` in `site/src/lib/hub-content.mjs` is the only code
    that combines the two inputs. The collection loader, the section indexes, the
@@ -127,6 +143,32 @@ satellite a kill switch on the hub's deploy and on withdrawal. See decision 5.
 - **The allowlist is now the security boundary.** Its guard and the leak check
   are the enforcement. The Skeptic Verifier's Wave 0b job is to show a wrong
   entry actually turns them red.
+
+### Known residual — the allowlist binds a name, not bytes
+
+The Wave 0b Red Team demonstrated (attack A5) that the allowlist binds a
+`(source, slug)`, never bytes. A hostile or compromised satellite can declare its
+private document's bytes under an allowlisted item — e.g. `cv` sets the
+allowlisted `academic` item's `path` to `anthropic-fellow.pdf` — and the hub will
+stage those bytes at `/pdfs/academic.pdf`. The build, the allowlist guard and the
+leak check all pass, because the trace is content under a different name with no
+matching path.
+
+This is a real limitation, and it is recorded rather than papered over:
+
+- **It is pre-existing, not introduced here.** Before D8 a satellite could
+  publish *anything* by asserting `visibility: public`. The allowlist strictly
+  narrows what can be public; it was never a content-integrity mechanism, because
+  the manifest contract carries no hashes and SEAM-B7 forbids a schema change.
+- **It is not fixable by a name guard.** Binding the entry to the declared
+  `path` catches the path-swap above but not a satellite that serves different
+  bytes at the same path; and a path change is the same class of ordinary
+  satellite edit SEAM-B5's condition B refuses to let stop the deploy. The real
+  fixes are (a) SEAM-B3 option 2 — have the `cv` satellite stop publishing the
+  fellowship PDF at all — or (b) an ADR for a content-digest binding in the
+  manifest. **Owner decision required**; tracked as a Wave 0b residual in
+  `llm/sprints/2026-09-hub/STATE.md`. Until one lands, D8 must not be described as
+  protecting the *contents* of an allowlisted item, only its identity.
 - **The GitHub Pages mirror is not retired until Phase 6.** The allowlist governs
   the `dist-public` build both hosts consume, so a redeploy removes the
   fellowship CV from Pages too; a historical URL there becomes 404 (never 200).

@@ -19,11 +19,10 @@ import path from "node:path";
 // per project") and design doc §11's project index. It is NOT owner decision D7,
 // which only keeps `research` and `projects` as separate SECTIONS.
 //
-// VISIBILITY: this reads the manifest's `visibility` because the hub's publish
-// allowlist does not exist yet. Owner decision D8 makes the allowlist the
-// authority; when Wave 0b lands `publish-allowlist.json`, this index must consume
-// the EFFECTIVE visibility (manifest request AND allowlist), not the raw field.
-// Noted so the D8 work does not miss it (Wave 1 Dissenter D5).
+// VISIBILITY: `collectPublicItems` now consumes EFFECTIVE visibility (manifest
+// request AND the committed allowlist) — owner decision D8, Wave 0b, ADR-0016.
+// It never reads the raw `visibility` field, so this index cannot list an item
+// the allowlist has not published (Wave 1 Dissenter D5, closed).
 //
 // Only html/bundle items get a link: those are the formats this build routes to
 // a frame at /<section>/<source>/<slug>/. An item in another format is listed

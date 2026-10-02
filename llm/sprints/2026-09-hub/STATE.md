@@ -2912,16 +2912,54 @@ leak rather than a false positive. After the fix, all PR checks pass (`build`,
 **PR:** https://github.com/djjay0131/website/pull/86 (draft). It must not merge until the
 Wave 0b adversarial round, security gate and live verification pass.
 
+### Adversarial round (2026-10-02)
+
+Contracts: `contracts/{red-team,skeptic-verifier,dissenter,security-tester,chief-reviewer}-wave-0b.md`.
+Handoffs beside them under `handoffs/`.
+
+- **Red Team** — 8 attacks / 10 cases. **9 REFUSED, 1 BYPASS (A5).** Casing, Unicode,
+  path-dot/traversal, `(source,slug)` collision, the `cv-data` residue canary and the
+  historical URLs are all refused with cited code paths. The bypass: the allowlist binds a
+  **name, not bytes** — a hostile `cv` manifest can point the allowlisted `academic` slug at
+  `anthropic-fellow.pdf` and the hub stages the private PDF at `/pdfs/academic.pdf` with
+  every guard green. Also Fix-later: raw consumers (`collectPublicItems`, staging, the leak
+  check) parse manifests without the slug-pattern guard, so only the Zod loader stops a
+  forged `hub` slash-slug item.
+- **Skeptic Verifier** — made the widened leak check red by planting a manifest-derived
+  marker on the fellowship item (caught by title), made the allowlist guard's conditions A
+  and B red and restored them, and confirmed a bare `cv` is not a needle while
+  `cv/anthropic-fellow` still is. Every guard is fail-able. The only non-fail-able case is
+  an arbitrary string that is not manifest-derived — a detection-coverage limit, not a
+  bypass.
+- **Dissenter** — five design objections; all dispositioned below.
+- **Security Tester** — gate **GREEN, 0 FAIL** across the six scoped checks (public-path
+  cleanliness red→green, allowlist A/B both modes, effective-visibility-only, historical
+  URLs, `firebase.json` unchanged in kind, private build links). One non-blocking stale
+  comment fixed.
+- **Chief Reviewer** — **Request changes**, solely documentary/mechanical: the round fixes
+  were uncommitted and the A5 residual was not recorded. Both are now closed (this commit;
+  ADR-0016 "Known residual"; seam amendments).
+
+### Dispositions (Lead Architect)
+
+| Finding | Source | Disposition |
+|---|---|---|
+| **A5 — allowlist binds a name, not bytes** | Red Team | **Fix later, High; owner decision required.** Pre-existing content-integrity gap in the manifest contract; not fixable by a name/path guard without either content hashes (blocked by SEAM-B7) or SEAM-B3 option 2 in the `cv` satellite. Recorded in ADR-0016 "Known residual". D8 must not be described as protecting an allowlisted item's *contents*. |
+| Raw consumers trust unvalidated manifest JSON | Red Team | **Fix later.** Real today only as defense-in-depth; the Zod loader fails the build in every current path. Add a shared pattern guard before Wave 5's RSS/search/OG consumers. |
+| `hub/*` entries declarative, not enforcement | Dissenter 1 | **Reconciled**: ADR-0016 decision 1 and SEAM-B1 amended to say so explicitly; first-party routes depend on the ADR-0011 structural guarantee. First-party route guard = ADR candidate. |
+| No reconciliation of public requests vs allowlist | Dissenter 2 | **Note.** By design; the allowlist is the authority and condition B covers the reverse. A request-not-allowlisted warning is optional clutter (`anthropic-fellow` would warn forever). |
+| De-allowlisting demotes, does not withdraw | Dissenter 3 | **Fixed (docs)**: stated in ADR-0016 decision 1 and `docs/satellites.md`. |
+| Deploy warning was a bare `console.warn` | Dissenter 4 | **Fixed**: emits `::warning` under GitHub Actions. |
+| Pages 404, not 410/sign-in | Dissenter 5 | **Recorded residual** (below). |
+| Stale comment at `projects/index.astro` | Security Tester | **Fixed.** |
+| Render-aware leak check | Skeptic Verifier | **Fix later / ADR candidate** (carried from Waves 1–2). |
+
 ### What is NOT done, stated rather than glossed
 
-- **The adversarial round has not run.** Red Team, Dissenter, Skeptic Verifier, Security
-  Tester, Boundary/Regression testers and Chief Reviewer for Wave 0b are outstanding. The
-  wave is **not merged** and pushed as a branch/PR only.
 - **No live verification yet** — nothing has deployed; the canonical host still serves the
-  old build until this merges.
+  old build until this merges. The owner's post-merge check is below.
 - **The GitHub Pages residual.** The allowlist governs both hosts' `dist-public`, so a
   redeploy removes the fellowship CV from Pages too; a *historical* Pages URL becomes 404
-  (never 200). Phase 6 retires Pages. Recorded per SEAM-B9's "say so explicitly".
-- **The first-party `hub` allowlist entries are documentation, not enforcement** — first-
-  party pages are committed, so no satellite can introduce one. A route-level guard is an
-  ADR candidate (`contracts/site-wave-0b.md`, handoff Recommendation 1).
+  (never 200), not the 410/sign-in SEAM-B9 names. Phase 6 retires Pages. Recorded per
+  SEAM-B9's "say so explicitly".
+- **A5 residual (High):** see the disposition table and ADR-0016.
