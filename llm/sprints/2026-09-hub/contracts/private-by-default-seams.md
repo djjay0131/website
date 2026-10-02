@@ -126,20 +126,23 @@ signed in.
 
 ## SEAM-B4 — What each build renders
 
-- **Private build** renders **every private item, across every section**, not only
-  `/phd/`, with the members' navigation. Public items are **not** duplicated into the
-  private output; they remain on the public site.
+- **Private build** lists **every item across every section**, not only `/phd/`, with
+  the members' navigation. It **frames only the private items** under `/p/`; a public
+  item is linked to its public URL, not duplicated into the private bucket.
 - **Public build** renders **only** allowlisted items, and **never names a non-allowlisted
   one** — not in a link, a list, a count, a title, an OG tag or a sitemap entry.
 
-> **Amended 2026-10-02 (post-merge deploy failure).** The first implementation read
-> "public and private alike" literally and staged public items into the private
-> bucket. On the real `main` deploy, `check:private-links` failed: the public KGIS
-> docs (MkDocs) carry off-origin `fonts.googleapis.com`/`gstatic.com` links and
-> absolute `/projects/kgis/...` links, which cannot resolve under `/p/` — and
-> serving public bytes through the gate is itself wrong. The private build now
-> stages only effectively-private items; a member reaches public items on the
-> public site. The every-**section** requirement is unchanged.
+> **Amended 2026-10-02 (post-merge deploy failure, then member-view fix).** The first
+> implementation read "public and private alike" literally and staged public items
+> into the private bucket. On the real `main` deploy, `check:private-links` failed:
+> the public KGIS docs (MkDocs) carry off-origin `fonts.googleapis.com`/`gstatic.com`
+> links and absolute `/projects/kgis/...` links, which cannot resolve under `/p/` —
+> and serving public bytes through the gate is itself wrong. The fix keeps the
+> members' area complete without duplicating bytes: the index lists every item, a
+> private item is framed under `/p/`, and a public item links to its public URL
+> (`memberHref` in `src-private/lib/private-content.mjs`), an outbound navigation
+> anchor the private-link guard allows by design. The every-**section** and
+> "member sees everything in one place" requirements are met.
 
 This extends ADR-0011's two-`srcDir` model rather than replacing it. The private build's
 `srcDir` now covers all sections; the router isolation stays exactly as ADR-0011 specifies,

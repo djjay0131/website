@@ -8,24 +8,23 @@
 // someone has to remember to apply.
 import { getCollection } from "astro:content";
 import PrivateBase from "../layouts/PrivateBase.astro";
-import { routeFor } from "../lib/private-content.mjs";
+import { memberHref } from "../lib/private-content.mjs";
 
-// The private area lists the member's private items across EVERY section (not
-// only /phd/). Public items are NOT duplicated here: they live on the public
-// site, and staging their payloads into the private bucket made
-// `check:private-links` fail on a public satellite's off-origin and absolute
-// links (KGIS docs). SEAM-B4 is amended accordingly: members see every private
-// item in one place, and reach the public ones on the public site.
-const items = (
-  await getCollection("sources", ({ data }) => data.effective_visibility === "private")
-)
+// SEAM-B4: the members' area shows EVERY item across every section (data items
+// are build inputs, not documents). Private items are framed under /p/; public
+// items are linked to their public URL (memberHref) and are NOT staged into the
+// private bucket — staging a public satellite's bytes too failed
+// `check:private-links` on the real deploy.
+const items = (await getCollection("sources", ({ data }) => data.format !== "data"))
   .map((entry) => entry.data)
   .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug < b.slug ? -1 : 1));
 
-// Astro sets BASE_URL from the same `base` that produced the asset URLs, so the
-// raw routes these functions build can never drift from them (issue #27).
 const base = import.meta.env.BASE_URL;
-const nav = items.map((item) => ({ href: routeFor(item, base), label: item.title }));
+const site = Astro.site?.toString() ?? "";
+const href = (item: (typeof items)[number]) => memberHref(item, { base, site });
+const nav = items
+  .map((item) => ({ href: href(item), label: item.title }))
+  .filter((n): n is { href: string; label: string } => n.href !== null);
 ---
 
 <PrivateBase title="Members' area" nav={nav}>
@@ -35,9 +34,14 @@ const nav = items.map((item) => ({ href: routeFor(item, base), label: item.title
     <ul class="items">
       {items.map((item) => (
         <li>
-          <h2><a href={routeFor(item, base)}>{item.title}</a></h2>
+          {href(item) ? (
+            <h2><a href={href(item)}>{item.title}</a></h2>
+          ) : (
+            <h2>{item.title}</h2>
+          )}
           <p class="meta">
             <time datetime={item.date}>{item.date}</time> · {item.source}
+            {item.effective_visibility === "public" && " · public"}
           </p>
           {item.summary && <p class="summary">{item.summary}</p>}
         </li>

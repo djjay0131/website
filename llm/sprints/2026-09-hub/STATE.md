@@ -2979,9 +2979,17 @@ second real catch:
 - `deploy` (GitHub Pages) had already succeeded; `firebase-deploy` and `private-sync` were
   **skipped**, so the canonical host and the private bucket are unchanged and nothing
   regressed live.
-- **Fix forward** on `fix/wave-0b-private-scope`: the private build stages and frames only
-  effectively-private items again (members reach public items on the public site). SEAM-B4,
-  ADR-0016 decision 3 and `contracts/site-wave-0b.md` requirement 2 are amended to state
-  this. The every-**section** requirement is unchanged.
+- **Fix forward 1** on `fix/wave-0b-private-scope` (merged `53f2651`): the private build
+  stages and frames only effectively-private items. SEAM-B4, ADR-0016 decision 3 and
+  `contracts/site-wave-0b.md` requirement 2 amended.
+- **Fix forward 2** on `fix/wave-0b-member-view`: fix forward 1 alone dropped the owner's
+  "/p/ shows four CVs signed in" criterion (the live bucket listed only the private
+  items). The members' area now lists **every** item across every section; a private item
+  is framed under `/p/`, and a public item is linked to its public URL (`memberHref`),
+  which `check:private-links` allows as an outbound navigation anchor. Locally the index
+  shows all four CV variants (three linked out, the fellowship one framed) with 24
+  outbound anchors allowed and the guard green. The every-section and "member sees
+  everything in one place" requirements are met.
 
-This is why the wave's exit is not recorded until the hotfix is merged and verified live.
+This is why the wave's exit is not recorded until the member-view fix is merged and
+verified live.
