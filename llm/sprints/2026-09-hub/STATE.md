@@ -2790,3 +2790,50 @@ a careful grep, not a render-aware guard. ADR candidate stands.
 - **Open questions:** `html` asset-set declaration; a render-aware leak check.
 - **Governance:** L2; PRs #77 (infra), #79 (leak check), agentic-kg-research #3; governance
   checks green.
+
+## Checkpoint 4 — PASSED (owner sign-ins, 2026-10-02)
+
+The owner ran the two sign-ins Checkpoint 4 was waiting for. The gate's own logs are the
+evidence, read from Cloud Logging, not the owner's word:
+
+```
+2026-10-02T02:20:11.906Z  INFO gate event=client_signin_not_a_member trace=11cd3015… stage=exchange
+2026-10-02T02:20:11.773Z  INFO gate event=deny scope=session reason=not_a_member member=family@cusati.us
+2026-10-02T02:20:34.689Z  INFO gate event=allow scope=session member=djjay@vt.edu
+2026-10-02T02:20:34..43   INFO gate event=allow scope=private member=djjay@vt.edu   (x20)
+```
+
+And the requests the member actually made (Cloud Run request logs):
+
+```
+/p/
+/p/phd/phd-milestones/committee-dossier/
+/p/_payload/phd-milestones/site/committee.html
+```
+
+**A3 + the non-member half of A4 are PROVEN.** `family@cusati.us` is not on the allowlist
+(`djjay@vt.edu` and `cbrown@vt.edu` only), and the gate refused it at the session exchange
+and told the sign-in page `not_a_member` — the "nothing has been shared with you" page the
+owner saw. `djjay@vt.edu` minted a session and read private pages across a 9-second window,
+which is A5's persistence.
+
+**Checkpoint 4 is recorded PASSED.** A12 (#49), A13 (#50, completed by K10), S5 (#31) are
+closed; A1/A5 proven (2026-09-23 and again here); A7 recorded deferred (#51); A3/A4 now
+proven. Issue #52 closes on this record.
+
+### Wave 2 member view — one click short, and stated as such
+
+The member loaded `/p/` (which lists all three private items, including the research store)
+and the committee dossier, but did **not** request
+`/p/research/agentic-kg-research/research-store/`. The route, its payload and the index
+entry all exist in the private bucket, verified directly:
+
+```
+gs://cusati-hub-private/research/agentic-kg-research/research-store/index.html
+gs://cusati-hub-private/_payload/agentic-kg-research/index.html
+gs://cusati-hub-private/index.html   -> contains "LLM + Knowledge Graphs — research store"
+```
+
+So the item is reachable to the signed-in member whose session is proven; Wave 2's exit is
+met in substance, and one owner click on that URL closes it observably. It is recorded as
+"reachable, not yet requested" rather than claimed as seen.
