@@ -37,7 +37,8 @@ const personJsonLd = {
   name: cv.meta.name,
   email: cv.meta.contact.email,
   url: new URL(`${base}cv/${variant}`, Astro.site).href,
-  image: new URL(`${base}photo_jason_1.jpeg`, Astro.site).href,
+  // No portrait on the public site (ADR-0015 decision 1): the former
+  // photo_jason_1.jpeg image is deliberately omitted from the Person data.
   alumniOf: cv.education.map((e) => ({
     "@type": "CollegeOrUniversity",
     name: e.institution,

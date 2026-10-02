@@ -128,12 +128,25 @@ describe("stage-public-assets — Phase 1's URLs keep resolving", () => {
     fs.rmSync(sources, { recursive: true, force: true });
   });
 
-  it("puts each published cv pdf at public/pdfs/<slug>.pdf and the photo beside it", () => {
+  it("puts each published cv pdf at public/pdfs/<slug>.pdf and NO portrait", () => {
     const { staged } = stagePublicAssets(sources, siteRoot);
     expect(staged).toContain(`${PUBLIC_PDF_DIR}/academic.pdf`);
     expect(staged).toContain(`${PUBLIC_PDF_DIR}/research-professional.pdf`);
-    expect(staged).toContain(PUBLIC_PHOTO_PATH);
+    // Amendment 4 / ADR-0015 decision 1: the public site serves no portrait.
+    expect(staged).not.toContain(PUBLIC_PHOTO_PATH);
+    expect(fs.existsSync(path.join(siteRoot, PUBLIC_PHOTO_PATH))).toBe(false);
     expect(fs.existsSync(path.join(siteRoot, PUBLIC_PDF_DIR, "sde-long.pdf"))).toBe(true);
+  });
+
+  it("removes a stale portrait an older build left in public/", () => {
+    // The fixture still carries the photo in the cv-data payload and the CV PDFs
+    // keep it; the point is that staging never publishes it, and that a leftover
+    // copy from a previous build does not survive.
+    const stale = path.join(siteRoot, PUBLIC_PHOTO_PATH);
+    fs.mkdirSync(path.dirname(stale), { recursive: true });
+    fs.writeFileSync(stale, "stale");
+    stagePublicAssets(sources, siteRoot);
+    expect(fs.existsSync(path.join(siteRoot, PUBLIC_PHOTO_PATH))).toBe(false);
   });
 
   it("stops serving a pdf whose item was withdrawn from the manifest", () => {

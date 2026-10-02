@@ -4,6 +4,18 @@
     "to": "/"
   },
   {
+    "from": "/website/_payload/kgis/",
+    "to": "/_payload/kgis/"
+  },
+  {
+    "from": "/website/_payload/kgis/assets/style.css",
+    "to": "/_payload/kgis/assets/style.css"
+  },
+  {
+    "from": "/website/_payload/kgis/manifest.json",
+    "to": "/_payload/kgis/manifest.json"
+  },
+  {
     "from": "/website/build-info.json",
     "to": "/build-info.json"
   },
@@ -14,10 +26,6 @@
   {
     "from": "/website/cv/academic/",
     "to": "/cv/academic/"
-  },
-  {
-    "from": "/website/cv/anthropic-fellow/",
-    "to": "/cv/anthropic-fellow/"
   },
   {
     "from": "/website/cv/research-professional/",
@@ -48,16 +56,20 @@
     "to": "/favicon.svg"
   },
   {
+    "from": "/website/og-card.png",
+    "to": "/og-card.png"
+  },
+  {
+    "from": "/website/og-card.svg",
+    "to": "/og-card.svg"
+  },
+  {
     "from": "/website/papers/",
     "to": "/papers/"
   },
   {
     "from": "/website/pdfs/academic.pdf",
     "to": "/pdfs/academic.pdf"
-  },
-  {
-    "from": "/website/pdfs/anthropic-fellow.pdf",
-    "to": "/pdfs/anthropic-fellow.pdf"
   },
   {
     "from": "/website/pdfs/research-professional.pdf",
@@ -72,10 +84,6 @@
     "to": "/phd/"
   },
   {
-    "from": "/website/photo_jason_1.jpeg",
-    "to": "/photo_jason_1.jpeg"
-  },
-  {
     "from": "/website/privacy/",
     "to": "/privacy/"
   },
@@ -84,52 +92,16 @@
     "to": "/projects/"
   },
   {
-    "from": "/website/projects/agentic-kg/",
-    "to": "/projects/agentic-kg/"
+    "from": "/website/projects/fixture-one/",
+    "to": "/projects/fixture-one/"
   },
   {
-    "from": "/website/projects/construction-ai/",
-    "to": "/projects/construction-ai/"
+    "from": "/website/projects/fixture-two/",
+    "to": "/projects/fixture-two/"
   },
   {
-    "from": "/website/projects/insurance-schema-framework/",
-    "to": "/projects/insurance-schema-framework/"
-  },
-  {
-    "from": "/website/projects/llm-coding-assistant/",
-    "to": "/projects/llm-coding-assistant/"
-  },
-  {
-    "from": "/website/projects/llm-data-importer/",
-    "to": "/projects/llm-data-importer/"
-  },
-  {
-    "from": "/website/projects/mrs-cloud-architecture/",
-    "to": "/projects/mrs-cloud-architecture/"
-  },
-  {
-    "from": "/website/projects/nfl-ml/",
-    "to": "/projects/nfl-ml/"
-  },
-  {
-    "from": "/website/projects/remote-robotics-control/",
-    "to": "/projects/remote-robotics-control/"
-  },
-  {
-    "from": "/website/projects/security-classifier/",
-    "to": "/projects/security-classifier/"
-  },
-  {
-    "from": "/website/projects/sentiment-yelp/",
-    "to": "/projects/sentiment-yelp/"
-  },
-  {
-    "from": "/website/projects/vttsi/",
-    "to": "/projects/vttsi/"
-  },
-  {
-    "from": "/website/projects/vvuq-beam-solver/",
-    "to": "/projects/vvuq-beam-solver/"
+    "from": "/website/projects/kgis/kgis-docs/",
+    "to": "/projects/kgis/kgis-docs/"
   },
   {
     "from": "/website/research/",

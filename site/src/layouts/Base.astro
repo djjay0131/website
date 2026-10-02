@@ -1,5 +1,5 @@
 ---
-// Site chrome: document head, navigation, footer and the design tokens.
+// Site chrome: document head, shared band and footer, and the design tokens.
 // Fonts are self-hosted from @fontsource packages; nothing loads from a CDN.
 import "@fontsource/spectral/400.css";
 import "@fontsource/spectral/400-italic.css";
@@ -12,6 +12,12 @@ import "@fontsource/ibm-plex-sans/700.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "../styles/tokens.css";
+import SiteBand from "../components/SiteBand.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import { loadContentPool } from "../lib/cv-data";
+import { CV_CONTENT_DIR } from "../lib/hub-content.mjs";
+import { readFooterData, resolveElsewhere, readBuildInfo } from "../lib/footer.mjs";
+import path from "node:path";
 
 interface Props {
   title: string;
@@ -20,6 +26,8 @@ interface Props {
   jsonLd?: Record<string, unknown>;
   /** Adds <meta name="robots" content="noindex">. */
   noindex?: boolean;
+  /** Renders the band and footer without navigation (e.g. /signin/, spec §6). */
+  hideNav?: boolean;
 }
 
 const {
@@ -28,13 +36,23 @@ const {
   ogImage,
   jsonLd,
   noindex = false,
+  hideNav = false,
 } = Astro.props;
 
 const base = import.meta.env.BASE_URL;
 const siteUrl = Astro.site?.toString().replace(/\/$/, "") ?? "";
 const canonicalUrl = `${siteUrl}${Astro.url.pathname}`;
-// Default link-preview image is the research emblem, not the portrait (owner decision, 2026-09-24).
-const ogImageUrl = ogImage ? `${siteUrl}${base}${ogImage}` : `${siteUrl}${base}emblem/research-emblem.png`;
+// The default link-preview image is a generated card (name, title, maroon band,
+// orange rule, no portrait). The portrait is never served on the public site
+// (ADR-0015 decision 1); scripts/og-card.mjs generates this PNG at build time.
+const ogImageUrl = ogImage ? `${siteUrl}${base}${ogImage}` : `${siteUrl}${base}og-card.png`;
+
+// Footer and identity data (Amendment 3; spec §9). The handles come from
+// cv-data's meta.contact, never hard-coded here.
+const footer = readFooterData();
+const meta = loadContentPool(path.resolve(CV_CONTENT_DIR)).meta;
+const elsewhere = resolveElsewhere(footer, meta.contact);
+const buildInfo = readBuildInfo(path.resolve("."), footer.repository);
 
 // Public navigation. The phd section is never linked (brief §4).
 const primaryNav = [
@@ -51,8 +69,23 @@ const secondaryNav = [
 const pathname = Astro.url.pathname;
 const relativePath = pathname.startsWith(base) ? pathname.slice(base.length) : pathname.replace(/^\/+/, "");
 const currentSection = relativePath.split("/")[0];
-const ariaCurrent = (section: string) =>
-  currentSection !== section ? undefined : relativePath.replace(/\/$/, "") === section ? "page" : "true";
+const navItems = (items: { label: string; section: string }[]) =>
+  items.map((item) => ({
+    label: item.label,
+    href: `${base}${item.section}/`,
+    current: currentSection === item.section,
+  }));
+
+// "This site" column (spec §4): nav plus Privacy, Email policy, an RSS
+// placeholder (Phase 6) and the provenance link to the website repository.
+const footerNav = [
+  ...primaryNav.map((item) => ({ label: item.label, href: `${base}${item.section}/` })),
+  ...secondaryNav.map((item) => ({ label: item.label, href: `${base}${item.section}/` })),
+  { label: "RSS", href: null },
+  { label: "Privacy", href: `${base}privacy/` },
+  { label: "Email policy", href: `${base}email/` },
+  { label: "Built from source", href: footer.repository, external: true },
+];
 ---
 
 <!doctype html>
@@ -87,38 +120,23 @@ const ariaCurrent = (section: string) =>
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
-    <header class="site-header" role="banner">
-      <nav aria-label="Main navigation">
-        <a href={base} class="nav-brand">Jason Cusati</a>
-        <div class="nav-links">
-          <ul class="nav-primary">
-            {primaryNav.map((item) => (
-              <li><a href={`${base}${item.section}/`} aria-current={ariaCurrent(item.section)}>{item.label}</a></li>
-            ))}
-          </ul>
-          <ul class="nav-secondary">
-            {secondaryNav.map((item) => (
-              <li><a href={`${base}${item.section}/`} aria-current={ariaCurrent(item.section)}>{item.label}</a></li>
-            ))}
-          </ul>
-        </div>
-      </nav>
-    </header>
+    <SiteBand
+      homeHref={base}
+      nav={hideNav ? [] : navItems(primaryNav)}
+      secondaryNav={hideNav ? [] : navItems(secondaryNav)}
+      wordmark={meta.name}
+    />
     <main id="main-content" role="main">
       <slot />
     </main>
-    <footer class="site-footer" role="contentinfo">
-      <p>&copy; {new Date().getFullYear()} Jason Cusati</p>
-      {/* A members' area exists; this says nothing about what is in it. It names
-          no item, no slug and no count, so it does not touch ADR-0005's guarantee
-          that no public page lists, links or names a private item -- and the leak
-          check still proves that on every build. /signin/ stays out of the
-          sitemap and carries noindex (site-routes.mjs NOINDEX_SECTIONS), so this
-          is a link for the two people who need it, not an invitation to crawlers.
-          Deliberately in the footer rather than the main navigation: the owner
-          chose the smallest disclosure that still makes it findable. */}
-      <p class="footer-signin"><a href={`${base}signin/`}>Sign in</a></p>
-    </footer>
+    <SiteFooter
+      contact={{ email: meta.contact.email, department: footer.department, university: footer.university }}
+      elsewhere={elsewhere}
+      nav={footerNav}
+      provenance={footer.provenance}
+      buildInfo={buildInfo}
+      signInHref={`${base}signin/`}
+    />
   </body>
 </html>
 
@@ -193,86 +211,6 @@ const ariaCurrent = (section: string) =>
     font-family: var(--font-body);
   }
 
-  .site-header {
-    /* The VT two-colour band: maroon over orange in the light theme, and orange
-       over maroon in dark, because --color-accent and --color-brand-rule swap
-       with the theme (tokens.css). Both are VT primaries; which one leads is a
-       legibility decision, since maroon is near-black on a dark ground.
-       A box-shadow rather than a second element, so the markup is unchanged.
-       Purely decorative, so it carries no text and needs no contrast guarantee --
-       the AA checker governs text pairs only. */
-    border-bottom: 3px solid var(--color-accent);
-    box-shadow: 0 3px 0 var(--color-brand-rule);
-    background: var(--color-bg);
-  }
-
-  .site-header nav {
-    max-width: var(--max-width);
-    margin: 0 auto;
-    padding: 1rem 1.5rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1.5rem;
-    justify-content: space-between;
-    align-items: baseline;
-  }
-
-  .nav-brand {
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 1.4rem;
-    color: var(--color-text);
-  }
-
-  .nav-brand:hover {
-    color: var(--color-text);
-  }
-
-  .nav-links {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.25rem 1.25rem;
-    font-family: var(--font-body);
-  }
-
-  .nav-links ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1.25rem;
-    list-style: none;
-    padding: 0;
-  }
-
-  .nav-secondary {
-    font-size: 0.9rem;
-  }
-
-  .nav-links a {
-    color: var(--color-muted);
-    font-weight: 500;
-  }
-
-  .nav-links a:hover {
-    color: var(--color-link);
-  }
-
-  .nav-links a[aria-current] {
-    color: var(--color-link);
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 0.35em;
-  }
-
-  .site-footer {
-    border-top: 1px solid var(--color-border);
-    text-align: center;
-    padding: 1.5rem;
-    font-size: 0.875rem;
-    color: var(--color-muted);
-    font-family: var(--font-body);
-  }
-
   h1, h2, h3, h4 {
     font-family: var(--font-display);
     font-weight: 600;
@@ -297,12 +235,8 @@ const ariaCurrent = (section: string) =>
     letter-spacing: 0.01em;
   }
 
-  @media (max-width: 600px) {
-    .nav-secondary { font-size: 1rem; }
-  }
-
   @media print {
-    .site-header, .site-footer, .skip-link { display: none; }
+    .site-band, .site-footer, .skip-link { display: none; }
     main { max-width: 100%; padding: 0; }
     .print-banner { display: block !important; }
     a[href]::after { content: none; }

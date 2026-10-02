@@ -20,7 +20,7 @@ const TRACKER_PALETTE: Record<"light" | "dark", Record<string, string>> = {
     paper: "#F4F5F1", "paper-2": "#EAEBE5", card: "#FBFBF8",
     ink: "#14181B", "ink-2": "#3C4448", "ink-3": "#6B7370",
     rule: "#D7D9D1", "rule-2": "#C3C6BC",
-    petrol: "#0F5C5A", "petrol-soft": "#DDE9E7",
+    "petrol-soft": "#DDE9E7",
     brass: "#8A6512", "brass-soft": "#F0E7D2",
     clay: "#9C3B2E", "clay-soft": "#F3E0DC",
   },
@@ -28,20 +28,43 @@ const TRACKER_PALETTE: Record<"light" | "dark", Record<string, string>> = {
     paper: "#111413", "paper-2": "#181C1B", card: "#1A1F1E",
     ink: "#EDEEE9", "ink-2": "#C0C5C0", "ink-3": "#8A918C",
     rule: "#2B312F", "rule-2": "#3A423F",
-    petrol: "#6FC4BE", "petrol-soft": "#16302E",
+    "petrol-soft": "#16302E",
     brass: "#D8AC5A", "brass-soft": "#2E2718",
     clay: "#E08A79", "clay-soft": "#33201C",
   },
 };
 
 // The only tokens allowed to leave the tracker palette for a reason other than
-// AA. They are the brand accent family, and they point at the --vt-* ramp instead
-// (tokens.css). Everything else in TOKEN_SOURCES -- surfaces, text, muted, and the
-// status colours -- stays governed by the mapping rule below, so this carve-out is
-// three tokens wide and no wider. The test after it proves these three really do
-// resolve to the VT ramp, so exempting them from one rule does not leave them
-// unguarded.
-const BRAND_ACCENT_TOKENS = new Set(["color-accent", "color-link", "color-focus"]);
+// AA. They are the brand accent family and the new brand band/rule tokens, and
+// they point at the --vt-* ramp instead (tokens.css). Everything else in
+// TOKEN_SOURCES -- surfaces, text, muted, and the status colours -- stays
+// governed by the mapping rule below. ADR-0015 decision 2 widens this carve-out
+// BY NAME for the four tokens Wave 0c adds; the test after it proves each one
+// really does resolve to the VT ramp, so exempting them from one rule does not
+// leave them unguarded.
+const BRAND_ACCENT_TOKENS = new Set([
+  "color-accent",
+  "color-link",
+  "color-focus",
+  "color-band",
+  "color-on-band",
+  "rule-orange",
+  "vt-orange-text",
+]);
+
+// Every token the carve-out exempts, and the VT-ramp value it must resolve to
+// in each theme. The band trio does NOT flip (ADR-0015 decision 2: the band is
+// the brand); the accent trio follows the theme, and --vt-orange-text may flip
+// because #c64600 is only ~3.5:1 on the dark ground.
+const VT_RAMP: Record<string, { light: string; dark: string }> = {
+  "color-accent": { light: "#861f41", dark: "#f0913f" },
+  "color-link": { light: "#861f41", dark: "#f0913f" },
+  "color-focus": { light: "#861f41", dark: "#f0913f" },
+  "color-band": { light: "#861f41", dark: "#861f41" },
+  "color-on-band": { light: "#ffffff", dark: "#ffffff" },
+  "rule-orange": { light: "#e5751f", dark: "#e5751f" },
+  "vt-orange-text": { light: "#c34600", dark: "#f0913f" },
+};
 
 describe("design tokens", () => {
   it("computes WCAG contrast correctly", () => {
@@ -89,14 +112,17 @@ describe("design tokens", () => {
     }
   });
 
-  it("points every brand accent token at the VT ramp, in both themes", () => {
+  it("resolves every brand token to the VT ramp, in both themes", () => {
     const declarations = parseDeclarations(css);
     const themes = parseThemes(css);
-    const vt = { light: "#861f41", dark: "#f0913f" };
-    for (const theme of ["light", "dark"] as const) {
-      for (const token of BRAND_ACCENT_TOKENS) {
-        expect(declarations[theme][token], `${theme} --${token}`).toMatch(/^var\(--vt-/);
-        expect(themes[theme][token], `${theme} --${token} resolves`).toBe(vt[theme]);
+    for (const [token, expected] of Object.entries(VT_RAMP)) {
+      for (const theme of ["light", "dark"] as const) {
+        // `--vt-orange-text` is itself a --vt-* primitive holding a literal, so
+        // only the site tokens that delegate to the ramp are required to.
+        if (token !== "vt-orange-text") {
+          expect(declarations[theme][token], `${theme} --${token} declaration`).toMatch(/^var\(--vt-/);
+        }
+        expect(themes[theme][token], `${theme} --${token} resolves`).toBe(expected[theme]);
       }
     }
   });

@@ -1,0 +1,31 @@
+{
+  "role": "PhD student, Computer Science, Virginia Tech · Software engineer",
+  "department": "Department of Computer Science, Virginia Tech",
+  "university": "Virginia Tech",
+  "provenance": "Content published from satellite repositories through a signed manifest contract",
+  "repository": "https://github.com/djjay0131/website",
+  "elsewhere": [
+    {
+      "id": "github",
+      "label": "GitHub",
+      "icon": "github",
+      "contact": "github",
+      "url": "https://github.com/{handle}",
+      "draft": true
+    },
+    {
+      "id": "linkedin",
+      "label": "LinkedIn",
+      "icon": "linkedin",
+      "contact": "linkedin",
+      "url": "https://www.linkedin.com/in/{handle}",
+      "draft": true
+    }
+  ],
+  "draft": {
+    "role": true,
+    "department": true,
+    "elsewhere": true,
+    "note": "Owner wording drafted from plan §3/§9; handles are read from cv-data meta.contact, never hard-coded. Scholar and ORCID are omitted until the owner supplies handles."
+  }
+}

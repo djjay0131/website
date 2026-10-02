@@ -10,9 +10,13 @@
  * --color-* tokens, which map onto it:
  *
  *   paper → bg          card → surface       rule → border
- *   ink → text          ink-3 → muted        petrol → accent, link, focus
+ *   ink → text          ink-3 → muted
  *   brass → caution     brass-soft → caution-bg
  *   clay → risk         clay-soft → risk-bg
+ *
+ * The accent family no longer carries over from the tracker: it is Virginia
+ * Tech's (see the brand block below). `--tracker-petrol` was removed with this
+ * wave (ADR-0015 decision 4); `tokens.test.ts`'s verbatim list drops it.
  *
  * Carried over but not yet read by any site token: paper-2, ink-2, rule-2,
  * petrol-soft (and ink-3 and brass in the light theme, below).
@@ -25,8 +29,10 @@
  *   light --color-caution #87620d, not brass #8a6512 (4.32:1 on brass-soft)
  *
  * Tokens with no tracker counterpart, kept because the site uses them:
- *   --color-accent-strong, --color-link-hover  petrol mixed 35% toward ink
+ *   --color-accent-strong, --color-link-hover  maroon mixed 35% toward ink
  *   --color-on-accent                          card (light) / paper (dark)
+ *   --color-band, --color-on-band, --rule-orange  the fixed VT brand band (below)
+ *   --vt-orange-text                           VT's darkened burnt orange
  *   --color-ok, --color-ok-bg                  green "confirmed" status in the
  *                                              source explorer; no tracker green
  *
@@ -61,7 +67,6 @@
   --tracker-ink-3: #6b7370;
   --tracker-rule: #d7d9d1;
   --tracker-rule-2: #c3c6bc;
-  --tracker-petrol: #0f5c5a;
   --tracker-petrol-soft: #dde9e7;
   --tracker-brass: #8a6512;
   --tracker-brass-soft: #f0e7d2;
@@ -87,10 +92,32 @@
   --vt-maroon-deep: #5f162e; /* maroon mixed toward ink, for hover */
   --vt-maroon-soft: #f3e4e8;
 
+  /* The band is the brand and does NOT flip with the theme (ADR-0015 decision
+     2): the header/footer band stays Chicago Maroon with a Burnt Orange rule in
+     both themes. These --vt-* primitives are held fixed; the theme-flipping
+     --vt-maroon/--vt-orange above are the ACCENT family, a different job.
+     --vt-orange-text is VT's own darkened burnt orange #c64600, added for
+     orange text in the light theme where #e5751f fails AA at ~3:1 (spec §5). */
+  --vt-band: #861f41;
+  --vt-on-band: #ffffff;
+  --vt-rule: #e5751f;
+  /* VT ships #c64600 as its darkened burnt orange (spec §5). Measured against
+     --color-bg it is 4.48:1 -- 0.02 below AA -- so, exactly as --color-muted and
+     --color-caution do for the tracker, this token holds the nearest same-family
+     darkening that passes: #c34600 at 4.57:1. Open question for the owner. */
+  --vt-orange-text: #c34600;
+
   /* Surfaces */
   --color-bg: var(--tracker-paper);
   --color-surface: var(--tracker-card);
   --color-border: var(--tracker-rule);
+
+  /* Band and rule: fixed brand tokens, deliberately not overridden in the dark
+     block, so header and footer read the same maroon-on-orange in both themes
+     (ADR-0015 decisions 2 and 4; spec §3). */
+  --color-band: var(--vt-band);
+  --color-on-band: var(--vt-on-band);
+  --rule-orange: var(--vt-rule);
 
   /* Text */
   --color-text: var(--tracker-ink);
@@ -127,7 +154,6 @@
     --tracker-ink-3: #8a918c;
     --tracker-rule: #2b312f;
     --tracker-rule-2: #3a423f;
-    --tracker-petrol: #6fc4be;
     --tracker-petrol-soft: #16302e;
     --tracker-brass: #d8ac5a;
     --tracker-brass-soft: #2e2718;
@@ -142,6 +168,11 @@
     --vt-orange: #f0913f;
     --vt-maroon-deep: #e9b3c3;
     --vt-maroon-soft: #2b1219;
+
+    /* --vt-orange-text is allowed to flip, unlike the band: #c64600 on this
+       dark ground is only ~3.5:1, so orange text uses the accent orange here.
+       --vt-band/--vt-on-band/--vt-rule are intentionally NOT overridden. */
+    --vt-orange-text: var(--vt-orange);
 
     /* Tokens that are literal in the light theme */
     --color-muted: var(--tracker-ink-3);

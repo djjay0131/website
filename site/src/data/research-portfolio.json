@@ -1,0 +1,124 @@
+{
+  "tenets": [
+    {
+      "id": "knowledge-graphs",
+      "title": "Knowledge Graphs for decision-making and provenance with AI",
+      "question": "How can a knowledge graph organise information so that AI-assisted decisions carry their provenance — every answer traceable to evidence, every uncertain extraction kept out of the canonical graph until it is curated?",
+      "projects": [
+        {
+          "name": "Research.AI",
+          "goal": "Show that a curated, provenance-bearing research graph gives better-grounded answers than an LLM's own recall.",
+          "status": "Staging on Cloud Run; approaching the experimental comparison against LLM-generated graphs.",
+          "href": null,
+          "repo": "agentic-kg",
+          "public": true,
+          "inferred": true,
+          "note": "inferred — confirm: agentic-kg + the Denario integration (plan §11)."
+        },
+        {
+          "name": "Construction.AI",
+          "goal": "A material take-off whose every quantity is traceable to a drawing element and whose simulation inputs carry quantified uncertainty.",
+          "status": "Phase 1 MVP on Cloud Run; Phase 5 adds a VVUQ layer for engineering-simulation reproducibility.",
+          "href": null,
+          "repo": "construction-ai",
+          "public": true,
+          "inferred": false
+        },
+        {
+          "name": "Baseball.AI",
+          "goal": null,
+          "status": null,
+          "href": null,
+          "repo": "baseball-ai",
+          "public": false,
+          "draft": true,
+          "inferred": true,
+          "note": "inferred — confirm: baseball-ai, private (plan §11). Owner to supply one sentence of goal and status."
+        },
+        {
+          "name": "Traffic.AI",
+          "goal": "A real-time safety index that can explain itself and degrade deterministically when the model is wrong.",
+          "status": null,
+          "href": null,
+          "repo": "cs6604-trafficsafety",
+          "public": true,
+          "inferred": true,
+          "draft": true,
+          "note": "inferred — confirm: VTTSI, cs6604-trafficsafety, the vttsi-* repos, and the KG-RTSI digital-twin proposals. Owner to confirm a status line."
+        },
+        {
+          "name": "Ecology project (insects and weeds)",
+          "goal": null,
+          "status": "Planned, with a collaborator at UCSB.",
+          "href": null,
+          "repo": null,
+          "public": false,
+          "draft": true,
+          "note": "Owner to supply the proposal's location so the goal can be stated in the proposal's own words (plan §11). No link until then."
+        }
+      ]
+    },
+    {
+      "id": "agentic-software-engineering",
+      "title": "Agentic software engineering",
+      "question": "What agentic development has actually built versus what it has measured, and how to govern agents so their output is reviewable, reproducible and honest?",
+      "projects": [
+        {
+          "name": "State of the Art in Agentic Software Engineering",
+          "goal": "A defensible map of the field and a memory-evaluation method.",
+          "status": "Two research tracks published as digests on this site; the survey is private until publication.",
+          "href": "/research/soa-agentic-se/",
+          "repo": "soa-agentic-se",
+          "public": true,
+          "inferred": false
+        },
+        {
+          "name": "Agentic governance and agentic research",
+          "goal": "Make governed, reproducible agent work the default rather than the exception.",
+          "status": "Active; the Springer chapter proposal \"Governed Agentic Research\" is due 2026-10-23.",
+          "href": null,
+          "repo": "agentic-governance",
+          "public": true,
+          "inferred": false
+        },
+        {
+          "name": "AI-aware application architecture",
+          "goal": "A three-layer hybrid: a deterministic skeleton, adaptive agent-driven decision points, and a shared capability substrate.",
+          "status": "Design work, not yet a repository — listed as a thread, not a project.",
+          "href": null,
+          "repo": null,
+          "public": false,
+          "draft": true,
+          "note": "Plan §11 lists this as a thread unless the owner wants it shown."
+        }
+      ]
+    },
+    {
+      "id": "ai-safety",
+      "title": "AI safety",
+      "question": "Whether a model's stated reasoning is faithful to its computation, and how to tell from the inside.",
+      "projects": [
+        {
+          "name": "MATS 12 application — mechanistic interpretability",
+          "goal": "A concrete, controlled result on relational binding.",
+          "status": "Submitted to Neel Nanda's stream (Winter 2026–27).",
+          "href": null,
+          "repo": "mats-12-application",
+          "public": false,
+          "draft": true,
+          "note": "Public card only after the owner decides what of the application is public — default private (plan §11)."
+        },
+        {
+          "name": "VTTSI grounding guardrails and honest-null",
+          "goal": "A real-time safety index that can explain itself and degrade deterministically when the model is wrong.",
+          "status": null,
+          "href": null,
+          "repo": "vttsi",
+          "public": false,
+          "draft": true,
+          "note": "Applied-safety cross-reference to Traffic.AI (plan §11); owner to confirm whether it gets a public card."
+        }
+      ]
+    }
+  ]
+}
