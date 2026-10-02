@@ -24,6 +24,14 @@ pages (`privateItemCount: 4`, `renderedItemCount: 8`); `check:private-links`,
 `contrast` (52 pairs, 0 below AA), `demo:leak-check` and
 `governance-checks --layout` all green.
 
+**CI found a real leak the local run could not, and it is the wave's best evidence.**
+On the first PR run both build jobs failed `check:no-private-in-public` on the
+CI-generated `build-info.json`, whose cv-release fingerprint listed every release
+asset — including `anthropic-fellow.pdf`. Fixed in `e360ce4`: the fingerprint is
+now a SHA-256 over the sorted asset list, so change detection is unchanged and no
+item is named. All PR checks then passed. PR: #86 (draft; not to merge before the
+adversarial round, security gate and live verification).
+
 ## Assumptions
 
 1. **The first-party `hub` entries are documentation, not enforcement.** The

@@ -2897,6 +2897,21 @@ npm run demo:leak-check         PASS — the guard failed on the injected leak
 governance-checks --layout      4 of 4 PASS
 ```
 
+**CI caught a real leak the local run could not see, and that is the wave's most valuable
+find.** On the first PR run both build jobs failed `check:no-private-in-public` on
+`build-info.json`: the CI-generated cv-release fingerprint listed every release asset,
+including `anthropic-fellow.pdf`, which is now effectively private. The check behaved
+exactly as designed — a content-only trace with no matching path. Fixed in `e360ce4` by
+hashing the sorted asset list before it is written to the public `build-info.json`
+(`cv_fingerprint` is now a SHA-256; change detection is unchanged, and no item is named).
+This is the same class as Wave 2's FP-1, in the opposite direction: a guard finding a real
+leak rather than a false positive. After the fix, all PR checks pass (`build`,
+`build-firebase`, `leak-check-self-test`, `contract-tests`, `governance-checks`,
+`budget-guard`, `check`, `deploy-tools`).
+
+**PR:** https://github.com/djjay0131/website/pull/86 (draft). It must not merge until the
+Wave 0b adversarial round, security gate and live verification pass.
+
 ### What is NOT done, stated rather than glossed
 
 - **The adversarial round has not run.** Red Team, Dissenter, Skeptic Verifier, Security
