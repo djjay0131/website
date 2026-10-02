@@ -34,21 +34,28 @@ what a contributor needs to pick up work today.
     trace (private-sync 139 uploaded, 0 deleted). The new leak-check false positive FP-1
     (a bare `index.html` payload path) was found by CI and fixed in PR #79. **The member
     view is owner-blocked on D12** (the team is unnamed), so the Firestore seed has not run.
-- **Checkpoint 4 (#52) is still NOT passed**: A3 and the non-member half of A4 need the
-  owner's non-member sign-in. A12/A13/S5 are closed, A1/A5 proven, A7 deferred (#51).
-- **Wave 0b (#46)**, private by default, is not started.
+- **Checkpoint 4 (#52) is PASSED (2026-10-02).** The owner signed in as `family@cusati.us`
+  (not on the allowlist) and was refused at session exchange (`event=deny reason=not_a_member`,
+  the "nothing has been shared with you" page), and as `djjay@vt.edu` and read the private
+  area. A3 + the non-member half of A4 proven; A12/A13/S5 closed, A1/A5 proven, A7 deferred.
+- **Wave 2's research store is reachable to the member** (route, payload and index entry in
+  the private bucket) but was not the page the member opened; one click on
+  `https://jason.cusati.us/p/research/agentic-kg-research/research-store/` closes it.
+- **Wave 0b (#46)**, private by default, is not started. **Wave 0c is blocked** on the
+  missing D14 branding plan (`llm/plans/…branding` does not exist).
 
 ## Stop point
 
-The owner's D12 team names and the sign-ins (member + non-member) that close Wave 2 and
-Checkpoint 4. Site-only work can continue meanwhile.
+Waves 1 and 2 are complete and Checkpoint 4 is passed. The next non-owner work is Wave 0b.
+The owner can optionally open
+`https://jason.cusati.us/p/research/agentic-kg-research/research-store/` to see the Wave 2
+item directly.
 
 ## Next
 
-1. **Wave 0b (#46)** — private by default and the publish allowlist.
-2. **Wave 0c (branding)** — needs the branding design spec (D14); no `llm/plans/…branding`
-   file exists, so this is a gap to raise with the owner.
-3. **Waves 3–5** (sharing, satellite remainder, Phase 6).
+1. **Wave 0b (#46)** — private by default and the publish allowlist (site-only).
+2. **Waves 3–5** (sharing, satellite remainder, Phase 6).
+3. **Wave 0c (branding)** is blocked: the D14 branding plan file does not exist.
 
 ## What only the owner can do
 
