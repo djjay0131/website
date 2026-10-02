@@ -41,32 +41,30 @@ what a contributor needs to pick up work today.
 - **Wave 2's research store is reachable to the member** (route, payload and index entry in
   the private bucket) but was not the page the member opened; one click on
   `https://jason.cusati.us/p/research/agentic-kg-research/research-store/` closes it.
-- **Wave 0b (#46)**, private by default, is **implemented on `feat/private-by-default`**
-  and **NOT merged** (2026-10-02). `site/publish-allowlist.json` is the authority;
-  `effectiveVisibility()` is the one computation; the public build stores only
-  effectively-public items and the private build every item; the leak check's
-  private set is every non-allowlisted item; `check-publish-allowlist` is wired into
-  both build jobs. `cv/anthropic-fellow` is gone from `dist-public`; Firebase 302s
-  its historical URLs to `/signin/`. Local evidence is green (291 tests, builds,
-  leak check, allowlist guard, contrast, governance 4/4). **Adversarial round,
-  security gate and live verification are outstanding, so it is not merged.**
-- **Wave 0c is unblocked**: the D14 branding plan is committed at
-  `llm/plans/2026-09-19-branding-plan.md` and the spec + ADR-0015 exist
-  (`llm/specs/2026-10-01-branding-design.md`).
+- **Wave 0b (#46) is DONE and LIVE 2026-10-02** (PRs #86, #88, #89; merge `ebf777d`).
+  `site/publish-allowlist.json` is the authority; `effectiveVisibility()` is the one
+  computation; the public build stores only effectively-public items; the members'
+  area lists every item (private framed under `/p/`, public linked to their public
+  URL); the leak check's private set is every non-allowlisted item;
+  `check-publish-allowlist` is wired into both build jobs. `cv/anthropic-fellow` is
+  gone from `dist-public`; Firebase 302s its historical URLs to `/signin/`. Adversarial
+  round run (Red Team 1 bypass dispositioned, Skeptic/Security/Chief Reviewer green).
+  Verified live on both hosts; one owner sign-in click outstanding. **A5 residual
+  (allowlist binds a name, not bytes) is a recorded owner decision.**
+- **Wave 0c is unblocked and is next**: the D14 branding plan is at
+  `llm/plans/2026-09-19-branding-plan.md`, and the spec + ADR-0015 are on `main`
+  (`llm/specs/2026-10-01-branding-design.md`, #85). It starts at the build streams.
 
 ## Stop point
 
-Wave 0b is implemented and awaiting its adversarial round and security gate. The next
-non-owner work is to run that round on `feat/private-by-default`, then merge and verify
-live. The owner can still open
-`https://jason.cusati.us/p/research/agentic-kg-research/research-store/` to see the Wave 2
-item directly.
+Wave 0b is merged and verified live. The next non-owner work is **Wave 0c (branding)**,
+starting at the build streams (site), per its spec and ADR-0015.
 
 ## Next
 
-1. **Wave 0b adversarial round + security gate**, then merge and verify live.
+1. **Wave 0c (branding)** — contracts, then the `site` build stream (band header,
+   footer, home page, tokens, shared chrome, OG card), then the a11y/adversarial round.
 2. **Waves 3–5** (sharing, satellite remainder, Phase 6).
-3. **Wave 0c (branding)** — spec and ADR-0015 are in; ready after 0b lands.
 
 ## What only the owner can do
 

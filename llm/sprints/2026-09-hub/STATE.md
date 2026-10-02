@@ -2991,5 +2991,42 @@ second real catch:
   outbound anchors allowed and the guard green. The every-section and "member sees
   everything in one place" requirements are met.
 
-This is why the wave's exit is not recorded until the member-view fix is merged and
-verified live.
+### Wave 0b — exit (2026-10-02)
+
+All three fixes shipped as **PR #86** (`ecd3a36`…`beadbdf`), **PR #88**/**#89**
+(`53f2651`, `ebf777d`). The `main` `build-and-deploy` run for `ebf777d`
+(37034415319) is **green end to end**: `build`, `build-firebase`, `deploy`,
+`firebase-deploy`, `private-sync`, `smoke-test`, `firebase-smoke-test`.
+
+Live on `https://jason.cusati.us` (2026-10-02):
+
+| Probe | Result |
+|---|---|
+| `/cv/academic/`, `/cv/research-professional/`, `/cv/sde-long/` | **200** |
+| `/pdfs/academic.pdf` | **200** |
+| `/cv/anthropic-fellow/`, `/pdfs/anthropic-fellow.pdf` | **302 → `/signin/`** (never 200) |
+| `/projects/kgis/kgis-docs/` (KGIS docs) | **200** |
+| `/research/soa-agentic-se/agentic-harnesses/` (digest) | **200** |
+| `/p/` signed out | **404** (gate) |
+| `sitemap-0.xml`, `build-info.json` | **0** occurrences of `anthropic` |
+
+Live on the GitHub Pages mirror `https://djjay0131.github.io/website`
+(`/cv/academic/`, `/pdfs/academic.pdf`, `/projects/kgis/kgis-docs/` **200**;
+`/cv/anthropic-fellow/`, `/pdfs/anthropic-fellow.pdf` **404**, never 200;
+sitemap **0**).
+
+Private members' index, read directly from `gs://cusati-hub-private/index.html`
+(read-only): lists the research store (framed `/p/`), **all four CVs**
+(`Academic`, `Anthropic Fellow` framed at `/p/cv/cv/anthropic-fellow/`,
+`Research Professional`, `Software Engineer` linked to the public site), and the
+KGIS docs. So "`/p/` shows four CVs signed in" is satisfied in the built private
+output.
+
+**Owner-only confirmation:** sign in as `djjay@vt.edu` (VT Google or email link,
+**not** `djjay0131@gmail.com`) at `https://jason.cusati.us/signin/`, then open
+`https://jason.cusati.us/p/` and
+`https://jason.cusati.us/p/cv/cv/anthropic-fellow/`. This is the last owner step;
+the wave's public and private outputs are otherwise verified live.
+
+**Wave 0b exit: MET** (public and private boundaries verified live; one owner
+sign-in click outstanding, recorded rather than assumed).
