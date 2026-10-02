@@ -2963,3 +2963,25 @@ Handoffs beside them under `handoffs/`.
   (never 200), not the 410/sign-in SEAM-B9 names. Phase 6 retires Pages. Recorded per
   SEAM-B9's "say so explicitly".
 - **A5 residual (High):** see the disposition table and ADR-0016.
+
+### Merge and the post-merge deploy failure (2026-10-02)
+
+PR #86 marked ready and **merged** as `beadbdf` after all required checks, the Security
+Tester's green gate and the Chief Reviewer's final **Approve**. The `main` `build-and-deploy`
+run then **failed in `build-firebase`** at `check:private-links`, and this is the wave's
+second real catch:
+
+- The first implementation read SEAM-B4's "public and private alike" literally and staged
+  **public** items into the private build. On the real bucket, the public KGIS docs
+  (MkDocs) carry off-origin `fonts.googleapis.com`/`gstatic.com` links and absolute
+  `/projects/kgis/...` links. `check:private-links` correctly refused them under `/p/` —
+  and serving public bytes through the gate is wrong regardless.
+- `deploy` (GitHub Pages) had already succeeded; `firebase-deploy` and `private-sync` were
+  **skipped**, so the canonical host and the private bucket are unchanged and nothing
+  regressed live.
+- **Fix forward** on `fix/wave-0b-private-scope`: the private build stages and frames only
+  effectively-private items again (members reach public items on the public site). SEAM-B4,
+  ADR-0016 decision 3 and `contracts/site-wave-0b.md` requirement 2 are amended to state
+  this. The every-**section** requirement is unchanged.
+
+This is why the wave's exit is not recorded until the hotfix is merged and verified live.

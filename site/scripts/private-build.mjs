@@ -56,9 +56,14 @@ export function privateBuild(options = {}) {
         // The private items this build actually rendered. Read back from the
         // manifests rather than from `pages`, so the staging plan and the pages
         // agree by construction.
+        //
+        // ONLY effectively-private items are staged. Staging public items too
+        // (the first cut of SEAM-B4) duplicated a public satellite's payload
+        // into the private bucket and failed `check:private-links` on the KGIS
+        // docs' off-origin and absolute links on the real deploy. Public items
+        // stay on the public site; the private area carries the private set.
         const allowlist = readPublishAllowlist();
         const items = [];
-        let effectivePrivateCount = 0;
         if (fs.existsSync(sourcesDir)) {
           for (const source of fs.readdirSync(sourcesDir).sort()) {
             const manifestPath = path.join(sourcesDir, source, "manifest.json");
@@ -71,10 +76,9 @@ export function privateBuild(options = {}) {
             }
             const name = manifest.source ?? source;
             for (const item of manifest?.items ?? []) {
-              if (effectiveVisibility(item, name, allowlist) === "private") effectivePrivateCount += 1;
-              // SEAM-B4: the private build carries every document a member may
-              // see, public and private alike. `format: data` items are build
-              // inputs, not framed documents, so they are not staged.
+              if (effectiveVisibility(item, name, allowlist) !== "private") continue;
+              // `format: data` items are build inputs, not framed documents, so
+              // they are not staged.
               if (item?.format === "data") continue;
               items.push({ ...item, source: name });
             }
@@ -88,8 +92,7 @@ export function privateBuild(options = {}) {
           fs.copyFileSync(from, dest);
         }
         logger.info(
-          `staged ${plan.length} payload file(s) for ${items.length} item(s) ` +
-            `(public and private alike, SEAM-B4) ` +
+          `staged ${plan.length} payload file(s) for ${items.length} private item(s) ` +
             `from ${plan.length === 0 ? "(nothing)" : "their containing directories"}`,
         );
 
@@ -130,11 +133,7 @@ export function privateBuild(options = {}) {
           builtAt: new Date().toISOString(),
           commit: process.env.GITHUB_SHA ?? null,
           runId: process.env.GITHUB_RUN_ID ?? null,
-          // P5's gate is about a genuinely empty private area, so this counts
-          // EFFECTIVELY private items, not everything rendered. A build that
-          // rendered public items but lost every private source still trips P5.
-          privateItemCount: effectivePrivateCount,
-          renderedItemCount: items.length,
+          privateItemCount: items.length,
           items: items.map((i) => `${i.source}/${i.slug}`).sort(),
           pageCount: pages?.length ?? 0,
           payloadFileCount: plan.length,

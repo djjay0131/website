@@ -43,8 +43,11 @@ that makes the hub, not the satellite, the authority.
 
 2. **SEAM-B4.** In the public build the content collection stores only
    effectively-public items; the private build stores every item and renders
-   public and private alike. The private build's paid payload is unchanged except
-   that `format: data` items are not staged or framed.
+   every **private** item across every section. Public items are not duplicated
+   into the private bucket (amended 2026-10-02: staging them failed
+   `check:private-links` on the public KGIS docs' off-origin and absolute links).
+   The private build's payload is unchanged except that `format: data` items are
+   not staged or framed.
 
 3. **SEAM-B3.** The CV variant list and its routes are filtered by effective
    visibility, so the variant defined inside the shared `cv-data` payload cannot
