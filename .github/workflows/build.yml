@@ -192,8 +192,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # HASHED, not the asset names. This fingerprint is written into the
+          # public site/build-info.json (see "Record build info" below), and an
+          # asset name is a trace of an item: after Wave 0b the leak check
+          # correctly failed the build because the list named
+          # `anthropic-fellow.pdf`, which is now effectively private. A SHA-256
+          # over the sorted list still changes whenever any asset changes, which
+          # is all the deployed-build comparison needs, and names nothing.
           FP=$(gh release view latest --repo djjay0131/cv --json assets \
-            --jq '[.assets[] | "\(.name):\(.updatedAt)"] | sort | join(",")')
+            --jq '[.assets[] | "\(.name):\(.updatedAt)"] | sort | join(",")' \
+            | sha256sum | cut -d' ' -f1)
           echo "cv_fingerprint=${FP}" >> "$GITHUB_OUTPUT"
           echo "cv release fingerprint: ${FP}"
 
