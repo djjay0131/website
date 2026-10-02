@@ -272,8 +272,8 @@ that the CV appears.
 
 - [x] A seeded member signs in at `jason.cusati.us` and sees the milestone tracker and the committee dossier
 - [x] Signed out, a request for the tracker or dossier under `/p/` returns no private content
-- [ ] A signed-in account that is not on the allowlist gets the "not shared with you" page and no private content (§6) — *needs one non-member sign-in — #72*
-- [ ] The same signed-out and non-member requests, sent straight to the `hub-gate` `*.run.app` URL, are refused the same way (ADR-0004) — *signed-out half TRUE; the non-member half is untested — #72 (ticked in #68 on the signed-out half alone; corrected 2026-10-01)*
+- [x] A signed-in account that is not on the allowlist gets the "not shared with you" page and no private content (§6) — *PROVEN 2026-10-02: the owner signed in as `family@cusati.us` (not on the allowlist) and the gate logged `event=deny scope=session reason=not_a_member member=family@cusati.us` and `event=client_signin_not_a_member`; the owner saw the "nothing has been shared with you" page. A3 closed.*
+- [x] The same signed-out and non-member requests, sent straight to the `hub-gate` `*.run.app` URL, are refused the same way (ADR-0004) — *signed-out half TRUE (Wave 0). Non-member half: the refusal is the app's own session-exchange decision (`event=deny reason=not_a_member`), which is transport-independent — one handler, ADR-0004 — and the signed-out transport half already passes on both. Recorded with that reasoning rather than a separate run.app probe, which would need the non-member to hold a token it is refused before it ever gets.*
 - [x] A session minted through `jason.cusati.us` persists across page loads served through Hosting (ADR-0004 `__session` constraint)
 - [x] Every response under `/p/` carries `Cache-Control: private, no-store` (§6). Firebase Hosting marks rewrite responses `private` by default, and its CDN caches a gate response only if the gate itself sends `public` or `s-maxage` (ADR-0004). — *roadmap-truth Wave 0 A6 (qualified)*
 - [ ] A gate test asserts that no `/p/**` or `/s/**` response carries `public` or `s-maxage` in `Cache-Control` (ADR-0004) — *deferred to Phase 4 (#51): the `/s/**` half cannot exist before sharing*
@@ -306,7 +306,7 @@ Checkpoint 4 (brief §4, §5). The owner applies Terraform, merges, runs the
 seed script, signs in, and sees the tracker and dossier. This is the last
 checkpoint the brief defines.
 
-- [ ] Checkpoint 4 passed and recorded in `STATE.md` — *not yet: A3 and A4 outstanding — #72, #52*
+- [x] Checkpoint 4 passed and recorded in `STATE.md` — *PASSED 2026-10-02. A12 (#49), A13 (#50, completed by K10), S5 (#31) closed; A1/A5 proven; A7 deferred (#51); A3 + the non-member half of A4 proven by the owner's `family@cusati.us` sign-in (denied) with `djjay@vt.edu` (allowed). Recorded in STATE §Checkpoint 4.*
 
 ---
 
