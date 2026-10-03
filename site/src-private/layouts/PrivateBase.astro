@@ -235,4 +235,13 @@ const footerNav = [
     color: var(--color-text);
     font-size: 0.85rem;
   }
+
+  /* The public layout hides the chrome when printing; the private one must too
+     (a11y Wave 0c, check 7). The band, footer and skip link are navigation, not
+     content, and the sign-out control is meaningless on paper. */
+  @media print {
+    .site-band, .site-footer, .skip-link { display: none; }
+    main { max-width: 100%; padding: 0; }
+    a[href]::after { content: none; }
+  }
 </style>

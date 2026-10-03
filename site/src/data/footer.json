@@ -42,6 +42,12 @@
       "label": "Bluesky",
       "icon": "bluesky",
       "url": "https://bsky.app/profile/djjay0131.bsky.social"
+    },
+    {
+      "id": "mastodon",
+      "label": "Mastodon",
+      "icon": "mastodon",
+      "url": "https://mastodon.social/@djjay0131"
     }
   ]
 }

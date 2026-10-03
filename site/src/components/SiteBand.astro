@@ -176,6 +176,14 @@ const {
     text-underline-offset: 0.35em;
   }
 
+  /* The global :focus-visible outline is --color-focus, which in the light theme
+     is Chicago Maroon — the same value as --color-band, so it is invisible on the
+     band (a11y Wave 0c, check 2). On the band the ring must be the on-band
+     colour. The selector is more specific than the global rule, so it wins. */
+  .site-band :focus-visible {
+    outline-color: var(--color-on-band);
+  }
+
   .band-more {
     display: none;
     position: relative;
