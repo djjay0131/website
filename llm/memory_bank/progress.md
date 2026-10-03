@@ -90,15 +90,15 @@ merged reality, not plans.
 
 ## What is left
 
-- **Wave 3 (`hub-004`, Phase 4 sharing) is implemented, PR #93** (2026-10-03):
-  `POST /share`, `GET /share` (owner), `DELETE /share/{token}`,
-  `GET /s/{token}/{path}`, the owner Shares island, and `roles/datastore.user` for
-  the gate's share store. The share serves an item-scoped `_doc/` document
-  (ADR-0017), never the member frame. Merge + apply + the owner's live mint
-  (SEAM-S7) remain.
-- Phases 5–6 of `llm/master-roadmap.md` (Waves 4–5: `construction-ai-proposal`
-  satellite + manifest-driven project index, then Pagefind/RSS/OG/Pages
-  retirement).
+- **Wave 4 (`hub-005`, Phase 5) is DONE 2026-10-03** (PRs #95, #97; satellite
+  PR #11): `construction-ai` satellite provisioned, boundary-proven, and
+  publishing two private items; index from manifests; a sync-content traversal
+  bypass and a leak-check false positive (FP-2) found and fixed. The public
+  project page is **deferred** until the owner allowlists the items (D8).
+- **Wave 5 (`hub-006`, Phase 6)** is next: Pagefind over `dist-public` only, RSS,
+  OG images, leak check extended to the derived outputs, and Pages retirement.
+- Owner steps outstanding: Wave 3's 14-day share mint (SEAM-S7); the
+  `construction-ai` public-page decision; the Firestore member seed.
 
 ## Known issues
 
