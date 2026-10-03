@@ -10,22 +10,38 @@
       "label": "GitHub",
       "icon": "github",
       "contact": "github",
-      "url": "https://github.com/{handle}",
-      "draft": true
+      "url": "https://github.com/{handle}"
     },
     {
       "id": "linkedin",
       "label": "LinkedIn",
       "icon": "linkedin",
       "contact": "linkedin",
-      "url": "https://www.linkedin.com/in/{handle}",
-      "draft": true
+      "url": "https://www.linkedin.com/in/{handle}"
+    },
+    {
+      "id": "scholar",
+      "label": "Google Scholar",
+      "icon": "scholar",
+      "url": "https://scholar.google.com/citations?user=nIp5xC0AAAAJ"
+    },
+    {
+      "id": "orcid",
+      "label": "ORCID",
+      "icon": "orcid",
+      "url": "https://orcid.org/0009-0001-7283-4050"
+    },
+    {
+      "id": "x",
+      "label": "X",
+      "icon": "x",
+      "url": "https://x.com/djay0131"
+    },
+    {
+      "id": "bluesky",
+      "label": "Bluesky",
+      "icon": "bluesky",
+      "url": "https://bsky.app/profile/djjay0131.bsky.social"
     }
-  ],
-  "draft": {
-    "role": true,
-    "department": true,
-    "elsewhere": true,
-    "note": "Owner wording drafted from plan §3/§9; handles are read from cv-data meta.contact, never hard-coded. Scholar and ORCID are omitted until the owner supplies handles."
-  }
+  ]
 }

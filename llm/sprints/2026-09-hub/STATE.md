@@ -492,7 +492,10 @@ them is to be re-asked.
 | D9 | **Apply `feat/infra-wave-0` BEFORE it merges (owner, 2026-09-22).** Breaks the §8 deadlock recorded below: check 4 is fixed *by* the apply, and the apply follows #53, so check 4 could not clear before a merge and no merge was permitted until it cleared. The owner accepts that production briefly runs config from an unmerged branch. Sequence: apply → set `GCP_AUDITOR_SA` → mark ready → merge #45 → #48 → #53 → #47 |
 | D10 | **Satellite order and scope (owner, 2026-09-25, #72).** `agentic-kgis` is satellite 3 (public, source `kgis`), then `agentic-kg-research` satellite 4 (private, for the team). `construction-ai-proposal` later; `agentic-kg` optional. Answers design doc §10 Q6 |
 | D11 | **Apply authority for the satellites run: the harness applies under D9** (owner, 2026-09-25; the brief's stated default, left unfilled) |
-| D12 | **Team members for the private area — PENDING.** The brief's placeholder was not filled. Gates only Wave 2's onboarding step; no allowlist entry is made until the owner names them |
+| D12 | **Team members for the private area — ANSWERED (owner, 2026-10-02).** The brief's placeholder is filled with the D3 pair (`djjay@vt.edu`, `cbrown@vt.edu`); the Firestore seed remains owner-run. See §D12 below |
+| D13 | **Licensing declined the VT marks** (owner, 2026-10-01); no VT logo or HokieBird is ever served; the original emblem (#71) is the site mark. Recorded in the completion brief §2; ADR-0015 |
+| D14 | **The branding plan is design authority for Wave 0c** (owner, 2026-10-01); the spec `llm/specs/2026-10-01-branding-design.md` + ADR-0015 are on `main` (#85) |
+| D15 | **Wave 0c owner wording and portfolio mappings (owner, 2026-10-02).** (1) Role line and department stay as drafted; (2) Elsewhere links: GitHub + LinkedIn from cv-data, plus Google Scholar `nIp5xC0AAAAJ`, ORCID `0009-0001-7283-4050`, X `djay0131` (amended), Bluesky `djjay0131.bsky.social` (amended), each `rel=me`, no Mastodon; (3) portfolio mappings confirmed — Research.AI `agentic-kg` + Denario, Traffic.AI VTTSI + `vttsi-*`, Baseball.AI the private `baseball-ai` repo (name-only card, status private/in progress, no invented goal); ecology stays a planned card with no link; (4) AI Safety has no MATS card and no public application card (question only, Traffic.AI cross-reference as text); AI-aware architecture stays a thread. All inferred-confirm and owner-to-supply notes removed |
 
 **D8 — the day-one allowlist, exactly.** `cv/academic`, `cv/research-professional`,
 `cv/sde-long`, `cv/cv-data` (the data item the public CV pages render from), `kgis/kgis-docs`,
@@ -3052,7 +3055,12 @@ the branded value measures 4.48:1 (0.02 below AA), and spec §5 itself requires
 0 below AA. Same-family nearest compliant shade; owner may overrule. Spec §5
 amended.
 
-**Open:** `research/index.astro` is not yet driven by `research-portfolio.json`
-(the plan expects it; the spec is silent). The a11y-tester and adversarial
-rounds for Wave 0c have not run, and the owner-drafted wording (role line,
-department, Elsewhere links) needs confirmation. Nothing to merge until then.
+**D15 applied (2026-10-02).** The owner confirmed the role line and department,
+all Elsewhere links (GitHub, LinkedIn, Google Scholar, ORCID, X, Bluesky — each
+`rel=me`; no Mastodon), and the portfolio mappings; removed every
+inferred-confirm/owner-to-supply note; AI Safety carries the question and the
+Traffic.AI cross-reference only; Baseball.AI is a name-only card (private / in
+progress). `research/index.astro` is now portfolio-driven.
+
+**Open:** the a11y-tester and adversarial rounds for Wave 0c have not run;
+nothing merges until the security gate is zero FAIL.

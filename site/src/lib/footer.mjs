@@ -31,24 +31,26 @@ export function readFooterData(filePath = FOOTER_DATA_PATH) {
 
 /**
  * Resolve the Elsewhere column from footer.json's templates and cv-data's
- * contact block. An entry whose handle is absent is dropped rather than
- * guessed: the site never invents a handle or an account that may not exist.
+ * contact block.
+ *
+ * Two kinds of entry:
+ *   - a TEMPLATE (`contact` + `{handle}` in `url`): the handle comes from
+ *     cv-data's meta.contact. An absent handle drops the entry rather than
+ *     guessing — the site never invents an account.
+ *   - a FIXED entry (no `contact`): Scholar, ORCID and the socials, whose URLs
+ *     the owner supplied directly. Used verbatim.
  *
  * @param {ReturnType<typeof readFooterData>} footer
  * @param {{github?: string, linkedin?: string}} [contact]
- * @returns {{id: string, label: string, icon: "github"|"linkedin", href: string}[]}
+ * @returns {{id: string, label: string, icon: string, href: string}[]}
  */
 export function resolveElsewhere(footer, contact = {}) {
   return (footer.elsewhere ?? [])
     .map((entry) => {
-      const handle = contact?.[entry.contact];
-      if (!handle) return null;
-      return {
-        id: entry.id,
-        label: entry.label,
-        icon: entry.icon,
-        href: String(entry.url).replace("{handle}", handle),
-      };
+      const handle = entry.contact ? contact?.[entry.contact] : undefined;
+      if (entry.contact && !handle) return null;
+      const href = handle ? String(entry.url).replace("{handle}", handle) : String(entry.url);
+      return { id: entry.id, label: entry.label, icon: entry.icon, href };
     })
     .filter(Boolean);
 }
