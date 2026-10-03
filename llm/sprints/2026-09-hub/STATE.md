@@ -3389,3 +3389,40 @@ the owner's.
 - **Open questions:** a public page + private PDF from one prefix root (D6); the
   roster-validation coverage gap; `main.pdf` currency (D8).
 - **Governance:** L2; contracts and handoffs `*-wave-4*.md`; checks 4/4 PASS.
+
+## Wave 5 — Phase 6: polish (2026-10-03, starting)
+
+Branch `feat/phase-6`; scenario `hub-006`. Seams `contracts/phase-6-seams.md`;
+ADR-0020 resolves O6. Design authority: design doc §11 Phase 6; ADR-0005
+(derived outputs are public-only).
+
+### Checkpoint 7 — defined BEFORE the phase starts (D6)
+
+This phase is accepted when, verified live plus the security gate:
+
+1. Every entry in `site/redirects/github-pages.json` forwards under
+   `https://djjay0131.github.io/website/...` to its `https://jason.cusati.us/...`
+   target (browser-equivalent probe of each entry); `djjay0131.github.io/website/`
+   no longer serves the site's own pages (only stubs + `404.html`).
+2. Search on `jason.cusati.us` returns public items, and the search index
+   contains no private slug or title.
+3. `rss.xml` validates and contains no private item.
+4. No OG image exists for a private item, and none shows a private title.
+5. The leak check explicitly covers the sitemap, RSS feed, search index and OG
+   images, and is shown **failing** when a private slug and title are planted into
+   `dist-private` and into each derived output.
+6. `redirects:check` is a required CI step.
+
+### Scope
+
+- Pagefind over `dist-public` (both build variants), a public search UI.
+- `rss.xml` from public manifest items; footer RSS link.
+- Redirect stubs + `404.html`; retire the full-site Pages upload; keep a
+  stubs-only Pages deployment (ADR-0020).
+- Extend `check-no-private-in-public` to the derived outputs; extend
+  `demo:leak-check`; wire `redirects:check`.
+- Governance Audit across Phases 0–6 at the phase close.
+
+### Status
+
+**Starting.** Seams and ADR-0020 committed. Builders and the round to follow.

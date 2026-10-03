@@ -31,6 +31,7 @@ from `0000-template.md`.
 | [0017](0017-shares-serve-the-item-document.md) | Share links serve the item's document under an item-scoped `_doc/` namespace | Accepted |
 | [0018](0018-gate-firestore-share-role-is-project-wide.md) | The gate's share store uses a project-wide Firestore role | Accepted |
 | [0019](0019-satellite-roster-and-source-keys.md) | Satellite roster and source keys — kgis #3, agentic-kg-research #4, construction-ai #5 | Accepted |
+| [0020](0020-pages-retirement-with-redirect-stubs.md) | Retire the full-site Pages deployment, keeping redirect stubs | Accepted |
 
 ## Lifecycle
 
