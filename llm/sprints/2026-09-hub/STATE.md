@@ -3193,13 +3193,28 @@ All required checks green on PR #93 (`governance-checks`, `budget-guard`, plus
 BYPASS; Skeptic Verifier zero un-failable guard; Chief Reviewer Comment; PR body
 carries the data/security/privacy section. Merged with a merge commit.
 
-**Apply (after this merge).** `infra` read-only plan: `1 to add, 0 to change,
-1 to destroy` — the only action is the `google_project_iam_member.hub_gate_firestore`
-role swap (`roles/datastore.viewer` → `roles/datastore.user`). The Firestore
-ruleset and its release are **not** in the action set; no bucket, database,
-Identity Platform config, service account, WIF pool/provider, budget or `kgis`
-resource is added/changed/destroyed. An IAM member is not a §7 stateful resource.
-Applied after merge, result recorded below.
+**Apply (after this merge) — DONE 2026-10-03.** Applied from `main` at `921741e`,
+clean tree, no override files, from the saved plan. Plan: **`1 to add, 0 to
+change, 1 to destroy`** — the only action is
+`google_project_iam_member.hub_gate_firestore` (`roles/datastore.viewer` →
+`roles/datastore.user`, immutable-role replacement). No ruleset/release, bucket,
+Firestore DB, Identity Platform config, service account, WIF pool/provider,
+budget or `kgis` resource appears in the action set. Second plan: **No changes.**
+Verified live: `hub-gate@cusati-hub` now holds `gateSessionMinter` +
+`roles/datastore.user` only.
+
+**Live verification (2026-10-03, after the `gate` and `build-and-deploy` runs on
+the merge were green):**
+
+```
+/share              -> 403  cache-control: private, no-store  (the bare rewrite works)
+/s/unknown-token/   -> 404  cache-control: private, no-store
+/p/                 -> 404  cache-control: private, no-store
+/                   -> 200  cache-control: max-age=3600
+```
+
+So A7's `/s/**` half is proven live: every share response is `private, no-store`
+and never `public`/`s-maxage`. `#51` (A7) is closed.
 
 ### Owner-only step — PENDING (SEAM-S7)
 
