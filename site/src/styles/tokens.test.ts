@@ -95,6 +95,20 @@ describe("design tokens", () => {
     }
   });
 
+  it("does NOT carry --tracker-petrol any more (ADR-0015 decision 4)", () => {
+    // The verbatim test above checks the palette the hub KEEPS. This one checks
+    // the token it removed: dropping petrol from a list proves nothing unless
+    // something also asserts a bare re-introduction fails. (Skeptic Verifier,
+    // Wave 0c: a re-added `--tracker-petrol` passed every other test.)
+    const declarations = parseDeclarations(css);
+    for (const theme of ["light", "dark"] as const) {
+      expect(
+        declarations[theme]["tracker-petrol"],
+        `${theme} still declares --tracker-petrol`,
+      ).toBeUndefined();
+    }
+  });
+
   it("maps each site token onto its tracker colour, departing only for AA", () => {
     const declarations = parseDeclarations(css);
     const themes = parseThemes(css);

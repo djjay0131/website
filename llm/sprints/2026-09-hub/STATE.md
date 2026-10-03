@@ -3064,3 +3064,49 @@ progress). `research/index.astro` is now portfolio-driven.
 
 **Open:** the a11y-tester and adversarial rounds for Wave 0c have not run;
 nothing merges until the security gate is zero FAIL.
+
+### Wave 0c — a11y and adversarial round (2026-10-02)
+
+- **a11y-tester** — 8 checks: 6 PASS, 2 **FAIL**, both fixed. FAIL 1: the band's
+  `:focus-visible` used `--color-focus` (maroon = `--color-band`), an invisible
+  1.00:1 ring; now `--color-on-band` (`SiteBand.astro`). FAIL 2: `PrivateBase`
+  had no print block, so the band/skip link printed under `/p/`; added.
+- **Dissenter** — 6 objections. **Objection 1 (BLOCKS) fixed:** the build stream
+  had regenerated `site/redirects/github-pages.json` from a fixture build,
+  dropping the 12 real legacy routes; restored from `main` and added the new
+  `/og-card.png|svg`. Objection 4 (dark-mode accents) fixed: in-page accents use
+  theme-aware `--color-accent`; the band and footer top rule stay `--color-band`.
+  Objections 2 (dead `repo` field), 3 (Baseball.AI name-only — authorized),
+  5 (`--vt-orange-text` unused), 6 (`/research/` flattens tenets) dispositioned
+  below.
+- **Red Team** — 7 targets / 11 cases: **0 BYPASS, 7 REFUSED** (OG card and
+  `og:image` carry no private title and no portrait; portrait absent; no
+  off-origin request; Recent uses effective visibility; Elsewhere accounts
+  correct; research index public-only; print/noindex).
+- **Skeptic Verifier** — all guards made red and restored. Three gaps found and
+  closed: a bare re-introduced `--tracker-petrol` now fails (`tokens.test.ts`); a
+  portrait-embedding OG path is now tested (`og-card.test.ts`); a portrait
+  pre-seeded into `dist-public` after the build is still not refused —
+  **Fix later** (out of pipeline; the build and `outDir` cleaning remove it, and
+  the Security Tester assessed it not a gate FAIL).
+- **Security Tester** — gate **GREEN, 0 FAIL** (no private content on the public
+  path red→green; Wave 0b unweakened; portrait absent; no off-origin; OG clean;
+  `firebase.json` unchanged in kind).
+- **Chief Reviewer** — **Comment** (approved-with-comments), no Fix-now, nothing
+  blocked.
+
+### Wave 0c dispositions (Lead Architect)
+
+| Finding | Source | Disposition |
+|---|---|---|
+| `redirects/github-pages.json` regenerated from fixture | Dissenter 1 | **Fixed** (restored + og-card entries). |
+| Dark-mode in-page accents invisible | Dissenter 4 | **Fixed** (`--color-accent`). |
+| Band focus ring invisible | a11y | **Fixed** (`--color-on-band`). |
+| Private print chrome | a11y | **Fixed** (print block). |
+| `--tracker-petrol` absence untested | Skeptic | **Fixed** (new test). |
+| OG no-portrait untested | Skeptic | **Fixed** (new `og-card.test.ts`). |
+| Portrait pre-seeded in `dist-public` not refused | Skeptic | **Fix later** (post-build hand-write, out of pipeline; not a gate FAIL). |
+| Dead `repo` field; D15 mappings under-represented | Dissenter 2 / Chief Reviewer | **Fix later** — mappings live in `repo` as data; surfacing them is a Wave 3+ decision. |
+| `--vt-orange-text` has no consumer | Dissenter 5 / a11y note | **Fix later / Note** — defined and contrast-checked; the spec's light-theme underline target is met by `--rule-orange` on the band. Owner call. |
+| `/research/` flattens tenets | Dissenter 6 | **Note** — tenet shown as card `meta`; the AI Safety tenet (no public projects) does not appear. |
+| Pre-seeded portrait assertion in the leak check | Security Tester | **Fix later** (the suggested home for the guard above). |
