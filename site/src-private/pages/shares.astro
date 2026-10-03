@@ -9,6 +9,7 @@
 // The page itself is static and reveals nothing: the island decides whether the
 // caller is the owner from GET /share, and the gate is the authority either way.
 import { getCollection } from "astro:content";
+import path from "node:path";
 import PrivateBase from "../layouts/PrivateBase.astro";
 import { memberHref } from "../lib/private-content.mjs";
 import SharesIsland from "../components/SharesIsland.tsx";
@@ -23,16 +24,31 @@ const href = (item: (typeof items)[number]) => memberHref(item, { base, site });
 const nav = items
   .map((item) => ({ href: href(item), label: item.title }))
   .filter((n): n is { href: string; label: string } => n.href !== null);
+
+// The items the owner may mint a share for: effectively private, non-`data`
+// (the collection already excludes `data`). `entry` is the item document's
+// basename -- exactly the name the private build stages under `_doc/`
+// (docStagingPlanFor) and the value POST /share must store so the token serves
+// the real file rather than an `index.html` over its bytes.
+const shareableItems = items
+  .filter((item) => item.effective_visibility === "private")
+  .map((item) => ({
+    section: item.section,
+    source: item.source,
+    slug: item.slug,
+    entry: path.posix.basename(item.path),
+    title: item.title,
+  }));
 ---
 
 <PrivateBase title="Shares" nav={nav}>
   <h1>Shares</h1>
   <p class="lede">
-    Share one item by section, source and slug for a bounded time. The link is a
-    bearer credential: anyone who has it can read that item until it expires or
-    you revoke it.
+    Choose an item to share for a bounded time. The link is a bearer
+    credential: anyone who has it can read that item until it expires or you
+    revoke it.
   </p>
-  <SharesIsland client:load />
+  <SharesIsland items={shareableItems} client:load />
 </PrivateBase>
 
 <style>
@@ -51,7 +67,8 @@ const nav = items
   }
   :global(.shares-island form) { display: grid; gap: 0.6rem; max-width: 28rem; }
   :global(.shares-island label) { display: grid; gap: 0.2rem; font-size: 0.9rem; }
-  :global(.shares-island input) {
+  :global(.shares-island input),
+  :global(.shares-island select) {
     font: inherit;
     padding: 0.35rem 0.5rem;
     border: 1px solid var(--color-border);

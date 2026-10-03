@@ -49,10 +49,13 @@ export function shareListRequestInit() {
 }
 
 /**
- * The mint request. EXACTLY the SEAM-S1 body: `{section, source, slug,
- * expires_in_days}`. Same-origin, so the JSON content-type costs no preflight.
+ * The mint request. EXACTLY the SEAM-S1 body: `{section, source, slug, entry,
+ * expires_in_days}`. `entry` is the item document's basename inside the token's
+ * `_doc/` prefix; without it the gate cannot name the real file and would serve
+ * an assumed `index.html` (wrong content type for a non-HTML item). Same-origin,
+ * so the JSON content-type costs no preflight.
  *
- * @param {{section: string, source: string, slug: string, expires_in_days: number}} input
+ * @param {{section: string, source: string, slug: string, entry: string, expires_in_days: number}} input
  * @returns {{method: "POST", credentials: "same-origin", headers: Record<string,string>, body: string}}
  */
 export function shareMintRequestInit(input) {
@@ -64,6 +67,7 @@ export function shareMintRequestInit(input) {
       section: input.section,
       source: input.source,
       slug: input.slug,
+      entry: input.entry,
       expires_in_days: input.expires_in_days,
     }),
   };
@@ -95,20 +99,56 @@ export function tokenStorageKey(id) {
 }
 
 /**
+ * The gate's object-name segment allowlist (`gate/app/serve.py`, `_SEGMENT`).
+ *
+ * NOT imported from frame-content.mjs: that module reaches `node:fs`, and this
+ * one is bundled into the browser island. Duplicating the one-line pattern is
+ * safer than dragging a filesystem module into the client bundle; the server
+ * remains the authority, and this only stops a typo reaching the network.
+ */
+const ENTRY_SEGMENT_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * True when `entry` is a safe relative filename the gate can serve.
+ *
+ * SEAM-S1: `entry` is the item document's filename relative to the token's
+ * `_doc/` prefix. It may be several segments (`site/index.html`), but each
+ * segment must match the gate's allowlist, and it must not be absolute, must
+ * not contain a backslash or an empty segment, and must not contain `.` or `..`.
+ *
+ * @param {unknown} entry
+ * @returns {boolean}
+ */
+export function isSafeEntry(entry) {
+  const raw = typeof entry === "string" ? entry.trim() : "";
+  if (raw === "" || raw.startsWith("/") || raw.endsWith("/") || raw.includes("\\")) return false;
+  for (const segment of raw.split("/")) {
+    if (segment === "." || segment === "..") return false;
+    if (!ENTRY_SEGMENT_PATTERN.test(segment)) return false;
+  }
+  return true;
+}
+
+/**
  * Validate the mint form before it reaches the network.
  *
- * @param {{section?: unknown, source?: unknown, slug?: unknown, expires_in_days?: unknown}} input
- * @returns {{ok: true, value: {section: string, source: string, slug: string, expires_in_days: number}} | {ok: false, errors: string[]}}
+ * @param {{section?: unknown, source?: unknown, slug?: unknown, entry?: unknown, expires_in_days?: unknown}} input
+ * @returns {{ok: true, value: {section: string, source: string, slug: string, entry: string, expires_in_days: number}} | {ok: false, errors: string[]}}
  */
 export function validateMintInput(input) {
   const errors = [];
   const section = typeof input?.section === "string" ? input.section.trim() : "";
   const source = typeof input?.source === "string" ? input.source.trim() : "";
   const slug = typeof input?.slug === "string" ? input.slug.trim() : "";
+  const entry = typeof input?.entry === "string" ? input.entry.trim() : "";
   const days = input?.expires_in_days;
   if (!section) errors.push("section is required");
   if (!source) errors.push("source is required");
   if (!slug) errors.push("slug is required");
+  if (!entry) errors.push("entry is required");
+  else if (!isSafeEntry(entry)) {
+    errors.push("entry must be a safe relative filename with no leading slash and no '..'");
+  }
   if (
     typeof days !== "number" ||
     !Number.isInteger(days) ||
@@ -118,7 +158,7 @@ export function validateMintInput(input) {
     errors.push(`expires_in_days must be a whole number from ${MIN_SHARE_DAYS} to ${MAX_SHARE_DAYS}`);
   }
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, value: { section, source, slug, expires_in_days: days } };
+  return { ok: true, value: { section, source, slug, entry, expires_in_days: days } };
 }
 
 /**
@@ -221,7 +261,7 @@ export async function listShares(deps = {}) {
  * Mint a share. The returned token is retained and deliberately NOT returned:
  * the caller gets the copyable URL, never the credential.
  *
- * @param {{section: string, source: string, slug: string, expires_in_days: number}} input
+ * @param {{section: string, source: string, slug: string, entry: string, expires_in_days: number}} input
  * @param {{fetch?: typeof globalThis.fetch, sessionStorage?: Storage}} [deps]
  * @returns {Promise<{ok: true, id: string, url: string, expiresAt: string} | {ok: false, reason: string, errors?: string[], status?: number, error?: unknown}>}
  */

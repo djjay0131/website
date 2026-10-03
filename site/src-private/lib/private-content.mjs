@@ -19,6 +19,8 @@ import { routeFor } from "../../src/lib/frame-content.mjs";
 export {
   GATE_SEGMENT_PATTERN,
   PAYLOAD_ROOT,
+  SHARE_DOC_ROOT,
+  docStagingPlanFor,
   findUnservablePaths,
   payloadUrlFor,
   routeFor,

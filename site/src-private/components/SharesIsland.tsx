@@ -8,6 +8,13 @@
 // It is owner UI. A 403 from GET /share means the signed-in member is not the
 // owner, and then NO mint or revoke control is drawn. The gate is the authority;
 // this is the visible half.
+//
+// The mint form SELECTS a real item from the list the page passes in, rather
+// than taking a free-text (section, source, slug) triple. The page supplies it
+// from the private build's own item list, so the owner cannot mistype an
+// address and the mint body can carry `entry` -- the item document's filename
+// under the token's `_doc/` prefix, which the gate needs to serve the real file
+// instead of assuming `index.html`.
 import { useEffect, useState } from "react";
 import {
   MAX_SHARE_DAYS,
@@ -22,7 +29,15 @@ import {
 
 type AnyRecord = Record<string, any>;
 
-const EMPTY_FORM = { section: "", source: "", slug: "", expires_in_days: 7 };
+type ShareableItem = {
+  section: string;
+  source: string;
+  slug: string;
+  entry: string;
+  title: string;
+};
+
+const DEFAULT_DAYS = 7;
 
 function sessionStore(): any {
   try {
@@ -32,9 +47,10 @@ function sessionStore(): any {
   }
 }
 
-export default function SharesIsland() {
+export default function SharesIsland({ items = [] }: { items?: ShareableItem[] }) {
   const [status, setStatus] = useState<AnyRecord | null>(null);
-  const [form, setForm] = useState<AnyRecord>({ ...EMPTY_FORM });
+  const [selected, setSelected] = useState(0);
+  const [days, setDays] = useState(DEFAULT_DAYS);
   const [minted, setMinted] = useState<AnyRecord | null>(null);
   const [paste, setPaste] = useState("");
   const [message, setMessage] = useState("");
@@ -49,19 +65,32 @@ export default function SharesIsland() {
   }, []);
 
   const view = sharesView(status ?? { ok: false });
+  const chosen = items[selected] ?? null;
 
   async function onMint(event: { preventDefault: () => void }) {
     event.preventDefault();
+    if (!chosen) {
+      setMessage("Choose an item to share.");
+      return;
+    }
     setBusy(true);
     setMessage("");
-    const outcome = await mintShare(form, { sessionStorage: sessionStore() });
+    const outcome = await mintShare(
+      {
+        section: chosen.section,
+        source: chosen.source,
+        slug: chosen.slug,
+        entry: chosen.entry,
+        expires_in_days: days,
+      },
+      { sessionStorage: sessionStore() },
+    );
     setBusy(false);
     if (!outcome.ok) {
       setMessage(outcome.errors ? outcome.errors.join("; ") : `Could not create the link (${outcome.reason}).`);
       return;
     }
     setMinted({ url: outcome.url, id: outcome.id });
-    setForm({ ...EMPTY_FORM });
     await refresh();
   }
 
@@ -173,22 +202,33 @@ export default function SharesIsland() {
 
       <section>
         <h2>Create a share</h2>
-        <form onSubmit={onMint}>
-          <label>Section<input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} /></label>
-          <label>Source<input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} /></label>
-          <label>Slug<input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} /></label>
-          <label>
-            Expires in days
-            <input
-              type="number"
-              min={MIN_SHARE_DAYS}
-              max={MAX_SHARE_DAYS}
-              value={form.expires_in_days}
-              onChange={(e) => setForm({ ...form, expires_in_days: Number(e.target.value) })}
-            />
-          </label>
-          <button type="submit" disabled={busy}>Create link</button>
-        </form>
+        {items.length === 0 ? (
+          <p className="shares-note">No shareable items were found in this build.</p>
+        ) : (
+          <form onSubmit={onMint}>
+            <label>
+              Item
+              <select value={selected} onChange={(e) => setSelected(Number(e.target.value))}>
+                {items.map((item, index) => (
+                  <option key={`${item.source}/${item.slug}`} value={index}>
+                    {item.title} — {item.section}/{item.source}/{item.slug}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Expires in days
+              <input
+                type="number"
+                min={MIN_SHARE_DAYS}
+                max={MAX_SHARE_DAYS}
+                value={days}
+                onChange={(e) => setDays(Number(e.target.value))}
+              />
+            </label>
+            <button type="submit" disabled={busy || !chosen}>Create link</button>
+          </form>
+        )}
       </section>
 
       <section>

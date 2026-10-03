@@ -191,6 +191,48 @@ export function classifyLink(link, pageUrl, base, tag) {
   return { kind: "ok", path: resolved.pathname };
 }
 
+/**
+ * Is this output-relative path inside the item-scoped share tree (`_doc/`)?
+ *
+ * The `_doc/` tree is a SATELLITE BYTES tree: the item's own document copied
+ * verbatim, minus the sibling documents that belong to other items. A document
+ * that cross-links to such an omitted sibling therefore points at a file this
+ * output deliberately does not carry, and that must not fail the build (the
+ * contract's addendum, requirement 10). Off-origin sub-resources and links that
+ * escape the base are still refused -- they are judged before this check.
+ *
+ * `_payload/**` keeps its existence check: a member's payload is a COMPLETE
+ * directory copy, so a link it carries pointing at nothing is a real broken
+ * page, and dropping that check would weaken the guard the members rely on.
+ *
+ * @param {string} relFile output-relative path, in OS or posix separators
+ */
+export function isShareDoc(relFile) {
+  return String(relFile)
+    .split(path.sep)
+    .join("/")
+    .split("/")
+    .includes("_doc");
+}
+
+/**
+ * The URL prefix of the item-scoped share tree a `_doc/` page lives in, from the
+ * page's output-relative path. A `_doc/` page may only link inside its own
+ * tree: a link back into `/p/_payload/…`, `/p/_astro/…` or the member frame
+ * resolves under the base but the share token cannot reach it, so the holder
+ * gets a 404 (this is the D1 shape the copy exists to remove).
+ *
+ * @param {string} relFile output-relative path of a `_doc/` page
+ * @param {string} base normalised base
+ * @returns {string | null}
+ */
+export function shareDocTreePrefix(relFile, base) {
+  const parts = String(relFile).split(path.sep).join("/").split("/");
+  const index = parts.indexOf("_doc");
+  if (index === -1) return null;
+  return `${normalizeBase(base)}${parts.slice(0, index + 1).join("/")}/`;
+}
+
 /** Every .html file under a directory. */
 export function htmlFiles(dir) {
   if (!fs.existsSync(dir)) return [];
@@ -225,7 +267,14 @@ export function findBadLinks(dist, base) {
   const outbound = [];
 
   for (const file of htmlFiles(dist)) {
-    const pageUrl = pageUrlFor(path.relative(dist, file), normalizedBase);
+    const relFile = path.relative(dist, file);
+    const pageUrl = pageUrlFor(relFile, normalizedBase);
+    // A `_doc/` page is satellite bytes: its internal links skip the existence
+    // check below, because the item copy deliberately omits sibling documents.
+    // It may still link out of its own tree only if the link is off-origin
+    // navigation; a same-origin link that leaves `_doc/` is unservable by the
+    // share token and stays a failure.
+    const docPrefix = shareDocTreePrefix(relFile, normalizedBase);
     const html = fs.readFileSync(file, "utf8");
 
     // Scan TAG-first so every link is judged by what carries it. Scanning
@@ -245,7 +294,20 @@ export function findBadLinks(dist, base) {
         continue;
       }
       if (verdict.kind === "ok") {
-        if (!resolvesToAFile(dist, verdict.path, normalizedBase)) {
+        if (docPrefix) {
+          // Satellite bytes: existence is not required (an omitted sibling
+          // document is deliberate), but the link must stay inside the tree.
+          if (!verdict.path.startsWith(docPrefix)) {
+            bad.push({
+              file,
+              link,
+              kind: "outside-tree",
+              why:
+                `resolves to ${verdict.path}, which leaves the item's ` +
+                `${docPrefix} share tree the token can reach`,
+            });
+          }
+        } else if (!resolvesToAFile(dist, verdict.path, normalizedBase)) {
           bad.push({
             file,
             link,

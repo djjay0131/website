@@ -187,12 +187,16 @@ describe("firebase.json routes sharing to the gate without disturbing the rest",
     }
   });
 
-  it("keeps the existing four gate rewrites exactly as they were", () => {
+  it("keeps the existing four gate rewrites in order, with the sharing routes appended", () => {
+    // The contract Exit names all three sharing rewrites: the exact `/share`
+    // for POST/GET, `/share/**` for DELETE by token, and `/s/**` for the
+    // signed-out view. The four pre-existing gate rewrites are unchanged.
     expect(rewrites.map((r) => r.source)).toEqual([
       "/p/**",
       "/session",
       "/session/end",
       "/client-events",
+      "/share",
       "/share/**",
       "/s/**",
     ]);

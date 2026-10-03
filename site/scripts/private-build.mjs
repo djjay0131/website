@@ -19,7 +19,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SOURCES_DIR, effectiveVisibility, readPublishAllowlist } from "../src/lib/hub-content.mjs";
-import { findUnservablePaths, stagingPlanFor } from "../src-private/lib/private-content.mjs";
+import {
+  docStagingPlanFor,
+  findUnservablePaths,
+  stagingPlanFor,
+} from "../src-private/lib/private-content.mjs";
 import { RECEIPT_NAME } from "./sync-private.mjs";
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -86,7 +90,30 @@ export function privateBuild(options = {}) {
         }
 
         const plan = stagingPlanFor(sourcesDir, items);
-        for (const { from, to } of plan) {
+
+        // THE SHARE-SERVABLE COPY (SEAM-S1, amended 2026-10-03). ADDITIVE: the
+        // member payloads above stay byte-for-byte. Each effectively-private
+        // item also gets a self-contained, item-scoped `_doc/` tree for a
+        // signed-out share holder, because the member frame leaks the private
+        // catalogue and links its payload through `/p/` (Dissenter Wave 3 D1).
+        const docPlan = docStagingPlanFor(sourcesDir, items);
+
+        // `_payload/<source>/…` and `<section>/<source>/<slug>/_doc/…` are
+        // disjoint by construction, but a malformed manifest must not silently
+        // have one plan overwrite a file the other staged. Fail closed instead.
+        const byTo = new Map();
+        for (const entry of [...plan, ...docPlan]) {
+          const previous = byTo.get(entry.to);
+          if (previous && previous.from !== entry.from) {
+            throw new Error(
+              `staging conflict: ${entry.to} would be copied from both ` +
+                `${previous.from} and ${entry.from}. Refusing to guess which one ` +
+                `the gate should serve.`,
+            );
+          }
+          byTo.set(entry.to, entry);
+        }
+        for (const { from, to } of byTo.values()) {
           const dest = path.join(outDir, to);
           fs.mkdirSync(path.dirname(dest), { recursive: true });
           fs.copyFileSync(from, dest);
@@ -94,6 +121,10 @@ export function privateBuild(options = {}) {
         logger.info(
           `staged ${plan.length} payload file(s) for ${items.length} private item(s) ` +
             `from ${plan.length === 0 ? "(nothing)" : "their containing directories"}`,
+        );
+        logger.info(
+          `staged ${docPlan.length} item-scoped _doc file(s) for ` +
+            `${items.length} private item(s) (the share-servable copy)`,
         );
 
         // SD-7. Every emitted path must be one the gate can actually serve,
@@ -137,6 +168,7 @@ export function privateBuild(options = {}) {
           items: items.map((i) => `${i.source}/${i.slug}`).sort(),
           pageCount: pages?.length ?? 0,
           payloadFileCount: plan.length,
+          docFileCount: docPlan.length,
           fileCount: countFiles(outDir),
         };
         fs.writeFileSync(

@@ -32,7 +32,8 @@ import {
 //
 //   - a cross-origin call the gate refuses with 403
 //   - controls rendered to a non-owner on GET /share 403
-//   - a mint body that names the wrong item, or a day count the server rejects
+//   - a mint body that names the wrong item, omits the item document's `entry`,
+//     or carries a day count the server rejects
 //   - a revoke that cannot find the token the list deliberately withholds
 //   - a token written to the console or sent anywhere but DELETE /share/{token}
 //
@@ -81,7 +82,13 @@ describe("every management call is same-origin and shaped the way the gate expec
     );
 
     await mintShare(
-      { section: "phd", source: "phd-milestones", slug: "committee-dossier", expires_in_days: 14 },
+      {
+        section: "phd",
+        source: "phd-milestones",
+        slug: "committee-dossier",
+        entry: "committee.html",
+        expires_in_days: 14,
+      },
       { fetch: impl, sessionStorage: memoryStorage() },
     );
 
@@ -95,9 +102,20 @@ describe("every management call is same-origin and shaped the way the gate expec
         section: "phd",
         source: "phd-milestones",
         slug: "committee-dossier",
+        entry: "committee.html",
         expires_in_days: 14,
       }),
     });
+    // The body carries EXACTLY these five keys -- no more (a token must never
+    // ride along) and no fewer (the gate cannot serve the real file without
+    // `entry`). Assert the parsed keys, not just the serialised string.
+    expect(Object.keys(JSON.parse(String((calls[0].init as { body: string }).body))).sort()).toEqual([
+      "entry",
+      "expires_in_days",
+      "section",
+      "slug",
+      "source",
+    ]);
   });
 
   it("DELETE goes to /share/<token>, and only there", async () => {
@@ -117,35 +135,78 @@ describe("every management call is same-origin and shaped the way the gate expec
     expect(SHARE_ENDPOINT).not.toContain("run.app");
     expect(SHARE_ENDPOINT).not.toContain("//");
     expect(shareListRequestInit()).not.toHaveProperty("mode");
-    expect(shareMintRequestInit({ section: "s", source: "x", slug: "y", expires_in_days: 1 }))
+    expect(shareMintRequestInit({ section: "s", source: "x", slug: "y", entry: "index.html", expires_in_days: 1 }))
       .not.toHaveProperty("mode");
     expect(shareRevokeRequestInit()).not.toHaveProperty("mode");
     expect(shareRevokeEndpoint("t")).toBe("/share/t");
   });
 });
 
-describe("the day bound is enforced before the network", () => {
-  it("accepts the closed interval [1, 30]", () => {
+describe("the mint input is validated before the network", () => {
+  const VALID = {
+    section: "phd",
+    source: "phd-milestones",
+    slug: "committee-dossier",
+    entry: "committee.html",
+    expires_in_days: 7,
+  };
+
+  it("accepts the closed interval [1, 30] and returns the five-key value", () => {
     for (const days of [MIN_SHARE_DAYS, 7, MAX_SHARE_DAYS]) {
-      expect(validateMintInput({ section: "s", source: "x", slug: "y", expires_in_days: days }).ok).toBe(true);
+      const result = validateMintInput({ ...VALID, expires_in_days: days });
+      expect(result.ok).toBe(true);
+      expect(result.ok && Object.keys(result.value).sort()).toEqual([
+        "entry",
+        "expires_in_days",
+        "section",
+        "slug",
+        "source",
+      ]);
     }
   });
 
   it("refuses 0, 31 and a non-integer", () => {
     for (const days of [0, 31, 3.5, "7", true]) {
-      expect(validateMintInput({ section: "s", source: "x", slug: "y", expires_in_days: days }).ok).toBe(false);
+      expect(validateMintInput({ ...VALID, expires_in_days: days }).ok).toBe(false);
     }
   });
 
   it("refuses an empty section, source or slug", () => {
-    expect(validateMintInput({ source: "x", slug: "y", expires_in_days: 1 }).ok).toBe(false);
-    expect(validateMintInput({ section: "s", slug: "y", expires_in_days: 1 }).ok).toBe(false);
-    expect(validateMintInput({ section: "s", source: "x", expires_in_days: 1 }).ok).toBe(false);
+    expect(validateMintInput({ ...VALID, section: "" }).ok).toBe(false);
+    expect(validateMintInput({ ...VALID, source: "" }).ok).toBe(false);
+    expect(validateMintInput({ ...VALID, slug: "" }).ok).toBe(false);
+  });
+
+  it("requires entry, and refuses an entry the gate could not serve", () => {
+    expect(validateMintInput({ ...VALID, entry: undefined }).ok).toBe(false);
+    expect(validateMintInput({ ...VALID, entry: "" }).ok).toBe(false);
+    for (const bad of [
+      "/committee.html", // absolute
+      "../committee.html", // traverses out
+      "site/../committee.html", // a `..` segment
+      "site//committee.html", // empty segment
+      "site\\committee.html", // backslash
+      "committee.html/", // trailing slash
+      "committee file.html", // a character outside the gate allowlist
+      "committee%2e%2f.html", // an encoded escape the gate refuses
+      ".", // not a file
+      "..", // not a file
+    ]) {
+      const result = validateMintInput({ ...VALID, entry: bad });
+      expect(result.ok, `entry ${JSON.stringify(bad)} must be refused`).toBe(false);
+    }
+  });
+
+  it("accepts a multi-segment entry, as the hub's own slugs are", () => {
+    expect(validateMintInput({ ...VALID, entry: "site/index.html" }).ok).toBe(true);
   });
 
   it("does not reach the network for an invalid form", async () => {
     const { calls, impl } = recordingFetch(jsonResponse(200, {}));
-    const outcome = await mintShare({ section: "", source: "", slug: "", expires_in_days: 99 }, { fetch: impl });
+    const outcome = await mintShare(
+      { section: "", source: "", slug: "", entry: "", expires_in_days: 99 },
+      { fetch: impl },
+    );
     expect(outcome.ok).toBe(false);
     expect(calls).toHaveLength(0);
   });
@@ -216,7 +277,7 @@ describe("the mint retains the token the list will never return, and never hands
     const storage = memoryStorage();
 
     const outcome = await mintShare(
-      { section: "cv", source: "cv", slug: "academic", expires_in_days: 30 },
+      { section: "cv", source: "cv", slug: "academic", entry: "academic.pdf", expires_in_days: 30 },
       { fetch: impl, sessionStorage: storage },
     );
 
@@ -238,7 +299,7 @@ describe("the mint retains the token the list will never return, and never hands
     const { impl } = recordingFetch(jsonResponse(200, { token: "t0k3n", expires_at: "x", url: "/s/t0k3n/" }));
 
     const outcome = await mintShare(
-      { section: "s", source: "x", slug: "y", expires_in_days: 1 },
+      { section: "s", source: "x", slug: "y", entry: "index.html", expires_in_days: 1 },
       { fetch: impl, sessionStorage: throwing as unknown as Storage },
     );
 
@@ -329,6 +390,19 @@ describe("the Shares page binds the island in the private srcDir", () => {
     expect(page).toMatch(/SharesIsland/);
     expect(page).toMatch(/client:load/);
     expect(page).toMatch(/PrivateBase/);
+  });
+
+  it("supplies the island the effectively-private items, each with its entry basename", () => {
+    // The page, not the user, names the item: the mint form selects from this
+    // list and the mint body carries the item document's `entry` (the basename
+    // the private build stages under `_doc/`). See the addendum, requirement 8b.
+    expect(page).toMatch(/effective_visibility === "private"/);
+    expect(page).toMatch(/path\.posix\.basename\(item\.path\)/);
+    expect(page).toMatch(/items=\{shareableItems\}/);
+    expect(page).toMatch(/section: item\.section/);
+    expect(page).toMatch(/source: item\.source/);
+    expect(page).toMatch(/slug: item\.slug/);
+    expect(page).toMatch(/entry:/);
   });
 
   it("is NOT reachable from the public srcDir", () => {
