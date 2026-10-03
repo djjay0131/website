@@ -3423,6 +3423,55 @@ This phase is accepted when, verified live plus the security gate:
   `demo:leak-check`; wire `redirects:check`.
 - Governance Audit across Phases 0–6 at the phase close.
 
+### What shipped
+
+- **site:** `pagefind@1.5.2` + `@astrojs/rss@4.0.19` (lockfile-pinned, no binary
+  download); a public search page and Pagefind index over `dist-public`; `rss.xml`
+  from public items; `redirects:stubs` generating a stubs-only Pages artifact
+  (`dist-redirects/`, HTML-navigable entries) plus a `404.html` path-mapper for
+  file-shaped legacy URLs (also emitted into `dist-public` for Hosting); the leak
+  check extended to the derived outputs (sitemap, RSS, Pagefind text and
+  gunzipped `.pf_*` fragments, OG card, stubs). Private build emits no
+  search/pagefind/rss/404. `site` **403 passed | 1 skipped**.
+- **infra/CI:** Pagefind runs in both build variants; the Pages artifact is now
+  `site/dist-redirects` only — the full-site Pages upload is retired (ADR-0020);
+  `smoke-test` asserts a stub forwards; `check`'s default host moves to the
+  Firebase host. `actionlint` clean; 28/28 `uses:` SHA-pinned.
+
+### Round and dispositions
+
+- **Security Tester — 0 FAIL** (two rounds): public-output cleanliness incl. a
+  marker in `dist-private` and each derived output; private build clean; stubs
+  safe; supply chain pinned; `firebase.json` unchanged; budget/Firestore
+  unaffected.
+- **Red Team — B1–B5 closed** after a hardening round (stub traversal fixed;
+  `checkSearchIndexScope` no longer no-ops; `.pf_*` fragments gunzipped and
+  scanned; file-shaped URLs handled by `404.html`). Residuals recorded:
+  **R2-a** a corrupt `.pf_meta`/`.pf_index` falls back to path-only
+  (tamper-only; fragments covered); **R2-b** an open redirect from a poisoned map
+  `to` — **fixed** (targets normalised to a rooted path) with a test; **B6** a
+  private title shorter than 8 characters is not a needle (pre-existing limit).
+- **Skeptic Verifier — escaping guard made fail-able** (was un-failable); the
+  remaining coverage gap **G2** (no static test pins the Wave 5 CI step wiring)
+  and **G3** (`redirects:check` unwired) are recorded.
+- **Dissenter — D1 deferred (record), D2 fixed, D3 fixed, D4/D5/D6 recorded.**
+  D1: `redirects:check` is unwired, so ADR-0020 decision 4 and Checkpoint 7 item
+  6 are **DEFERRED, not met** (map staleness requires a real-content
+  regeneration; ADR-0020 amended). D2 (file-shaped legacy URLs) fixed via
+  `404.html`. D3 (Pagefind binary) fixed for fragments; PNG OG bytes remain
+  path-only with a public-only structural guarantee. D4: the `404.html` mapper
+  names the historical private fellowship path (already public); D5: RSS covers
+  manifest public items only; D6: "retirement" means Pages no longer serves the
+  site, not that the environment is deleted.
+
+### Roadmap criteria — honest state
+
+Ticked only on live evidence. **Not ticked:** every redirect-map entry forwards
+(file-shaped entries rely on `404.html`, unverified live); `redirects:check`
+enforced (deferred). The search/RSS/OG/leak criteria are met in the build and
+pending live verification. **Checkpoint 7 is not recorded passed.**
+
 ### Status
 
-**Starting.** Seams and ADR-0020 committed. Builders and the round to follow.
+**Build complete on `feat/phase-6`; not yet merged/verified live.** Residuals
+above are recorded; `redirects:check` is the one deferred acceptance item.

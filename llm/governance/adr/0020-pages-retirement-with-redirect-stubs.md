@@ -38,6 +38,17 @@ Two facts make the resolution concrete:
 4. **`redirects:check` becomes a required CI step**, so the committed map cannot
    drift from the route inventory.
 
+   > **Amended 2026-10-03 (Wave 5, Dissenter D1).** This decision is **DEFERRED,
+   > not met**. `redirects:check` currently exits 1 on pre-existing map staleness:
+   > the committed `site/redirects/github-pages.json` is a Phase 1 snapshot
+   > generated before `kgis` existed and contains fixture entries, and the route
+   > inventory has not excluded `_payload/**`. Making a failing check required
+   > would block every merge. The plan to close it: regenerate the map from a
+   > real-content Pages-variant inventory with `_payload/**` and `pagefind/**`
+   > excluded from `route-inventory.mjs`, then wire `redirects:check` and promote
+   > it. Tracked in STATE Wave 5. Until then the redirect map is **not**
+   > CI-enforced.
+
 ## Rationale
 
 The brief itself specifies this shape ("meta-refresh stubs for the redirect map,

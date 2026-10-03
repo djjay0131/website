@@ -232,3 +232,14 @@ describe("generateRedirectStubs writes the stubs-only artifact", () => {
     expect(fellowship).toBeTruthy();
   });
 });
+
+describe("render404 target normalisation (Red Team Wave 5 R2-b)", () => {
+  it("normalises a poisoned 'to' to a canonical path, so it cannot become an open redirect", () => {
+    const html = render404([{ from: "/website/x.pdf", to: "@evil.example" }]);
+    // The injected mapping must be a rooted PATH on the canonical origin, never
+    // an authority after the origin.
+    expect(html).toContain('"/@evil.example"');
+    expect(html).not.toContain('"@evil.example"');
+    expect(html).not.toContain("//evil.example");
+  });
+});

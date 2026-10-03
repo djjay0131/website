@@ -180,8 +180,18 @@ export function renderStub({ to }) {
 export function render404(fileRoutes = []) {
   const origin = escapeScriptString(CANONICAL_ORIGIN);
   const originHtml = escapeHtml(CANONICAL_ORIGIN);
+  // The target is normalised to a canonical PATH (one leading slash) before it
+  // is concatenated after the origin. Without this, a map entry whose `to` is
+  // `@evil.example` renders `https://jason.cusati.us@evil.example` — an open
+  // redirect if the committed map is ever poisoned (Red Team Wave 5 round 2,
+  // residual R2-b). A leading slash makes it a path on the canonical host.
   const routes = fileRoutes
-    .map((entry) => `[${escapeScriptString(entry.from)}, ${escapeScriptString(entry.to)}]`)
+    .map(
+      (entry) =>
+        `[${escapeScriptString(entry.from)}, ${escapeScriptString(
+          `/${String(entry.to ?? "").replace(/^\/+/, "")}`,
+        )}]`,
+    )
     .join(", ");
   return `<!doctype html>
 <html lang="en">
