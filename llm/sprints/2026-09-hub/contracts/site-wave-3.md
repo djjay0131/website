@@ -19,6 +19,8 @@ Wire the two sharing rewrites and build the owner-only Shares island in the
 - `firebase.json` (rewrites only; the existing four rewrites and the three
   anthropic-fellow redirects stay byte-identical in effect)
 - `site/src-private/**` (new page, island, lib)
+- `site/src/lib/frame-content.mjs` (the item-scoped `_doc/` staging plan; public
+  behaviour of `stagingPlanFor` unchanged)
 - `site/package.json` / `site/package-lock.json` (React island dependencies)
 - `site/astro.config.mjs` (React integration, **private branch only**)
 - `site/scripts/**` only if a check must learn about the new route

@@ -1,7 +1,7 @@
 # Active Context
 
 Status: Active
-Last updated: 2026-10-01
+Last updated: 2026-10-03
 Owner: Chief Architect
 
 What belongs here: the current focus, the current stop point, and next steps —
@@ -59,20 +59,36 @@ what a contributor needs to pick up work today.
   (`--vt-orange-text` `#c34600`). a11y + adversarial round run; Security gate
   GREEN; Chief Reviewer Comment.
 
+- **Wave 3 (`hub-004`, Phase 4 sharing) is implemented and in PR #93** (2026-10-03).
+  `POST /share`, `GET /share`, `DELETE /share/{token}`, `GET /s/{token}/{path}`; the
+  owner Shares React island in the private build; `roles/datastore.user` for the
+  gate's share store. Two adversarial rounds + a test-hardening round: Red Team 0
+  bypass, Security Tester 0 FAIL, Skeptic 0 un-failable guards, Chief Reviewer
+  Comment. **The share serves `<section>/<source>/<slug>/_doc/<entry>`, not the
+  member frame** (ADR-0017). Owner live mint (SEAM-S7) pending.
+
 ## Stop point
 
-Waves 0b and 0c are merged and verified live. The next non-owner work is **Wave 3
-(sharing)** per the completion brief.
+Wave 3 is ready to merge (PR #93) and apply (one IAM member change). The owner's
+live mint is the only outstanding Phase 4 acceptance step. Then Waves 4–5.
+The next non-owner work after the merge is **Wave 4 (`hub-005`)** — the
+`construction-ai-proposal` satellite and the manifest-driven project index.
 
 ## Next
 
-1. **Wave 3 (`hub-004`)** — Phase 4 sharing: `POST /share`, `GET /share` (owner),
-   `DELETE /share/{token}`, `GET /s/{token}/{path}`; Shares page as a React island
-   in the private build; A7 closes here.
-2. **Waves 4–5** (satellite remainder, Phase 6).
+1. **Wave 3 close:** merge PR #93, apply the `datastore.user` IAM change, record
+   the result; live-probe `/share` and `/s/**`; owner's 14-day mint (SEAM-S7).
+2. **Wave 4 (`hub-005`)** — `construction-ai-proposal` as satellite 5 (private
+   until allowlisted; `pdf` + `html` from its README); project index from manifests;
+   reverse-leg proofs.
+3. **Wave 5 (`hub-006`)** — Phase 6: Pagefind over `dist-public` only, RSS, OG
+   images, leak check extended, Pages retirement.
 
 ## What only the owner can do
 
+- **Wave 3 live acceptance (SEAM-S7):** mint a real 14-day share as `djjay@vt.edu`,
+  open it signed-out in a fresh browser, revoke it, re-test. Exact command in
+  `STATE.md` §Wave 3.
 - **Run the Firestore member seed** (D12 is answered; the list is the D3 pair
   `djjay@vt.edu` and `cbrown@vt.edu`): the seed itself is owner-run per §9. Then one
   click on `https://jason.cusati.us/p/research/agentic-kg-research/research-store/`
@@ -92,10 +108,11 @@ Waves 0b and 0c are merged and verified live. The next non-owner work is **Wave 
   seeded, two: `djjay@vt.edu` (owner), `cbrown@vt.edu` (D3). **Q5** the app lives under
   `site/` (ADR-0001). **Q6** satellite order: `agentic-kgis` 3, `agentic-kg-research` 4
   (D10, owner, 2026-09-25, #72).
-- ADRs 0001–0016, all Accepted: `llm/governance/adr/`. The most recent: ADR-0014
-  (satellites call the contract at a moving `v1` tag), ADR-0015 (branding — no
-  portrait, maroon band token, no VT mark), ADR-0016 (private by default — the
-  publish allowlist is the authority; amends design doc §4–§5).
+- ADRs 0001–0018, all Accepted: `llm/governance/adr/`. The most recent: ADR-0016
+  (private by default — the publish allowlist is the authority; amends design doc
+  §4–§5), ADR-0017 (share links serve the item's document under an item-scoped
+  `_doc/` namespace), ADR-0018 (the gate's share store uses a project-wide
+  Firestore role).
 - **D12 is answered (owner, 2026-10-02):** the private-area team is the D3 pair; the
   Firestore seed is owner-run.
 - Roadmap: `llm/master-roadmap.md`.

@@ -90,13 +90,15 @@ merged reality, not plans.
 
 ## What is left
 
-- **Satellites run (#72)**: satellite 3 `kgis` is done; satellite 4
-  `agentic-kg-research` (private, for the team) is Wave 2.
-- **Checkpoint 4 is not passed** (#52) until the owner's non-member sign-in records A3
-  and A4. A13 is closed (the `phd-milestones` prefix proofs ran, K10 included).
-- **Wave 3 (`hub-004`, Phase 4 sharing)** is next: `POST /share`, `GET /share`
-  (owner), `DELETE /share/{token}`, `GET /s/{token}/{path}`, the Shares island.
-- Phases 5–6 of `llm/master-roadmap.md` (Waves 4–5: satellite remainder, Phase 6).
+- **Wave 3 (`hub-004`, Phase 4 sharing) is implemented, PR #93** (2026-10-03):
+  `POST /share`, `GET /share` (owner), `DELETE /share/{token}`,
+  `GET /s/{token}/{path}`, the owner Shares island, and `roles/datastore.user` for
+  the gate's share store. The share serves an item-scoped `_doc/` document
+  (ADR-0017), never the member frame. Merge + apply + the owner's live mint
+  (SEAM-S7) remain.
+- Phases 5–6 of `llm/master-roadmap.md` (Waves 4–5: `construction-ai-proposal`
+  satellite + manifest-driven project index, then Pagefind/RSS/OG/Pages
+  retirement).
 
 ## Known issues
 

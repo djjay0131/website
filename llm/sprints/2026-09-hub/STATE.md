@@ -1,7 +1,7 @@
 # Research Hub — Orchestration State
 
 Status: Active
-Last updated: 2026-09-16
+Last updated: 2026-10-03
 Owner: Chief Architect (Lead Architect)
 
 **Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 for the work streams; **L3 for PR #12** (roadmap requirement changes — delta review 2, Part D)
@@ -3135,32 +3135,104 @@ Live on `https://jason.cusati.us` (2026-10-02):
 Spec §5 amended (`--vt-orange-text` `#c34600`), ADR-0015 amended to match.
 **Wave 0c exit: MET.** Fix-later items are the dispositions table above.
 
-## Wave 3 — Phase 4 sharing (2026-10-02, in progress)
+## Wave 3 — Phase 4 sharing (2026-10-02 → 2026-10-03, PR #93)
 
-Branch `feat/sharing`; issue `hub-004`; decision D2 (§10 Q3 — share links
-wanted). Seams `contracts/phase-4-seams.md`; contracts `gate-wave-3.md` (and
-`site-wave-3.md` to follow). Design authority: design doc §6 responsibility 4 and
-§11 Phase 4.
+Branch `feat/sharing`; scenario `hub-004`; decision D2 (§10 Q3 — share links
+wanted). Seams `contracts/phase-4-seams.md`; contracts `{gate,site,infra}-wave-3.md`.
+Design authority: design doc §6 responsibility 4 (amended) and §11 Phase 4.
 
-**Landed: the `gate` stream** (handoff `handoffs/gate-wave-3.md`):
-`gate/app/shares.py` (`ShareStore` Protocol + Firestore and static stores; token
-`secrets.token_urlsafe(32)`; `expires_in_days ∈ [1,30]`); `members.is_owner()`;
-`serve.safe_prefix()` reusing the path allowlist/containment; routes
-`POST /share`, `GET /share`, `DELETE /share/{token}`, `GET /s/{token}/{path:path}`
-(no session; unknown/expired/revoked → 404; prefix-confined); `private, no-store`
-on every share response; `gate/tests/test_shares.py` plus conftest/scope updates.
-`pyproject.toml` test run: **396 passed**; ruff clean.
+### What shipped
 
-**Seam defect found and fixed in the seam text (SEAM-S1).** The token must store
-`(section, source, slug)`, not `(source, slug)`: the private address is
-`<section>/<source>/<slug>/` and the gate holds `objects.get` only, so it cannot
-derive the `section` from the bucket. `POST /share` now takes `section`. The gate
-stream shipped the original shape and **must be updated to accept/store
-`section` before the owner's live mint** (SEAM-S7).
+- **gate** (`3f5a4d0`…`405111b`, `46af523`): `shares.py` (`ShareStore`, Firestore +
+  static stores; token `secrets.token_urlsafe(32)`; `expires_in_days ∈ [1,30]`),
+  `members.is_owner()`, `serve.safe_prefix()`, and routes `POST /share`,
+  `GET /share`, `DELETE /share/{token}`, `GET /s/{token}/{path:path}` — no session
+  on `/s/**`, owner-only management, origin check on state changes, uniform
+  404 for unknown/expired/revoked, `private, no-store` on every response.
+  **455 pytest passed**; ruff clean.
+- **site** (`e232e5a`…`fcecfd8`): `/share`, `/share/**`, `/s/**` Hosting rewrites;
+  a private-build-only React Shares island at `/p/shares/` (owner controls decided
+  by the API's 403); the bare `/share` rewrite the `/**` form does not match.
+  **352 vitest passed / 1 skipped**.
+- **infra** (`c605c72`): `hub-gate` `roles/datastore.viewer` → `roles/datastore.user`
+  so the store can write `shares/{token}`; `firestore.tf` untouched.
+- **records:** ADR-0017 (shares serve the item document), ADR-0018 (project-wide
+  Firestore share role and its blast radius); SEAM-S1 amended three times; design
+  doc §6 amended; `contracts/security-tester-wave-0.md` gate-roles line corrected.
 
-**Still to do in Wave 3:** the gate `section` follow-up; the `site` stream
-(`firebase.json` `/share/**` and `/s/**` rewrites, the owner-only Shares React
-island in the private build); the `infra` stream (a Firestore write role for the
-gate SA on `shares/` only; deny-all rules stay released); the adversarial round,
-Security Tester and Chief Reviewer; then the owner mints a real 14-day share,
-opens it signed-out, revokes it, and re-tests (SEAM-S7). Nothing merged yet.
+### The two rounds, and what they changed
+
+- **Round 1** — Red Team 18 attacks: 16 refused, **1 BYPASS (availability)** and 1
+  seam deviation. The bypass: `source: "/share/**"` does **not** match the bare
+  `POST /share`/`GET /share`, so management would have failed through Hosting.
+  Fixed with an explicit `/share` rewrite. Dissenter **8 objections, 3 block**:
+  D1 (a share served the member frame, leaking every private title and rendering
+  empty signed-out — fixed), D5 (`POST /share` logged the private triple — fixed),
+  D3 (project-wide `datastore.user` widens a compromised gate's reach — recorded
+  as ADR-0018). Security Tester 0 FAIL. Regression 0 regressions.
+- **Round 2** (after the D1 fix) — Red Team 6/6 refused, **0 bypass**. Security
+  Tester **0 FAIL** across all 10 checks. Skeptic Verifier found **2 un-failable
+  guards + 3 coverage gaps**; `455`-test hardening made all fail-able, re-verified
+  to **0 un-failable / 0 gaps**. Chief Reviewer **Comment, no must-fix**, L2.
+
+### The share model (the wave's real design work)
+
+SEAM-S1's first shape `<section>/<source>/<slug>/` was wrong: that path holds the
+**hub's member frame**, not the item's bytes. The share prefix is now
+`<section>/<source>/<slug>/_doc/` (the private build's item-scoped, nav-free copy
+of the document and its non-document assets, excluding sibling-declared
+documents), and the row carries `entry` (the document filename) so a `pdf` is
+served as a PDF, not `text/html`. The member frame and `_payload/` are unchanged
+and unreachable through a share. ADR-0017.
+
+### §8 merge record
+
+All required checks green on PR #93 (`governance-checks`, `budget-guard`, plus
+`build`, `build-firebase`, `contract-tests`, `leak-check-self-test`, `test`,
+`check`, `deploy-tools`). Security Tester zero FAIL; Red Team zero unhandled
+BYPASS; Skeptic Verifier zero un-failable guard; Chief Reviewer Comment; PR body
+carries the data/security/privacy section. Merged with a merge commit.
+
+**Apply (after this merge).** `infra` read-only plan: `1 to add, 0 to change,
+1 to destroy` — the only action is the `google_project_iam_member.hub_gate_firestore`
+role swap (`roles/datastore.viewer` → `roles/datastore.user`). The Firestore
+ruleset and its release are **not** in the action set; no bucket, database,
+Identity Platform config, service account, WIF pool/provider, budget or `kgis`
+resource is added/changed/destroyed. An IAM member is not a §7 stateful resource.
+Applied after merge, result recorded below.
+
+### Owner-only step — PENDING (SEAM-S7)
+
+Mint a real 14-day share as `djjay@vt.edu`, open it signed-out in a fresh
+browser, revoke it, re-test. The harness cannot mint as the owner. Exact steps in
+`handoffs/completion-final.md` (to follow) or:
+`curl -X POST https://jason.cusati.us/share -H 'Content-Type: application/json' -b <owner-cookie> -d '{"section":"phd","source":"phd-milestones","slug":"committee-dossier","entry":"committee.html","expires_in_days":14}'`
+then open the returned `url`, then `DELETE /share/{token}`.
+
+### Overnight decisions (Lead Architect, conservative path chosen, owner asleep)
+
+- **2026-10-03 — bare `/share` rewrite added beyond the seam.** SEAM-S4 said
+  `/share/**`; Firebase Hosting does not match the bare path with a `/**` glob
+  (verified live against `/p/**`), so mint/list would be dead through the domain.
+  Added an explicit `/share` rewrite. Conservative: reachability.
+- **2026-10-03 — a share serves `_doc/<entry>`, not the member frame.** See
+  ADR-0017. This is a design-doc §6 amendment, within the "ADR amendment"
+  allowance rather than a §10 hard stop. Recorded here and as ADR-0017.
+- **2026-10-03 — `roles/datastore.user` accepted over a bespoke custom role.**
+  Firestore cannot be collection-scoped; a too-narrow custom role fails the
+  private area closed. Blast radius recorded in ADR-0018. The owner may narrow it
+  later.
+- **2026-10-03 — owner live mint deferred, not blocking.** Per the run prompt; the
+  API and every signed-out refusal are unit- and statically proven, and live
+  binding is recorded UNVERIFIABLE rather than assumed.
+
+### Five-line status (Wave 3)
+
+- **State:** Phase 4 sharing implemented across gate/site/infra; two adversarial
+  rounds and a test-hardening round complete; PR #93 ready to merge under §8.
+- **What to review:** ADR-0017/0018; the `_doc`/`entry` model; the `/share`
+  rewrite set; the datastore.user widening.
+- **What only the owner can do:** the SEAM-S7 live mint/open/revoke; the Firestore
+  member seed if not already run; decide whether to narrow the Firestore role.
+- **Open questions:** revoke-by-display-id; a render-aware leak check (carried).
+- **Governance:** L2; contracts and handoffs `*-wave-3*.md`; checks 4/4 PASS.
