@@ -51,20 +51,25 @@ what a contributor needs to pick up work today.
   round run (Red Team 1 bypass dispositioned, Skeptic/Security/Chief Reviewer green).
   Verified live on both hosts; one owner sign-in click outstanding. **A5 residual
   (allowlist binds a name, not bytes) is a recorded owner decision.**
-- **Wave 0c is unblocked and is next**: the D14 branding plan is at
-  `llm/plans/2026-09-19-branding-plan.md`, and the spec + ADR-0015 are on `main`
-  (`llm/specs/2026-10-01-branding-design.md`, #85). It starts at the build streams.
+- **Wave 0c (branding) is DONE and LIVE 2026-10-02** (PR #91, merge `beb7301`).
+  Maroon band + "Virginia Tech" text (no mark), three-column footer with 7
+  `rel="me"` profiles (GitHub, LinkedIn, Scholar, ORCID, X, Bluesky, Mastodon),
+  portfolio-driven home and research index, generated `og-card.png`, no portrait
+  (`/photo_jason_1.jpeg` 404). D15 wording applied; spec §5 and ADR-0015 amended
+  (`--vt-orange-text` `#c34600`). a11y + adversarial round run; Security gate
+  GREEN; Chief Reviewer Comment.
 
 ## Stop point
 
-Wave 0b is merged and verified live. The next non-owner work is **Wave 0c (branding)**,
-starting at the build streams (site), per its spec and ADR-0015.
+Waves 0b and 0c are merged and verified live. The next non-owner work is **Wave 3
+(sharing)** per the completion brief.
 
 ## Next
 
-1. **Wave 0c (branding)** — contracts, then the `site` build stream (band header,
-   footer, home page, tokens, shared chrome, OG card), then the a11y/adversarial round.
-2. **Waves 3–5** (sharing, satellite remainder, Phase 6).
+1. **Wave 3 (`hub-004`)** — Phase 4 sharing: `POST /share`, `GET /share` (owner),
+   `DELETE /share/{token}`, `GET /s/{token}/{path}`; Shares page as a React island
+   in the private build; A7 closes here.
+2. **Waves 4–5** (satellite remainder, Phase 6).
 
 ## What only the owner can do
 

@@ -3110,3 +3110,27 @@ nothing merges until the security gate is zero FAIL.
 | `--vt-orange-text` has no consumer | Dissenter 5 / a11y note | **Fix later / Note** — defined and contrast-checked; the spec's light-theme underline target is met by `--rule-orange` on the band. Owner call. |
 | `/research/` flattens tenets | Dissenter 6 | **Note** — tenet shown as card `meta`; the AI Safety tenet (no public projects) does not appear. |
 | Pre-seeded portrait assertion in the leak check | Security Tester | **Fix later** (the suggested home for the guard above). |
+
+### Wave 0c — exit (2026-10-02)
+
+**PR #91 merged** as `beb7301` after all required checks, the Security Tester's
+green gate and the Chief Reviewer's Comment (approved-with-comments). The `main`
+`build-and-deploy` run for `beb7301` (37093087637) is green: `build`,
+`build-firebase`, `deploy`, `firebase-deploy`, `private-sync`, `smoke-test`,
+`firebase-smoke-test`.
+
+Live on `https://jason.cusati.us` (2026-10-02):
+
+| Probe | Result |
+|---|---|
+| Home band + "Virginia Tech" affiliation text, no VT mark | present |
+| `og:image` on `/` and every page | `https://jason.cusati.us/og-card.png` (200) |
+| `photo_jason_1.jpeg` | **404** (not served) |
+| Elsewhere footer links with `rel="me noopener"` | **7** — GitHub, LinkedIn, Google Scholar, ORCID, X, Bluesky, Mastodon |
+| `/research/` | portfolio-driven (Research.AI, Construction.AI, Baseball.AI, Traffic.AI, Ecology, …) |
+| `/cv/academic/`, `/projects/kgis/kgis-docs/`, `/research/soa-agentic-se/` | **200** |
+| `/pdfs/anthropic-fellow.pdf` | **302 → `/signin/`** |
+| Pages mirror home + `og-card.png` | **200** |
+
+Spec §5 amended (`--vt-orange-text` `#c34600`), ADR-0015 amended to match.
+**Wave 0c exit: MET.** Fix-later items are the dispositions table above.
