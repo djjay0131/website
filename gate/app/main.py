@@ -122,7 +122,7 @@ SESSION_COOKIE_ATTRS = {
 # attempt, and reading it would be work done on behalf of an anonymous caller.
 MAX_SESSION_BODY_BYTES = 8192
 
-# A mint body is three short fields. The cap is the same discipline as /session:
+# A mint body is four short fields. The cap is the same discipline as /session:
 # an anonymous caller must never make the gate read an arbitrary amount.
 MAX_SHARE_BODY_BYTES = 4096
 
@@ -520,11 +520,14 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             logger.info("event=deny scope=share action=mint reason=%s", reason or "not_owner")
             return JSONResponse({"status": "forbidden"}, status_code=403)
 
+        section = payload.get("section")
         source = payload.get("source")
         slug = payload.get("slug")
         days = payload.get("expires_in_days")
         prefix = (
-            _share_item_prefix(source, slug) if isinstance(source, str) and isinstance(slug, str) else None
+            _share_item_prefix(section, source, slug)
+            if isinstance(section, str) and isinstance(source, str) and isinstance(slug, str)
+            else None
         )
         if prefix is None or not _valid_days(days):
             logger.info("event=reject scope=share reason=invalid_item")
@@ -533,6 +536,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         now = datetime.now(UTC)
         share = Share(
             token=mint_token(),
+            section=section,
             source=source,
             slug=slug,
             exp=expiry_from_days(days, now=now),
@@ -542,7 +546,11 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         )
         deps.shares.create(share)
         logger.info(
-            "event=allow scope=share action=mint item=%s/%s by=%s", share.source, share.slug, principal.email
+            "event=allow scope=share action=mint item=%s/%s/%s by=%s",
+            share.section,
+            share.source,
+            share.slug,
+            principal.email,
         )
         return JSONResponse(
             {
@@ -569,6 +577,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
                 "shares": [
                     {
                         "id": _short_share_id(share.token),
+                        "section": share.section,
                         "source": share.source,
                         "slug": share.slug,
                         "created_by": share.created_by,
@@ -613,7 +622,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             )
             return _html(pages.NOT_FOUND, 404)
 
-        prefix = _share_item_prefix(share.source, share.slug)
+        prefix = _share_item_prefix(share.section, share.source, share.slug)
         if prefix is None:
             # A corrupt stored row is refused, never served.
             logger.warning("event=deny scope=share stage=item reason=invalid_item")
@@ -904,22 +913,26 @@ def _is_owner(principal: Principal, deps: Dependencies) -> bool:
     )
 
 
-def _share_item_prefix(source: str, slug: str) -> str | None:
-    """The object prefix a token may reach: `<source>/<slug>`, or None.
+def _share_item_prefix(section: str, source: str, slug: str) -> str | None:
+    """The object prefix a token may reach: `<section>/<source>/<slug>`, or None.
 
     Validated with `safe_prefix`, the same segment allowlist a served path
-    passes. `source` must be a single segment (`source: "a/b"` would let one
-    token's prefix overlap another's); `slug` may be several, because the hub's
-    slugs are (`hub/research/soa-agentic-se`).
+    passes. `section` and `source` must each be a single segment (`source:
+    "a/b"` would let one token's prefix overlap another's); `slug` may be
+    several, because the hub's slugs are (`hub/research/soa-agentic-se`). The
+    private build addresses an item at exactly `<section>/<source>/<slug>/`
+    (`site/src/lib/frame-content.mjs: routeFor`), which is why the section is
+    stored and served rather than derived.
     """
     try:
+        clean_section = safe_prefix(section)
         clean_source = safe_prefix(source)
         clean_slug = safe_prefix(slug)
     except UnsafePath:
         return None
-    if "/" in clean_source:
+    if "/" in clean_section or "/" in clean_source:
         return None
-    return f"{clean_source}/{clean_slug}"
+    return f"{clean_section}/{clean_source}/{clean_slug}"
 
 
 def _share_url(settings: Settings, token: str) -> str:

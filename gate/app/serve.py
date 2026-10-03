@@ -103,7 +103,7 @@ def safe_object_path(raw: str, prefix: str = "") -> str:
 
 
 def safe_prefix(raw: str) -> str:
-    """Validate a relative namespace prefix -- an item's `(source, slug)`.
+    """Validate a relative namespace prefix -- an item's `(section, source, slug)`.
 
     The share routes build an object name as `safe_object_path(path, prefix)`,
     where `prefix` is this item prefix. That call is the same containment check

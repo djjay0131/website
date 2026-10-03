@@ -29,8 +29,10 @@ from app.main import create_app
 from app.serve import UnsafePath, safe_object_path
 from app.shares import Share
 
-OWNER_ITEM = ("phd-milestones", "committee-dossier")
-OTHER_ITEM = ("cv", "academic")
+# `(section, source, slug)` -- the real private-build address, e.g.
+# `phd/phd-milestones/committee-dossier/` (frame-content.mjs: routeFor).
+OWNER_ITEM = ("phd", "phd-milestones", "committee-dossier")
+OTHER_ITEM = ("cv", "cv", "academic")
 
 # Encoded traversal spellings, which an HTTP client transmits verbatim and the
 # ASGI server decodes before routing -- the same device test_paths.py uses.
@@ -42,12 +44,18 @@ HOSTILE_PATHS = [
     "%2fetc%2fpasswd",
     "%5cwindows%5csystem32",
     "%00",
-    "phd-milestones%2f%2e%2e%2fsecrets",
+    "phd%2fphd-milestones%2f%2e%2e%2fsecrets",
 ]
 
 # Raw spellings that a conforming client refuses to put on the wire; their unit
 # test is the real test (test_paths.py makes the same distinction).
-HOSTILE_RAW = ["../secrets", "..", "/etc/passwd", "a/../../b", "phd-milestones/../../cv/academic"]
+HOSTILE_RAW = [
+    "../secrets",
+    "..",
+    "/etc/passwd",
+    "a/../../b",
+    "phd/phd-milestones/../../cv/cv/academic",
+]
 
 
 def _mint_headers(transport, session):
@@ -55,7 +63,12 @@ def _mint_headers(transport, session):
 
 
 def _mint(client, transport, session, **overrides):
-    body = {"source": OWNER_ITEM[0], "slug": OWNER_ITEM[1], "expires_in_days": 14}
+    body = {
+        "section": OWNER_ITEM[0],
+        "source": OWNER_ITEM[1],
+        "slug": OWNER_ITEM[2],
+        "expires_in_days": 14,
+    }
     body.update(overrides)
     return client.post("/share", json=body, headers=_mint_headers(transport, session))
 
@@ -71,8 +84,9 @@ def _seed(shares, token: str, *, days: int = 14, revoked: bool = False, item=OWN
     shares.create(
         Share(
             token=token,
-            source=item[0],
-            slug=item[1],
+            section=item[0],
+            source=item[1],
+            slug=item[2],
             exp=now + timedelta(days=days),
             revoked=revoked,
             created_by=MEMBER_EMAIL,
@@ -109,7 +123,7 @@ def test_the_minted_share_serves_its_item_without_a_session(client, member_sessi
     response = client.get(f"/s/{token}/index.html", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd-milestones/committee-dossier/index.html"]
+    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/index.html"]
     assert response.headers["content-type"].startswith("text/html")
 
 
@@ -119,7 +133,7 @@ def test_a_share_directory_request_serves_the_entry_document(client, member_sess
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd-milestones/committee-dossier/index.html"]
+    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/index.html"]
 
 
 def test_a_share_serves_a_subpath_with_the_right_content_type(client, member_session, transport):
@@ -128,7 +142,7 @@ def test_a_share_serves_a_subpath_with_the_right_content_type(client, member_ses
     response = client.get(f"/s/{token}/private.css", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd-milestones/milestones/private.css"]
+    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/milestones/private.css"]
     assert response.headers["content-type"].startswith("text/css")
 
 
@@ -201,7 +215,12 @@ def test_a_non_owner_member_cannot_revoke(client, member_session, other_member_s
 def test_an_anonymous_caller_cannot_mint(client, transport):
     response = client.post(
         "/share",
-        json={"source": OWNER_ITEM[0], "slug": OWNER_ITEM[1], "expires_in_days": 14},
+        json={
+            "section": OWNER_ITEM[0],
+            "source": OWNER_ITEM[1],
+            "slug": OWNER_ITEM[2],
+            "expires_in_days": 14,
+        },
         headers={**request_headers(transport), "origin": origin_header(transport)},
     )
 
@@ -224,7 +243,12 @@ def test_mint_refuses_a_cross_origin_request(client, member_session, transport):
 
     forged = client.post(
         "/share",
-        json={"source": OWNER_ITEM[0], "slug": OWNER_ITEM[1], "expires_in_days": 14},
+        json={
+            "section": OWNER_ITEM[0],
+            "source": OWNER_ITEM[1],
+            "slug": OWNER_ITEM[2],
+            "expires_in_days": 14,
+        },
         headers={
             **request_headers(transport, {"__session": member_session}),
             "origin": "https://evil.example",
@@ -257,7 +281,12 @@ def test_mint_and_revoke_refuse_everything_when_no_origin_is_configured(deps, me
 
     minted = client.post(
         "/share",
-        json={"source": OWNER_ITEM[0], "slug": OWNER_ITEM[1], "expires_in_days": 14},
+        json={
+            "section": OWNER_ITEM[0],
+            "source": OWNER_ITEM[1],
+            "slug": OWNER_ITEM[2],
+            "expires_in_days": 14,
+        },
         headers=headers,
     )
 
@@ -271,6 +300,13 @@ def test_mint_and_revoke_refuse_everything_when_no_origin_is_configured(deps, me
 @pytest.mark.parametrize(
     "overrides",
     [
+        {"section": ""},
+        {"section": "a/b"},
+        {"section": ".."},
+        {"section": "%2e%2e"},
+        {"section": "/absolute"},
+        {"section": None},
+        {"section": 5},
         {"source": ""},
         {"source": "../cv"},
         {"source": "a/b"},
@@ -291,6 +327,18 @@ def test_mint_and_revoke_refuse_everything_when_no_origin_is_configured(deps, me
 )
 def test_mint_rejects_bad_input_with_400(client, member_session, transport, overrides):
     response = _mint(client, transport, member_session, **overrides)
+
+    assert response.status_code == 400
+    assert response.json() == {"status": "invalid_request"}
+
+
+def test_mint_rejects_a_body_with_no_section_at_all(client, member_session, transport):
+    """Ruling 1: the section is required, not defaulted."""
+    response = client.post(
+        "/share",
+        json={"source": OWNER_ITEM[1], "slug": OWNER_ITEM[2], "expires_in_days": 14},
+        headers=_mint_headers(transport, member_session),
+    )
 
     assert response.status_code == 400
     assert response.json() == {"status": "invalid_request"}
@@ -339,23 +387,79 @@ def test_a_share_refuses_traversal_and_never_touches_the_bucket(
 @pytest.mark.parametrize("hostile", HOSTILE_RAW)
 def test_safe_object_path_with_an_item_prefix_refuses_raw_traversal(hostile):
     with pytest.raises(UnsafePath):
-        safe_object_path(hostile, "phd-milestones/committee-dossier")
+        safe_object_path(hostile, "phd/phd-milestones/committee-dossier")
 
 
 def test_a_share_cannot_reach_a_second_item(client, member_session, transport):
     """SEAM-S1: one token addresses one item and cannot address a second."""
-    token = _mint_ok(client, transport, member_session, source=OTHER_ITEM[0], slug=OTHER_ITEM[1])
+    token = _mint_ok(
+        client, transport, member_session, section=OTHER_ITEM[0], source=OTHER_ITEM[1], slug=OTHER_ITEM[2]
+    )
 
     served = client.get(f"/s/{token}/index.html", headers=request_headers(transport))
     assert served.status_code == 200
-    assert served.content == PRIVATE_OBJECTS["cv/academic/index.html"]
+    assert served.content == PRIVATE_OBJECTS["cv/cv/academic/index.html"]
 
     sibling = client.get(
-        f"/s/{token}/phd-milestones/committee-dossier/index.html",
+        f"/s/{token}/phd/phd-milestones/committee-dossier/index.html",
         headers=request_headers(transport),
     )
     assert sibling.status_code == 404
     assert b"Committee dossier" not in sibling.content
+
+
+def test_a_token_cannot_reach_a_sibling_section(client, store, member_session, transport):
+    """Lead Architect ruling 1: the section is part of the prefix.
+
+    `phd/phd-milestones/committee-dossier` and
+    `projects/phd-milestones/internal-notes` share a source but not a section;
+    traversal to the sibling must be refused before the bucket is touched.
+    """
+    token = _mint_ok(client, transport, member_session)
+    store.fetches.clear()
+
+    sibling = client.get(
+        f"/s/{token}/%2e%2e%2f%2e%2e%2fprojects%2fphd-milestones%2finternal-notes%2findex.html",
+        headers=request_headers(transport),
+    )
+
+    assert sibling.status_code == 404
+    assert b"Internal notes" not in sibling.content
+    assert store.fetches == []
+
+
+def test_a_token_cannot_reach_a_prefix_extended_slug(client, store, member_session, transport):
+    """A slug that merely starts with the token's slug is not inside its prefix.
+
+    `.../committee-dossier` must not reach `.../committee-dossier-evil/`; the
+    containment check is on whole segments, so `-evil` is a sibling, not a child.
+    """
+    token = _mint_ok(client, transport, member_session)
+    store.fetches.clear()
+
+    sibling = client.get(
+        f"/s/{token}/%2e%2e%2fcommittee-dossier-evil%2findex.html",
+        headers=request_headers(transport),
+    )
+
+    assert sibling.status_code == 404
+    assert b"Evil sibling" not in sibling.content
+    assert store.fetches == []
+
+
+def test_safe_object_path_keeps_the_prefix_segment_bounded():
+    """A prefix-string overlap is refused by the segment allowlist, not by luck."""
+    with pytest.raises(UnsafePath):
+        safe_object_path("../committee-dossier-evil/index.html", "phd/phd-milestones/committee-dossier")
+
+
+def test_a_corrupt_stored_section_is_refused(client, shares, transport):
+    """A stored row whose section is not a single legal segment never serves."""
+    _seed(shares, "corrupt-section", item=("a/b", "phd-milestones", "committee-dossier"))
+
+    response = client.get("/s/corrupt-section/", headers=request_headers(transport))
+
+    assert response.status_code == 404
 
 
 def test_a_share_path_is_confined_to_the_token_prefix(client, store, member_session, transport):
@@ -367,7 +471,7 @@ def test_a_share_path_is_confined_to_the_token_prefix(client, store, member_sess
     response = client.get(f"/s/{token}/assets/private.css", headers=request_headers(transport))
 
     assert response.status_code == 404
-    assert store.fetches == ["phd-milestones/committee-dossier/assets/private.css"]
+    assert store.fetches == ["phd/phd-milestones/committee-dossier/assets/private.css"]
 
 
 # --- Caching (SEAM-S3) -----------------------------------------------------
@@ -414,8 +518,9 @@ def test_the_list_never_returns_the_full_token(client, member_session, transport
     rows = response.json()["shares"]
     assert len(rows) == 1
     assert rows[0]["id"] == token[:12]
-    assert rows[0]["source"] == OWNER_ITEM[0]
-    assert rows[0]["slug"] == OWNER_ITEM[1]
+    assert rows[0]["section"] == OWNER_ITEM[0]
+    assert rows[0]["source"] == OWNER_ITEM[1]
+    assert rows[0]["slug"] == OWNER_ITEM[2]
     assert rows[0]["created_by"] == MEMBER_EMAIL
     assert "token" not in rows[0]
 

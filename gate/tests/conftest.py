@@ -37,19 +37,26 @@ MEMBER_EMAIL = "djjay@vt.edu"
 OTHER_MEMBER_EMAIL = "cbrown@vt.edu"
 NON_MEMBER_EMAIL = "djjay0131@gmail.com"  # SEAM-3's documented matching trap.
 
-# The two private items Phase 3 puts behind the gate (SEAM-7).
+# The two private items Phase 3 puts behind the gate (SEAM-7), at their /p/**
+# object names.
 PRIVATE_OBJECTS = {
     "phd/milestones/index.html": b"<h1>Milestone tracker</h1>",
     "phd/committee-dossier/index.html": b"<h1>Committee dossier</h1>",
     "assets/private.css": b"body{color:#0F5C5A}",
-    # The same items as a share sees them: the token's item prefix is
-    # `<source>/<slug>`, so a share of ("phd-milestones", "committee-dossier")
-    # reaches exactly this subtree and nothing beside it.
-    "phd-milestones/committee-dossier/index.html": b"<h1>Committee dossier</h1>",
-    "phd-milestones/committee-dossier/notes.html": b"<p>Private notes</p>",
-    "phd-milestones/milestones/index.html": b"<h1>Milestone tracker</h1>",
-    "phd-milestones/milestones/private.css": b"body{color:#0F5C5A}",
-    "cv/academic/index.html": b"<h1>Academic CV</h1>",
+    # The same items as a share sees them. The private build addresses an item
+    # at `<section>/<source>/<slug>/` (`frame-content.mjs: routeFor`), so a
+    # share of ("phd", "phd-milestones", "committee-dossier") reaches exactly
+    # this subtree and nothing beside it.
+    "phd/phd-milestones/committee-dossier/index.html": b"<h1>Committee dossier</h1>",
+    "phd/phd-milestones/committee-dossier/notes.html": b"<p>Private notes</p>",
+    "phd/phd-milestones/milestones/index.html": b"<h1>Milestone tracker</h1>",
+    "phd/phd-milestones/milestones/private.css": b"body{color:#0F5C5A}",
+    "cv/cv/academic/index.html": b"<h1>Academic CV</h1>",
+    # Siblings the committee-dossier token must never reach: the same source
+    # under a DIFFERENT section (`projects`), and a slug that extends the
+    # token's slug by a string prefix (`committee-dossier-evil`).
+    "projects/phd-milestones/internal-notes/index.html": b"<h1>Internal notes</h1>",
+    "phd/phd-milestones/committee-dossier-evil/index.html": b"<h1>Evil sibling</h1>",
 }
 
 HOSTING_HEADERS = {

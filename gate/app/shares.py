@@ -1,9 +1,10 @@
 """Share links: a bounded, revocable read grant for one item.
 
 Design doc §6 responsibility 4 and `phase-4-seams.md` SEAM-S1..S3. A share names
-ONE item by `(source, slug)` and stores it at Firestore `shares/{token}`:
+ONE item by `(section, source, slug)` and stores it at Firestore
+`shares/{token}`:
 
-    { source, slug, exp, revoked, created_by, created_at }
+    { section, source, slug, exp, revoked, created_by, created_at }
 
 The token is the document id and is minted with `secrets.token_urlsafe(32)` --
 256 bits, twice the brief's floor. `exp` is computed on the server and
@@ -51,6 +52,7 @@ class Share:
     """One row of `shares/{token}`."""
 
     token: str
+    section: str
     source: str
     slug: str
     exp: datetime
@@ -87,17 +89,19 @@ def _share_from_document(token: str, data: dict[str, Any]) -> Share | None:
     unknown expiry is not a share, and defaulting `revoked` to False would serve
     bytes a corrupt row never granted.
     """
+    section = data.get("section")
     source = data.get("source")
     slug = data.get("slug")
     created_by = data.get("created_by")
     exp = data.get("exp")
     created_at = data.get("created_at")
-    if not all(isinstance(value, str) and value for value in (source, slug, created_by)):
+    if not all(isinstance(value, str) and value for value in (section, source, slug, created_by)):
         return None
     if not isinstance(exp, datetime) or not isinstance(created_at, datetime):
         return None
     return Share(
         token=token,
+        section=section,
         source=source,
         slug=slug,
         exp=exp,
@@ -134,6 +138,7 @@ class FirestoreShareStore:
     def create(self, share: Share) -> None:
         self._ensure_client().collection(self._collection).document(share.token).set(
             {
+                "section": share.section,
                 "source": share.source,
                 "slug": share.slug,
                 "exp": share.exp,
