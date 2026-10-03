@@ -67,22 +67,30 @@ what a contributor needs to pick up work today.
   Comment. **The share serves `<section>/<source>/<slug>/_doc/<entry>`, not the
   member frame** (ADR-0017). Owner live mint (SEAM-S7) pending.
 
+- **Wave 4 (`hub-005`, Phase 5) is DONE 2026-10-03** (hub PRs #95, #97; satellite
+  PR #11). The `construction-ai` source (key, not repo name — SEAM-C1) is
+  provisioned and boundary-proven; the satellite publishes two `visibility:
+  private` items (proposal PDF + generated overview). The manifest-driven project
+  index needed no site change. A pre-existing content-sync path-traversal bypass
+  was found and fixed. The leak check false-positived on the new source key
+  colliding with the owner's public CV project `construction-ai` (FP-2) and was
+  fixed. **The roadmap public-page criterion is deferred/partial** (items are
+  private until the owner allowlists, D8).
+
 ## Stop point
 
-Wave 3 is ready to merge (PR #93) and apply (one IAM member change). The owner's
-live mint is the only outstanding Phase 4 acceptance step. Then Waves 4–5.
-The next non-owner work after the merge is **Wave 4 (`hub-005`)** — the
-`construction-ai-proposal` satellite and the manifest-driven project index.
+Waves 3 and 4 are merged, applied, and verified (Wave 3's owner share-mint and
+Wave 4's public-page decision remain owner steps). The next non-owner work is
+**Wave 5 (`hub-006`)** — Phase 6.
 
 ## Next
 
-1. **Wave 3 close:** merge PR #93, apply the `datastore.user` IAM change, record
-   the result; live-probe `/share` and `/s/**`; owner's 14-day mint (SEAM-S7).
-2. **Wave 4 (`hub-005`)** — `construction-ai-proposal` as satellite 5 (private
-   until allowlisted; `pdf` + `html` from its README); project index from manifests;
-   reverse-leg proofs.
-3. **Wave 5 (`hub-006`)** — Phase 6: Pagefind over `dist-public` only, RSS, OG
-   images, leak check extended, Pages retirement.
+1. **Wave 5 (`hub-006`)** — Phase 6: Pagefind over `dist-public` only, RSS, OG
+   images, leak check extended to the derived outputs, and Pages retirement per
+   ADR (redirect stubs, `404.html`, delete the full-site Pages job).
+2. **Owner steps:** Wave 3's 14-day share mint (SEAM-S7); decide whether to flip
+   the `construction-ai` items public (satellite visibility + allowlist); the
+   Firestore member seed.
 
 ## What only the owner can do
 
