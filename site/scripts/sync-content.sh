@@ -165,6 +165,7 @@ fi
 # ---------------------------------------------------------------------------
 rm -rf "$DEST"
 mkdir -p "$DEST"
+DEST_REAL="$(realpath -m -- "$DEST")"
 
 if [ "$OBJECT_COUNT" -eq 0 ]; then
   echo "sync-content: no objects under sources/ -- nothing to sync."
@@ -172,6 +173,24 @@ else
   while IFS="$(printf '\t')" read -r NAME _GEN _SIZE; do
     REL="${NAME#sources/}"
     OUT="$DEST/$REL"
+
+    # Traversal guard (Red Team Wave 4 bypass). A GCS object name is arbitrary
+    # flat UTF-8: a satellite that calls the Storage API directly -- the
+    # publish action is not the boundary -- can create
+    # sources/<key>/../../../publish-allowlist.json. It passes the
+    # startsWith('sources/<key>/') IAM condition, and then REL walks the write
+    # out of $DEST and over a tracked hub file. Refuse any name whose resolved
+    # path is not strictly under $DEST. This runs before mkdir/write, so a
+    # hostile name cannot even create a directory outside the tree.
+    case "$REL" in
+      ""|/*) die "unsafe object name ${NAME}: empty or absolute" ;;
+    esac
+    OUT_REAL="$(realpath -m -- "$OUT")"
+    case "$OUT_REAL" in
+      "$DEST_REAL"/*) ;;
+      *) die "unsafe object name ${NAME}: resolves outside ${DEST}" ;;
+    esac
+
     mkdir -p "$(dirname "$OUT")"
     if [ -n "$BUCKET" ]; then
       ENCODED="$(NAME="$NAME" node -e 'process.stdout.write(encodeURIComponent(process.env.NAME))')"

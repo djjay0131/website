@@ -273,6 +273,8 @@ repository (principle 3), and nothing here depends on how a satellite builds.
 | `agentic-governance` | Canon. Binding pin: CI at SHA `851a50a` (v0.9.0); the plugin auto-updates locally (§Canon Location). | — |
 | `cv` | Satellite #1, public items. **Public** repository, default branch `master` (design doc §2 corrected by ADR-0008 — it is not private). Consumed ad hoc via release download in `build.yml` through Phase 1; formalized under the manifest contract in Phase 2. `fetch-data.sh` is **retained** as the pull-request build's CV source — the hub's WIF binding admits only `refs/heads/main`, so a PR cannot read the bucket (ADR-0008 Consequences; STATE C25). | 2 |
 | `phd-milestones` | Satellite #2, private items: milestone tracker, committee dossier. To be created as a private repo from the handoff tarball. | 3 |
-| `agentic-kg` | Satellite #3, project page (public), optional private notes. | 5 |
-| `construction-ai-proposal` | Satellite #4, project page (public). | 5 |
+| `agentic-kgis` | Satellite #3 (source `kgis`), public items: MkDocs project page. **Substituted for `agentic-kg`** by D4/D10 (ADR-0019). | 5 |
+| `agentic-kg-research` | Satellite #4, private items: a Quarto research store. | 5 |
+| `construction-ai-proposal` | Satellite #5 (source `construction-ai`), `visibility: private` items until allowlisted. | 5 |
+| `agentic-kg` | Later/optional, project page (public) from its `docs/`. | 5 |
 | `agentic-research` | Not a satellite. Academic-writing tooling; not used in Phases 0–3. | — |
