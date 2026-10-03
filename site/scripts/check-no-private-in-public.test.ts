@@ -208,17 +208,129 @@ describe("the leak check fails on a private item in the public output", () => {
   });
 });
 
-describe("needles and their limits are declared, not implied", () => {
-  it("builds the documented needle kinds for an item", () => {
-    const kinds = needlesFor(PRIVATE_ITEM).map((n) => n.kind);
-    expect(kinds).toEqual(
-      expect.arrayContaining(["qualified-id", "slug", "route", "source", "payload-path", "title", "summary"]),
-    );
+// ---------------------------------------------------------------------------
+// WAVE 4 FP-2 — a source name that equals public first-party content
+// ---------------------------------------------------------------------------
+describe("Wave 4 FP-2: the `construction-ai` source key collides with a public CV project", () => {
+  // The real Wave 4 satellite publishes under source key `construction-ai` (the
+  // repo is `construction-ai-proposal`; the key is shortened for the GCP SA-id
+  // limit, ADR-0019). The owner's CV legitimately has a public first-party
+  // project with id `construction-ai`, rendered at /projects/construction-ai/.
+  // The html item's slug is `construction-ai-site`; the pdf item's is
+  // `construction-ai-proposal`.
+  const CONSTRUCTION_AI_ITEM = {
+    source: "construction-ai",
+    slug: "construction-ai-site",
+    section: "projects",
+    path: "index.html",
+    title: "Construction.AI — Project Overview",
+    summary: "Self-contained overview page for the Construction.AI material takeoff project.",
+  };
+
+  // A CLEAN public build containing the CV's public project page. Its PATH
+  // segment is `construction-ai` and its text contains `construction-ai` — the
+  // exact bytes a bare `source` needle used to match.
+  const CLEAN_CV_PROJECT = {
+    "projects/construction-ai/index.html": [
+      "<h1>Construction-AI: LLM- and KG-backed Material Takeoff</h1>",
+      '<p>Phase 1 MVP deployed on Cloud Run.</p>',
+      '<a href="/projects/construction-ai/">Back to projects</a>',
+    ].join("\n"),
+    "projects/index.html":
+      '<li><a href="/projects/construction-ai/">Construction-AI: LLM- and KG-backed Material Takeoff</a></li>',
+    "sitemap-0.xml": "<loc>https://jason.cusati.us/projects/construction-ai/</loc>",
+  };
+
+  it("REGRESSION: a clean build containing /projects/construction-ai/ is NOT a leak", () => {
+    const dist = tree(CLEAN_CV_PROJECT);
+    try {
+      expect(findLeaks(dist, [CONSTRUCTION_AI_ITEM])).toEqual([]);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
   });
 
-  it("matches the bare slug and source ONLY when delimiter-bounded", () => {
+  // Each shape below plants ONE distinctive trace of the SAME private item in a
+  // public file. Each assertion names the specific needle kind, so deleting that
+  // needle from `needlesFor` turns the corresponding row red: the route row pins
+  // the `route` needle, the qualified-id row the `qualified-id` needle, and so
+  // on. That is how the guard is shown to still work after the source needle is
+  // removed.
+  const SHAPES = [
+    {
+      name: "route",
+      file: "nav.html",
+      body: '<nav><a href="/projects/construction-ai/construction-ai-site/">Overview</a></nav>',
+      kind: "route",
+    },
+    {
+      name: "qualified-id",
+      file: "manifest.json",
+      body: '{"id":"construction-ai/construction-ai-site"}',
+      kind: "qualified-id",
+    },
+    {
+      name: "payload-path",
+      file: "frame.html",
+      body: '<iframe src="/_payload/construction-ai/index.html"></iframe>',
+      kind: "payload-path",
+    },
+    {
+      name: "title",
+      file: "index.html",
+      body: `<a>${CONSTRUCTION_AI_ITEM.title}</a>`,
+      kind: "title",
+    },
+    {
+      name: "slug",
+      file: "index.html",
+      body: "<li>construction-ai-site</li>",
+      kind: "slug",
+    },
+  ];
+
+  it.each(SHAPES)(
+    "still reports the private $name needle planted in a public file",
+    ({ file, body, kind }) => {
+      const dist = tree({ [file]: body });
+      try {
+        const kinds = findLeaks(dist, [CONSTRUCTION_AI_ITEM]).map((l) => l.kind);
+        expect(kinds).toContain(kind);
+      } finally {
+        fs.rmSync(dist, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("the `construction-ai` source name alone is NOT a content needle", () => {
+    // A stated LIMIT, not a gap: the qualified-id/route/payload-path/title
+    // needles are what bind the item. This pins that the bare source is gone.
+    const dist = tree({
+      "cv/research-professional/index.html":
+        '<a href="/projects/construction-ai/">Construction-AI (public CV project)</a>',
+    });
+    try {
+      expect(findLeaks(dist, [CONSTRUCTION_AI_ITEM])).toEqual([]);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("needles and their limits are declared, not implied", () => {
+  it("builds the documented needle kinds for an item, and NO bare `source` needle", () => {
+    const kinds = needlesFor(PRIVATE_ITEM).map((n) => n.kind);
+    expect(kinds).toEqual(
+      expect.arrayContaining(["qualified-id", "slug", "route", "payload-path", "title", "summary"]),
+    );
+    // Wave 4 FP-2: a source name is not a bare needle. It is carried by the
+    // qualified-id/route/payload-path/title/summary needles instead.
+    expect(kinds).not.toContain("source");
+  });
+
+  it("matches the bare slug ONLY when delimiter-bounded", () => {
     const bounded = needlesFor(PRIVATE_ITEM).filter((n) => n.bounded).map((n) => n.kind);
-    expect(bounded.sort()).toEqual(["slug", "source"]);
+    expect(bounded.sort()).toEqual(["slug"]);
   });
 
   it("refuses a too-short title as a needle, and says so", () => {
@@ -248,19 +360,21 @@ describe("needles and their limits are declared, not implied", () => {
     }
   });
 
-  it("still catches a source-qualified payload path", () => {
+  it("does NOT treat a bare source name as a path segment (Wave 4 FP-2)", () => {
+    // The Wave 4 source key `construction-ai` is also the id of the owner's
+    // public CV project, rendered at /projects/construction-ai/. A file under
+    // that directory must not be reported as a leak of the private item.
     const item = {
-      source: "agentic-kg-research",
-      slug: "research-store",
-      section: "research",
+      source: "construction-ai",
+      slug: "construction-ai-site",
+      section: "projects",
       path: "index.html",
-      title: "A private research store",
-      summary: "Private research synthesis on LLMs and knowledge graphs.",
+      title: "Construction.AI — Project Overview",
+      summary: "Self-contained overview page for the Construction.AI project.",
     };
-    const dist = tree({ "leaked/agentic-kg-research/index.html": "<p>x</p>" });
+    const dist = tree({ "projects/construction-ai/index.html": "<h1>Construction-AI</h1>" });
     try {
-      // The `agentic-kg-research` path segment is a PATH match on the source.
-      expect(findLeaks(dist, [item]).some((l) => l.where === "path")).toBe(true);
+      expect(findLeaks(dist, [item]).some((l) => l.where === "path")).toBe(false);
     } finally {
       fs.rmSync(dist, { recursive: true, force: true });
     }
