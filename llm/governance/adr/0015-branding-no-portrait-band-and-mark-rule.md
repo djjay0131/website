@@ -28,10 +28,15 @@ styling, each with a reason that outlives the wave:
    CV PDFs the owner already publishes. The build stops staging `photo_jason_1.jpeg` into
    `dist-public`.
 2. **The band is a token pair, and the theme invariant is explicit.** Add `--color-band`,
-   `--color-on-band`, `--rule-orange` and `--vt-orange-text` (`#c64600`). The first three do
-   **not** flip between themes: the band is the brand. `tokens.test.ts`'s carve-out is
-   widened **by name** with a positive test that each resolves to the `--vt-*` ramp; the
-   verbatim-palette assertion is amended to drop `--tracker-petrol`, not deleted.
+   `--color-on-band`, `--rule-orange` and `--vt-orange-text`. The first three do **not**
+   flip between themes: the band is the brand. `tokens.test.ts`'s carve-out is widened **by
+   name** with a positive test that each resolves to the `--vt-*` ramp; the verbatim-palette
+   assertion is amended to drop `--tracker-petrol`, not deleted.
+
+   > Amended 2026-10-02 (Wave 0c build). `--vt-orange-text` holds **`#c34600`**, not the
+   > `#c64600` first named: `#c64600` measures 4.48:1 on `--color-bg`, 0.02 below AA, and
+   > this ADR's contrast suite requires 0 below AA. `#c34600` is the nearest same-family
+   > shade that passes (4.57:1). Spec §5 is amended to match.
 3. **No VT mark without permission.** Wave 0c serves the affiliation as plain text
    ("Virginia Tech") and no mark. Adding the mark later is an ADR amendment, on evidence of
    permission (licensing@vt.edu).

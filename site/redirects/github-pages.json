@@ -48,6 +48,14 @@
     "to": "/favicon.svg"
   },
   {
+    "from": "/website/og-card.png",
+    "to": "/og-card.png"
+  },
+  {
+    "from": "/website/og-card.svg",
+    "to": "/og-card.svg"
+  },
+  {
     "from": "/website/papers/",
     "to": "/papers/"
   },

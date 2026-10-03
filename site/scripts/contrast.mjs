@@ -28,11 +28,21 @@ export const TEXT_PAIRS = [
   ["color-link", "color-caution-bg"],
   ["color-on-accent", "color-accent"],
   ["color-on-accent", "color-accent-strong"],
+  // The brand band (ADR-0015; spec §5): white on Chicago Maroon is 8.4:1 in
+  // both themes because neither token flips. Orange text is checked against the
+  // page ground; it is the light theme where #e5751f would fail and #c64600 is
+  // used instead.
+  ["color-on-band", "color-band"],
+  ["vt-orange-text", "color-bg"],
 ];
 
 // Site token → the tracker palette token it carries over (contract D2, amended).
 // A site token either reads its source through var() or, where the source fails
 // AA as text, holds the nearest compliant hex. tokens.test.ts enforces that.
+// NOTE (Wave 0c): the accent rows still name "tracker-petrol" as their former
+// source for historical accuracy only. `--tracker-petrol` was removed this wave
+// (ADR-0015 decision 4) and the accent family now points at the --vt-* ramp; the
+// rows are skipped by the carve-out in tokens.test.ts and proved there instead.
 /** @type {Record<string, string>} */
 export const TOKEN_SOURCES = {
   "color-bg": "tracker-paper",

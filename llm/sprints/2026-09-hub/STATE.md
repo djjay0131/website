@@ -492,7 +492,10 @@ them is to be re-asked.
 | D9 | **Apply `feat/infra-wave-0` BEFORE it merges (owner, 2026-09-22).** Breaks the §8 deadlock recorded below: check 4 is fixed *by* the apply, and the apply follows #53, so check 4 could not clear before a merge and no merge was permitted until it cleared. The owner accepts that production briefly runs config from an unmerged branch. Sequence: apply → set `GCP_AUDITOR_SA` → mark ready → merge #45 → #48 → #53 → #47 |
 | D10 | **Satellite order and scope (owner, 2026-09-25, #72).** `agentic-kgis` is satellite 3 (public, source `kgis`), then `agentic-kg-research` satellite 4 (private, for the team). `construction-ai-proposal` later; `agentic-kg` optional. Answers design doc §10 Q6 |
 | D11 | **Apply authority for the satellites run: the harness applies under D9** (owner, 2026-09-25; the brief's stated default, left unfilled) |
-| D12 | **Team members for the private area — PENDING.** The brief's placeholder was not filled. Gates only Wave 2's onboarding step; no allowlist entry is made until the owner names them |
+| D12 | **Team members for the private area — ANSWERED (owner, 2026-10-02).** The brief's placeholder is filled with the D3 pair (`djjay@vt.edu`, `cbrown@vt.edu`); the Firestore seed remains owner-run. See §D12 below |
+| D13 | **Licensing declined the VT marks** (owner, 2026-10-01); no VT logo or HokieBird is ever served; the original emblem (#71) is the site mark. Recorded in the completion brief §2; ADR-0015 |
+| D14 | **The branding plan is design authority for Wave 0c** (owner, 2026-10-01); the spec `llm/specs/2026-10-01-branding-design.md` + ADR-0015 are on `main` (#85) |
+| D15 | **Wave 0c owner wording and portfolio mappings (owner, 2026-10-02).** (1) Role line and department stay as drafted; (2) Elsewhere links, in order: GitHub + LinkedIn from cv-data, Google Scholar `nIp5xC0AAAAJ`, ORCID `0009-0001-7283-4050`, X `djay0131`, Bluesky `djjay0131.bsky.social`, Mastodon `djjay0131@mastodon.social` (amended 2026-10-02, superseding the earlier "no Mastodon"), each `rel=me`; (3) portfolio mappings confirmed — Research.AI `agentic-kg` + Denario, Traffic.AI VTTSI + `vttsi-*`, Baseball.AI the private `baseball-ai` repo (name-only card, status private/in progress, no invented goal); ecology stays a planned card with no link; (4) AI Safety has no MATS card and no public application card (question only, Traffic.AI cross-reference as text); AI-aware architecture stays a thread. All inferred-confirm and owner-to-supply notes removed |
 
 **D8 — the day-one allowlist, exactly.** `cv/academic`, `cv/research-professional`,
 `cv/sde-long`, `cv/cv-data` (the data item the public CV pages render from), `kgis/kgis-docs`,
@@ -3030,3 +3033,80 @@ the wave's public and private outputs are otherwise verified live.
 
 **Wave 0b exit: MET** (public and private boundaries verified live; one owner
 sign-in click outstanding, recorded rather than assumed).
+
+## Wave 0c — branding, build stream (2026-10-02, in progress)
+
+Branch `feat/branding`, draft **PR #91**. Spec + ADR-0015 were already on `main`
+(#85), so this wave started at the build streams, per the owner. Contract:
+`contracts/site-wave-0c.md`; handoff: `handoffs/site-wave-0c.md`.
+
+**Landed (green locally):** theme-invariant `--color-band`/`--color-on-band`/
+`--rule-orange` and `--vt-orange-text`; `--tracker-petrol` removed;
+`tokens.test.ts` carve-out widened by name with VT-ramp positive tests;
+`contrast.mjs` 56 pairs / 0 below AA; shared `SiteBand`/`SiteFooter`/`SiteIcon`
+used by both layouts; the home page per spec §2; `footer.json` and
+`research-portfolio.json`; the portrait is no longer staged and `og:image` is
+`/og-card.png`; SectionIndex/ItemPage/signin/`/p/**` chrome; SPEC Amendment 6
+(`---` → em dash). `npm test` 295 passed / 1 skipped; public 26 pages; leak
+check and allowlist guard PASS; private build + links PASS; governance 4/4.
+
+**Deliberate spec amendment:** `--vt-orange-text` is `#c34600`, not `#c64600`:
+the branded value measures 4.48:1 (0.02 below AA), and spec §5 itself requires
+0 below AA. Same-family nearest compliant shade; owner may overrule. Spec §5
+amended.
+
+**D15 applied (2026-10-02).** The owner confirmed the role line and department,
+all Elsewhere links (GitHub, LinkedIn, Google Scholar, ORCID, X, Bluesky — each
+`rel=me`; no Mastodon), and the portfolio mappings; removed every
+inferred-confirm/owner-to-supply note; AI Safety carries the question and the
+Traffic.AI cross-reference only; Baseball.AI is a name-only card (private / in
+progress). `research/index.astro` is now portfolio-driven.
+
+**Open:** the a11y-tester and adversarial rounds for Wave 0c have not run;
+nothing merges until the security gate is zero FAIL.
+
+### Wave 0c — a11y and adversarial round (2026-10-02)
+
+- **a11y-tester** — 8 checks: 6 PASS, 2 **FAIL**, both fixed. FAIL 1: the band's
+  `:focus-visible` used `--color-focus` (maroon = `--color-band`), an invisible
+  1.00:1 ring; now `--color-on-band` (`SiteBand.astro`). FAIL 2: `PrivateBase`
+  had no print block, so the band/skip link printed under `/p/`; added.
+- **Dissenter** — 6 objections. **Objection 1 (BLOCKS) fixed:** the build stream
+  had regenerated `site/redirects/github-pages.json` from a fixture build,
+  dropping the 12 real legacy routes; restored from `main` and added the new
+  `/og-card.png|svg`. Objection 4 (dark-mode accents) fixed: in-page accents use
+  theme-aware `--color-accent`; the band and footer top rule stay `--color-band`.
+  Objections 2 (dead `repo` field), 3 (Baseball.AI name-only — authorized),
+  5 (`--vt-orange-text` unused), 6 (`/research/` flattens tenets) dispositioned
+  below.
+- **Red Team** — 7 targets / 11 cases: **0 BYPASS, 7 REFUSED** (OG card and
+  `og:image` carry no private title and no portrait; portrait absent; no
+  off-origin request; Recent uses effective visibility; Elsewhere accounts
+  correct; research index public-only; print/noindex).
+- **Skeptic Verifier** — all guards made red and restored. Three gaps found and
+  closed: a bare re-introduced `--tracker-petrol` now fails (`tokens.test.ts`); a
+  portrait-embedding OG path is now tested (`og-card.test.ts`); a portrait
+  pre-seeded into `dist-public` after the build is still not refused —
+  **Fix later** (out of pipeline; the build and `outDir` cleaning remove it, and
+  the Security Tester assessed it not a gate FAIL).
+- **Security Tester** — gate **GREEN, 0 FAIL** (no private content on the public
+  path red→green; Wave 0b unweakened; portrait absent; no off-origin; OG clean;
+  `firebase.json` unchanged in kind).
+- **Chief Reviewer** — **Comment** (approved-with-comments), no Fix-now, nothing
+  blocked.
+
+### Wave 0c dispositions (Lead Architect)
+
+| Finding | Source | Disposition |
+|---|---|---|
+| `redirects/github-pages.json` regenerated from fixture | Dissenter 1 | **Fixed** (restored + og-card entries). |
+| Dark-mode in-page accents invisible | Dissenter 4 | **Fixed** (`--color-accent`). |
+| Band focus ring invisible | a11y | **Fixed** (`--color-on-band`). |
+| Private print chrome | a11y | **Fixed** (print block). |
+| `--tracker-petrol` absence untested | Skeptic | **Fixed** (new test). |
+| OG no-portrait untested | Skeptic | **Fixed** (new `og-card.test.ts`). |
+| Portrait pre-seeded in `dist-public` not refused | Skeptic | **Fix later** (post-build hand-write, out of pipeline; not a gate FAIL). |
+| Dead `repo` field; D15 mappings under-represented | Dissenter 2 / Chief Reviewer | **Fix later** — mappings live in `repo` as data; surfacing them is a Wave 3+ decision. |
+| `--vt-orange-text` has no consumer | Dissenter 5 / a11y note | **Fix later / Note** — defined and contrast-checked; the spec's light-theme underline target is met by `--rule-orange` on the band. Owner call. |
+| `/research/` flattens tenets | Dissenter 6 | **Note** — tenet shown as card `meta`; the AI Safety tenet (no public projects) does not appear. |
+| Pre-seeded portrait assertion in the leak check | Security Tester | **Fix later** (the suggested home for the guard above). |

@@ -5,6 +5,11 @@
 // links 404s inside the private output, which is served by the gate from a
 // separate bucket and contains none of those pages.
 //
+// Wave 0c (spec §7, ADR-0015 decision 5): the BAND and FOOTER are now shared
+// components under src/components/, imported here and by Base.astro. Only the
+// navigation differs, and it arrives as a prop, so no public nav reaches this
+// build through the components.
+//
 // This file lives under src-private/, which the public build's srcDir never
 // includes. Nothing here can reach dist-public.
 import "@fontsource/spectral/400.css";
@@ -14,6 +19,12 @@ import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "../../src/styles/tokens.css";
+import SiteBand from "../../src/components/SiteBand.astro";
+import SiteFooter from "../../src/components/SiteFooter.astro";
+import { loadContentPool } from "../../src/lib/cv-data";
+import { CV_CONTENT_DIR } from "../../src/lib/hub-content.mjs";
+import { readFooterData, resolveElsewhere, readBuildInfo } from "../../src/lib/footer.mjs";
+import path from "node:path";
 
 interface Props {
   title: string;
@@ -22,6 +33,34 @@ interface Props {
 }
 
 const { title, nav = [] } = Astro.props;
+
+const base = import.meta.env.BASE_URL; // "/p/"
+const site = Astro.site?.toString().replace(/\/$/, "") ?? "";
+const here = Astro.url.pathname;
+const bandNav = nav.map((entry) => ({ ...entry, current: here === entry.href }));
+
+const footer = readFooterData();
+const meta = loadContentPool(path.resolve(CV_CONTENT_DIR)).meta;
+const elsewhere = resolveElsewhere(footer, meta.contact);
+const buildInfo = readBuildInfo(path.resolve("."), footer.repository);
+
+// Public pages are reached by their CANONICAL public URL, not a /p/-relative
+// link: the gate serves dist-private under /p/, and a bare /research/ would
+// escape the base (check:private-links). An absolute outbound anchor is allowed
+// by that check by design.
+const canon = (rel: string) => (site ? `${site}/${rel}` : `/${rel}`);
+const footerNav = [
+  { label: "Research", href: canon("research/") },
+  { label: "Projects", href: canon("projects/") },
+  { label: "Writing", href: canon("writing/") },
+  { label: "CV", href: canon("cv/") },
+  { label: "Papers", href: canon("papers/") },
+  { label: "Resumes", href: canon("resumes/") },
+  { label: "RSS", href: null },
+  { label: "Privacy", href: canon("privacy/") },
+  { label: "Email policy", href: canon("email/") },
+  { label: "Built from source", href: footer.repository, external: true },
+];
 ---
 
 <!doctype html>
@@ -37,38 +76,42 @@ const { title, nav = [] } = Astro.props;
     <title>{title}</title>
   </head>
   <body>
-    <header class="private-header">
-      <p class="badge">Private · shared with you</p>
-      <nav aria-label="Private navigation">
-        <a href={import.meta.env.BASE_URL} class="brand">Members' area</a>
-        {nav.length > 0 && (
-          <ul>
-            {nav.map((entry) => (
-              <li><a href={entry.href}>{entry.label}</a></li>
-            ))}
-          </ul>
-        )}
-        <!-- THE SIGN-OUT CONTROL (SD-4; finding B-8).
-             A BUTTON, not a link: sign-out is a state change, so it is a POST.
-             An <a href> or a GET here would be triggerable by an <img> tag on
-             any page the member visits. The call itself lives in
-             src-private/lib/signout.mjs, where its three security properties are
-             pinned by tests rather than by review.
-             It sits in the layout so that EVERY private page carries it -- a
-             sign-out a member has to go looking for is one they will not use. -->
-        <button id="sign-out" type="button" class="sign-out">Sign out</button>
-      </nav>
-      <!-- A failed sign-out must be SEEN. A member who believes they signed out
-           and did not is worse off than one who sees an error. -->
-      <p id="sign-out-error" class="sign-out-error" role="alert" hidden></p>
-    </header>
-    <main>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <SiteBand
+      homeHref={base}
+      nav={bandNav}
+      membersTag="Members"
+      wordmark={meta.name}
+      navLabel="Private navigation"
+    >
+      <!-- THE SIGN-OUT CONTROL (SD-4; finding B-8).
+           A BUTTON, not a link: sign-out is a state change, so it is a POST.
+           An <a href> or a GET here would be triggerable by an <img> tag on
+           any page the member visits. The call itself lives in
+           src-private/lib/signout.mjs, where its three security properties are
+           pinned by tests rather than by review.
+           It sits in the layout so that EVERY private page carries it -- a
+           sign-out a member has to go looking for is one they will not use. -->
+      <button slot="band-actions" id="sign-out" type="button" class="sign-out">Sign out</button>
+    </SiteBand>
+
+    <!-- A failed sign-out must be SEEN. A member who believes they signed out
+         and did not is worse off than one who sees an error. -->
+    <p id="sign-out-error" class="sign-out-error" role="alert" hidden></p>
+
+    <main id="main-content">
       <slot />
     </main>
-    <footer class="private-footer">
-      <p>Not for redistribution.</p>
-    </footer>
-  
+
+    <SiteFooter
+      contact={{ email: meta.contact.email, department: footer.department, university: footer.university }}
+      elsewhere={elsewhere}
+      nav={footerNav}
+      provenance={footer.provenance}
+      buildInfo={buildInfo}
+      signInHref={canon("signin/")}
+    />
+
     <script>
       // Capture what the members' area would otherwise swallow.
       //
@@ -147,44 +190,40 @@ const { title, nav = [] } = Astro.props;
   h1, h2, h3 { font-family: var(--font-display); font-weight: 600; line-height: 1.25; }
   h1 { font-size: 2rem; margin-bottom: 1rem; }
 
-  .private-header {
-    border-bottom: 3px solid var(--color-accent);
-    padding: 1rem 1.5rem;
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
   }
-  .private-header nav {
-    max-width: var(--max-width);
-    margin: 0 auto;
-    display: flex;
-    gap: 1.5rem;
-    align-items: baseline;
-    flex-wrap: wrap;
-  }
-  .private-header ul {
-    display: flex;
-    gap: 1.25rem;
-    list-style: none;
-    padding: 0;
-    flex-wrap: wrap;
-  }
-  .brand {
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 1.2rem;
-    color: var(--color-text);
-  }
-  .sign-out {
-    margin-left: auto;
+  .skip-link:focus {
+    position: fixed;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    width: auto;
+    height: auto;
+    padding: 0.5rem 1rem;
+    background: var(--color-on-band);
+    color: var(--color-band);
+    z-index: 1000;
     font-family: var(--font-body);
-    font-size: 0.85rem;
-    padding: 0.3rem 0.9rem;
-    border: 1px solid var(--color-border);
+  }
+
+  .sign-out {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    padding: 0.25rem 0.8rem;
+    border: 1px solid var(--color-on-band);
     border-radius: var(--radius);
-    background: var(--color-surface);
-    color: var(--color-text);
+    background: transparent;
+    color: var(--color-on-band);
     cursor: pointer;
   }
-  .sign-out:hover { border-color: var(--color-accent); }
-  .sign-out:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+  .sign-out:hover { background: rgba(255, 255, 255, 0.12); }
+  .sign-out:focus-visible { outline: 2px solid var(--rule-orange); outline-offset: 2px; }
   .sign-out[disabled] { opacity: 0.6; cursor: progress; }
   .sign-out-error {
     max-width: var(--max-width);
@@ -196,20 +235,13 @@ const { title, nav = [] } = Astro.props;
     color: var(--color-text);
     font-size: 0.85rem;
   }
-  .badge {
-    max-width: var(--max-width);
-    margin: 0 auto 0.5rem;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-muted);
-  }
-  .private-footer {
-    border-top: 1px solid var(--color-border);
-    text-align: center;
-    padding: 1.5rem;
-    font-size: 0.875rem;
-    color: var(--color-muted);
+
+  /* The public layout hides the chrome when printing; the private one must too
+     (a11y Wave 0c, check 7). The band, footer and skip link are navigation, not
+     content, and the sign-out control is meaningless on paper. */
+  @media print {
+    .site-band, .site-footer, .skip-link { display: none; }
+    main { max-width: 100%; padding: 0; }
+    a[href]::after { content: none; }
   }
 </style>

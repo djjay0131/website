@@ -1,136 +1,267 @@
 ---
+import { getCollection } from "astro:content";
 import Base from "../layouts/Base.astro";
 import { loadContentPool } from "../lib/cv-data";
+import { mdToHtml } from "../lib/md";
 import { CV_CONTENT_DIR } from "../lib/hub-content.mjs";
+import { readFooterData } from "../lib/footer.mjs";
 import path from "node:path";
+import portfolio from "../data/research-portfolio.json";
 
-// The CV payload now arrives from the content bucket through the publishing
+// The CV payload arrives from the content bucket through the publishing
 // contract (SEAM-5). Only where the files are read from changed.
 const pool = loadContentPool(path.resolve(CV_CONTENT_DIR));
 const meta = pool.meta;
-const summary = Object.values(pool.summaries)[0];
+// The RESEARCH statement, not the industry one (spec §2). Prefer the academic
+// summary by id; fall back to the first summary so a renamed id still renders.
+const academic = pool.summaries.academic ?? Object.values(pool.summaries)[0];
+const footer = readFooterData();
 const base = import.meta.env.BASE_URL;
+
+// Recent (spec §2, item 3): the five most recent items across all sections,
+// read from the content collection's EFFECTIVE (allowlisted) visibility. It
+// never reads a manifest's raw `visibility`; the loader in content.config.ts is
+// the one place that combines the request with the allowlist (Wave 0b).
+const entries = await getCollection(
+  "sources",
+  ({ data }) => data.effective_visibility === "public" && data.format !== "data",
+);
+const recent = entries
+  .map((entry) => entry.data)
+  .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug < b.slug ? -1 : 1))
+  .slice(0, 5);
+
+/** Where a public item is reachable, or undefined when it has no page. */
+function hrefFor(item: (typeof recent)[number]): string | undefined {
+  if (item.format === "pdf" && item.section === "cv") return `${base}cv/${item.slug}`;
+  if (item.format === "html" || item.format === "bundle") {
+    return `${base}${item.section}/${item.source}/${item.slug}/`;
+  }
+  return undefined;
+}
+
+// The "Ways in" copy is a draft the owner edits (plan §3).
+const waysIn = [
+  { label: "Research", href: `${base}research/`, description: "Working digests grouped by project." },
+  { label: "Projects", href: `${base}projects/`, description: "Selected projects and research." },
+  { label: "Writing", href: `${base}writing/`, description: "Notes, papers and shorter pieces." },
+  { label: "CV", href: `${base}cv/`, description: "The CV in each of its variants." },
+];
 ---
 
-<Base title="Jason Cusati">
-  <div class="hero">
-    {/* The research emblem replaces the portrait (owner decision, 2026-09-24).
-        It is an original SVG in the VT colour family: no university mark and
-        no HokieBird, because the Office of Licensing and Trademarks declined
-        the request to use them. Colours are not trademarks; the marks are. */}
-    <img
-      src={`${base}emblem/research-emblem.svg`}
-      alt=""
-      class="hero-emblem"
-      width="200"
-      height="200"
-    />
-    <div class="hero-text">
-      <h1>{meta.name}</h1>
-      <p class="subtitle">{summary?.text}</p>
-      <div class="hero-links">
-        <a href={`mailto:${meta.contact.email}`}>{meta.contact.email}</a>
-        {meta.contact.github && (
-          <a href={`https://github.com/${meta.contact.github}`}>GitHub</a>
-        )}
-        {meta.contact.linkedin && (
-          <a href={`https://linkedin.com/in/${meta.contact.linkedin}`}>LinkedIn</a>
-        )}
-      </div>
-      <div class="hero-actions">
-        <a href={`${base}cv/academic`} class="btn btn-primary">View CV</a>
-        <a href={`${base}pdfs/academic.pdf`} class="btn btn-secondary">Download PDF</a>
-        <a href={`${base}papers`} class="btn btn-secondary">Papers</a>
-      </div>
+<Base title={meta.name} description="Research hub of Jason Cusati, PhD student in Computer Science at Virginia Tech.">
+  <section class="identity" aria-labelledby="identity-name">
+    <h1 id="identity-name">{meta.name}</h1>
+    <p class="role">{footer.role}</p>
+    {academic && <div class="statement" set:html={mdToHtml(academic.text)} />}
+    <hr class="identity-rule" />
+  </section>
+
+  <section class="block" aria-labelledby="working-on">
+    <h2 id="working-on">What I&rsquo;m working on</h2>
+    <div class="tenet-grid">
+      {portfolio.tenets.map((tenet) => {
+        const shown = tenet.projects.filter((project) => project.public);
+        return (
+          <article class="tenet">
+            <h3>{tenet.title}</h3>
+            <p class="tenet-question">{tenet.question}</p>
+            {shown.length > 0 && (
+              <ul class="tenet-projects">
+                {shown.map((project) => (
+                  <li>
+                    {project.href ? (
+                      <a href={`${base}${project.href.replace(/^\//, "")}`}>{project.name}</a>
+                    ) : (
+                      <span>{project.name}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {tenet.crossReference && <p class="tenet-cross">{tenet.crossReference}</p>}
+          </article>
+        );
+      })}
     </div>
-  </div>
+  </section>
+
+  <section class="block" aria-labelledby="recent">
+    <h2 id="recent">Recent</h2>
+    {recent.length > 0 ? (
+      <ul class="recent-list">
+        {recent.map((item) => (
+          <li class="recent-item">
+            <time class="meta-mono" datetime={item.date}>{item.date}</time>
+            <span class="recent-title">
+              {hrefFor(item) ? <a href={hrefFor(item)}>{item.title}</a> : item.title}
+            </span>
+            <span class="recent-section meta-mono">{item.section}</span>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="recent-empty">Nothing has been published yet.</p>
+    )}
+  </section>
+
+  <section class="block" aria-labelledby="ways-in">
+    <h2 id="ways-in">Ways in</h2>
+    <div class="ways-grid">
+      {waysIn.map((way) => (
+        <a class="way" href={way.href}>
+          <span class="way-label">{way.label}</span>
+          <span class="way-description">{way.description}</span>
+        </a>
+      ))}
+    </div>
+  </section>
 </Base>
 
 <style>
-  .hero {
+  .identity {
+    padding-top: 0.5rem;
+  }
+
+  .role {
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: var(--color-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .statement {
+    font-size: 1.05rem;
+    max-width: 46rem;
+  }
+
+  .statement :global(p) {
+    margin-bottom: 0.6rem;
+  }
+
+  /* A thin maroon rule closes the identity block (spec §2). */
+  .identity-rule {
+    border: none;
+    border-top: 2px solid var(--color-accent);
+    margin: 1.5rem 0 0;
+    width: 4rem;
+  }
+
+  .block {
+    margin-top: 2.5rem;
+  }
+
+  .tenet-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .tenet {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-top: 3px solid var(--color-accent);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+  }
+
+  .tenet h3 {
+    margin-top: 0;
+    font-size: 1.05rem;
+  }
+
+  .tenet-question {
+    color: var(--color-muted);
+    font-size: 0.9rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .tenet-projects {
+    list-style: none;
+    padding: 0;
+    margin: 0;
     display: flex;
-    gap: 2rem;
-    align-items: flex-start;
-    padding: 2rem 0;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.9rem;
+    font-size: 0.9rem;
+    font-weight: 500;
   }
 
-  .hero-emblem {
-    width: 200px;
-    height: 200px;
+  .recent-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+  }
+
+  .recent-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .recent-item:last-child {
+    border-bottom: none;
+  }
+
+  .recent-item time {
     flex-shrink: 0;
+    min-width: 6.5rem;
   }
 
-  .hero-text {
+  .recent-title {
     flex: 1;
   }
 
-  .subtitle {
-    color: var(--color-muted);
-    margin-bottom: 1rem;
-    font-size: 0.95rem;
-  }
-
-  .hero-links {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: 1.5rem;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-  }
-
-  .hero-actions {
-    display: flex;
+  .ways-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
-    flex-wrap: wrap;
+    margin-top: 1rem;
   }
 
-  .btn {
-    display: inline-block;
-    padding: 0.5rem 1.25rem;
-    border-radius: var(--radius);
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    font-weight: 500;
-    text-decoration: none;
-  }
-
-  .btn-primary {
-    background: var(--color-accent);
-    color: var(--color-on-accent);
-  }
-
-  .btn-primary:hover {
-    background: var(--color-accent-strong);
-    color: var(--color-on-accent);
-    text-decoration: none;
-  }
-
-  .btn-secondary {
+  .way {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 1.1rem;
     background: var(--color-surface);
-    color: var(--color-text);
     border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text);
   }
 
-  .btn-secondary:hover {
-    background: var(--color-border);
-    color: var(--color-text);
+  .way:hover {
+    border-color: var(--color-accent);
     text-decoration: none;
+  }
+
+  .way-label {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.15rem;
+  }
+
+  .way-description {
+    color: var(--color-muted);
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 700px) {
+    .tenet-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 600px) {
-    .hero {
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
+    .ways-grid {
+      grid-template-columns: 1fr;
     }
 
-    .hero-links {
-      justify-content: center;
-    }
-
-    .hero-actions {
-      justify-content: center;
+    .recent-item {
+      flex-wrap: wrap;
+      gap: 0.15rem 0.75rem;
     }
   }
 </style>

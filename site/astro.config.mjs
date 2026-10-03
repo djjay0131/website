@@ -37,6 +37,7 @@ import { LEGACY_REDIRECTS, isExcludedFromSitemap } from './scripts/site-routes.m
 import { resolveHubOutput } from './scripts/site-output.mjs';
 import { privateBuild } from './scripts/private-build.mjs';
 import { publicBuild } from './scripts/public-build.mjs';
+import { ogCard } from './scripts/og-card.mjs';
 
 const { site, base } = resolveSiteEnv(process.env);
 const { outDir, isPrivate } = resolveHubOutput(process.env);
@@ -52,9 +53,12 @@ export default defineConfig({
   // only). A sitemap of the private area would be a list of private URLs.
   // publicBuild() stages the payload bytes of the public framed items
   // (scripts/public-build.mjs); the private build's twin is privateBuild().
+  // ogCard() generates the default link-preview card (name, title, maroon band,
+  // orange rule, no portrait) into public/ before the build copies it. It runs
+  // only in the public output: private pages are noindex and carry no og:image.
   integrations: isPrivate
     ? [privateBuild()]
-    : [sitemap({ filter: (page) => !isExcludedFromSitemap(page, base) }), publicBuild()],
+    : [sitemap({ filter: (page) => !isExcludedFromSitemap(page, base) }), ogCard(), publicBuild()],
   // The legacy GitHub Pages redirects are public routes and have no meaning in
   // the private output.
   redirects: isPrivate

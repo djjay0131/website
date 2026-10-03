@@ -1,0 +1,246 @@
+---
+// THE SHARED HEADER BAND (spec §3; ADR-0015 decision 5).
+//
+// Imported by BOTH src/layouts/Base.astro (public) and
+// src-private/layouts/PrivateBase.astro. It carries NO navigation of its own:
+// every link arrives as a prop, so the public nav can never leak into the
+// private build through this component (the structural guarantee in
+// scripts/private-structure.test.ts).
+//
+// The band is the one theme-invariant surface: --color-band and --rule-orange
+// are fixed brands that do not flip (ADR-0015 decision 2).
+interface NavItem {
+  label: string;
+  href: string;
+  current?: boolean;
+}
+
+interface Props {
+  /** Home link for the wordmark. Public: base; private: the members' index. */
+  homeHref: string;
+  /** Primary navigation (Research, Projects, Writing, CV). */
+  nav?: NavItem[];
+  /** Secondary navigation (Papers, Resumes), shown as "More" on narrow screens. */
+  secondaryNav?: NavItem[];
+  /** A discreet tag such as "Members", shown only in the private build. */
+  membersTag?: string;
+  wordmark?: string;
+  affiliation?: string;
+  navLabel?: string;
+}
+
+const {
+  homeHref,
+  nav = [],
+  secondaryNav = [],
+  membersTag,
+  wordmark = "Jason Cusati",
+  affiliation = "Virginia Tech",
+  navLabel = "Main navigation",
+} = Astro.props;
+---
+
+<header class="site-band">
+  <div class="band-inner">
+    <a class="band-brand" href={homeHref}>
+      <span class="band-wordmark">{wordmark}</span>
+      <span class="band-affiliation">{affiliation}</span>
+    </a>
+
+    {membersTag && <span class="band-members">{membersTag}</span>}
+
+    <!-- The public layout always passes nav; /signin/ passes none and no band
+         action, so it renders no navigation at all (spec §6). The private
+         layout passes a band action (sign-out), which keeps the nav element
+         even when the private item list is empty. -->
+    {(nav.length > 0 || secondaryNav.length > 0 || Astro.slots.has("band-actions")) && (
+      <nav class="band-nav" aria-label={navLabel}>
+        <ul class="band-primary">
+          {nav.map((item) => (
+            <li>
+              <a href={item.href} aria-current={item.current ? "page" : undefined}>{item.label}</a>
+            </li>
+          ))}
+        </ul>
+
+        {secondaryNav.length > 0 && (
+          <details class="band-more">
+            <summary>More</summary>
+            <ul class="band-secondary">
+              {secondaryNav.map((item) => (
+                <li>
+                  <a href={item.href} aria-current={item.current ? "page" : undefined}>{item.label}</a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        <slot name="band-actions" />
+      </nav>
+    )}
+  </div>
+</header>
+
+<style>
+  .site-band {
+    background: var(--color-band);
+    color: var(--color-on-band);
+    /* The 4px Burnt Orange rule beneath the band (spec §3). */
+    border-bottom: 4px solid var(--rule-orange);
+  }
+
+  .band-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0.85rem 1.5rem 0.75rem;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .band-brand {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    color: var(--color-on-band);
+    margin-right: auto;
+  }
+
+  .band-brand:hover {
+    color: var(--color-on-band);
+    text-decoration: none;
+  }
+
+  .band-wordmark {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.4rem;
+  }
+
+  .band-affiliation {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    opacity: 0.9;
+  }
+
+  .band-members {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--color-on-band);
+    border-radius: 999px;
+    padding: 0.1rem 0.55rem;
+    align-self: center;
+    opacity: 0.85;
+  }
+
+  .band-nav {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem 1.25rem;
+  }
+
+  .band-primary,
+  .band-secondary {
+    display: flex;
+    gap: 0.75rem 1.25rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .band-nav a {
+    color: var(--color-on-band);
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.95rem;
+    text-decoration: none;
+  }
+
+  .band-nav a:hover {
+    color: var(--color-on-band);
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+  }
+
+  /* The current section is underlined in orange (spec §3). On the maroon band
+     the burnt-orange rule is the brand accent; it is a decorative underline, so
+     it carries no AA text obligation. */
+  .band-nav a[aria-current] {
+    text-decoration: underline;
+    text-decoration-color: var(--rule-orange);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 0.35em;
+  }
+
+  /* The global :focus-visible outline is --color-focus, which in the light theme
+     is Chicago Maroon — the same value as --color-band, so it is invisible on the
+     band (a11y Wave 0c, check 2). On the band the ring must be the on-band
+     colour. The selector is more specific than the global rule, so it wins. */
+  .site-band :focus-visible {
+    outline-color: var(--color-on-band);
+  }
+
+  .band-more {
+    display: none;
+    position: relative;
+  }
+
+  .band-more summary {
+    cursor: pointer;
+    color: var(--color-on-band);
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+
+  .band-secondary {
+    position: absolute;
+    right: 0;
+    margin-top: 0.5rem;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--color-band);
+    border: 1px solid var(--rule-orange);
+    border-radius: var(--radius);
+    z-index: 20;
+    min-width: 8rem;
+  }
+
+  @media (max-width: 700px) {
+    .band-more {
+      display: block;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .band-inner {
+      flex-wrap: nowrap;
+      align-items: center;
+    }
+
+    .band-brand {
+      margin-right: 0;
+    }
+
+    .band-nav {
+      min-width: 0;
+    }
+
+    /* One-row scrollable list, no hamburger JavaScript (spec §3). */
+    .band-primary {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 0.15rem;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .band-primary li {
+      white-space: nowrap;
+    }
+  }
+</style>

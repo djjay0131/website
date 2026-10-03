@@ -75,18 +75,20 @@ export const CV_VARIANTS_DIR = `${CV_DATA_DIR}/data/variants`;
 export const CV_DATA_ROOT = `${CV_DATA_DIR}/data`;
 /** Former site/data/own-bib.bib */
 export const CV_BIB_PATH = `${CV_DATA_DIR}/own-bib.bib`;
-/** The photo's path WITHIN the cv source's prefix, i.e. relative to sources/cv/. */
-export const CV_PHOTO_REL = `${CV_DATA_SLUG}/photo_jason_1.jpeg`;
-/** Former (fetched) site/public/photo_jason_1.jpeg, relative to site/. */
-export const CV_PHOTO_PATH = `${CV_DATA_DIR}/photo_jason_1.jpeg`;
 
 /**
  * Where the hub serves the synced CV assets from. Phase 1 served
- * /pdfs/<variant>.pdf and /photo_jason_1.jpeg out of public/, and it still
- * does: the staging step copies them there after the sync, so no URL moves
- * (ADR-0008 decision 4).
+ * /pdfs/<variant>.pdf and /photo_jason_1.jpeg out of public/; the staging step
+ * still copies the PDFs there (ADR-0008 decision 4).
  */
 export const PUBLIC_PDF_DIR = "public/pdfs";
+
+/**
+ * The former public photo path. Wave 0c stops staging the portrait onto the
+ * public site (Amendment 4; ADR-0015 decision 1), so this constant is no longer
+ * a destination. It survives only so the staging step can DELETE a stale copy
+ * left in public/ by an older build — the photo is never copied there again.
+ */
 export const PUBLIC_PHOTO_PATH = "public/photo_jason_1.jpeg";
 
 /**

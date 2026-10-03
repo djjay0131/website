@@ -113,3 +113,56 @@ describe("nothing the public build compiles imports anything private", () => {
     expect(signin).not.toMatch(/private-content/);
   });
 });
+
+// ===========================================================================
+// THE SHARED CHROME (Wave 0c; spec §7; ADR-0015 decision 5)
+// ===========================================================================
+// The band and footer are extracted into src/components/ so BOTH layouts share
+// them while keeping their navigations separate. This block is an EXTENSION of
+// the structural guarantee above, not a weakening of it: the shared components
+// live inside the public srcDir (so the private build may import them), they
+// import nothing private, and they carry no navigation of their own -- every
+// link arrives as a prop, which is the property that keeps the public nav from
+// riding into the private build through the shared chrome.
+describe("the shared band and footer are safe for both builds", () => {
+  it("ships SiteBand, SiteFooter and the icon set under src/components/", () => {
+    for (const name of ["SiteBand.astro", "SiteFooter.astro", "SiteIcon.astro"]) {
+      expect(fs.existsSync(path.join(SRC, "components", name)), `src/components/${name}`).toBe(true);
+    }
+  });
+
+  it("both layouts import the same shared components", () => {
+    const base = fs.readFileSync(path.join(SRC, "layouts", "Base.astro"), "utf8");
+    const priv = fs.readFileSync(path.join(SRC_PRIVATE, "layouts", "PrivateBase.astro"), "utf8");
+    for (const [label, text] of [
+      ["Base.astro", base],
+      ["PrivateBase.astro", priv],
+    ] as const) {
+      expect(text, `${label} imports SiteBand`).toMatch(/components\/SiteBand\.astro/);
+      expect(text, `${label} imports SiteFooter`).toMatch(/components\/SiteFooter\.astro/);
+    }
+    // The private -> public arrow is the ONLY direction: PrivateBase reaches
+    // into src/components/, and no file under src/ imports src-private/ (the
+    // block above still proves the reverse is absent).
+    expect(priv).toMatch(/\.\.\/\.\.\/src\/components\/SiteBand\.astro/);
+    expect(priv).toMatch(/\.\.\/\.\.\/src\/components\/SiteFooter\.astro/);
+  });
+
+  it("the shared components import nothing private and carry no navigation", () => {
+    for (const name of ["SiteBand", "SiteFooter", "SiteIcon"]) {
+      const text = fs.readFileSync(path.join(SRC, "components", `${name}.astro`), "utf8");
+      // Judge IMPORT lines, not prose: a comment may legitimately explain that
+      // the private build imports this shared component.
+      for (const line of text.split("\n")) {
+        if (!/\b(import|require)\b/.test(line)) continue;
+        expect(line, `${name} imports something private: ${line.trim()}`).not.toMatch(
+          /src-private|private-content|PrivateBase|private-build/,
+        );
+      }
+      // Navigation arrives as a prop; a component that read the collection or
+      // hard-coded a route would be navigation of its own.
+      expect(text, `${name} reads no collection`).not.toMatch(/getCollection/);
+      expect(text, `${name} hard-codes no root-absolute link`).not.toMatch(/href="\//);
+    }
+  });
+});

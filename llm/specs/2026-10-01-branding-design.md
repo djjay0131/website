@@ -84,8 +84,16 @@ collapsing to one column on mobile. Data-driven from `cv-data` `meta.contact` pl
 ## 5. Tokens, type and colour
 
 - Keep Spectral / Plex Sans / Plex Mono. Do **not** add VT brand typefaces.
-- Add `#c64600` as `--vt-orange-text`, for orange text and the light-theme underline where
-  `#e5751f` fails AA.
+- Add VT's darkened burnt orange as `--vt-orange-text`, for orange text and the
+  light-theme underline where `#e5751f` fails AA.
+
+  > Amended 2026-10-02 (Wave 0c build). The token holds **`#c34600`**, not the
+  > `#c64600` first specified: measured against `--color-bg`, `#c64600` is 4.48:1
+  > — 0.02 below AA — and this spec requires the contrast suite at zero below AA.
+  > `#c34600` is the nearest same-family darkening that passes (4.57:1), exactly
+  > as `--color-muted` and `--color-caution` already depart from their tracker
+  > values. The owner may prefer the branded `#c64600` and accept the 4.48:1; that
+  > is an open question, not a defect.
 - Add `--color-band`, `--color-on-band`, `--rule-orange` so the bands and rule are tokens,
   not literals.
 - **Remove `--tracker-petrol`** (it paints nothing; only a test pinned it).

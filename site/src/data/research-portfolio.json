@@ -1,0 +1,83 @@
+{
+  "tenets": [
+    {
+      "id": "knowledge-graphs",
+      "title": "Knowledge Graphs for decision-making and provenance with AI",
+      "question": "How can a knowledge graph organise information so that AI-assisted decisions carry their provenance — every answer traceable to evidence, every uncertain extraction kept out of the canonical graph until it is curated?",
+      "crossReference": null,
+      "projects": [
+        {
+          "name": "Research.AI",
+          "goal": "Show that a curated, provenance-bearing research graph gives better-grounded answers than an LLM's own recall.",
+          "status": "Staging on Cloud Run; approaching the experimental comparison against LLM-generated graphs.",
+          "href": null,
+          "repo": "agentic-kg",
+          "public": true
+        },
+        {
+          "name": "Construction.AI",
+          "goal": "A material take-off whose every quantity is traceable to a drawing element and whose simulation inputs carry quantified uncertainty.",
+          "status": "Phase 1 MVP on Cloud Run; Phase 5 adds a VVUQ layer for engineering-simulation reproducibility.",
+          "href": null,
+          "repo": "construction-ai",
+          "public": true
+        },
+        {
+          "name": "Baseball.AI",
+          "goal": null,
+          "status": "Private — in progress.",
+          "href": null,
+          "repo": "baseball-ai",
+          "public": true
+        },
+        {
+          "name": "Traffic.AI",
+          "goal": "A real-time safety index that can explain itself and degrade deterministically when the model is wrong.",
+          "status": null,
+          "href": null,
+          "repo": "vttsi",
+          "public": true
+        },
+        {
+          "name": "Ecology project (insects and weeds)",
+          "goal": null,
+          "status": "Planned, with a collaborator at UCSB.",
+          "href": null,
+          "repo": null,
+          "public": true
+        }
+      ]
+    },
+    {
+      "id": "agentic-software-engineering",
+      "title": "Agentic software engineering",
+      "question": "What agentic development has actually built versus what it has measured, and how to govern agents so their output is reviewable, reproducible and honest?",
+      "crossReference": null,
+      "projects": [
+        {
+          "name": "State of the Art in Agentic Software Engineering",
+          "goal": "A defensible map of the field and a memory-evaluation method.",
+          "status": "Two research tracks published as digests on this site; the survey is private until publication.",
+          "href": "/research/soa-agentic-se/",
+          "repo": "soa-agentic-se",
+          "public": true
+        },
+        {
+          "name": "Agentic governance and agentic research",
+          "goal": "Make governed, reproducible agent work the default rather than the exception.",
+          "status": "Active; the Springer chapter proposal \"Governed Agentic Research\" is due 2026-10-23.",
+          "href": null,
+          "repo": "agentic-governance",
+          "public": true
+        }
+      ]
+    },
+    {
+      "id": "ai-safety",
+      "title": "AI safety",
+      "question": "Whether a model's stated reasoning is faithful to its computation, and how to tell from the inside.",
+      "crossReference": "The Traffic.AI grounding-guardrail and honest-null work also belongs here as applied safety.",
+      "projects": []
+    }
+  ]
+}

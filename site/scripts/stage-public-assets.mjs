@@ -4,11 +4,12 @@
 //   node scripts/stage-public-assets.mjs [--sources DIR]
 //
 // Phase 1 served /pdfs/<variant>.pdf and /photo_jason_1.jpeg out of site/public/,
-// where scripts/fetch-data.sh put them. Phase 2 changes where the bytes come
-// from, not where they are served: this step copies them from the synced
-// payload into the same two places, so every Phase 1 URL keeps resolving with
+// where scripts/fetch-data.sh put them. Phase 2 changes where the PDF bytes come
+// from, not where they are served, so every Phase 1 PDF URL keeps resolving with
 // no redirect (ADR-0008 decision 4; SEAM-5 "PDFs land at /pdfs/<variant>.pdf,
-// the path Phase 1 serves").
+// the path Phase 1 serves"). Wave 0c stops serving the portrait: the photo is
+// removed from public/ and never copied back (Amendment 4; ADR-0015
+// decision 1).
 //
 // It is driven by each source's manifest, never by globbing the tree: the
 // manifest is the authority on what exists (an item dropped from `items` is
@@ -23,8 +24,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  CV_PHOTO_REL,
-  CV_SOURCE,
   PUBLIC_PDF_DIR,
   PUBLIC_PHOTO_PATH,
   SOURCES_DIR,
@@ -83,15 +82,11 @@ export function stagePublicAssets(sourcesDir, siteRoot = SITE_ROOT) {
     }
   }
 
-  // The photo is part of the claimed cv-data payload rather than an item of its
-  // own, so it is named directly (SEAM-5). Resolved against the SYNCED TREE,
-  // not against site/: the two coincide in a normal build but not when
-  // --dest points elsewhere, and only one of them is right.
-  const photo = path.join(sourcesDir, CV_SOURCE, CV_PHOTO_REL);
-  if (fs.existsSync(photo)) {
-    fs.copyFileSync(photo, path.join(siteRoot, PUBLIC_PHOTO_PATH));
-    staged.push(PUBLIC_PHOTO_PATH);
-  }
+  // THE PORTRAIT IS NEVER STAGED (Amendment 4; ADR-0015 decision 1). The photo
+  // is still part of the claimed cv-data payload and the CV PDFs that embed it
+  // are unchanged, but no copy reaches the public site. The rmSync above (next
+  // to the PDF rebuild) deletes any stale copy an older build left in public/,
+  // and nothing copies one back.
 
   return { staged, removed };
 }

@@ -166,12 +166,24 @@ function indexById<T extends { id: string }>(items: T[]): Record<string, T> {
   return result;
 }
 
+// Amendment 6 (spec §11): the CV data spells an em dash as three hyphens, and a
+// project NAME is rendered as a heading that never passes through the Markdown
+// renderer, so live titles showed a literal "---". Normalise the data here, at
+// the one point both the /projects/ index and the CV variant pages read project
+// names from, rather than teaching every heading to render Markdown.
+function normalizeProjectName(name: string): string {
+  return name.replace(/\s*---\s*/g, " — ");
+}
+
 export function loadContentPool(contentDir: string): ContentPool {
   const meta = readYaml<Meta>(path.join(contentDir, "meta.yaml"));
   const summaries = readYaml<Summary[]>(path.join(contentDir, "summaries.yaml")) ?? [];
   const employment = readYaml<EmploymentRole[]>(path.join(contentDir, "employment.yaml")) ?? [];
   const education = readYaml<EducationEntry[]>(path.join(contentDir, "education.yaml")) ?? [];
-  const projects = readYaml<Project[]>(path.join(contentDir, "projects.yaml")) ?? [];
+  const projects = (readYaml<Project[]>(path.join(contentDir, "projects.yaml")) ?? []).map((p) => ({
+    ...p,
+    name: normalizeProjectName(p.name),
+  }));
   const skills = readYaml<SkillGroup[]>(path.join(contentDir, "skills.yaml")) ?? [];
   const misc = readYaml<Misc>(path.join(contentDir, "misc.yaml")) ?? { awards: [], certifications: [] };
   const referees = readYaml<Referee[]>(path.join(contentDir, "referees.yaml")) ?? [];

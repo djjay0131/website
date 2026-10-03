@@ -69,6 +69,18 @@ export function publicBuild(options = {}) {
   return {
     name: "hub-public-build",
     hooks: {
+      // THE PORTRAIT NEVER REACHES dist-public (Amendment 4; ADR-0015 decision
+      // 1). stage-public-assets.mjs already stops copying it and deletes a
+      // stale `public/photo_jason_1.jpeg`; this removes any leftover again at
+      // build start, so Astro cannot copy one into the output even if the
+      // staging step was skipped (a bare `astro build`).
+      "astro:config:setup": ({ logger }) => {
+        const portrait = path.join(SITE_ROOT, "public", "photo_jason_1.jpeg");
+        if (fs.existsSync(portrait)) {
+          fs.rmSync(portrait, { force: true });
+          logger.info("removed a stale public portrait; the public site serves none (ADR-0015)");
+        }
+      },
       "astro:build:done": async ({ dir, logger }) => {
         const outDir = fileURLToPath(dir);
         const allowlist = readPublishAllowlist();
