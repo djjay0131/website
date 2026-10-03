@@ -76,18 +76,19 @@
 //
 //   - the sitemap (sitemap.xml / sitemap-index.xml / sitemap-N.xml)
 //   - the RSS feed (rss.xml) and any other XML
-//   - the Pagefind index TEXT files: pagefind-entry.json and the JSON/JS/CSS
-//     bundles under pagefind/
+//   - the Pagefind index: pagefind-entry.json and the JSON/JS/CSS bundles AND
+//     the gzip `.pf_fragment` / `.pf_meta` / `.pf_index` payloads, which are
+//     decompressed and contents-scanned (Red Team Wave 5 B1–B3)
 //   - the OG card (og-card.png bytes, og-card.svg text)
 //   - the redirect stubs (dist-redirects/**), scanned separately below
 //
-// THE SEARCH INDEX GETS A STRUCTURAL CHECK AS WELL (SEAM-P6). Pagefind's
-// `.pf_index` / `.pf_fragment` / `.pf_meta` files are gzip binaries, so the
-// contents scan cannot read them (see LIMITS). `checkSearchIndexScope` instead
-// decompresses every fragment and asserts each indexed URL is public-rooted,
-// is not under the private base `/p/`, and resolves to a file that exists in
+// THE SEARCH INDEX GETS A STRUCTURAL CHECK AS WELL (SEAM-P6). `checkSearchIndexScope`
+// requires the entry file whenever a `pagefind/` directory exists, then
+// decompresses every fragment and asserts each indexed URL is public-rooted, is
+// not under the private base `/p/`, and resolves to a file that exists in
 // dist-public. That is how "the index was built from dist-public only" is
-// checked rather than assumed.
+// checked rather than assumed, and a missing entry file is a failure rather than
+// a silent no-op (Red Team Wave 5 B4).
 //
 // THE REDIRECT STUBS ARE SCANNED FOR TITLES AND SUMMARIES ONLY. A stub must
 // forward the LEGACY PATH (ADR-0020), and the committed map already names the
@@ -97,11 +98,12 @@
 // asserts exactly that.
 //
 // LIMITS, STATED SO NO ONE MISTAKES THIS FOR A PROOF (ADR-0005 Risks):
-//   - Binary files are matched by PATH ONLY. A private title baked into an OG
-//     image's pixels, a renamed PDF's interior, or the gzip `.pf_*` Pagefind
-//     fragments would pass a contents scan. The OG card and the fragments are
-//     named here so the limit is explicit; the structural URL check above is the
-//     search index's second half, and it is not a contents scan.
+//   - Opaque binary files are matched by PATH ONLY. A private title baked into
+//     an OG image's pixels or a renamed PDF's interior would pass a contents
+//     scan. The gzip `.pf_*` Pagefind payloads were in this class; they are now
+//     gunzipped and contents-scanned, and a `.pf_*` file whose decompression
+//     fails still falls back to PATH only. The structural URL check above
+//     remains the search index's second half.
 //   - Private text quoted into a public page WITHOUT its slug, title or summary
 //     would pass. Nothing mechanical can catch that.
 //   - A slug occurring in prose is deliberately not a match (above).
@@ -324,6 +326,27 @@ function isTextFile(relFile, absFile) {
   }
 }
 
+/**
+ * The UTF-8 text of a gzip Pagefind `.pf_*` file, or null when the file is not
+ * one of those or cannot be gunzipped (Red Team Wave 5 B1–B3).
+ *
+ * Pagefind writes its fragment, meta and index payloads as gzip streams whose
+ * bytes are not directly readable as text. They ARE gunzippable, so the contents
+ * scan decompresses them and greps the result with the same needles: a private
+ * title planted into a `.pf_fragment`/`.pf_meta`/`.pf_index` is now caught.
+ * A file that cannot be gunzipped is treated as opaque binary and matched by
+ * PATH only, exactly as before.
+ */
+export function decompressPagefind(relFile, absFile) {
+  const ext = path.extname(relFile).toLowerCase();
+  if (!BINARY_EXTENSIONS.has(ext)) return null;
+  try {
+    return zlib.gunzipSync(fs.readFileSync(absFile)).toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
 function snippet(haystack, value) {
   const at = haystack.indexOf(value);
   if (at === -1) return "";
@@ -371,13 +394,17 @@ export function findLeaks(distDir, items) {
       }
     }
 
-    // 2. CONTENTS. The half the brief's path-only form would have missed.
-    if (!isTextFile(relFile, absFile)) continue;
-    let text;
-    try {
-      text = fs.readFileSync(absFile, "utf8");
-    } catch {
-      continue;
+    // 2. CONTENTS. The half the brief's path-only form would have missed. The
+    // gzip Pagefind payloads are decompressed first (SEAM-P6); a `.pf_*` file
+    // whose gunzip fails stays on the binary path-only rule.
+    let text = decompressPagefind(relFile, absFile);
+    if (text === null) {
+      if (!isTextFile(relFile, absFile)) continue;
+      try {
+        text = fs.readFileSync(absFile, "utf8");
+      } catch {
+        continue;
+      }
     }
     for (const { item, needles } of byItem) {
       for (const needle of needles) {
@@ -466,8 +493,28 @@ export function fragmentUrls(file) {
  */
 export function checkSearchIndexScope(distDir) {
   const problems = [];
-  const entry = path.join(distDir, "pagefind", "pagefind-entry.json");
-  if (!fs.existsSync(entry)) return problems; // no index in this build; not applicable
+  const pagefindDir = path.join(distDir, "pagefind");
+  // No Pagefind directory at all: a fixture build without search. Clean pass.
+  if (!fs.existsSync(pagefindDir)) return problems;
+
+  // A Pagefind DIRECTORY whose entry file is missing or unreadable is an
+  // incomplete index, NOT a scope pass (Red Team Wave 5 B4). The old shape
+  // returned [] here, so deleting `pagefind-entry.json` silently switched the
+  // only structural index guard off.
+  const entry = path.join(pagefindDir, "pagefind-entry.json");
+  let entryReadable = true;
+  try {
+    fs.accessSync(entry, fs.constants.R_OK);
+  } catch {
+    entryReadable = false;
+  }
+  if (!entryReadable) {
+    problems.push(
+      `pagefind/ exists but pagefind/pagefind-entry.json is missing or unreadable, so the ` +
+        `index is incomplete; a missing entry file is not a scope pass (SEAM-P6).`,
+    );
+    return problems;
+  }
 
   const fragments = searchIndexFragments(distDir);
   if (fragments.length === 0) {

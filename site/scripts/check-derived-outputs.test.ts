@@ -112,8 +112,20 @@ describe("checkSearchIndexScope: the index must be built from dist-public only (
     expect(checkSearchIndexScope(dist)[0]).toMatch(/no \.pf_fragment files/);
   });
 
-  it("is not applicable (no problems) when there is no index", () => {
-    expect(checkSearchIndexScope(scratch())).toEqual([]);
+  // Red Team Wave 5 B4: deleting the entry file used to turn the whole
+  // structural guard into a no-op.
+  it("FAILS when pagefind/ exists but the entry file is missing", () => {
+    const dist = scratch();
+    writePagefindFragment(dist, "en_a.pf_fragment", "/index.html");
+    const problems = checkSearchIndexScope(dist);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/missing or unreadable/);
+  });
+
+  it("is not applicable (no problems) only when there is no pagefind/ directory", () => {
+    const dist = scratch();
+    expect(fs.existsSync(path.join(dist, "pagefind"))).toBe(false);
+    expect(checkSearchIndexScope(dist)).toEqual([]);
   });
 });
 
@@ -145,20 +157,39 @@ describe("findRedirectStubLeaks scans stubs for titles/summaries (SEAM-P6)", () 
   });
 });
 
-describe("the Pagefind .pf_* binary limit is declared (SEAM-P6)", () => {
-  it("names the gzip fragment extensions as binary", () => {
+describe("the Pagefind gzip payloads are contents-scanned (SEAM-P6, Red Team B1-B3)", () => {
+  it("names the gzip fragment extensions as binary-on-disk", () => {
     expect([...BINARY_EXTENSIONS].sort()).toEqual([".pf_fragment", ".pf_index", ".pf_meta"]);
   });
 
-  it("does not read a private title inside a gzip fragment (stated limit)", () => {
+  it("finds a private title decompressed from a .pf_fragment", () => {
     const dist = scratch();
     const victim = ITEMS.find((i) => i.title)!;
-    const dir = path.join(dist, "pagefind", "fragment");
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(
-      path.join(dir, "en_x.pf_fragment"),
-      zlib.gzipSync(Buffer.from(`pagefind_dcd${JSON.stringify({ url: "/x/", content: victim.title })}`)),
-    );
-    expect(findLeaks(dist, ITEMS)).toEqual([]);
+    writePagefindFragment(dist, "en_x.pf_fragment", "/x/", victim.title);
+    const leaks = findLeaks(dist, ITEMS);
+    expect(leaks.some((l) => l.kind === "title" && l.file.endsWith(".pf_fragment"))).toBe(true);
+  });
+
+  it("finds a private title decompressed from a .pf_meta and a .pf_index", () => {
+    const dist = scratch();
+    const victim = ITEMS.find((i) => i.title)!;
+    for (const rel of ["pagefind/x.pf_meta", "pagefind/index/x.pf_index"]) {
+      const file = path.join(dist, rel);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, zlib.gzipSync(Buffer.from(`pagefind_dcd${victim.title}`)));
+    }
+    const files = findLeaks(dist, ITEMS)
+      .filter((l) => l.kind === "title")
+      .map((l) => l.file);
+    expect(files).toContain("pagefind/x.pf_meta");
+    expect(files).toContain("pagefind/index/x.pf_index");
+  });
+
+  it("falls back to PATH-only when a .pf_* file is not valid gzip", () => {
+    const dist = scratch();
+    const victim = ITEMS.find((i) => i.title)!;
+    fs.mkdirSync(path.join(dist, "pagefind"), { recursive: true });
+    fs.writeFileSync(path.join(dist, "pagefind", "broken.pf_meta"), Buffer.from(victim.title));
+    expect(findLeaks(dist, ITEMS).filter((l) => l.where === "contents")).toEqual([]);
   });
 });

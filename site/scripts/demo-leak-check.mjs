@@ -20,8 +20,12 @@
 //   3. rss.xml -- the private title appended to the feed.
 //   4. sitemap-0.xml -- the private route appended.
 //   5. pagefind/pagefind-entry.json -- the private title appended (the Pagefind
-//      TEXT file the byte grep can read; the gzip .pf_* fragments are the
-//      documented binary limit and are not used for the plant).
+//      TEXT file the byte grep reads directly).
+//   5b. pagefind/fragment/*.pf_fragment, pagefind/*.pf_meta and
+//      pagefind/index/*.pf_index -- the private title planted inside gzip
+//      payloads, which the check now gunzips and contents-scans (SEAM-P6). A
+//      valid fragment URL keeps the structural scope check green so this run
+//      proves the CONTENTS scan, not an unrelated index problem.
 //   6. the OG card -- a copy of og-card.png at a path naming the private slug,
 //      which the path-only rule for binaries must catch.
 //   7. a redirect stub -- the private TITLE appended to a generated stub, which
@@ -96,6 +100,12 @@ function writeAppend(file, text) {
   fs.writeFileSync(file, `${before}${text}\n`);
 }
 
+/** A structurally valid gzip Pagefind payload carrying `json` as its text. */
+function writeGzipFile(file, json) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, zlib.gzipSync(Buffer.from(`pagefind_dcd${JSON.stringify(json)}`)));
+}
+
 try {
   const injected = path.join(scratch, OUTPUT_DIRS.public);
   fs.cpSync(distDir, injected, { recursive: true });
@@ -120,23 +130,27 @@ try {
   writeAppend(path.join(injected, "sitemap-0.xml"), `<url><loc>${route}</loc></url>`);
   planted.push("sitemap-0.xml");
 
-  // 5. the Pagefind TEXT file the byte grep can read. If the real index was not
-  // built (the CI self-test job does not run search:index), add a structurally
-  // valid fragment too, so the scope check passes for the right reason and the
-  // run still reports the injected leak rather than an unrelated index problem.
+  // 5. the Pagefind TEXT file the byte grep reads directly.
   writeAppend(
     path.join(injected, "pagefind", "pagefind-entry.json"),
     JSON.stringify({ leak: needle }),
   );
-  const fragmentDir = path.join(injected, "pagefind", "fragment");
-  if (!fs.existsSync(fragmentDir)) {
-    fs.mkdirSync(fragmentDir, { recursive: true });
-    const fragment = Buffer.from(
-      `pagefind_dcd${JSON.stringify({ url: "/index.html", content: "demo fragment" })}`,
-    );
-    fs.writeFileSync(path.join(fragmentDir, "en_demo.pf_fragment"), zlib.gzipSync(fragment));
-  }
   planted.push("pagefind/pagefind-entry.json");
+
+  // 5b. the gzip Pagefind payloads. The byte grep gunzips these now, so the
+  // title planted inside `content` is caught. A valid fragment URL keeps the
+  // scope check green so this run proves the CONTENTS scan.
+  writeGzipFile(path.join(injected, "pagefind", "fragment", "en_demo_plant.pf_fragment"), {
+    url: "/index.html",
+    content: `demo fragment ${needle}`,
+  });
+  planted.push("pagefind/fragment/en_demo_plant.pf_fragment");
+  for (const rel of ["pagefind/pagefind.en_demo.pf_meta", "pagefind/index/en_demo.pf_index"]) {
+    const file = path.join(injected, rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, zlib.gzipSync(Buffer.from(`pagefind_dcd${needle}`, "utf8")));
+    planted.push(rel);
+  }
 
   // 6. the OG card, BINARY: the private slug in the PATH is the only signal.
   const ogSource = path.join(injected, "og-card.png");
