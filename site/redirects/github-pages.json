@@ -204,6 +204,14 @@
     "to": "/robots.txt"
   },
   {
+    "from": "/website/rss.xml",
+    "to": "/rss.xml"
+  },
+  {
+    "from": "/website/search/",
+    "to": "/search/"
+  },
+  {
     "from": "/website/signin/",
     "to": "/signin/"
   },

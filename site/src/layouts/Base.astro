@@ -81,7 +81,7 @@ const navItems = (items: { label: string; section: string }[]) =>
 const footerNav = [
   ...primaryNav.map((item) => ({ label: item.label, href: `${base}${item.section}/` })),
   ...secondaryNav.map((item) => ({ label: item.label, href: `${base}${item.section}/` })),
-  { label: "RSS", href: null },
+  { label: "RSS", href: `${base}rss.xml` },
   { label: "Privacy", href: `${base}privacy/` },
   { label: "Email policy", href: `${base}email/` },
   { label: "Built from source", href: footer.repository, external: true },
@@ -99,6 +99,9 @@ const footerNav = [
     <title>{title}</title>
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
     <link rel="canonical" href={canonicalUrl} />
+    <!-- Feed autodiscovery (SEAM-P3). Public layout only; the private layout
+         emits no feed and links none. -->
+    <link rel="alternate" type="application/rss+xml" title="Jason Cusati — Research hub" href={`${base}rss.xml`} />
 
     <!-- OpenGraph -->
     <meta property="og:title" content={title} />
@@ -117,6 +120,10 @@ const footerNav = [
     {jsonLd && (
       <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     )}
+
+    <!-- Page-level head additions (e.g. the search page's Pagefind stylesheet).
+         Pages that need no extra head content pass none, so this stays inert. -->
+    <slot name="head" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>

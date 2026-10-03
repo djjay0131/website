@@ -1,0 +1,5 @@
+# The stubs-only GitHub Pages artifact (ADR-0020; scripts/generate-redirect-stubs.mjs).
+# Generated on every run of `npm run redirects:stubs`, like dist-public/dist-private
+# (whose entries live in the root .gitignore). Kept here rather than there so this
+# stream touches nothing outside site/**.
+/dist-redirects/

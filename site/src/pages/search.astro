@@ -1,0 +1,84 @@
+---
+// THE PUBLIC SEARCH PAGE (SEAM-P2).
+//
+// This file lives under src/pages/, so the PRIVATE build (srcDir src-private)
+// never resolves it: a search page over a public-only Pagefind index has no
+// place in the members' area. The index itself is built by `npm run search:index`
+// over dist-public into dist-public/pagefind/; this page only hosts the UI.
+//
+// URLS ARE BASE-AWARE. The Pagefind bundle is served from the same output
+// directory as this page, so its URL is `<base>pagefind/`. The Firebase build
+// uses base "/", the retired Pages variant used "/website/"; reading BASE_URL
+// means the page works under either without a hard-coded path.
+import Base from "../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+const bundlePath = `${base}pagefind/`;
+---
+
+<Base
+  title="Search — Jason Cusati"
+  description="Search the public pages of Jason Cusati's research hub."
+>
+  <!-- Pagefind's own stylesheet, injected into <head>. The search UI is
+       unusable without it (the generated input and result list would be
+       unstyled), and <link> is a head element. -->
+  <link slot="head" rel="stylesheet" href={`${bundlePath}pagefind-ui.css`} />
+
+  <h1>Search</h1>
+  <p class="search-intro">
+    Search every public page on this site. Results link to the page and show the
+    matching excerpt.
+  </p>
+
+  <!-- Pagefind builds its input and results here. The data attribute carries the
+       base-aware bundle path to the inline initialiser below, so the path is
+       declared once. -->
+  <div id="search" data-bundle-path={bundlePath}></div>
+
+  <noscript>
+    <p class="search-noscript">
+      Search needs JavaScript. You can still browse
+      <a href={`${base}research/`}>Research</a>,
+      <a href={`${base}projects/`}>Projects</a>,
+      <a href={`${base}writing/`}>Writing</a> and the
+      <a href={`${base}cv/`}>CV</a>.
+    </p>
+  </noscript>
+
+  <!-- A classic script, loaded before the initialiser that follows it, so the
+       PagefindUI global exists by the time it runs. is:inline keeps Astro from
+       bundling or deferring it into the wrong order. -->
+  <script is:inline src={`${bundlePath}pagefind-ui.js`}></script>
+  <script is:inline>
+    window.addEventListener("DOMContentLoaded", function () {
+      var host = document.getElementById("search");
+      if (!host || typeof PagefindUI === "undefined") return;
+      new PagefindUI({
+        element: "#search",
+        bundlePath: host.getAttribute("data-bundle-path") || "/pagefind/",
+        showSubResults: true,
+      });
+    });
+  </script>
+</Base>
+
+<style>
+  .search-intro {
+    color: var(--color-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .search-noscript {
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+
+  /* Keep the search input to a comfortable reading measure. Pagefind's own
+     stylesheet is self-hosted with the rest of the index. */
+  #search {
+    max-width: 48rem;
+  }
+</style>

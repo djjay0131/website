@@ -3389,3 +3389,91 @@ the owner's.
 - **Open questions:** a public page + private PDF from one prefix root (D6); the
   roster-validation coverage gap; `main.pdf` currency (D8).
 - **Governance:** L2; contracts and handoffs `*-wave-4*.md`; checks 4/4 PASS.
+
+## Wave 5 — Phase 6: polish (2026-10-03, starting)
+
+Branch `feat/phase-6`; scenario `hub-006`. Seams `contracts/phase-6-seams.md`;
+ADR-0020 resolves O6. Design authority: design doc §11 Phase 6; ADR-0005
+(derived outputs are public-only).
+
+### Checkpoint 7 — defined BEFORE the phase starts (D6)
+
+This phase is accepted when, verified live plus the security gate:
+
+1. Every entry in `site/redirects/github-pages.json` forwards under
+   `https://djjay0131.github.io/website/...` to its `https://jason.cusati.us/...`
+   target (browser-equivalent probe of each entry); `djjay0131.github.io/website/`
+   no longer serves the site's own pages (only stubs + `404.html`).
+2. Search on `jason.cusati.us` returns public items, and the search index
+   contains no private slug or title.
+3. `rss.xml` validates and contains no private item.
+4. No OG image exists for a private item, and none shows a private title.
+5. The leak check explicitly covers the sitemap, RSS feed, search index and OG
+   images, and is shown **failing** when a private slug and title are planted into
+   `dist-private` and into each derived output.
+6. `redirects:check` is a required CI step.
+
+### Scope
+
+- Pagefind over `dist-public` (both build variants), a public search UI.
+- `rss.xml` from public manifest items; footer RSS link.
+- Redirect stubs + `404.html`; retire the full-site Pages upload; keep a
+  stubs-only Pages deployment (ADR-0020).
+- Extend `check-no-private-in-public` to the derived outputs; extend
+  `demo:leak-check`; wire `redirects:check`.
+- Governance Audit across Phases 0–6 at the phase close.
+
+### What shipped
+
+- **site:** `pagefind@1.5.2` + `@astrojs/rss@4.0.19` (lockfile-pinned, no binary
+  download); a public search page and Pagefind index over `dist-public`; `rss.xml`
+  from public items; `redirects:stubs` generating a stubs-only Pages artifact
+  (`dist-redirects/`, HTML-navigable entries) plus a `404.html` path-mapper for
+  file-shaped legacy URLs (also emitted into `dist-public` for Hosting); the leak
+  check extended to the derived outputs (sitemap, RSS, Pagefind text and
+  gunzipped `.pf_*` fragments, OG card, stubs). Private build emits no
+  search/pagefind/rss/404. `site` **404 passed | 1 skipped** (the R2-b test added
+  one after the reviewers' first pass; their verdicts predate it, and the R2-b
+  fix is covered by that test — Chief Reviewer should-fix #3/#4).
+- **infra/CI:** Pagefind runs in both build variants; the Pages artifact is now
+  `site/dist-redirects` only — the full-site Pages upload is retired (ADR-0020);
+  `smoke-test` asserts a stub forwards; `check`'s default host moves to the
+  Firebase host. `actionlint` clean; 28/28 `uses:` SHA-pinned.
+
+### Round and dispositions
+
+- **Security Tester — 0 FAIL** (two rounds): public-output cleanliness incl. a
+  marker in `dist-private` and each derived output; private build clean; stubs
+  safe; supply chain pinned; `firebase.json` unchanged; budget/Firestore
+  unaffected.
+- **Red Team — B1–B5 closed** after a hardening round (stub traversal fixed;
+  `checkSearchIndexScope` no longer no-ops; `.pf_*` fragments gunzipped and
+  scanned; file-shaped URLs handled by `404.html`). Residuals recorded:
+  **R2-a** a corrupt `.pf_meta`/`.pf_index` falls back to path-only
+  (tamper-only; fragments covered); **R2-b** an open redirect from a poisoned map
+  `to` — **fixed** (targets normalised to a rooted path) with a test; **B6** a
+  private title shorter than 8 characters is not a needle (pre-existing limit).
+- **Skeptic Verifier — escaping guard made fail-able** (was un-failable); the
+  remaining coverage gap **G2** (no static test pins the Wave 5 CI step wiring)
+  and **G3** (`redirects:check` unwired) are recorded.
+- **Dissenter — D1 deferred (record), D2 fixed, D3 fixed, D4/D5/D6 recorded.**
+  D1: `redirects:check` is unwired, so ADR-0020 decision 4 and Checkpoint 7 item
+  6 are **DEFERRED, not met** (map staleness requires a real-content
+  regeneration; ADR-0020 amended). D2 (file-shaped legacy URLs) fixed via
+  `404.html`. D3 (Pagefind binary) fixed for fragments; PNG OG bytes remain
+  path-only with a public-only structural guarantee. D4: the `404.html` mapper
+  names the historical private fellowship path (already public); D5: RSS covers
+  manifest public items only; D6: "retirement" means Pages no longer serves the
+  site, not that the environment is deleted.
+
+### Roadmap criteria — honest state
+
+Ticked only on live evidence. **Not ticked:** every redirect-map entry forwards
+(file-shaped entries rely on `404.html`, unverified live); `redirects:check`
+enforced (deferred). The search/RSS/OG/leak criteria are met in the build and
+pending live verification. **Checkpoint 7 is not recorded passed.**
+
+### Status
+
+**Build complete on `feat/phase-6`; not yet merged/verified live.** Residuals
+above are recorded; `redirects:check` is the one deferred acceptance item.

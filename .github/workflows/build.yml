@@ -212,9 +212,12 @@ jobs:
           USE_BUCKET: ${{ steps.final.outputs.use_bucket }}
           CONTENT_FINGERPRINT: ${{ steps.bucket.outputs.content_fingerprint }}
           CV_FINGERPRINT: ${{ steps.release.outputs.cv_fingerprint }}
-          # SEAM-5: read the deployed build info from SITE_URL when the owner has
-          # set it, else from GitHub Pages.
+          # SEAM-5 / ADR-0020: read the deployed build info from SITE_URL when the
+          # owner has set it, else from the Firebase Hosting default URL. GitHub
+          # Pages no longer serves the full site (Phase 6), so it is no longer a
+          # valid fingerprint source.
           SITE_URL: ${{ vars.SITE_URL }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
           echo "content_fingerprint=${CONTENT_FINGERPRINT}" >> "$GITHUB_OUTPUT"
           echo "cv_fingerprint=${CV_FINGERPRINT}" >> "$GITHUB_OUTPUT"
@@ -233,7 +236,7 @@ jobs:
             exit 0
           fi
 
-          DEPLOYED_SITE="${SITE_URL:-https://djjay0131.github.io/website}"
+          DEPLOYED_SITE="${SITE_URL:-https://${GCP_PROJECT_ID}.web.app}"
           DEPLOYED_SITE="${DEPLOYED_SITE%/}"
           echo "reading deployed build info from ${DEPLOYED_SITE}/build-info.json"
 
@@ -1083,15 +1086,34 @@ jobs:
           PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.PUBLIC_FIREBASE_PROJECT_ID }}
         run: npm run build
 
+      # SEAM-P2: Pagefind indexes dist-public (the only derived-output source,
+      # SEAM-P1) after the Astro build and before the leak check, so the leak
+      # check's byte scan and its structural search-index scope assertion both
+      # cover the index. Pages now ships only stubs (ADR-0020), so this index is
+      # not uploaded here; running it exercises the derived-output coverage on
+      # both build variants.
+      - name: Build the search index (GitHub Pages variant)
+        run: npm run search:index
+
       # SEAM-7: fail before the upload (and so before deploy) when a smoke-test
       # route has no file in site/dist-public.
       - name: Check smoke-test routes exist (GitHub Pages variant)
         run: npm run check:smoke-routes
 
+      # SEAM-P5 / ADR-0020: generate the stubs-only Pages artifact. This must run
+      # BEFORE the leak check so the check's --stubs scan (npm run
+      # check:no-private-in-public passes --stubs dist-redirects) covers the
+      # stubs. The generator writes only the legacy path and the canonical
+      # target, never a private title or summary.
+      - name: Generate the redirect stubs artifact (GitHub Pages variant)
+        run: npm run redirects:stubs
+
       # SEAM-4 / ADR-0005: the leak check runs BETWEEN build and deploy, on
-      # every deploy, for BOTH hosts. GitHub Pages is still the authoritative
-      # public host until Phase 6, so a private item leaking into this variant
-      # is exactly as bad as one leaking into the Firebase variant.
+      # every deploy, for BOTH hosts. The Pages variant is no longer public
+      # (ADR-0020 retires the full-site upload), but its dist-public is still
+      # built and still exercises the derived outputs, and the stubs generated
+      # above are scanned too (npm run check:no-private-in-public passes
+      # --stubs dist-redirects).
       #
       # It greps file CONTENTS as well as paths: a private title rendered into a
       # public index page is a leak with no matching path (K11; the brief's §4
@@ -1108,10 +1130,13 @@ jobs:
           MODE=${{ github.event_name == 'pull_request' && 'pr' || 'deploy' }}
           node scripts/check-publish-allowlist.mjs --mode "$MODE"
 
-      - name: Upload Pages artifact
+      # ADR-0020: Pages is retired as a full-site host. It receives only the
+      # generated stubs-only tree (site/dist-redirects, which includes 404.html);
+      # site/dist-public is no longer a Pages input.
+      - name: Upload the redirect stubs to Pages
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: site/dist-public
+          path: site/dist-redirects
 
   # Builds and tests the Firebase Hosting variant from the same commit, as a
   # separate job (SEAM-5), so nothing here is a new failure point for the Pages
@@ -1198,6 +1223,21 @@ jobs:
           PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.PUBLIC_FIREBASE_PROJECT_ID }}
         run: npm run build
 
+      # SEAM-P2: index dist-public after the build and before the leak check, so
+      # the index travels with the firebase-hosting artifact -- Firebase is the
+      # host that now serves the full site. The leak check's structural
+      # search-index scope assertion runs against it below.
+      - name: Build the search index (Firebase Hosting variant)
+        run: npm run search:index
+
+      # SEAM-P5 / ADR-0020 decision 3: the stubs generator also writes the
+      # canonical 404.html into dist-public, which Firebase Hosting serves for
+      # unknown paths. Run BEFORE the leak check so 404.html is scanned too (the
+      # generator also writes site/dist-redirects, which the check's --stubs scan
+      # covers).
+      - name: Generate the canonical 404 page (Firebase Hosting variant)
+        run: npm run redirects:stubs
+
       # SEAM-7: fail before any upload when a smoke-test route has no file in
       # site/dist-public.
       - name: Check smoke-test routes exist (Firebase Hosting variant)
@@ -1272,10 +1312,18 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
+      # ADR-0020: `build` uploaded the stubs-only dist-redirects tree, so this
+      # publishes the redirect stubs and 404.html and nothing else. Pages no
+      # longer serves any of the site's own pages.
+      - name: Deploy the redirect stubs to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
+  # ADR-0020: Pages is retired as a full-site host, so this job asserts the
+  # OPPOSITE of what it used to: that the old host is now a stubs-only
+  # deployment. The live-site route and body smoke checks run against the
+  # Firebase host in firebase-smoke-test, which is the host that serves the
+  # site.
   smoke-test:
     needs: deploy
     runs-on: ubuntu-24.04
@@ -1285,35 +1333,36 @@ jobs:
       - name: Wait for Pages propagation
         run: sleep 30
 
-      - name: Smoke test live routes
+      # The retired root must be a redirect stub to the canonical host, NOT a
+      # site page. If the full-site Pages upload ever comes back, this fails:
+      # the real index carries neither the stub title nor the refresh target.
+      - name: Verify the retired Pages root serves a redirect stub, not the site
         run: |
           SITE="https://djjay0131.github.io/website"
-          FAILED=0
-          for ROUTE in "/" "/resumes/" "/cv/academic" "/cv/research-professional" "/papers/" "/pdfs/academic.pdf" "/projects/"; do
-            STATUS=$(curl -sL -o /dev/null -w "%{http_code}" "${SITE}${ROUTE}")
-            if [ "$STATUS" = "200" ]; then
-              echo "OK: ${ROUTE} → ${STATUS}"
-            else
-              echo "FAIL: ${ROUTE} → ${STATUS}"
-              FAILED=1
-            fi
-          done
-          if [ "$FAILED" -eq 1 ]; then
-            echo "::error::One or more smoke tests failed."
+          BODY="$(curl -sL "${SITE}/")"
+          if printf '%s' "${BODY}" | grep -Fq '<title>Redirecting</title>' \
+             && printf '%s' "${BODY}" | grep -Fq 'url=https://jason.cusati.us/'; then
+            echo "OK: ${SITE}/ is a redirect stub to https://jason.cusati.us/ (the full site is retired)."
+          else
+            echo "::error::${SITE}/ is not the expected redirect stub. The full site must no longer be published to Pages (ADR-0020)."
             exit 1
           fi
 
-      - name: Verify non-empty body on key routes
+      # A legacy inbound link must forward to the canonical host. The stub is a
+      # meta-refresh file; curl does not follow meta-refresh, so this reads the
+      # stub HTML itself and asserts the canonical target it forwards to.
+      - name: Verify a redirect stub forwards to the canonical host
         run: |
           SITE="https://djjay0131.github.io/website"
-          for ROUTE in "/cv/academic" "/papers/"; do
-            BODY_SIZE=$(curl -sL "${SITE}${ROUTE}" | wc -c)
-            if [ "$BODY_SIZE" -lt 500 ]; then
-              echo "::error::${ROUTE} returned suspiciously small body (${BODY_SIZE} bytes)"
-              exit 1
-            fi
-            echo "OK: ${ROUTE} body is ${BODY_SIZE} bytes"
-          done
+          ROUTE="/cv/academic/"
+          TARGET="https://jason.cusati.us/cv/academic/"
+          BODY="$(curl -sL "${SITE}${ROUTE}")"
+          if printf '%s' "${BODY}" | grep -Fq "url=${TARGET}"; then
+            echo "OK: ${SITE}${ROUTE} forwards to ${TARGET}"
+          else
+            echo "::error::${SITE}${ROUTE} does not forward to ${TARGET}; the redirect stub is missing or wrong."
+            exit 1
+          fi
 
   # Firebase Hosting deploy (SEAM-3, SEAM-4). Runs only on the deploy path and
   # only after the owner sets vars.GCP_PROJECT_ID. Authentication is Workload
