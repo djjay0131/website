@@ -25,23 +25,25 @@ Do NOT touch `site/**`, `firebase.json`, `infra/**`; those are other streams.
 
 ## Requirements (see the seams for the binding shape)
 
-1. **Store (SEAM-S1).** Firestore `shares/{token}` with `{source, slug, exp,
-   revoked, created_by, created_at}`. Token `secrets.token_urlsafe(32)`.
-   `expires_in_days` ∈ [1,30]. One slug per token.
-2. **Mint `POST /share`** (owner only): validate `(source, slug)` against the
-   private content the gate can see (a manifest read or a config; if the gate
-   cannot enumerate items, mint for a well-formed `(source, slug)` and let
-   serving 404); 403 for non-owner; 400 for bad input; return
-   `{token, expires_at, url}`. Enforce the allowed-origin check.
+1. **Store (SEAM-S1).** Firestore `shares/{token}` with `{section, source,
+   slug, exp, revoked, created_by, created_at}`. Token
+   `secrets.token_urlsafe(32)`. `expires_in_days` ∈ [1,30]. One slug per token.
+2. **Mint `POST /share`** (owner only): body `{section, source, slug,
+   expires_in_days}`. Validate `(section, source, slug)` against the private
+   content the gate can see (a manifest read or a config; if the gate cannot
+   enumerate items, mint for a well-formed triple and let serving 404); 403 for
+   non-owner; 400 for bad input; return `{token, expires_at, url}`. Enforce the
+   allowed-origin check.
 3. **List `GET /share`** (owner only): active shares, never returning a full
-   token (return a short id + `created_by`, `exp`, `slug`).
+   token (return a short id + `created_by`, `exp`, `section`, `source`, `slug`).
 4. **Revoke `DELETE /share/{token}`** (owner only): set `revoked: true`,
    idempotent, origin check.
 5. **Serve `GET /s/{token}/{path:path}`** (no session): resolve the token; reject
    unknown/expired/revoked with 404 (never 403, so a token's existence is not
-   confirmed); resolve the path **inside the token's item prefix only**, reusing
-   the existing path-allowlist and prefix-containment logic (SEAM-S8); stream
-   bytes with correct `Content-Type`.
+   confirmed); resolve the path **inside the token's item prefix only** —
+   `<section>/<source>/<slug>/`, built from the stored triple — reusing the
+   existing path-allowlist and prefix-containment logic (SEAM-S8); stream bytes
+   with correct `Content-Type`.
 6. **Caching (SEAM-S3).** Every `/s/**` and `/share/**` response carries
    `Cache-Control: private, no-store`. Add a test.
 7. **No credentials on `/s/**`**: accept no cookie/session; never mint one.
@@ -57,3 +59,32 @@ Do NOT touch `site/**`, `firebase.json`, `infra/**`; those are other streams.
 
 Routes implemented and unit-tested; `gate.yml` unchanged unless a test needs it.
 The owner's live mint/open/revoke (SEAM-S7) is a separate, owner-only step.
+
+## Lead Architect rulings on the first stream's open questions (2026-10-03)
+
+The `gate` stream delivered the routes correctly but reported six open questions.
+These are the rulings; they bind the follow-up and every downstream stream.
+
+1. **The item prefix gains `section` (SEAM-S1).** The store keeps
+   `(section, source, slug)`; `_share_item_prefix` returns
+   `<section>/<source>/<slug>`. The section is validated with the same segment
+   allowlist as source/slug (`safe_prefix`), single segment for `section` and
+   `source`, and is **not** restricted to a hardcoded enum — the gate cannot own
+   the hub's section set, and an object that does not exist still 404s. This is
+   the "store `section`/`prefix`" option (a) in the handoff; do not flatten the
+   private layout.
+2. **`GET /share` stays token-less.** The short display `id` is kept; the full
+   token is returned only by the mint that created it. The owner UI (SEAM-S6)
+   retains the token from the mint in the browser session and offers revoke for
+   those rows, plus a paste-a-token/link revoke for shares the owner saved. This
+   is a usability limit, not a security one, and is recorded as fix-later.
+3. **The display `id` may remain a token prefix.** It is 12 characters against a
+   43-character credential over an owner-only, `private, no-store` response. If
+   the owner UI is ever exposed more widely, revisit with a keyed hash; recorded,
+   not changed.
+4. **IAM is the `infra` stream's** (SEAM-S5): the runtime SA moves from
+   `roles/datastore.viewer` to a write-capable Firestore grant, recorded there.
+5. **Rewrites are the `site` stream's** (SEAM-S4). Until they land the routes
+   answer only on `*.run.app`; the Wave 3 merge carries both.
+6. **Token collision on `set` is accepted**, defended only by 256-bit entropy.
+   Recorded, not changed.
