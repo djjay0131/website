@@ -3326,23 +3326,48 @@ Branch `feat/construction-ai`; scenario `hub-005`; decisions D4/D10 (order) and 
   plan` fails), and nothing tests the satellite workflow's publish gate
   (`actionlint` unavailable). Both recorded as follow-ups.
 
-### Merge and apply plan — PENDING as of this commit
+### Merge, apply, publish and boundary proof — DONE 2026-10-03
 
-Do not read any of this as done until its result is recorded below.
+1. **Hub PR #95 merged** (`bafc33e`) under §8 after all required checks, Security
+   0 FAIL, the Red Team bypass closed, Skeptic 0 un-failable, and the Chief
+   Reviewer's must-fix resolved (governance-delta duplicate row deleted;
+   merge/apply no longer claimed as done).
+2. **`terraform apply`**: `4 added, 0 changed, 0 destroyed`; second plan
+   `No changes`. The four new resources are the `construction-ai` provider, SA,
+   impersonation binding and conditioned bucket binding.
+3. **Four `GCP_*` variables set** on `djjay0131/construction-ai-proposal`; its PR
+   #11 merged; the first `publish-hub` run failed on `iam.serviceAccounts.getAccessToken`
+   (IAM propagation) and **succeeded on re-run** (17s), publishing `index.html`,
+   `main.pdf`, `manifest.json` under `sources/construction-ai/`.
+4. **The hub synced and deployed** (`build-and-deploy` on `main` for `bafc33e`
+   green). The private bucket carries
+   `projects/construction-ai/<slug>/index.html` and `_doc/` for both items; the
+   private index names both. Public boundary verified live:
+   `/projects/construction-ai/` (the CV's own project) **200**,
+   `/projects/construction-ai/construction-ai-site/` **404**,
+   `/p/projects/construction-ai/construction-ai-site/` **404** signed-out,
+   sitemap **0** occurrences of `construction-ai-site`.
+5. **Boundary proof (SEAM-C6) PASSES** — `handoffs/boundary-tester-wave-4.md`:
+   forward create/read/overwrite/delete inside `sources/construction-ai/`
+   200/200/200/204; `sources/cv/`, `sources/kgis/`,
+   `sources/agentic-kg-research/`, `sources/construction-ai-evil/` and the
+   bucket root refused 403; `list` refused 403 on the bucket and on its own
+   prefix; the reverse leg (`cv` read/write `sources/construction-ai/`) refused
+   403. Temporary impersonation grants removed and verified removed.
 
-1. Merge hub PR #95 under §8 (checks green, Security 0 FAIL, Red Team bypass
-   closed, Skeptic 0 un-failable, Chief Reviewer must-fix resolved).
-2. `terraform apply` from the merged commit; expected `4 to add, 0 to change,
-   0 to destroy`; then a second plan clean.
-3. Set the four `GCP_*` variables on `djjay0131/construction-ai-proposal`, merge
-   its PR #11, and let the first publish run through WIF. Objects land under
-   `sources/construction-ai/`; the hub syncs them into the private bucket only.
-4. Run the Boundary Tester (SEAM-C6) under a temporary impersonation grant:
-   forward in-prefix allowed, every other prefix refused, no `list`, reverse leg
-   refused. Record the transcript and the removal proof in
-   `handoffs/boundary-tester-wave-4.md`. This is UNVERIFIABLE until then.
+### Wave 4 finding FP-2 — the leak check false-positived on the new source key
 
-**Result:** _pending — recorded when run._
+The first `main` sync after the satellite published **failed the leak check with
+8 leaks** — all of them the `source` needle `construction-ai` matching the
+**owner's own public CV project** `id: construction-ai`
+(`/projects/construction-ai/`). A source name that equals legitimate public
+first-party content cannot be a bare needle. Fixed in **PR #97** (`fix/leak-check-source-collision`,
+merged): the bare `source` needle is removed; the private item stays bound by its
+`qualified-id`, `route`, `payload-path`, `title` and `summary` needles, each with
+a test that goes red if the needle is removed. `demo:leak-check` still fails as
+designed. This is the same class as Wave 2's FP-1 and is recorded as such. The
+`slug` needle is noted as the next same-class risk if the CV ever renders
+`project.url` (FP-3, not currently live).
 
 ### Owner-only step — PENDING
 
