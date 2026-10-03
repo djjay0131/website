@@ -3432,7 +3432,9 @@ This phase is accepted when, verified live plus the security gate:
   file-shaped legacy URLs (also emitted into `dist-public` for Hosting); the leak
   check extended to the derived outputs (sitemap, RSS, Pagefind text and
   gunzipped `.pf_*` fragments, OG card, stubs). Private build emits no
-  search/pagefind/rss/404. `site` **403 passed | 1 skipped**.
+  search/pagefind/rss/404. `site` **404 passed | 1 skipped** (the R2-b test added
+  one after the reviewers' first pass; their verdicts predate it, and the R2-b
+  fix is covered by that test — Chief Reviewer should-fix #3/#4).
 - **infra/CI:** Pagefind runs in both build variants; the Pages artifact is now
   `site/dist-redirects` only — the full-site Pages upload is retired (ADR-0020);
   `smoke-test` asserts a stub forwards; `check`'s default host moves to the

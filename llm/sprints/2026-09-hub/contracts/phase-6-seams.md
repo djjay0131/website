@@ -46,12 +46,21 @@ plus a test, not by a new binary pipeline.
 
 ## SEAM-P5 — Redirect stubs and `404.html` (ADR-0020)
 
-A generator produces, from `site/redirects/github-pages.json`, one meta-refresh
-stub per entry and a `404.html`, into a dedicated stubs directory (e.g.
-`site/dist-redirects/`). The `deploy` job uploads **only** that directory to
-GitHub Pages; the `build` job stops uploading `dist-public` to Pages. `404.html`
-is also emitted into `dist-public` so Firebase Hosting serves it. Every stub
-forwards to `https://jason.cusati.us/<to>`.
+A generator produces, from `site/redirects/github-pages.json`, a meta-refresh
+stub per **HTML-navigable** entry into a dedicated stubs directory
+(`site/dist-redirects/`), plus a single `404.html`. The `deploy` job uploads
+**only** that directory to Pages; the `build` job stops uploading `dist-public`.
+
+> **Amended 2026-10-03, on the Dissenter's D2.** "One stub per entry" does not
+> hold for **file-shaped** entries (`.pdf`, `.json`, `.xml`, `.png`, `.svg`,
+> `.ico`, `robots.txt`): Pages serves such a file with the extension's MIME type,
+> so a meta-refresh HTML body cannot fire. Those entries therefore get **no**
+> per-path file; they are listed in the `404.html` mapping, which Pages serves
+> (as `text/html`) for an unmatched path and whose inline script forwards
+> `/website/<path>` to `https://jason.cusati.us/<path>`. Targets are normalised
+> to a rooted path so a poisoned `to` cannot become an open redirect. `404.html`
+> is also emitted into `dist-public` so Firebase Hosting serves it (without the
+> file-route mapping, which would name a legacy path in the scanned build).
 
 ## SEAM-P6 — Leak check covers the derived outputs
 
@@ -60,7 +69,14 @@ extends it so the sitemap, `rss.xml`, the Pagefind text files (`pagefind-entry.j
 and any JSON/JS) and the OG card are explicitly named and covered, and documents
 the binary limit for `.pf_*` fragments and PNG OG bytes. `demo:leak-check` is
 extended to plant a private needle into each derived output and show the check
-red. `redirects:check` is wired into CI.
+red.
+
+> **Amended 2026-10-03 (Dissenter D1): `redirects:check` is NOT wired into CI.**
+> It exits 1 on pre-existing map staleness (the map predates `kgis`; the route
+> inventory has not excluded `_payload/**`). Making a failing check required
+> would block every merge. The deferral is recorded in ADR-0020 decision 4 and
+> STATE Wave 5; the map is not CI-enforced until it is regenerated from real
+> content.
 
 ## SEAM-P7 — URLs
 
