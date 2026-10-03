@@ -32,6 +32,7 @@
 // schema: src-private/content.config.ts re-exports src/content.config.ts.
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
+import react from '@astrojs/react';
 import { resolveSiteEnv, withBase } from './scripts/site-env.mjs';
 import { LEGACY_REDIRECTS, isExcludedFromSitemap } from './scripts/site-routes.mjs';
 import { resolveHubOutput } from './scripts/site-output.mjs';
@@ -56,8 +57,14 @@ export default defineConfig({
   // ogCard() generates the default link-preview card (name, title, maroon band,
   // orange rule, no portrait) into public/ before the build copies it. It runs
   // only in the public output: private pages are noindex and carry no og:image.
+  //
+  // THE REACT ISLAND IS PRIVATE-ONLY (SEAM-S6; ADR-0003). The integration is
+  // mounted inside the isPrivate branch and nowhere else, so the public build
+  // never runs the React plugin and cannot emit a framework runtime chunk. The
+  // import above is inert on its own; only the integration in this array makes
+  // Astro process .tsx or hydrate an island.
   integrations: isPrivate
-    ? [privateBuild()]
+    ? [react(), privateBuild()]
     : [sitemap({ filter: (page) => !isExcludedFromSitemap(page, base) }), ogCard(), publicBuild()],
   // The legacy GitHub Pages redirects are public routes and have no meaning in
   // the private output.

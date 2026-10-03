@@ -28,6 +28,8 @@ from `0000-template.md`.
 | [0014](0014-satellites-call-the-publish-contract-at-a-moving-v1-tag.md) | Satellites call the publish contract at a moving `v1` tag | Accepted |
 | [0015](0015-branding-no-portrait-band-and-mark-rule.md) | Branding — no portrait, maroon band as a token, no VT mark without permission | Accepted |
 | [0016](0016-private-by-default-publish-allowlist.md) | Private by default — the hub's publish allowlist is the authority | Accepted |
+| [0017](0017-shares-serve-the-item-document.md) | Share links serve the item's document under an item-scoped `_doc/` namespace | Accepted |
+| [0018](0018-gate-firestore-share-role-is-project-wide.md) | The gate's share store uses a project-wide Firestore role | Accepted |
 
 ## Lifecycle
 

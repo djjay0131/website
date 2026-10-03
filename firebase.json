@@ -35,6 +35,27 @@
           "serviceId": "hub-gate",
           "region": "us-east1"
         }
+      },
+      {
+        "source": "/share",
+        "run": {
+          "serviceId": "hub-gate",
+          "region": "us-east1"
+        }
+      },
+      {
+        "source": "/share/**",
+        "run": {
+          "serviceId": "hub-gate",
+          "region": "us-east1"
+        }
+      },
+      {
+        "source": "/s/**",
+        "run": {
+          "serviceId": "hub-gate",
+          "region": "us-east1"
+        }
       }
     ],
     "redirects": [

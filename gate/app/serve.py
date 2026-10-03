@@ -39,21 +39,15 @@ class UnsafePath(Exception):
         self.reason = reason
 
 
-def safe_object_path(raw: str, prefix: str = "") -> str:
-    """Map a /p/** path to a private-bucket object name, or raise UnsafePath.
+def _checked_segments(path: str) -> list[str]:
+    """Validate a decoded relative object path, segment by segment.
 
-    `raw` is already percent-decoded by the ASGI server, so `%2e%2e%2f` arrives
-    here as `../` and is caught by the `..` check. A double-encoded `%252e`
-    arrives as the literal `%2e`, whose `%` is not in the segment allowlist, so
-    it is refused too.
+    THE allowlist (SD-7). Shared by `safe_object_path` and `safe_prefix` so a
+    served file and a share's item prefix are validated by one rule rather than
+    two that can drift. `%2e%2e%2f` arrives here already decoded as `../` and is
+    caught by the `..` check; a double-encoded `%252e` arrives as the literal
+    `%2e`, whose `%` is not in the segment allowlist, so it is refused too.
     """
-    path = raw
-
-    # A directory-style request serves that directory's index document. Done
-    # before validation so the empty path ("/p/") has something to validate.
-    if path == "" or path.endswith("/"):
-        path = path + INDEX_DOCUMENT
-
     if len(path) > MAX_PATH_LENGTH:
         raise UnsafePath("too_long")
     if "\x00" in path:
@@ -77,7 +71,25 @@ def safe_object_path(raw: str, prefix: str = "") -> str:
         if not _SEGMENT.match(segment):
             raise UnsafePath("illegal_character")
 
-    name = "/".join(segments)
+    return segments
+
+
+def safe_object_path(raw: str, prefix: str = "") -> str:
+    """Map a /p/** path to a private-bucket object name, or raise UnsafePath.
+
+    `raw` is already percent-decoded by the ASGI server, so `%2e%2e%2f` arrives
+    here as `../` and is caught by the `..` check. A double-encoded `%252e`
+    arrives as the literal `%2e`, whose `%` is not in the segment allowlist, so
+    it is refused too.
+    """
+    path = raw
+
+    # A directory-style request serves that directory's index document. Done
+    # before validation so the empty path ("/p/") has something to validate.
+    if path == "" or path.endswith("/"):
+        path = path + INDEX_DOCUMENT
+
+    name = "/".join(_checked_segments(path))
 
     if prefix:
         cleaned = prefix.strip("/")
@@ -88,6 +100,22 @@ def safe_object_path(raw: str, prefix: str = "") -> str:
             raise UnsafePath("escaped_prefix")
 
     return name
+
+
+def safe_prefix(raw: str) -> str:
+    """Validate a relative namespace prefix -- an item's `(section, source, slug)`.
+
+    The share routes build an object name as `safe_object_path(path, prefix)`,
+    where `prefix` is this item prefix. That call is the same containment check
+    /p/** already uses, so the share's files cannot leave the item any more than
+    a member's can leave the bucket.
+
+    Unlike `safe_object_path` this appends no index document: the prefix names a
+    directory, and the served path supplies the file within it.
+    """
+    if raw == "" or raw.endswith("/"):
+        raise UnsafePath("empty_segment")
+    return "/".join(_checked_segments(raw))
 
 
 def guess_content_type(name: str, fallback: str | None = None) -> str:

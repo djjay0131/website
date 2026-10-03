@@ -30,9 +30,17 @@ def normalise_email(email: str) -> str | None:
 
 
 class MemberDirectory(Protocol):
-    """The one question the gate asks the allowlist."""
+    """The two questions the gate asks the allowlist.
+
+    `is_owner` is the same lookup as `is_member` with the `role` field checked
+    (design doc §6 responsibility 2: members with `role: owner` manage shares).
+    It is separate from `is_member` so no route can confuse "may read" with
+    "may mint".
+    """
 
     def is_member(self, email: str) -> bool: ...
+
+    def is_owner(self, email: str) -> bool: ...
 
 
 class FirestoreMemberDirectory:
@@ -65,13 +73,27 @@ class FirestoreMemberDirectory:
         snapshot = self._ensure_client().collection(self._collection).document(key).get()
         return bool(snapshot.exists)
 
+    def is_owner(self, email: str) -> bool:
+        key = normalise_email(email)
+        if key is None:
+            return False
+        snapshot = self._ensure_client().collection(self._collection).document(key).get()
+        if not snapshot.exists:
+            return False
+        return (snapshot.to_dict() or {}).get("role") == "owner"
+
 
 class StaticMemberDirectory:
     """An in-memory allowlist. Used by the tests; never wired in production."""
 
-    def __init__(self, emails: object = ()) -> None:
+    def __init__(self, emails: object = (), owners: object = ()) -> None:
         self._emails = {e.strip().lower() for e in emails}  # type: ignore[union-attr]
+        self._owners = {e.strip().lower() for e in owners}  # type: ignore[union-attr]
 
     def is_member(self, email: str) -> bool:
         key = normalise_email(email)
         return key is not None and key in self._emails
+
+    def is_owner(self, email: str) -> bool:
+        key = normalise_email(email)
+        return key is not None and key in self._owners

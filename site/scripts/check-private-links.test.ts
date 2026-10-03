@@ -3,7 +3,14 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { classifyLink, findBadLinks, normalizeBase, pageUrlFor } from "./check-private-links.mjs";
+import {
+  classifyLink,
+  findBadLinks,
+  isShareDoc,
+  normalizeBase,
+  pageUrlFor,
+  shareDocTreePrefix,
+} from "./check-private-links.mjs";
 
 // ===========================================================================
 // F-1: the guard could not see an off-origin link
@@ -288,5 +295,85 @@ describe("findBadLinks names the file, the link and the reason", () => {
     expect(out).toHaveLength(1);
     expect(out[0].link).toBe("https://graduateschool.vt.edu/policy.html");
     expect(out[0].tag).toBe("a");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `_doc/**` IS SATELLITE BYTES (site-wave-3 addendum, requirement 10)
+// ---------------------------------------------------------------------------
+// The item's `_doc/` copy is the item's own document minus the sibling
+// documents other items own, so an internal cross-link may point at a file the
+// output deliberately does not carry. That is not a broken member page the way
+// a missing payload asset is: existence is not checked inside `_doc/`. An
+// off-origin SUB-RESOURCE and a link escaping the base remain failures, because
+// the share holder's browser fetches them and the gate cannot serve them.
+describe("check:private-links treats the item-scoped _doc/ as satellite bytes", () => {
+  it("isShareDoc keys on the _doc segment", () => {
+    expect(isShareDoc("phd/phd-milestones/committee-dossier/_doc/index.html")).toBe(true);
+    expect(isShareDoc("_payload/phd-milestones/site/index.html")).toBe(false);
+  });
+
+  it("shareDocTreePrefix names the tree a _doc page may reach", () => {
+    expect(shareDocTreePrefix("phd/phd-milestones/committee-dossier/_doc/index.html", BASE)).toBe(
+      "/p/phd/phd-milestones/committee-dossier/_doc/",
+    );
+    expect(shareDocTreePrefix("_payload/s/site/index.html", BASE)).toBeNull();
+  });
+
+  let dist: string;
+  afterEach(() => {
+    if (dist) fs.rmSync(dist, { recursive: true, force: true });
+  });
+
+  it("PASSES when an internal link points at an omitted sibling document", () => {
+    dist = tree({
+      "phd/phd-milestones/committee-dossier/_doc/index.html":
+        '<link href="assets/style.css"><a href="internal.html">sibling item</a>' +
+        '<a href="missing-page.html">another omitted page</a>',
+      "phd/phd-milestones/committee-dossier/_doc/assets/style.css": "body{}",
+    });
+    const result = run(dist);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("PASS");
+  });
+
+  it("still FAILS an off-origin sub-resource under _doc/", () => {
+    dist = tree({
+      "phd/phd-milestones/committee-dossier/_doc/index.html":
+        '<img src="https://evil.invalid/x.png">',
+    });
+    const result = run(dist);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("evil.invalid");
+  });
+
+  it("still FAILS a link escaping the base from _doc/", () => {
+    dist = tree({
+      "phd/phd-milestones/committee-dossier/_doc/index.html": '<a href="/elsewhere/">x</a>',
+    });
+    const result = run(dist);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("outside /p/");
+  });
+
+  it("still FAILS a same-origin link that leaves the _doc/ tree (the D1 shape)", () => {
+    // A copy of a satellite page that still points back at the member payload
+    // resolves under the base but is unservable by the share token.
+    dist = tree({
+      "phd/phd-milestones/committee-dossier/_doc/index.html":
+        '<link href="/p/_payload/phd-milestones/site/assets/style.css">',
+    });
+    const result = run(dist);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("outside-tree");
+  });
+
+  it("still FAILS a broken link outside _doc/ (the members' payload guard is not weakened)", () => {
+    dist = tree({
+      "_payload/s/site/index.html": '<link href="assets/missing.css">',
+    });
+    const result = run(dist);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("points at nothing");
   });
 });

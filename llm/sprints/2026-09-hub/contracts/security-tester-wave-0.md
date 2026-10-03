@@ -96,8 +96,17 @@ THE CHECKLIST — all must pass
      which is why the field is per satellite and why a copy-paste error would be invisible.
      The satellites pool is separate from the hub pool.
      No satellite role holds storage.objects.list — ever.
-     The gate runtime SA holds only objects.get on the private bucket, datastore.viewer, and
+     The gate runtime SA holds only objects.get on the private bucket, datastore.user, and
      the narrowed auth role.
+
+     CORRECTED 2026-10-03 by the Lead Architect. The line above read datastore.viewer;
+     Phase 4 sharing re-widened it to datastore.user (read AND write) so the gate can mint,
+     list and revoke shares/{token} (SEAM-S5). Firestore data roles are project-level, so a
+     collection-scoped grant cannot be expressed in IAM; the control that keeps the gate
+     from writing the members/ allowlist is the FirestoreShareStore class plus the deny-all
+     released rules, not the role. datastore.user includes delete, which the store does not
+     use; it is accepted over a bespoke custom role rather than implied. The line was
+     correct for Phase 3 and this is the reviewed change Phase 3 deferred.
      After Wave 0's item 3, the PUBLIC deploy identity holds NO private-bucket permission.
      Test that last one by attempting the access and being refused, not by reading a policy.
 

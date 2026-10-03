@@ -25,6 +25,25 @@ import { effectiveVisibility, readPublishAllowlist } from "./hub-content.mjs";
 export const PAYLOAD_ROOT = "_payload";
 
 /**
+ * THE SHARE-SERVABLE DOCUMENT NAMESPACE (SEAM-S1, amended 2026-10-03).
+ *
+ * A share token reaches `<section>/<source>/<slug>/_doc/`, NOT the member frame
+ * at `<section>/<source>/<slug>/`. The frame carries the members' navigation
+ * (every private item's title) and absolute `/p/` links, so a signed-out share
+ * holder saw an empty page that leaked the private catalogue (Dissenter Wave 3
+ * D1). This namespace holds a self-contained, item-scoped copy of the item's
+ * document under its own basename (e.g. `committee.html`,
+ * `anthropic-fellow.pdf`), plus its non-document assets. Renaming the entry to
+ * `index.html` mangled a non-HTML item: the gate infers the content type from
+ * the object name, so `_doc/index.html` over PDF bytes would be served as
+ * `text/html`. The stored share row carries `entry` so `GET /s/{token}/` can
+ * name the real file (SEAM-S1, amended again 2026-10-03).
+ *
+ * `_doc` is a hub-owned namespace: a satellite source or slug may not be `_doc`.
+ */
+export const SHARE_DOC_ROOT = "_doc";
+
+/**
  * THE GATE'S PATH ALLOWLIST (gate stream finding SD-7).
  *
  * The gate validates `GET /p/{path}` with an ALLOWLIST: every path segment must
@@ -174,6 +193,141 @@ export function stagingPlanFor(sourcesDir, items) {
   return [...staged.entries()]
     .map(([to, { from, source }]) => ({ from, to, source }))
     .sort((a, b) => (a.to < b.to ? -1 : a.to > b.to ? 1 : 0));
+}
+
+/**
+ * THE ITEM-SCOPED SHARE DOCUMENT PLAN (SEAM-S1, amended 2026-10-03).
+ *
+ * A share is one item, served from `<section>/<source>/<slug>/_doc/` by a
+ * signed-out holder, so the copy must be SELF-CONTAINED: it cannot reference the
+ * member frame, `_payload/…` or `_astro/…`, none of which the token can reach.
+ * For each effectively-private item this returns the files to copy:
+ *
+ *   - the item's own document (`path`), copied to the tree root under its own
+ *     basename (the value the share row stores as `entry`), so the gate serves
+ *     it with the content type its extension names;
+ *   - every non-document file from the document's containing directory,
+ *     preserving its relative structure (a page that loads `assets/style.css`
+ *     renders only when the stylesheet travels with it).
+ *
+ * DOCUMENTS ARE NOT ASSETS, and how they travel depends on where the item lives
+ * (the same named-directory/prefix-root distinction `stagingPlanFor` draws):
+ *
+ *   - inside a NAMED directory the item is one page in a directory shared with
+ *     sibling items (both phd fixture pages live in `site/`), so only the
+ *     entry travels. A sibling's page and a WITHDRAWN page's leftover
+ *     bytes both stay behind -- the same protection `stagingPlanFor` gives the
+ *     member payload;
+ *   - at the PREFIX ROOT the item's `path` names a built site's entry point, so
+ *     the whole subtree travels except documents ANOTHER item declares. The
+ *     undeclared pages are that site's own pages, not another item's.
+ *
+ * It does NOT change `stagingPlanFor`, which the public and member builds still
+ * use unchanged. The two plans are additive: `_doc/` is a second, item-scoped
+ * copy, not a replacement for `_payload/…`. The residual is the same one
+ * `stagingPlanFor` records (C28): a withdrawn sibling's non-document asset is
+ * indistinguishable from a shared asset and still travels.
+ *
+ * `_doc` is reserved. The manifest schema already rejects a `source`/`slug` of
+ * `_doc`, and this fails closed a second time by skipping one if it arrives
+ * unvalidated (defence in depth, as `addFile` does for `source`).
+ *
+ * @param {string} sourcesDir the synced tree (site/src/content/sources)
+ * @param {{section: string, source: string, slug: string, path: string, format: string}[]} items
+ *        the effectively-private items to stage
+ * @returns {{from: string, to: string, source: string}[]} absolute `from`,
+ *        output-relative `to`
+ */
+export function docStagingPlanFor(sourcesDir, items) {
+  const staged = new Map(); // to -> {from, source}
+
+  // Every document path declared per source. A document in this set, other than
+  // the current item's own entry, belongs to a sibling item and is excluded.
+  const declaredPages = new Map();
+  for (const item of items) {
+    if (!declaredPages.has(item.source)) declaredPages.set(item.source, new Set());
+    declaredPages.get(item.source).add(normalizeRel(item.path));
+  }
+
+  for (const item of items) {
+    const source = String(item.source ?? "");
+    const slug = String(item.slug ?? "");
+    // `_doc` is a hub-owned namespace (SEAM-S1). A source or slug of `_doc`
+    // would let one item's tree collide with another's; the schema rejects both,
+    // and this is the fail-closed second check.
+    if (source === SHARE_DOC_ROOT || slug === SHARE_DOC_ROOT) continue;
+
+    const treeRoot = shareDocRootFor(item);
+    if (treeRoot === null) continue; // a section/source/slug that is not a safe path
+
+    const rel = normalizeRel(item.path);
+    if (rel === "" || rel.endsWith("/")) continue; // no document to stage
+
+    // The item's own document, copied under its own basename. DO NOT rename it
+    // to `index.html`: the gate infers the content type from the object name,
+    // so a PDF served as `index.html` would arrive as `text/html`. The basename
+    // is the share row's `entry`, and `GET /s/{token}/` requests it by name.
+    const entry = path.posix.basename(rel);
+    addDocFile(staged, sourcesDir, source, rel, `${treeRoot}/${entry}`);
+
+    // Only a framed item is a folder of files. A pdf/data item is one file:
+    // walking its containing directory would sweep unrelated siblings (the cv
+    // prefix root holds every CV) into the document tree, so it stages only its
+    // entry.
+    const isFolderFormat = item.format === "html" || item.format === "bundle";
+    if (!isFolderFormat) continue;
+
+    const dir = path.posix.dirname(rel);
+    const relDir = dir === "." ? "" : dir;
+    const isPrefixRoot = relDir === "";
+    const absDir = path.join(sourcesDir, source, relDir);
+
+    for (const relInDir of walk(absDir)) {
+      const relFromPrefix = relDir === "" ? relInDir : path.posix.join(relDir, relInDir);
+      if (relFromPrefix === rel) continue; // the entry, already staged under its basename
+      const ext = path.posix.extname(relInDir).toLowerCase();
+      if (PAGE_EXTENSIONS.has(ext)) {
+        // A DOCUMENT IS NOT AN ASSET. Inside a named directory the item is one
+        // page, so only its renamed entry travels: a sibling's page and a
+        // WITHDRAWN page's leftover bytes both stay behind (the same protection
+        // stagingPlanFor gives the member payload). At the prefix root the
+        // item's `path` names a built site's entry point, so every page travels
+        // except those a sibling item declares.
+        if (!isPrefixRoot) continue;
+        if (declaredPages.get(source)?.has(relFromPrefix)) continue; // a sibling item's page
+      }
+      addDocFile(staged, sourcesDir, source, relFromPrefix, `${treeRoot}/${relInDir}`);
+    }
+  }
+
+  return [...staged.entries()]
+    .map(([to, { from, source }]) => ({ from, to, source }))
+    .sort((a, b) => (a.to < b.to ? -1 : a.to > b.to ? 1 : 0));
+}
+
+/** The `_doc` tree root for an item, or null when a segment is not a safe path. */
+function shareDocRootFor(item) {
+  for (const part of [item.section, item.source, item.slug]) {
+    if (typeof part !== "string" || part === "") return null;
+    for (const segment of part.split("/")) {
+      // `..` matches the gate's segment allowlist, so reject it explicitly.
+      if (segment === "." || segment === "..") return null;
+      if (!GATE_SEGMENT_PATTERN.test(segment)) return null;
+    }
+  }
+  return path.posix.join(item.section, item.source, item.slug, SHARE_DOC_ROOT);
+}
+
+function addDocFile(staged, sourcesDir, source, relFromPrefix, to) {
+  // A source name is one safe path segment. Fail closed, as addFile does, so a
+  // `source: "../cv"` cannot place a share tree outside `sourcesDir`.
+  if (!/^[A-Za-z0-9._-]+$/.test(String(source)) || source === "." || source === "..") return;
+  const prefixRoot = path.resolve(sourcesDir, source);
+  const from = path.resolve(prefixRoot, relFromPrefix);
+  if (from !== prefixRoot && !from.startsWith(prefixRoot + path.sep)) return;
+  if (!fs.existsSync(from)) return;
+  const normalizedTo = String(to).split(path.sep).join("/");
+  if (!staged.has(normalizedTo)) staged.set(normalizedTo, { from, source });
 }
 
 function addFile(staged, sourcesDir, source, relFromPrefix) {

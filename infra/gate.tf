@@ -72,32 +72,42 @@ locals {
 #    object by name. Not objectViewer: that adds storage.objects.list, and
 #    private object names are private material.
 #
-# 2. roles/datastore.viewer (project) -- READ-ONLY over the Firestore
-#    database. Needed for responsibility 2, the member allowlist (§6).
+# 2. roles/datastore.user (project) -- READ AND WRITE over the Firestore
+#    database. The member allowlist (§6) needs the read; the share store
+#    (Phase 4, SEAM-S5) needs the write.
 #
-#    NARROWED 2026-09-17, closing the gate stream's finding SD-3. This was
-#    roles/datastore.user, which is read AND write, justified by "the gate must
-#    be able to write in later phases (shares, Phase 4) without a role change
-#    here". That is granting a privilege now for a capability a later phase may
-#    need, and the privilege in question is write access to the allowlist --
-#    the access-control list for the committee dossier. A flaw in the gate
-#    could have added a member. Phase 4 changes this line when Phase 4 needs
-#    it, reviewed at that time.
+#    RE-WIDENED 2026-10-03, for Phase 4 sharing, and deliberately. SD-3
+#    (2026-09-17) had narrowed this from datastore.user to datastore.viewer
+#    precisely so the write capability would not be held before a phase needed
+#    it, and recorded "Phase 4 changes this line when Phase 4 needs it,
+#    reviewed at that time." This is that change: the gate mints, lists and
+#    revokes shares/{token} (SEAM-S1, SEAM-S5).
 #
-#    Verified rather than assumed: gate/app/ contains no Firestore write of any
-#    kind. The only call sites are in app/members.py -- the import, the client,
-#    and one .collection(...).document(key).get() per request.
+#    WHY datastore.user AND NOT A COLLECTION-SCOPED GRANT. Firestore data
+#    roles are project-level; IAM has no "shares/ only" spelling, so the grant
+#    that reaches shares/ necessarily reaches members/ as well. What keeps the
+#    gate from writing the allowlist is therefore not IAM but the collection
+#    discipline: FirestoreShareStore is the one share writer and targets
+#    shares/{token}, and the deny-all released rules (firestore.tf) bind every
+#    client SDK. SEAM-S5 records that as the control. (The Admin SDK bypasses
+#    those rules, so the rules are not what constrains the gate either; the
+#    class is.)
 #
-#    Predefined rather than the custom read-only role the gate stream proposed
-#    (datastore.entities.get [+ datastore.databases.get]): neither stream could
-#    confirm from a primary source whether the Python client needs
-#    databases.get to connect, and a role too narrow to connect fails closed by
-#    breaking the private area. The custom-role tightening is a Checkpoint 4
-#    item alongside the firebaseauth.admin one.
+#    datastore.user INCLUDES DELETE, which the store does not use, and that is
+#    accepted rather than implied. The store needs create/get/update/list; its
+#    DELETE /share/{token} sets revoked: true (SEAM-S2) and never deletes a
+#    document. No predefined role holds only those four verbs, and the
+#    custom-role alternative is rejected for the same reason the read-only
+#    custom role was: neither stream can confirm from a primary source the
+#    exact permission set the Python Admin SDK needs, and a role too narrow to
+#    connect fails closed by breaking the private area. A custom role would
+#    also gain no scoping -- Firestore custom roles are project-level too. So
+#    the delete permission is named and accepted, not hidden.
 #
 #    It is NOT roles/datastore.owner, which adds index and database
 #    administration, import/export, and the ability to delete the allowlist
 #    wholesale.
+#
 #    NOTE the scope: Firestore data roles are project-level. There is one
 #    database in this project, so "project-level" and "this database" coincide
 #    today; if a second database is ever added, this grant reaches it.
@@ -151,9 +161,13 @@ resource "google_service_account" "hub_gate" {
   depends_on = [google_project_service.phase1]
 }
 
+# The grant described at point 2 above. The role changed 2026-10-03 (Phase 4
+# sharing): datastore.user, so the gate can write shares/{token}. See the
+# comment block at the head of this file for why a collection-scoped grant is
+# not expressible and why the delete permission is accepted.
 resource "google_project_iam_member" "hub_gate_firestore" {
   project = var.project_id
-  role    = "roles/datastore.viewer"
+  role    = "roles/datastore.user"
   member  = google_service_account.hub_gate.member
 }
 
