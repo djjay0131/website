@@ -35,10 +35,19 @@
 //   payload-path   the item's declared `path`, QUALIFIED by source, e.g.
 //                  phd-milestones/site/index.html           (a bare `index.html`
 //                  is not a needle: every static site has one — see needlesFor)
-//   source         the source name                          e.g. phd-milestones
 //   slug           the bare slug                            e.g. milestones
 //   title          the item's title, raw and HTML-escaped
 //   summary        the item's summary, raw and HTML-escaped
+//
+// A SOURCE NAME IS NOT A BARE NEEDLE (Wave 4 FP-2). The Wave 4 satellite
+// publishes under source key `construction-ai`, which is also the id of the
+// owner's own public CV project, rendered first-party at /projects/construction-ai/.
+// A bare `source` needle matched that legitimate page in both PATH and CONTENTS
+// and failed a CLEAN build. This is the same over-broad-needle class as Wave 2's
+// FP-1 (a bare `index.html` payload-path needle). A source name is carried by
+// its qualified-id, route, payload-path and title/summary needles, all of which
+// are distinctive; on its own it is only as safe as the most generic public word
+// it could equal.
 //
 // BOUNDED vs EXACT. A bare slug is matched only when it is DELIMITER-BOUNDED on
 // BOTH sides -- that is, it sits in markup, in a URL, or in a quoted string
@@ -71,6 +80,10 @@
 //   - Private text quoted into a public page WITHOUT its slug, title or summary
 //     would pass. Nothing mechanical can catch that.
 //   - A slug occurring in prose is deliberately not a match (above).
+//   - A private source name that equals public first-party content is not a
+//     needle by itself (Wave 4 FP-2, above). A leak that preserves only the
+//     source name and none of the qualified-id/route/payload-path/title/summary
+//     needles would pass; those needles are what bind the item.
 // The bucket IAM test (§12.1, infra D8) is the other half of the guarantee, and
 // neither half is sufficient alone.
 import fs from "node:fs";
@@ -83,19 +96,6 @@ const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 
 /** Titles/summaries shorter than this are too generic to be safe needles. */
 export const TITLE_MIN_LENGTH = 8;
-
-/**
- * A source name at least this long is a safe BARE needle. Shorter names are not.
- *
- * SEAM-B6 widens the private set to everything the allowlist omits, which now
- * includes `cv/anthropic-fellow`. The bare source needle for it would be "cv",
- * and "cv" occurs delimiter-bounded in every `/cv/…` link and `cv-data` path in
- * a perfectly clean public build. A guard that fails a clean build is removed
- * within a week, so a short source name is carried by its qualified-id,
- * route and payload-path needles instead, exactly as short titles and summaries
- * already are.
- */
-export const SOURCE_MIN_LENGTH = 4;
 
 /** Extensions read as text. Anything else is matched by path only. */
 export const TEXT_EXTENSIONS = new Set([
@@ -188,9 +188,11 @@ export function needlesFor(item) {
     add("slug", item.slug, true);
     if (item.section) add("route", `/${item.section}/${item.source}/${item.slug}/`, false);
   }
-  if (typeof item.source === "string" && item.source.length >= SOURCE_MIN_LENGTH) {
-    add("source", item.source, true);
-  }
+  // NO `source` NEEDLE. A source name can equal public first-party content (the
+  // Wave 4 key `construction-ai` is also a public CV project id), so it is not a
+  // safe needle on its own; the qualified-id, route, payload-path and
+  // title/summary needles carry it. See the header, Wave 4 FP-2.
+  //
   // The payload path is a needle only when QUALIFIED by its source. A bare
   // filename such as `index.html` is not a trace of any particular private item —
   // every static site has one — and matching it made a CLEAN public build fail:
@@ -305,11 +307,14 @@ export function findLeaks(distDir, items) {
   for (const relFile of files) {
     const absFile = path.join(distDir, relFile);
 
-    // 1. PATHS. A private slug or source appearing as a path segment.
+    // 1. PATHS. A private SLUG appearing as a path segment. A source name is
+    // deliberately NOT a path needle: it can equal public first-party content
+    // (Wave 4 FP-2). The qualified-id, route and payload-path needles still bind
+    // the item in CONTENTS.
     const segments = relFile.split("/");
     for (const { item, needles } of byItem) {
       for (const needle of needles) {
-        if (needle.kind !== "slug" && needle.kind !== "source") continue;
+        if (needle.kind !== "slug") continue;
         const hit = segments.some((s) => s === needle.value || s.startsWith(`${needle.value}.`));
         if (hit) {
           leaks.push({
@@ -439,8 +444,8 @@ if (isMain) {
   }
 
   console.log(
-    `\ncheck:no-private-in-public: PASS — no private slug, source, route, payload path, title or ` +
-      `summary appears in any path or any file's contents under ${shownDist} ` +
+    `\ncheck:no-private-in-public: PASS — no private slug, route, payload path, title or summary ` +
+      `appears in any path or any file's contents under ${shownDist} ` +
       `(${walkFiles(distDir).length} files scanned).`,
   );
 }
