@@ -37,7 +37,14 @@ const { title, nav = [] } = Astro.props;
 const base = import.meta.env.BASE_URL; // "/p/"
 const site = Astro.site?.toString().replace(/\/$/, "") ?? "";
 const here = Astro.url.pathname;
-const bandNav = nav.map((entry) => ({ ...entry, current: here === entry.href }));
+// The Shares entry is added HERE, not by each page, so it appears on every
+// /p/** page without touching any page or shared component (contract
+// requirement 5). It is a private route under the base, so no public nav leaks.
+const sharesHref = `${base}shares/`;
+const bandNav = [
+  ...nav.map((entry) => ({ ...entry, current: here === entry.href })),
+  { href: sharesHref, label: "Shares", current: here === sharesHref },
+];
 
 const footer = readFooterData();
 const meta = loadContentPool(path.resolve(CV_CONTENT_DIR)).meta;

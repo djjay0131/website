@@ -1,0 +1,82 @@
+---
+// THE SHARES PAGE (SEAM-S6; contract site-wave-3 requirement 2).
+//
+// Served by the gate at /p/shares/. This page exists only in the private build:
+// the public build's srcDir is ./src and never resolves this directory, so the
+// page, its island and the React runtime cannot reach dist-public by any build
+// path (proved by build, not assertion -- see the contract's Evidence).
+//
+// The page itself is static and reveals nothing: the island decides whether the
+// caller is the owner from GET /share, and the gate is the authority either way.
+import { getCollection } from "astro:content";
+import PrivateBase from "../layouts/PrivateBase.astro";
+import { memberHref } from "../lib/private-content.mjs";
+import SharesIsland from "../components/SharesIsland.tsx";
+
+const items = (await getCollection("sources", ({ data }) => data.format !== "data"))
+  .map((entry) => entry.data)
+  .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug < b.slug ? -1 : 1));
+
+const base = import.meta.env.BASE_URL;
+const site = Astro.site?.toString() ?? "";
+const href = (item: (typeof items)[number]) => memberHref(item, { base, site });
+const nav = items
+  .map((item) => ({ href: href(item), label: item.title }))
+  .filter((n): n is { href: string; label: string } => n.href !== null);
+---
+
+<PrivateBase title="Shares" nav={nav}>
+  <h1>Shares</h1>
+  <p class="lede">
+    Share one item by section, source and slug for a bounded time. The link is a
+    bearer credential: anyone who has it can read that item until it expires or
+    you revoke it.
+  </p>
+  <SharesIsland client:load />
+</PrivateBase>
+
+<style>
+  .lede { color: var(--color-muted); margin-bottom: 1.5rem; max-width: 60ch; }
+
+  :global(.shares-island) { display: grid; gap: 2rem; }
+  :global(.shares-island h2) { font-size: 1.2rem; margin-bottom: 0.5rem; }
+  :global(.shares-note) { color: var(--color-muted); font-size: 0.9rem; }
+  :global(.shares-island table) { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  :global(.shares-island th),
+  :global(.shares-island td) {
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: top;
+  }
+  :global(.shares-island form) { display: grid; gap: 0.6rem; max-width: 28rem; }
+  :global(.shares-island label) { display: grid; gap: 0.2rem; font-size: 0.9rem; }
+  :global(.shares-island input) {
+    font: inherit;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+  :global(.shares-island button) {
+    font: inherit;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+  }
+  :global(.shares-island button:disabled) { opacity: 0.6; cursor: progress; }
+  :global(.minted .link) { width: 100%; }
+  :global(.visually-hidden) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+</style>

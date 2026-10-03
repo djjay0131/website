@@ -166,3 +166,40 @@ describe("the shared band and footer are safe for both builds", () => {
     }
   });
 });
+
+// ===========================================================================
+// THE HOSTING REWRITES FOR SHARING (SEAM-S4; contract site-wave-3 requirement 1)
+// ===========================================================================
+// /share/** carries owner-only POST/GET/DELETE and /s/** the public share view.
+// Both are Firebase Hosting prefix rewrites to the gate. The existing four
+// rewrites must survive byte-identical in effect, and trailingSlash stays true.
+describe("firebase.json routes sharing to the gate without disturbing the rest", () => {
+  const config = JSON.parse(fs.readFileSync(path.resolve("..", "firebase.json"), "utf8"));
+  const rewrites = config.hosting.rewrites as { source: string; run?: { serviceId: string; region: string } }[];
+  const bySource = new Map(rewrites.map((r) => [r.source, r]));
+
+  it("adds /share/** and /s/** as us-east1 hub-gate prefix rewrites", () => {
+    for (const source of ["/share/**", "/s/**"]) {
+      expect(bySource.get(source), `${source} rewrite`).toEqual({
+        source,
+        run: { serviceId: "hub-gate", region: "us-east1" },
+      });
+    }
+  });
+
+  it("keeps the existing four gate rewrites exactly as they were", () => {
+    expect(rewrites.map((r) => r.source)).toEqual([
+      "/p/**",
+      "/session",
+      "/session/end",
+      "/client-events",
+      "/share/**",
+      "/s/**",
+    ]);
+  });
+
+  it("still publishes dist-public with trailing slashes", () => {
+    expect(config.hosting.public).toBe("site/dist-public");
+    expect(config.hosting.trailingSlash).toBe(true);
+  });
+});
