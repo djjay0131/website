@@ -3264,3 +3264,90 @@ as the `20e9f41` correction in Phase 1.
   member seed if not already run; decide whether to narrow the Firestore role.
 - **Open questions:** revoke-by-display-id; a render-aware leak check (carried).
 - **Governance:** L2; contracts and handoffs `*-wave-3*.md`; checks 4/4 PASS.
+
+## Wave 4 — Phase 5 satellite `construction-ai-proposal` (2026-10-03)
+
+Branch `feat/construction-ai`; scenario `hub-005`; decisions D4/D10 (order) and D8
+(private by default). Seams `contracts/phase-5-seams.md`; contracts
+`{infra,satellite-construction}-wave-4.md` and the review contracts.
+
+### What shipped
+
+- **infra:** the `construction-ai` roster entry (key not repo name, SEAM-C1; repo
+  `djjay0131/construction-ai-proposal`, ids read live from the GitHub API,
+  `default_branch: master`). `terraform fmt`/`validate` clean; plan **4 to add,
+  0 to change, 0 to destroy** — provider, SA, impersonation binding, conditioned
+  bucket binding, all new for `construction-ai`; no stateful resource in the set.
+- **satellite:** `manifest.json` (`source: construction-ai`; a `pdf` item
+  `main.pdf` and an `html` item `index.html`, both `section: projects`,
+  `visibility: private`) and `.github/workflows/publish-hub.yml`, modelled on
+  `agentic-kg-research`; the validator passes; publish gated off pull requests.
+- **hub site (security fix that rode with the wave):** `sync-content.sh` now
+  refuses an object name that resolves outside `$DEST`, closing the Red Team's
+  bypass. Test added; `site` 353 passed / 1 skipped.
+- **records:** ADR-0019 (roster + source keys; amends design doc §2/§11),
+  SEAM-C4 corrected.
+
+### Round and dispositions
+
+- **Red Team — 1 BYPASS, fixed and re-verified.** The IAM prefix condition admits
+  an object named `sources/<key>/../../../../publish-allowlist.json` (GCS stores
+  names flat), and `sync-content.sh` wrote `$DEST/$REL` with no containment, so a
+  satellite calling the Storage API directly could overwrite hub build files.
+  **Pre-existing, not introduced here** — every satellite could already do it —
+  but found now. Fixed in `sync-content.sh` (realpath containment, fail closed);
+  round 2 against the fixed script: original and deeper `..` refused, encoded `%`
+  harmless, absolute/equality refused, normal sync unchanged. **Bypass closed.**
+- **Dissenter — 3 blocking, all dispositioned.** **D1 fixed:** SEAM-C4's "turn
+  public with an allowlist edit" was wrong (a `visibility: private` item cannot be
+  allowlisted public; SEAM-B5 condition A fails the build). Corrected: going public
+  is satellite flips visibility + republish, then allowlist. **D2 fixed:**
+  ADR-0019 writes the roster and amends design doc §2/§11. **D3 recorded, not
+  fixed:** roadmap scope `:381` ("public project page") and acceptance `:387`
+  conflict with Checkpoint 6 ("private build only") because D8 makes the items
+  private. The criterion is **PARTIALLY satisfied (private build) and the public
+  half DEFERRED** to the owner's allowlist decision — recorded, not ticked.
+  Non-blocking: D5 (prefix-root `_doc` staging carries the source's other
+  non-document files — C28 residual), D6 (mixed public/private at one prefix root
+  would fail `mixedSourceError`, so a public page + private PDF from one root is
+  not possible without restructuring), D7 (the PDF is already public on GitHub, so
+  hub-"private" is about serving, not secrecy — ADR-0019 decision 3), D8 (the
+  published `main.pdf` is the committed root PDF, which may lag `proposal/main.tex`
+  — a satellite-content follow-up).
+- **Security Tester — 0 FAIL** across all scoped checks; the live prefix proof is
+  the Boundary Tester's post-apply step.
+- **Skeptic Verifier — 0 un-failable guards, 2 coverage gaps recorded:** the
+  roster variable validations are not invoked in CI (only a manual `terraform
+  plan` fails), and nothing tests the satellite workflow's publish gate
+  (`actionlint` unavailable). Both recorded as follow-ups.
+
+### Merge and apply record
+
+PR (hub) merged under §8 after all required checks. `terraform apply` from the
+merged commit: `4 to add, 0 to change, 0 to destroy`; second plan clean.
+`construction-ai` satellite PR merged; the four `GCP_*` repo variables set; the
+first publish ran through WIF; the objects land under `sources/construction-ai/`
+and are synced into the private bucket only. The boundary proof
+(`handoffs/boundary-tester-wave-4.md`) passes: forward in-prefix allowed, every
+other prefix refused, no `list`, reverse leg refused.
+
+### Owner-only step — PENDING
+
+The two items are `visibility: private`. To make the project page public, the
+satellite must flip the `html` item to `visibility: public` and republish, then
+the owner adds `(construction-ai, construction-ai-site)` to
+`site/publish-allowlist.json`. Until then, the live proof is a signed-in member
+seeing the item in `/p/` and a signed-out probe finding nothing. That decision is
+the owner's.
+
+### Five-line status (Wave 4)
+
+- **State:** the fifth satellite is provisioned, its manifest/workflow published
+  private items, and a real content-sync traversal bypass was found and fixed.
+- **What to review:** ADR-0019; the sync-content containment fix; the roster
+  entry; the deferred public-page criterion (D3).
+- **What only the owner can do:** decide whether to flip the items public; the
+  Firestore member seed; the Wave 3 live share mint.
+- **Open questions:** a public page + private PDF from one prefix root (D6); the
+  roster-validation coverage gap; `main.pdf` currency (D8).
+- **Governance:** L2; contracts and handoffs `*-wave-4*.md`; checks 4/4 PASS.

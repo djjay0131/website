@@ -71,6 +71,74 @@ describe("sync-content.sh --from (the bucket-shaped local tree)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Traversal guard (Red Team Wave 4). A satellite that talks to the Storage API
+// directly -- the publish action is optional -- can create an object named
+// `sources/<key>/../../<target>`. It is one literal GCS name, so it satisfies
+// the prefix IAM condition, but sync-content.sh strips `sources/` and appends
+// the remainder to $DEST, letting `..` walk the write out of the tree.
+//
+// The hostile name cannot be put on a local `--from` tree: a filesystem cannot
+// hold a literal `..` component, and find/realpath would collapse it. So the
+// bucket transport is stubbed at PATH: a fake `curl` returns a listing with the
+// hostile object, exactly as objects.list would. No production seam is added.
+// ---------------------------------------------------------------------------
+describe("sync-content.sh refuses an object name that escapes the destination", () => {
+  let parent: string;
+  let dest: string;
+  let binDir: string;
+  const HOSTILE = "sources/cv/../../pwned.txt";
+
+  beforeEach(() => {
+    parent = fs.mkdtempSync(path.join(os.tmpdir(), "sync-guard-"));
+    dest = path.join(parent, "dest");
+    binDir = fs.mkdtempSync(path.join(os.tmpdir(), "sync-bin-"));
+    const listing = JSON.stringify({
+      items: [{ name: HOSTILE, generation: "1", size: "5" }],
+    });
+    const stub = `#!/usr/bin/env bash
+set -euo pipefail
+url=""; out=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    http*) url="$1"; shift ;;
+    *) shift ;;
+  esac
+done
+case "$url" in
+  *alt=media*) printf 'pwned' > "$out" ;;
+  *) printf '%s' '${listing}' ;;
+esac
+`;
+    fs.writeFileSync(path.join(binDir, "curl"), stub, { mode: 0o755 });
+  });
+  afterEach(() => {
+    fs.rmSync(parent, { recursive: true, force: true });
+    fs.rmSync(binDir, { recursive: true, force: true });
+  });
+
+  it("fails loudly and writes nothing when REL escapes $DEST", () => {
+    const r = spawnSync(
+      "bash",
+      [SCRIPT, "--bucket", "example-bucket", "--dest", dest, "--no-stage"],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${binDir}:${process.env.PATH}`,
+          GCS_ACCESS_TOKEN: "fake",
+        },
+      },
+    );
+    // Removed guard: the hostile object is written to parent/pwned.txt and the
+    // script exits 0 -- both assertions below go red.
+    expect(r.status, r.stdout).toBe(1);
+    expect(r.stderr).toContain("unsafe object name");
+    expect(fs.existsSync(path.join(parent, "pwned.txt"))).toBe(false);
+  });
+});
+
 describe("the fingerprint covers the whole object set, deletions included", () => {
   let tree: string;
   beforeEach(() => {

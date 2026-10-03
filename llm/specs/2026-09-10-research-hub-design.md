@@ -42,8 +42,10 @@ is authored. Content is authored in satellites; the hub renders it.
 | `website` | Jason | **Becomes the hub.** Already Astro; already consumes `cv`. Moves from GitHub Pages to Firebase Hosting. | Do not start a new hub repo. Evolve this one. |
 | `cv` | Jason (public) | Satellite #1 (public items). Already integrated ad hoc; formalize under the manifest contract. | **Corrected 2026-09-16 (ADR-0008):** `cv` is a *public* repository and its default branch is `master`. The earlier "private repo, public output" framing was wrong; `phd-milestones` (Phase 3) is the first genuinely private satellite. |
 | `phd-milestones` | Jason (to create) | Satellite #2 (private items): milestone tracker, committee dossier, VT policy. | Source tarball is committed on the handoff branch at `llm/plans/handoff/phd-milestones.tar.gz`; create the private GitHub repo from it, then delete the tarball from `website`. |
-| `agentic-kg` | Jason | Satellite #3: project page (public) from its `docs/`; optional private research notes. Already has `llm/` + `docs/` layout. | The agentic knowledge-graph research project. |
-| `construction-ai-proposal` | Jason | Satellite #4: project page (public). | Later phase. |
+| `agentic-kgis` (source `kgis`) | Jason (public) | Satellite #3 (public items): project page from its MkDocs `docs-site/`. **Substituted for `agentic-kg` (2026-09-25, D4/D10) because its content already existed.** Live 2026-10-01 at `/projects/kgis/kgis-docs/`. | ADR-0019. Source key differs from the repo name. |
+| `agentic-kg-research` | Jason (private repo) | Satellite #4 (private items): a Quarto research store, `section: research`. | ADR-0019. |
+| `construction-ai-proposal` (source `construction-ai`) | Jason (public) | Satellite #5: proposal PDF + generated overview page, `section: projects`. **Items are `visibility: private` until the owner allowlists them** (D8; Checkpoint 6). | ADR-0019. Source key `construction-ai` for the SA-id length limit. |
+| `agentic-kg` | Jason | Later/optional: project page from its `docs/`; optional private research notes. | Substituted as satellite #3 by `agentic-kgis` (D4/D10). |
 | `agentic-governance` | Jason | **Not a content satellite.** It is the operating system this build runs under. Adopt via `/governance:establish`. May publish its README as a project page later. | |
 | `agentic-research` | Jason | **Not a content satellite.** Jason's plugin for academic writing projects (paper/proposal skeletons, citation matrix, originality review). Part of the toolkit available in the execution environment. May publish its README as a project page later. | Corrected 2026-09-10: this is tooling, not the KG project. |
 | Constellize | third party | Not a satellite. A plugin the governance framework delegates specialist personas to. | Removed from earlier drafts. |
@@ -378,7 +380,7 @@ after `/governance:establish`:
 | 2 | Contract schema, publish action, content bucket, poll-driven rebuild (ADR-0007); `cv` formalized as satellite #1 | CV published through the contract |
 | 3 | Gate service + tests, Identity Platform, Firestore, private bucket, two-output build + leak check, `/p/**` rewrite; `phd-milestones` as satellite #2; seed members | Tracker + dossier behind sign-in |
 | 4 | Share mint/list/revoke; Shares page (React island) | 14-day link to one document |
-| 5 | `agentic-kg`, `construction-ai-proposal` as satellites; project index | Self-updating projects section |
+| 5 | `agentic-kgis`, `agentic-kg-research`, `construction-ai-proposal` as satellites; project index (ADR-0019) | Self-updating projects section |
 | 6 | Pagefind search (public only), RSS, OG images, redirects from `djjay0131.github.io/website`; retire Pages | Old URL forwards |
 
 ## 12. Non-negotiables reviewers protect

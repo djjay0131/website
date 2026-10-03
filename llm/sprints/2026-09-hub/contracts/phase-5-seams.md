@@ -59,8 +59,17 @@ publish skipped.
 
 Both items declare `visibility: private` and are **not** added to
 `site/publish-allowlist.json` in this wave. They render in the private build only;
-the public index/leak check carry no trace. Turning them public is a later,
-owner-driven L0 allowlist edit (ADR-0016).
+the public index/leak check carry no trace.
+
+> **Corrected 2026-10-03 (Dissenter Wave 4 D1).** "Turn public with an allowlist
+> edit" was wrong. Under ADR-0016 an item is public only when the manifest says
+> `public` **and** the allowlist names it; allowlisting a `visibility: private`
+> item does nothing, and SEAM-B5 condition A makes that allowlist entry a hard
+> build failure. Going public is therefore **two steps**: the satellite flips the
+> item to `visibility: public` and republishes, **then** the owner adds
+> `(construction-ai, <slug>)` to the allowlist. This is the trust story working as
+> designed (the satellite cannot self-publish, and the hub cannot override the
+> manifest), not a defect — but the earlier wording hid the second step.
 
 ## SEAM-C5 — The hub needs no template change
 
