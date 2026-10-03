@@ -65,6 +65,14 @@ PRIVATE_OBJECTS = {
     # item directory. A share must reach neither.
     "phd/phd-milestones/committee-dossier/index.html": b"<h1>Member frame (must not serve)</h1>",
     "phd/phd-milestones/committee-dossier/_payload/hidden.html": b"<h1>Item payload (must not serve)</h1>",
+    # An item-local payload at the `_payload/<source>/...` shape. A direct (not
+    # traversal) `/s/<token>/_payload/<source>/...` request resolves inside the
+    # token's `_doc/` prefix -- `<...>/_doc/_payload/<source>/...`, a miss -- and
+    # if the `_doc` suffix were ever dropped it would resolve to this object and
+    # be served. The test below watches the fetched name, not only the status.
+    "phd/phd-milestones/committee-dossier/_payload/phd-milestones/site/committee.html": (
+        b"<h1>Item payload namespace (must not serve)</h1>"
+    ),
     "_payload/phd-milestones/site/committee.html": b"<h1>Shared payload (must not serve)</h1>",
     # Siblings the committee-dossier token must never reach: the same source
     # under a DIFFERENT section (`projects`), and a slug that extends the

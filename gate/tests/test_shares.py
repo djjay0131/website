@@ -18,6 +18,7 @@ credentials here and none may be created.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -25,9 +26,9 @@ import pytest
 from conftest import MEMBER_EMAIL, PRIVATE_OBJECTS, origin_header, request_headers
 from fastapi.testclient import TestClient
 
-from app.main import create_app
+from app.main import _short_share_id, create_app
 from app.serve import UnsafePath, safe_object_path
-from app.shares import Share
+from app.shares import Share, _share_from_document
 
 # `(section, source, slug)` -- the real private-build address, e.g.
 # `phd/phd-milestones/committee-dossier/` (frame-content.mjs: routeFor).
@@ -524,13 +525,26 @@ def test_safe_object_path_keeps_the_prefix_segment_bounded():
         )
 
 
-def test_a_corrupt_stored_section_is_refused(client, shares, transport):
-    """A stored row whose section is not a single legal segment never serves."""
+def test_a_corrupt_stored_section_is_refused(client, store, shares, transport):
+    """A stored row whose section is not a single legal segment never serves.
+
+    The escaped prefix is seeded with a serve-able sentinel, so the test fails
+    if the `/`-in-section check is dropped: without it the prefix becomes
+    `a/b/phd-milestones/committee-dossier/_doc`, the sentinel is fetched and
+    returned 200. With the check the row is refused before any bucket read and
+    the linked object is never touched (Skeptic W3).
+    """
+    escaped = "a/b/phd-milestones/committee-dossier/_doc/index.html"
+    store.objects[escaped] = b"<h1>Escaped sentinel (must not serve)</h1>"
     _seed(shares, "corrupt-section", item=("a/b", "phd-milestones", "committee-dossier"))
 
     response = client.get("/s/corrupt-section/", headers=request_headers(transport))
 
     assert response.status_code == 404
+    assert "Not found" in response.text
+    assert b"Escaped sentinel" not in response.content
+    assert escaped not in store.fetches
+    assert store.fetches == []
 
 
 def test_a_share_path_is_confined_to_the_token_prefix(client, store, member_session, transport):
@@ -586,6 +600,50 @@ def test_the_payload_namespace_is_unreachable_with_zero_bucket_fetches(
         assert response.status_code == 404
         assert b"must not serve" not in response.content
         assert store.fetches == []
+
+
+def test_the_member_frame_is_not_served_by_a_direct_request(client, store, member_session, transport):
+    """A direct `/s/{token}/index.html` resolves to the `_doc/` copy, never the frame.
+
+    `<section>/<source>/<slug>/index.html` is the members' frame -- nav plus
+    absolute `/p/...` links -- and exists in the bucket. The only name a token
+    may fetch for `index.html` is the staged `<...>/_doc/index.html`. If the
+    `_doc` suffix were dropped (Skeptic break #2) the same request would fetch
+    the frame and serve it 200, so this watches the fetched name and the bytes,
+    not only the status (Skeptic W1/C3).
+    """
+    token = _mint_ok(client, transport, member_session)
+    store.fetches.clear()
+
+    response = client.get(f"/s/{token}/index.html", headers=request_headers(transport))
+
+    assert store.fetches == ["phd/phd-milestones/committee-dossier/_doc/index.html"]
+    assert response.status_code == 200
+    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"]
+    assert b"Member frame" not in response.content
+
+
+def test_a_direct_payload_request_is_confined_to_the_doc_namespace(client, store, member_session, transport):
+    """A direct `/s/{token}/_payload/<source>/...` is a miss under `_doc/`.
+
+    The item-local payload is a sibling of the item's `_doc/`. Requesting it by
+    its real name under the token must resolve to `<...>/_doc/_payload/...`,
+    which does not exist, rather than to the payload itself. Dropping `_doc`
+    would fetch and serve the item payload 200 (Skeptic W2/C3).
+    """
+    token = _mint_ok(client, transport, member_session)
+    store.fetches.clear()
+
+    response = client.get(
+        f"/s/{token}/_payload/phd-milestones/site/committee.html",
+        headers=request_headers(transport),
+    )
+
+    assert store.fetches == [
+        "phd/phd-milestones/committee-dossier/_doc/_payload/phd-milestones/site/committee.html"
+    ]
+    assert response.status_code == 404
+    assert b"Item payload namespace" not in response.content
 
 
 def test_a_token_cannot_reach_a_sibling_items_doc(client, store, member_session, transport):
@@ -687,3 +745,75 @@ def test_a_session_cookie_is_not_a_credential_for_someone_elses_share(client, me
 
     assert response.status_code == 404
     assert "set-cookie" not in response.headers
+
+
+# --- Stored-document parsing (FirestoreShareStore's parser) ----------------
+#
+# `StaticShareStore` hands whole `Share` objects to the gate, so no committed
+# test used to execute `_share_from_document` -- the parser every production
+# read goes through. These two drive it directly and are the only tests that
+# would go red if its refusal of a row missing `entry` were removed.
+
+
+def _stored_document(**overrides):
+    """A well-formed `shares/{token}` document, before fields are varied."""
+    now = datetime.now(UTC)
+    document = {
+        "section": OWNER_ITEM[0],
+        "source": OWNER_ITEM[1],
+        "slug": OWNER_ITEM[2],
+        "entry": "index.html",
+        "created_by": MEMBER_EMAIL,
+        "exp": now + timedelta(days=14),
+        "created_at": now,
+        "revoked": False,
+    }
+    document.update(overrides)
+    return document
+
+
+def test_a_stored_document_missing_entry_is_refused_not_defaulted():
+    """A row without `entry` is refused; the parser must not default `index.html`.
+
+    Skeptic break #3: change `data.get("entry")` to
+    `data.get("entry", "index.html")` and drop `entry` from the required tuple,
+    and both assertions below return a `Share` instead of `None`.
+    """
+    assert _share_from_document("tok", _stored_document(entry=None)) is None
+
+    without_key = _stored_document()
+    del without_key["entry"]
+    assert _share_from_document("tok", without_key) is None
+
+
+def test_a_stored_document_with_every_field_builds_a_share():
+    """The contrast case: with `entry` present the parser returns a Share."""
+    share = _share_from_document("tok", _stored_document(entry="dossier.html"))
+
+    assert isinstance(share, Share)
+    assert share.token == "tok"
+    assert share.entry == "dossier.html"
+
+
+# --- Logging discipline (Dissenter D5) -------------------------------------
+
+
+def test_the_mint_log_carries_no_item_material(client, member_session, transport, caplog):
+    """The mint line names the row by short id only -- no section/source/slug/entry.
+
+    Skeptic break #12: add the item triple to the mint line in `main.py` and a
+    captured record contains one of these private path segments, so this fails.
+    """
+    with caplog.at_level(logging.INFO):
+        response = _mint(client, transport, member_session, entry="dossier.html")
+
+    assert response.status_code == 200
+    token = response.json()["token"]
+    short_id = _short_share_id(token)
+
+    records = "\n".join(record.getMessage() for record in caplog.records)
+    assert "action=mint" in records, "the mint did not log a record at INFO"
+    for private in (*OWNER_ITEM, "dossier.html"):
+        assert private not in records, private
+    assert short_id in records
+    assert token not in records
