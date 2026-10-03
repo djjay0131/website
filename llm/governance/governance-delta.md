@@ -277,5 +277,4 @@ repository (principle 3), and nothing here depends on how a satellite builds.
 | `agentic-kg-research` | Satellite #4, private items: a Quarto research store. | 5 |
 | `construction-ai-proposal` | Satellite #5 (source `construction-ai`), `visibility: private` items until allowlisted. | 5 |
 | `agentic-kg` | Later/optional, project page (public) from its `docs/`. | 5 |
-| `construction-ai-proposal` | Satellite #4, project page (public). | 5 |
 | `agentic-research` | Not a satellite. Academic-writing tooling; not used in Phases 0–3. | — |
