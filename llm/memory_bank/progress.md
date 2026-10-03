@@ -50,6 +50,13 @@ merged reality, not plans.
 
 ## Done, most recent first
 
+- **Wave 0c (branding) DONE and LIVE** 2026-10-02 (PR #91, merge `beb7301`) — maroon
+  band header with "Virginia Tech" text (no mark), three-column footer with 7
+  `rel="me"` profiles (GitHub, LinkedIn, Google Scholar, ORCID, X, Bluesky, Mastodon),
+  portfolio-driven home + research index, generated `og-card.png`, no portrait
+  (`/photo_jason_1.jpeg` 404). D15 owner wording/mappings applied; spec §5 and ADR-0015
+  amended (`--vt-orange-text` `#c34600`). a11y + adversarial round run; Security gate
+  GREEN 0 FAIL; Chief Reviewer Comment. Live on both hosts.
 - **Wave 0b (private by default) DONE and LIVE** 2026-10-02 (PRs #86, #88, #89; merge
   `ebf777d`) — `site/publish-allowlist.json` is the authority (D8, ADR-0016);
   `effectiveVisibility()` is the one computation; the public build stores only
@@ -87,10 +94,9 @@ merged reality, not plans.
   `agentic-kg-research` (private, for the team) is Wave 2.
 - **Checkpoint 4 is not passed** (#52) until the owner's non-member sign-in records A3
   and A4. A13 is closed (the `phd-milestones` prefix proofs ran, K10 included).
-- **Wave 0c (branding)** is next: spec + ADR-0015 are on `main` (#85); start at the
-  build streams (`site`: band header, footer, home page, tokens, shared chrome).
-- Phases 4–6 of `llm/master-roadmap.md` (Waves 3–5: sharing, satellite remainder,
-  Phase 6).
+- **Wave 3 (`hub-004`, Phase 4 sharing)** is next: `POST /share`, `GET /share`
+  (owner), `DELETE /share/{token}`, `GET /s/{token}/{path}`, the Shares island.
+- Phases 5–6 of `llm/master-roadmap.md` (Waves 4–5: satellite remainder, Phase 6).
 
 ## Known issues
 
