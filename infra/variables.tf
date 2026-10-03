@@ -202,6 +202,27 @@ variable "satellites" {
       repository_owner_id = "5666389"
       default_branch      = "main"
     }
+    # Satellite 5 (D10, 2026-10-03). PUBLIC repository (private: false read
+    # live), PRIVATE items: the proposal PDF and its generated landing page are
+    # declared visibility: private and are not added to the publish allowlist in
+    # this wave (SEAM-C4), so they render in the private build only. The grant is
+    # again the same custom role with the same startsWith condition; the
+    # private/public distinction lives in the manifest's visibility, not in the
+    # satellite's IAM.
+    #
+    # The key is construction-ai, NOT the repository name: the SA is named
+    # publish-<key> and a service-account ID is at most 30 characters, while
+    # publish-construction-ai-proposal would be 32 (SEAM-C1). Precedent: kgis for
+    # agentic-kgis. default_branch is master, not main.
+    #
+    # Both ids read from the GitHub REST API on 2026-10-03, not copied from a
+    # brief; the same read returned default_branch master.
+    construction-ai = {
+      repository          = "djjay0131/construction-ai-proposal"
+      repository_id       = "1134376420"
+      repository_owner_id = "5666389"
+      default_branch      = "master"
+    }
   }
 
   validation {
