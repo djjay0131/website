@@ -34,6 +34,32 @@ to that item's files for a bounded time. Firestore `shares/{token}`:
 > `section` before the owner's live mint (SEAM-S7). The `path` served is still
 > confined to `<section>/<source>/<slug>/`.
 
+> **Amended 2026-10-03 by the Lead Architect, on the Dissenter's Wave 3 D1
+> (BLOCK).** `<section>/<source>/<slug>/` holds the *hub's member frame*, not the
+> item's bytes: the frame carries the members' navigation (every private item's
+> title) and links absolutely to `/p/_payload/<source>/<path>` and `/p/_astro/…`.
+> A share holder is signed out, so the frame renders empty and leaks the private
+> item list; serving it is wrong on privacy and function alike. **The share
+> prefix is therefore `<section>/<source>/<slug>/_doc/`,** where the private build
+> stages a self-contained, item-scoped copy of the item's document and its
+> non-document assets (the entry filename is named by `entry`, below). Sibling documents
+> declared by other items of the same source are excluded, so one token reaches
+> one item. The member frame at `<section>/<source>/<slug>/` is unchanged.
+> `_doc` is a hub-owned namespace: a satellite source or slug may not be `_doc`.
+>
+> **Amended again 2026-10-03 (site follow-up), for non-HTML items.** Renaming the
+> entry to `index.html` mangles a `pdf`: the gate serves `_doc/index.html` as
+> `text/html` over PDF bytes. The stored row therefore gains `entry`, the item's
+> document filename **relative to `_doc/`** (the basename of the manifest's
+> `path`; e.g. `committee.html`, `anthropic-fellow.pdf`). `POST /share` takes
+> `{section, source, slug, entry, expires_in_days}`; `GET /s/{token}/` serves
+> `_doc/<entry>` and `GET /s/{token}/<sub>` serves `_doc/<sub>`. `entry` is
+> validated with the same segment allowlist as a served path (it may be several
+> segments, e.g. `site/index.html`) and must resolve inside the token's `_doc/`
+> prefix. The Shares page supplies `entry` from the private build's own item
+> list, so the owner chooses a real item rather than typing a blind triple.
+
+
 - **Token**: `secrets.token_urlsafe(32)` (256 bits of entropy; the brief requires
   ≥128). The token is the Firestore document id.
 - **exp** is server-side and is the authority; `expires_in_days` caps at 30.

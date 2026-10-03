@@ -218,6 +218,13 @@ Four responsibilities; keep it small enough to read in one sitting.
    mints a random token, stores `{slug, exp, created_by, revoked}` in
    Firestore `shares/{token}`. `GET /s/{token}/{path:path}` serves that one
    slug's files without a session. `DELETE /share/{token}` revokes.
+   **Amended 2026-10-03 (Wave 3, `hub-004`).** The item is addressed by
+   `(section, source, slug)` and the row also stores `entry`, the item
+   document's filename. A share serves the item-scoped `<section>/<source>/<slug>/_doc/`
+   namespace (the document and its non-document assets), not the member frame,
+   so a signed-out holder gets the document and never the members' navigation or
+   the private item list. See SEAM-S1 in `llm/sprints/2026-09-hub/contracts/phase-4-seams.md`
+   and ADR-0017.
 
 `min-instances=0`. Cold start ≈1s is acceptable.
 

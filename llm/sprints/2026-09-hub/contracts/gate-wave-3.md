@@ -26,24 +26,29 @@ Do NOT touch `site/**`, `firebase.json`, `infra/**`; those are other streams.
 ## Requirements (see the seams for the binding shape)
 
 1. **Store (SEAM-S1).** Firestore `shares/{token}` with `{section, source,
-   slug, exp, revoked, created_by, created_at}`. Token
+   slug, entry, exp, revoked, created_by, created_at}`. Token
    `secrets.token_urlsafe(32)`. `expires_in_days` ∈ [1,30]. One slug per token.
-2. **Mint `POST /share`** (owner only): body `{section, source, slug,
-   expires_in_days}`. Validate `(section, source, slug)` against the private
-   content the gate can see (a manifest read or a config; if the gate cannot
-   enumerate items, mint for a well-formed triple and let serving 404); 403 for
-   non-owner; 400 for bad input; return `{token, expires_at, url}`. Enforce the
-   allowed-origin check.
+   `entry` is the item's document filename relative to `_doc/`.
+2. **Mint `POST /share`** (owner only): body `{section, source, slug, entry,
+   expires_in_days}`. Validate `(section, source, slug, entry)` against the
+   private content the gate can see (a manifest read or a config; if the gate
+   cannot enumerate items, mint for a well-formed quad and let serving 404); 403
+   for non-owner; 400 for bad input; return `{token, expires_at, url}`. Enforce
+   the allowed-origin check. `entry` defaults to `index.html` when omitted, so the
+   API stays usable without it and existing clients are not broken.
 3. **List `GET /share`** (owner only): active shares, never returning a full
-   token (return a short id + `created_by`, `exp`, `section`, `source`, `slug`).
+   token (return a short id + `created_by`, `exp`, `section`, `source`, `slug`,
+   `entry`).
 4. **Revoke `DELETE /share/{token}`** (owner only): set `revoked: true`,
    idempotent, origin check.
 5. **Serve `GET /s/{token}/{path:path}`** (no session): resolve the token; reject
    unknown/expired/revoked with 404 (never 403, so a token's existence is not
    confirmed); resolve the path **inside the token's item prefix only** —
-   `<section>/<source>/<slug>/`, built from the stored triple — reusing the
-   existing path-allowlist and prefix-containment logic (SEAM-S8); stream bytes
-   with correct `Content-Type`.
+   `<section>/<source>/<slug>/_doc/`, built from the stored triple, with the empty
+   path serving the stored `entry` (SEAM-S1, as amended 2026-10-03: the item's
+   bytes live under `_doc/`, not the member frame) — reusing the existing
+   path-allowlist and prefix-containment logic (SEAM-S8); stream bytes with
+   correct `Content-Type` (so a `pdf` entry is served as a PDF, not HTML).
 6. **Caching (SEAM-S3).** Every `/s/**` and `/share/**` response carries
    `Cache-Control: private, no-store`. Add a test.
 7. **No credentials on `/s/**`**: accept no cookie/session; never mint one.
@@ -65,9 +70,10 @@ The owner's live mint/open/revoke (SEAM-S7) is a separate, owner-only step.
 The `gate` stream delivered the routes correctly but reported six open questions.
 These are the rulings; they bind the follow-up and every downstream stream.
 
-1. **The item prefix gains `section` (SEAM-S1).** The store keeps
-   `(section, source, slug)`; `_share_item_prefix` returns
-   `<section>/<source>/<slug>`. The section is validated with the same segment
+1. **The item prefix gains `section` (SEAM-S1), and the served root is the
+   item's `_doc/` namespace.** The store keeps `(section, source, slug)`;
+   `_share_item_prefix` returns `<section>/<source>/<slug>/_doc`. The section is
+   validated with the same segment
    allowlist as source/slug (`safe_prefix`), single segment for `section` and
    `source`, and is **not** restricted to a hardcoded enum — the gate cannot own
    the hub's section set, and an object that does not exist still 404s. This is
@@ -88,3 +94,9 @@ These are the rulings; they bind the follow-up and every downstream stream.
    answer only on `*.run.app`; the Wave 3 merge carries both.
 6. **Token collision on `set` is accepted**, defended only by 256-bit entropy.
    Recorded, not changed.
+7. **`entry` names the item's document** (2026-10-03, site follow-up). Store it;
+   mint accepts it (default `index.html` if absent, so the API and old clients
+   keep working); list returns it; `GET /s/{token}/` serves `_doc/<entry>`. It is
+   validated as a relative object path with the same segment allowlist and
+   prefix containment as any served path, so it cannot escape `_doc/`. This is
+   what lets a `pdf` item be shared as a PDF rather than as `index.html`.

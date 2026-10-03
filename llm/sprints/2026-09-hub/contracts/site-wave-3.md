@@ -75,8 +75,51 @@ Do NOT touch `gate/**` or `infra/**`; those are other streams.
 `npm run check:private-links`; `npm run check:smoke-routes`; governance
 `--layout`. Record exact counts.
 
+## Addendum — the share-servable document (`_doc/`), 2026-10-03
+
+The Dissenter's Wave 3 D1 found that a share serving the member frame
+`<section>/<source>/<slug>/index.html` is broken and leaks: the frame carries the
+members' nav (every private item title) and absolute `/p/…` links. SEAM-S1 is
+amended so the share prefix is `<section>/<source>/<slug>/_doc/`. The `site`
+stream stages that namespace; the `gate` stream serves it.
+
+8. **Stage `_doc/` for every effectively-private item.** Add an item-scoped
+   staging plan (do not change `stagingPlanFor`'s public behaviour) that, for a
+   private item, copies into `<section>/<source>/<slug>/_doc/`:
+   - the item's own document (`path`) **under its own filename** (do NOT rename
+     it: a `pdf` renamed to `index.html` would be served as HTML);
+   - every non-document file (assets: css/js/images/fonts, and any
+     non-`.html/.htm` file) from the document's containing directory, preserving
+     relative structure;
+   - a document declared by **another** item of the same source is excluded, so
+     one token reaches one item. A prefix-root item stages its whole subtree
+     except sibling-declared documents. Record the residual: a withdrawn item's
+     shared non-document asset may still travel (C28).
+   `_doc` is a reserved hub segment (SEAM-S1); the build must still refuse a
+   manifest whose `source`/`slug` is `_doc`.
+8b. **The Shares page supplies `entry`.** The page passes its effectively-private
+   items' `{section, source, slug, entry, title}` (entry = `basename(path)`) to
+   the island; the mint form selects a real item and `POST /share`s
+   `{section, source, slug, entry, expires_in_days}`. A free-text fallback may
+   remain but must send an `entry`.
+9. **Keep the member frame unchanged.** `<section>/<source>/<slug>/index.html`
+   and `_payload/<source>/…` remain for members exactly as they are. The new
+   `_doc/` tree is additive.
+10. **`check:private-links` must treat `_doc/**` as satellite bytes**, the way it
+    treats `_payload/**` (no off-origin sub-resource, no base escape inside the
+    tree), and stay green.
+11. **Tests:** unit-test the item-scoped plan (sibling-declared documents
+    excluded; entry kept under its basename; assets kept; a prefix-root single
+    item keeps its whole site) against the phd fixture (`site/committee.html`,
+    `site/index.html`, `site/internal.html`, `assets/style.css`), and assert the
+    built `dist-private` contains
+    `phd/phd-milestones/committee-dossier/_doc/index.html` plus its asset and
+    does NOT contain a sibling document under that `_doc/`.
+
 ## Exit
 
-Rewrites present; island renders in `dist-private` and is absent from
-`dist-public`; owner controls gated on `GET /share` red→green; all checks green.
-The owner's live mint/open/revoke (SEAM-S7) is a separate, owner-only step.
+Rewrites present (`/share`, `/share/**`, `/s/**`); island renders in
+`dist-private` and is absent from `dist-public`; owner controls gated on
+`GET /share` red→green; `_doc/` staged item-scoped and self-contained; all checks
+green. The owner's live mint/open/revoke (SEAM-S7) is a separate, owner-only
+step.
