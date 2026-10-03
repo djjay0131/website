@@ -43,20 +43,34 @@ PRIVATE_OBJECTS = {
     "phd/milestones/index.html": b"<h1>Milestone tracker</h1>",
     "phd/committee-dossier/index.html": b"<h1>Committee dossier</h1>",
     "assets/private.css": b"body{color:#0F5C5A}",
-    # The same items as a share sees them. The private build addresses an item
-    # at `<section>/<source>/<slug>/` (`frame-content.mjs: routeFor`), so a
-    # share of ("phd", "phd-milestones", "committee-dossier") reaches exactly
-    # this subtree and nothing beside it.
-    "phd/phd-milestones/committee-dossier/index.html": b"<h1>Committee dossier</h1>",
-    "phd/phd-milestones/committee-dossier/notes.html": b"<p>Private notes</p>",
-    "phd/phd-milestones/milestones/index.html": b"<h1>Milestone tracker</h1>",
-    "phd/phd-milestones/milestones/private.css": b"body{color:#0F5C5A}",
-    "cv/cv/academic/index.html": b"<h1>Academic CV</h1>",
+    # The same items as a share sees them. SEAM-S1 was amended 2026-10-03: a
+    # share serves the item's self-contained `_doc/` namespace, NOT the member
+    # frame at `<section>/<source>/<slug>/`, so a token for ("phd",
+    # "phd-milestones", "committee-dossier") reaches exactly
+    # `phd/phd-milestones/committee-dossier/_doc/` and nothing beside it.
+    "phd/phd-milestones/committee-dossier/_doc/index.html": b"<h1>Committee dossier</h1>",
+    "phd/phd-milestones/committee-dossier/_doc/private.css": b"body{color:#0F5C5A}",
+    # A non-HTML entry and a non-`index.html` document entry. The stored `entry`
+    # names the file the token root serves, so the object's real content type
+    # wins: a `pdf` entry is served as `application/pdf`, not `text/html` over
+    # PDF bytes (SEAM-S1, amended again 2026-10-03).
+    "phd/phd-milestones/committee-dossier/_doc/anthropic-fellow.pdf": b"%PDF-1.4\n%fake pdf bytes\n",
+    "phd/phd-milestones/committee-dossier/_doc/dossier.html": b"<h1>Dossier entry</h1>",
+    "phd/phd-milestones/milestones/_doc/index.html": b"<h1>Milestone tracker</h1>",
+    "phd/phd-milestones/milestones/_doc/private.css": b"body{color:#0F5C5A}",
+    "cv/cv/academic/_doc/index.html": b"<h1>Academic CV</h1>",
+    # The member frame and the payload namespace exist in the bucket for a
+    # member under /p/, but they sit OUTSIDE any token's `_doc/` prefix: the
+    # frame carries the whole private nav, and the payload is a sibling of the
+    # item directory. A share must reach neither.
+    "phd/phd-milestones/committee-dossier/index.html": b"<h1>Member frame (must not serve)</h1>",
+    "phd/phd-milestones/committee-dossier/_payload/hidden.html": b"<h1>Item payload (must not serve)</h1>",
+    "_payload/phd-milestones/site/committee.html": b"<h1>Shared payload (must not serve)</h1>",
     # Siblings the committee-dossier token must never reach: the same source
     # under a DIFFERENT section (`projects`), and a slug that extends the
     # token's slug by a string prefix (`committee-dossier-evil`).
-    "projects/phd-milestones/internal-notes/index.html": b"<h1>Internal notes</h1>",
-    "phd/phd-milestones/committee-dossier-evil/index.html": b"<h1>Evil sibling</h1>",
+    "projects/phd-milestones/internal-notes/_doc/index.html": b"<h1>Internal notes</h1>",
+    "phd/phd-milestones/committee-dossier-evil/_doc/index.html": b"<h1>Evil sibling</h1>",
 }
 
 HOSTING_HEADERS = {

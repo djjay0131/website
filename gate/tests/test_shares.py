@@ -63,6 +63,8 @@ def _mint_headers(transport, session):
 
 
 def _mint(client, transport, session, **overrides):
+    # `entry` is deliberately absent by default: most tests exercise the
+    # `index.html` default, and a test that wants another entry adds it here.
     body = {
         "section": OWNER_ITEM[0],
         "source": OWNER_ITEM[1],
@@ -79,7 +81,15 @@ def _mint_ok(client, transport, session, **overrides) -> str:
     return response.json()["token"]
 
 
-def _seed(shares, token: str, *, days: int = 14, revoked: bool = False, item=OWNER_ITEM) -> None:
+def _seed(
+    shares,
+    token: str,
+    *,
+    days: int = 14,
+    revoked: bool = False,
+    item=OWNER_ITEM,
+    entry: str = "index.html",
+) -> None:
     now = datetime.now(UTC)
     shares.create(
         Share(
@@ -87,6 +97,7 @@ def _seed(shares, token: str, *, days: int = 14, revoked: bool = False, item=OWN
             section=item[0],
             source=item[1],
             slug=item[2],
+            entry=entry,
             exp=now + timedelta(days=days),
             revoked=revoked,
             created_by=MEMBER_EMAIL,
@@ -123,7 +134,7 @@ def test_the_minted_share_serves_its_item_without_a_session(client, member_sessi
     response = client.get(f"/s/{token}/index.html", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/index.html"]
+    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"]
     assert response.headers["content-type"].startswith("text/html")
 
 
@@ -133,7 +144,57 @@ def test_a_share_directory_request_serves_the_entry_document(client, member_sess
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/index.html"]
+    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"]
+
+
+def test_the_empty_path_serves_the_stored_entry_not_index_html(client, member_session, transport):
+    """SEAM-S1, amended again 2026-10-03: the token root serves `_doc/<entry>`."""
+    token = _mint_ok(client, transport, member_session, entry="dossier.html")
+
+    response = client.get(f"/s/{token}/", headers=request_headers(transport))
+
+    assert response.status_code == 200
+    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/dossier.html"]
+    assert response.headers["content-type"].startswith("text/html")
+
+
+def test_a_pdf_entry_is_served_as_a_pdf(client, member_session, transport):
+    """A `pdf` entry must not be mangled to `text/html` -- the bug `entry` fixes."""
+    token = _mint_ok(client, transport, member_session, entry="anthropic-fellow.pdf")
+
+    response = client.get(f"/s/{token}/", headers=request_headers(transport))
+
+    assert response.status_code == 200
+    assert (
+        response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/anthropic-fellow.pdf"]
+    )
+    assert response.headers["content-type"].startswith("application/pdf")
+
+    # The same object is reachable by its own name, also as a PDF.
+    named = client.get(f"/s/{token}/anthropic-fellow.pdf", headers=request_headers(transport))
+    assert named.status_code == 200
+    assert named.headers["content-type"].startswith("application/pdf")
+
+
+def test_entry_may_be_several_segments(client, member_session, transport):
+    """Ruling 7: `entry` may be several segments (e.g. `site/index.html`)."""
+    _mint_ok(client, transport, member_session, entry="site/index.html")
+
+    listed = client.get("/share", headers=request_headers(transport, {"__session": member_session}))
+
+    assert listed.status_code == 200
+    assert listed.json()["shares"][0]["entry"] == "site/index.html"
+
+
+def test_entry_defaults_to_index_html_when_omitted(client, member_session, transport):
+    """Ruling 7: the field defaults, so existing clients keep working."""
+    token = _mint_ok(client, transport, member_session)
+
+    listed = client.get("/share", headers=request_headers(transport, {"__session": member_session}))
+    assert listed.json()["shares"][0]["entry"] == "index.html"
+
+    response = client.get(f"/s/{token}/", headers=request_headers(transport))
+    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"]
 
 
 def test_a_share_serves_a_subpath_with_the_right_content_type(client, member_session, transport):
@@ -142,7 +203,7 @@ def test_a_share_serves_a_subpath_with_the_right_content_type(client, member_ses
     response = client.get(f"/s/{token}/private.css", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/milestones/private.css"]
+    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/milestones/_doc/private.css"]
     assert response.headers["content-type"].startswith("text/css")
 
 
@@ -316,6 +377,13 @@ def test_mint_and_revoke_refuse_everything_when_no_origin_is_configured(deps, me
         {"slug": "a//b"},
         {"slug": "/absolute"},
         {"slug": None},
+        {"entry": "../secrets"},
+        {"entry": "/etc/passwd"},
+        {"entry": ""},
+        {"entry": None},
+        {"entry": "a//b"},
+        {"entry": "a/b/../c"},
+        {"entry": 5},
         {"expires_in_days": 0},
         {"expires_in_days": 31},
         {"expires_in_days": -1},
@@ -387,7 +455,7 @@ def test_a_share_refuses_traversal_and_never_touches_the_bucket(
 @pytest.mark.parametrize("hostile", HOSTILE_RAW)
 def test_safe_object_path_with_an_item_prefix_refuses_raw_traversal(hostile):
     with pytest.raises(UnsafePath):
-        safe_object_path(hostile, "phd/phd-milestones/committee-dossier")
+        safe_object_path(hostile, "phd/phd-milestones/committee-dossier/_doc")
 
 
 def test_a_share_cannot_reach_a_second_item(client, member_session, transport):
@@ -398,10 +466,10 @@ def test_a_share_cannot_reach_a_second_item(client, member_session, transport):
 
     served = client.get(f"/s/{token}/index.html", headers=request_headers(transport))
     assert served.status_code == 200
-    assert served.content == PRIVATE_OBJECTS["cv/cv/academic/index.html"]
+    assert served.content == PRIVATE_OBJECTS["cv/cv/academic/_doc/index.html"]
 
     sibling = client.get(
-        f"/s/{token}/phd/phd-milestones/committee-dossier/index.html",
+        f"/s/{token}/phd/phd-milestones/committee-dossier/_doc/index.html",
         headers=request_headers(transport),
     )
     assert sibling.status_code == 404
@@ -419,7 +487,8 @@ def test_a_token_cannot_reach_a_sibling_section(client, store, member_session, t
     store.fetches.clear()
 
     sibling = client.get(
-        f"/s/{token}/%2e%2e%2f%2e%2e%2fprojects%2fphd-milestones%2finternal-notes%2findex.html",
+        f"/s/{token}/%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fprojects%2fphd-milestones"
+        "%2finternal-notes%2f_doc%2findex.html",
         headers=request_headers(transport),
     )
 
@@ -438,7 +507,7 @@ def test_a_token_cannot_reach_a_prefix_extended_slug(client, store, member_sessi
     store.fetches.clear()
 
     sibling = client.get(
-        f"/s/{token}/%2e%2e%2fcommittee-dossier-evil%2findex.html",
+        f"/s/{token}/%2e%2e%2f%2e%2e%2fcommittee-dossier-evil%2f_doc%2findex.html",
         headers=request_headers(transport),
     )
 
@@ -450,7 +519,9 @@ def test_a_token_cannot_reach_a_prefix_extended_slug(client, store, member_sessi
 def test_safe_object_path_keeps_the_prefix_segment_bounded():
     """A prefix-string overlap is refused by the segment allowlist, not by luck."""
     with pytest.raises(UnsafePath):
-        safe_object_path("../committee-dossier-evil/index.html", "phd/phd-milestones/committee-dossier")
+        safe_object_path(
+            "../committee-dossier-evil/_doc/index.html", "phd/phd-milestones/committee-dossier/_doc"
+        )
 
 
 def test_a_corrupt_stored_section_is_refused(client, shares, transport):
@@ -471,7 +542,65 @@ def test_a_share_path_is_confined_to_the_token_prefix(client, store, member_sess
     response = client.get(f"/s/{token}/assets/private.css", headers=request_headers(transport))
 
     assert response.status_code == 404
-    assert store.fetches == ["phd/phd-milestones/committee-dossier/assets/private.css"]
+    assert store.fetches == ["phd/phd-milestones/committee-dossier/_doc/assets/private.css"]
+
+
+def test_the_member_frame_is_unreachable_with_zero_bucket_fetches(client, store, member_session, transport):
+    """SEAM-S1 as amended: a token serves `_doc/`, never the member frame.
+
+    `<section>/<source>/<slug>/index.html` is the members' frame -- the whole
+    private nav plus absolute `/p/...` links -- and exists in the bucket. The
+    token prefix ends at `_doc`, so the only route to the frame is traversal,
+    and that is refused before any bucket read.
+    """
+    token = _mint_ok(client, transport, member_session)
+    store.fetches.clear()
+
+    frame = client.get(f"/s/{token}/%2e%2e%2findex.html", headers=request_headers(transport))
+
+    assert frame.status_code == 404
+    assert b"Member frame" not in frame.content
+    assert store.fetches == []
+
+
+def test_the_payload_namespace_is_unreachable_with_zero_bucket_fetches(
+    client, store, member_session, transport
+):
+    """`_payload/**` is a sibling of the item directory, outside every `_doc/`.
+
+    `/_payload/<source>/...` carries the document bytes for members, and the
+    item's own `_payload/` is a sibling of its `_doc/`. A share holder reaches
+    only the staged `_doc/` copy, so traversal toward either is refused before
+    any bucket read.
+    """
+    token = _mint_ok(client, transport, member_session)
+    store.fetches.clear()
+
+    attempts = [
+        f"/s/{token}/%2e%2e%2f_payload%2fhidden.html",
+        f"/s/{token}/%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f_payload%2fphd-milestones%2fsite%2fcommittee.html",
+    ]
+    for url in attempts:
+        response = client.get(url, headers=request_headers(transport))
+
+        assert response.status_code == 404
+        assert b"must not serve" not in response.content
+        assert store.fetches == []
+
+
+def test_a_token_cannot_reach_a_sibling_items_doc(client, store, member_session, transport):
+    """One token reaches one item: the sibling item's `_doc/` is never served."""
+    token = _mint_ok(client, transport, member_session)
+    store.fetches.clear()
+
+    sibling = client.get(
+        f"/s/{token}/%2e%2e%2fmilestones%2f_doc%2findex.html",
+        headers=request_headers(transport),
+    )
+
+    assert sibling.status_code == 404
+    assert b"Milestone tracker" not in sibling.content
+    assert store.fetches == []
 
 
 # --- Caching (SEAM-S3) -----------------------------------------------------
@@ -521,6 +650,7 @@ def test_the_list_never_returns_the_full_token(client, member_session, transport
     assert rows[0]["section"] == OWNER_ITEM[0]
     assert rows[0]["source"] == OWNER_ITEM[1]
     assert rows[0]["slug"] == OWNER_ITEM[2]
+    assert rows[0]["entry"] == "index.html"
     assert rows[0]["created_by"] == MEMBER_EMAIL
     assert "token" not in rows[0]
 

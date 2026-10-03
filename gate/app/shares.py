@@ -4,7 +4,13 @@ Design doc §6 responsibility 4 and `phase-4-seams.md` SEAM-S1..S3. A share name
 ONE item by `(section, source, slug)` and stores it at Firestore
 `shares/{token}`:
 
-    { section, source, slug, exp, revoked, created_by, created_at }
+    { section, source, slug, entry, exp, revoked, created_by, created_at }
+
+`entry` is the item's document filename **relative to `_doc/`** -- the basename
+of the manifest's `path` (`committee.html`, `anthropic-fellow.pdf`), possibly
+several segments (`site/index.html`). It is what `GET /s/{token}/` serves, so a
+`pdf` item is returned as a PDF rather than as `index.html` (SEAM-S1, amended
+again 2026-10-03).
 
 The token is the document id and is minted with `secrets.token_urlsafe(32)` --
 256 bits, twice the brief's floor. `exp` is computed on the server and
@@ -55,6 +61,7 @@ class Share:
     section: str
     source: str
     slug: str
+    entry: str
     exp: datetime
     revoked: bool
     created_by: str
@@ -86,16 +93,18 @@ def _share_from_document(token: str, data: dict[str, Any]) -> Share | None:
     """Build a Share from a Firestore document, or None if it is malformed.
 
     A document missing a field is refused rather than defaulted: a share with an
-    unknown expiry is not a share, and defaulting `revoked` to False would serve
+    unknown expiry is not a share, defaulting `entry` to `index.html` would serve
+    the wrong bytes for a `pdf`, and defaulting `revoked` to False would serve
     bytes a corrupt row never granted.
     """
     section = data.get("section")
     source = data.get("source")
     slug = data.get("slug")
+    entry = data.get("entry")
     created_by = data.get("created_by")
     exp = data.get("exp")
     created_at = data.get("created_at")
-    if not all(isinstance(value, str) and value for value in (section, source, slug, created_by)):
+    if not all(isinstance(value, str) and value for value in (section, source, slug, entry, created_by)):
         return None
     if not isinstance(exp, datetime) or not isinstance(created_at, datetime):
         return None
@@ -104,6 +113,7 @@ def _share_from_document(token: str, data: dict[str, Any]) -> Share | None:
         section=section,
         source=source,
         slug=slug,
+        entry=entry,
         exp=exp,
         revoked=bool(data.get("revoked", False)),
         created_by=created_by,
@@ -141,6 +151,7 @@ class FirestoreShareStore:
                 "section": share.section,
                 "source": share.source,
                 "slug": share.slug,
+                "entry": share.entry,
                 "exp": share.exp,
                 "revoked": share.revoked,
                 "created_by": share.created_by,

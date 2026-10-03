@@ -15,10 +15,10 @@ The gate implements §6 responsibilities 1–4, and only those:
 | `POST /session` | Verify a Firebase ID token, mint a 14-day session cookie |
 | `POST /session/end` | Sign out: clear `__session`. Origin-checked; identical whether or not a session existed |
 | `GET /p/{path}` | Verify the session, check the allowlist, stream the object |
-| `POST /share` | **Owner only**, origin-checked. Mint a token for one `(section, source, slug)`; body `{section, source, slug, expires_in_days}`; returns `{token, expires_at, url}`. `expires_in_days` is capped at 30; a bad item or expiry is 400, a non-owner is 403 |
-| `GET /share` | **Owner only**. List active shares. Never returns a full token — a short display id (`id`) plus `section`, `source`, `slug`, `created_by`, `expires_at` |
+| `POST /share` | **Owner only**, origin-checked. Mint a token for one `(section, source, slug)`; body `{section, source, slug, entry, expires_in_days}`; returns `{token, expires_at, url}`. `entry` names the item's document relative to `_doc/` and defaults to `index.html` when omitted; it is validated with the same segment allowlist as a served path. `expires_in_days` is capped at 30; a bad item, entry or expiry is 400, a non-owner is 403 |
+| `GET /share` | **Owner only**. List active shares. Never returns a full token — a short display id (`id`) plus `section`, `source`, `slug`, `entry`, `created_by`, `expires_at` |
 | `DELETE /share/{token}` | **Owner only**, origin-checked. Revoke. Idempotent |
-| `GET /s/{token}/{path}` | **No session.** Serve the token's one item's file inside that item's `<section>/<source>/<slug>/` prefix. Unknown, expired and revoked are all 404; a path that leaves the prefix is 404 |
+| `GET /s/{token}/{path}` | **No session.** Serve the token's one item's file inside that item's `<section>/<source>/<slug>/_doc/` prefix — the item-scoped document namespace, never the member frame. The empty path serves the stored `entry` (`_doc/<entry>`); a non-empty path resolves inside the prefix. Unknown, expired and revoked are all 404; a path that leaves the prefix is 404 |
 | `GET /_health` | Deploy verification; reveals nothing. **Not** `/healthz`: that path never reaches the container on Cloud Run (Google's frontend answers it), verified at Checkpoint 4. |
 
 `tests/test_scope.py` asserts the route table exactly, so a new route cannot
@@ -27,13 +27,24 @@ appear without a test and a README entry.
 ## Sharing
 
 A share is one item by `(section, source, slug)`, stored at Firestore
-`shares/{token}` with `{section, source, slug, exp, revoked, created_by,
-created_at}` (SEAM-S1; Lead Architect ruling 1). The private build addresses an
-item at `<section>/<source>/<slug>/` (`site/src/lib/frame-content.mjs: routeFor`,
-e.g. `phd/phd-milestones/committee-dossier/`), so the full triple is stored; the
-gate cannot derive the section from the bucket. The token is the document id,
-minted with `secrets.token_urlsafe(32)` — 256 bits. `exp` is computed server-side
-and the client may ask for at most 30 days.
+`shares/{token}` with `{section, source, slug, entry, exp, revoked, created_by,
+created_at}` (SEAM-S1; Lead Architect rulings 1 and 7). The private build
+addresses an item's *member frame* at `<section>/<source>/<slug>/`
+(`site/src/lib/frame-content.mjs: routeFor`, e.g.
+`phd/phd-milestones/committee-dossier/`), but that directory carries the
+members' navigation and absolute `/p/...` links, not the item's bytes. The
+item's self-contained, item-scoped document copy is staged at
+`<section>/<source>/<slug>/_doc/`, so that is where a token is pointed (SEAM-S1,
+amended 2026-10-03); the full triple is stored and the gate cannot derive the
+section from the bucket. `entry` is the item's document filename **relative to
+`_doc/`** (`committee.html`, `anthropic-fellow.pdf`, possibly several segments
+such as `site/index.html`); `GET /s/{token}/` serves `_doc/<entry>`, so a `pdf`
+item is returned as a PDF rather than as `index.html` (SEAM-S1, amended again
+2026-10-03). `entry` defaults to `index.html` when the mint body omits it, and
+is validated with the same segment allowlist and prefix containment as any
+served path, so it cannot escape `_doc/`. The token is the document id, minted
+with `secrets.token_urlsafe(32)` — 256 bits. `exp` is computed server-side and
+the client may ask for at most 30 days.
 
 Minting, listing and revoking are **owner only**: a verified email that is still
 on the allowlist **and** whose member document carries `role: owner`
@@ -43,11 +54,14 @@ same allowed-origin check as `/session/end`; listing is a read and does not.
 `GET /s/**` needs no session and no origin check, and the handler never reads
 the cookie and never calls `set_cookie` — a share link is opened in a fresh
 browser. Authorisation is the token plus its stored item prefix
-(`<section>/<source>/<slug>/`), and the served path is resolved with the same
-allowlist and containment logic `/p/**` uses (`safe_object_path(path, prefix)`),
-so a share
-cannot leave its own item (SEAM-S8). An unknown, expired or revoked token is a
-404, never a 403, so the gate does not confirm a token exists.
+(`<section>/<source>/<slug>/_doc/`), and the served path is resolved with the
+same allowlist and containment logic `/p/**` uses
+(`safe_object_path(path, prefix)`), so a share cannot leave its own item
+(SEAM-S8); the member frame and `_payload/**` sit outside that prefix and are
+unreachable. The token root (the empty path) serves the stored `entry` at
+`_doc/<entry>`; every other path resolves inside the prefix as before. An
+unknown, expired or revoked token is a 404, never a 403, so the gate does not
+confirm a token exists.
 
 ## The two things most likely to make a correct-looking gate wrong
 

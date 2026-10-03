@@ -7,8 +7,8 @@
   4. Share links     -- POST/GET /share and DELETE /share/{token} (owner only,
                         origin-checked where state changes) mint, list and revoke
                         a bounded grant for one item; GET /s/{token}/{path} serves
-                        that item's files with no session, resolving the path
-                        inside the token's item prefix only (SEAM-S1..S3).
+                        that item's `_doc/` files with no session, resolving the
+                        path inside the token's item prefix only (SEAM-S1..S3).
 
 Two properties are worth stating up front, because both are easy to break
 without any test going red (ADR-0004):
@@ -40,7 +40,14 @@ from . import pages
 from .auth import FirebaseTokenVerifier, Principal, TokenRejected, TokenVerifier
 from .config import ALLOWED_ORIGINS_VAR, SESSION_COOKIE_NAME, Settings, load_settings, parse_origin
 from .members import FirestoreMemberDirectory, MemberDirectory
-from .serve import GcsObjectStore, ObjectStore, UnsafePath, safe_object_path, safe_prefix
+from .serve import (
+    INDEX_DOCUMENT,
+    GcsObjectStore,
+    ObjectStore,
+    UnsafePath,
+    safe_object_path,
+    safe_prefix,
+)
 from .shares import (
     MAX_SHARE_DAYS,
     MIN_SHARE_DAYS,
@@ -523,13 +530,14 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         section = payload.get("section")
         source = payload.get("source")
         slug = payload.get("slug")
+        entry = _share_entry(payload)
         days = payload.get("expires_in_days")
         prefix = (
             _share_item_prefix(section, source, slug)
             if isinstance(section, str) and isinstance(source, str) and isinstance(slug, str)
             else None
         )
-        if prefix is None or not _valid_days(days):
+        if prefix is None or entry is None or not _valid_days(days):
             logger.info("event=reject scope=share reason=invalid_item")
             return JSONResponse({"status": "invalid_request"}, status_code=400)
 
@@ -539,17 +547,21 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             section=section,
             source=source,
             slug=slug,
+            entry=entry,
             exp=expiry_from_days(days, now=now),
             revoked=False,
             created_by=principal.email,
             created_at=now,
         )
         deps.shares.create(share)
+        # The item triple and the document filename are private material and are
+        # NOT logged: the gate keeps object paths out of logs
+        # (GATE_LOG_OBJECT_PATHS), and a share's section/source/slug/entry is
+        # exactly such a path. The short id names the row without naming the
+        # item. (Dissenter Wave 3 D5.)
         logger.info(
-            "event=allow scope=share action=mint item=%s/%s/%s by=%s",
-            share.section,
-            share.source,
-            share.slug,
+            "event=allow scope=share action=mint id=%s by=%s",
+            _short_share_id(share.token),
             principal.email,
         )
         return JSONResponse(
@@ -580,6 +592,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
                         "section": share.section,
                         "source": share.source,
                         "slug": share.slug,
+                        "entry": share.entry,
                         "created_by": share.created_by,
                         "expires_at": share.exp.isoformat(),
                     }
@@ -629,6 +642,15 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             return _html(pages.NOT_FOUND, 404)
         if deps.settings.private_prefix:
             prefix = f"{deps.settings.private_prefix}/{prefix}"
+
+        # The token root (the empty path) serves the item's stored `entry`
+        # document rather than the old hardcoded `index.html`. `entry` is the
+        # item's filename relative to `_doc/` (SEAM-S1, amended again
+        # 2026-10-03), so a `pdf` item is returned as a PDF. A non-empty path
+        # resolves as before; a corrupt or traversal `entry` is still refused by
+        # `safe_object_path` below, which re-validates it inside the prefix.
+        if path == "":
+            path = share.entry
 
         try:
             name = safe_object_path(path, prefix)
@@ -898,6 +920,26 @@ def _valid_days(value: object) -> bool:
     )
 
 
+def _share_entry(payload: dict) -> str | None:
+    """The mint body's `entry`: the item's document filename relative to `_doc/`.
+
+    Absent defaults to `index.html`, so the API and existing clients stay usable
+    without the field (Lead Architect ruling 7). A value that is present but not
+    a plain relative object path -- empty, absolute, `..`, an illegal segment --
+    is refused rather than defaulted, because silently serving `index.html` for a
+    mistyped `pdf` is the bug this field exists to fix. Validation reuses
+    `safe_prefix`, the same segment allowlist a served path passes; `entry` may
+    be several segments (`site/index.html`).
+    """
+    raw = payload.get("entry", INDEX_DOCUMENT)
+    if not isinstance(raw, str):
+        return None
+    try:
+        return safe_prefix(raw)
+    except UnsafePath:
+        return None
+
+
 def _is_owner(principal: Principal, deps: Dependencies) -> bool:
     """May this principal manage shares?
 
@@ -914,15 +956,21 @@ def _is_owner(principal: Principal, deps: Dependencies) -> bool:
 
 
 def _share_item_prefix(section: str, source: str, slug: str) -> str | None:
-    """The object prefix a token may reach: `<section>/<source>/<slug>`, or None.
+    """The object prefix a token may reach: `<section>/<source>/<slug>/_doc`, or None.
 
     Validated with `safe_prefix`, the same segment allowlist a served path
     passes. `section` and `source` must each be a single segment (`source:
     "a/b"` would let one token's prefix overlap another's); `slug` may be
-    several, because the hub's slugs are (`hub/research/soa-agentic-se`). The
-    private build addresses an item at exactly `<section>/<source>/<slug>/`
-    (`site/src/lib/frame-content.mjs: routeFor`), which is why the section is
-    stored and served rather than derived.
+    several, because the hub's slugs are (`hub/research/soa-agentic-se`).
+
+    The stored item address is `<section>/<source>/<slug>/`
+    (`site/src/lib/frame-content.mjs: routeFor`), but that directory holds the
+    hub's *member frame* -- members' navigation and absolute `/p/...` links --
+    not the item's bytes. A share holder is signed out, so serving the frame
+    would render empty and disclose every private item's title. SEAM-S1 (amended
+    2026-10-03) therefore confines a token to the item's self-contained
+    document namespace, `<section>/<source>/<slug>/_doc/`; the section is stored
+    so this prefix can be built without a bucket `list`.
     """
     try:
         clean_section = safe_prefix(section)
@@ -932,7 +980,7 @@ def _share_item_prefix(section: str, source: str, slug: str) -> str | None:
         return None
     if "/" in clean_section or "/" in clean_source:
         return None
-    return f"{clean_section}/{clean_source}/{clean_slug}"
+    return f"{clean_section}/{clean_source}/{clean_slug}/_doc"
 
 
 def _share_url(settings: Settings, token: str) -> str:
