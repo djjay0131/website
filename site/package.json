@@ -19,11 +19,13 @@
     "data:fetch": "./scripts/fetch-data.sh",
     "redirects:generate": "node scripts/generate-redirect-map.mjs",
     "redirects:check": "node scripts/generate-redirect-map.mjs --check",
+    "redirects:stubs": "node scripts/generate-redirect-stubs.mjs",
     "contrast": "node scripts/contrast.mjs",
     "check:smoke-routes": "node scripts/check-smoke-routes.mjs",
     "build:public": "HUB_OUTPUT=public astro build",
     "build:private": "HUB_OUTPUT=private SITE_BASE=/p/ astro build",
-    "check:no-private-in-public": "node scripts/check-no-private-in-public.mjs",
+    "search:index": "pagefind --site dist-public",
+    "check:no-private-in-public": "node scripts/check-no-private-in-public.mjs --stubs dist-redirects",
     "check:publish-allowlist": "node scripts/check-publish-allowlist.mjs",
     "check:npm-audit": "node scripts/check-npm-audit.mjs",
     "check:private-links": "node scripts/check-private-links.mjs",
@@ -33,6 +35,7 @@
   "dependencies": {
     "@astrojs/check": "^0.9.8",
     "@astrojs/react": "^7.0.0",
+    "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.2",
     "@citation-js/core": "^0.7.21",
     "@citation-js/plugin-bibtex": "^0.7.21",
@@ -50,6 +53,7 @@
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0"
+    "@types/react-dom": "^19.3.0",
+    "pagefind": "^1.5.2"
   }
 }

@@ -69,14 +69,39 @@
 // and distinctive; a title shorter than TITLE_MIN_LENGTH is skipped as a needle
 // and reported as a warning rather than silently trusted.
 //
-// DERIVED OUTPUTS COVERED. Every file under dist-public is walked, so this
-// covers the sitemap, robots.txt, the Astro redirect pages, the JSON payloads
-// the source explorers inline, every rendered page, and any future RSS or search
-// index -- provided they are text. See LIMITS below for what it does NOT cover.
+// DERIVED OUTPUTS COVERED (Wave 5, SEAM-P6). Every file under dist-public is
+// walked, so the derived outputs are covered by construction. Wave 5 names them
+// explicitly, because "walked" is not "understood", and a reader deserves to
+// know which files a future build could add without anyone noticing:
 //
-// LIMITS, STATED SO NOBODY MISTAKES THIS FOR A PROOF (ADR-0005 Risks):
+//   - the sitemap (sitemap.xml / sitemap-index.xml / sitemap-N.xml)
+//   - the RSS feed (rss.xml) and any other XML
+//   - the Pagefind index TEXT files: pagefind-entry.json and the JSON/JS/CSS
+//     bundles under pagefind/
+//   - the OG card (og-card.png bytes, og-card.svg text)
+//   - the redirect stubs (dist-redirects/**), scanned separately below
+//
+// THE SEARCH INDEX GETS A STRUCTURAL CHECK AS WELL (SEAM-P6). Pagefind's
+// `.pf_index` / `.pf_fragment` / `.pf_meta` files are gzip binaries, so the
+// contents scan cannot read them (see LIMITS). `checkSearchIndexScope` instead
+// decompresses every fragment and asserts each indexed URL is public-rooted,
+// is not under the private base `/p/`, and resolves to a file that exists in
+// dist-public. That is how "the index was built from dist-public only" is
+// checked rather than assumed.
+//
+// THE REDIRECT STUBS ARE SCANNED FOR TITLES AND SUMMARIES ONLY. A stub must
+// forward the LEGACY PATH (ADR-0020), and the committed map already names the
+// private fellowship paths — repeating a path that was public on the old site is
+// accepted, and the path slug is not a leak of the item's content. What must
+// never appear is the item's TITLE or SUMMARY, and `findRedirectStubLeaks`
+// asserts exactly that.
+//
+// LIMITS, STATED SO NO ONE MISTAKES THIS FOR A PROOF (ADR-0005 Risks):
 //   - Binary files are matched by PATH ONLY. A private title baked into an OG
-//     image, a renamed PDF's interior, or a compressed payload would pass.
+//     image's pixels, a renamed PDF's interior, or the gzip `.pf_*` Pagefind
+//     fragments would pass a contents scan. The OG card and the fragments are
+//     named here so the limit is explicit; the structural URL check above is the
+//     search index's second half, and it is not a contents scan.
 //   - Private text quoted into a public page WITHOUT its slug, title or summary
 //     would pass. Nothing mechanical can catch that.
 //   - A slug occurring in prose is deliberately not a match (above).
@@ -84,12 +109,16 @@
 //     needle by itself (Wave 4 FP-2, above). A leak that preserves only the
 //     source name and none of the qualified-id/route/payload-path/title/summary
 //     needles would pass; those needles are what bind the item.
+//   - A redirect stub's legacy path (which names the private slug) is not
+//     flagged; only its title/summary is. ADR-0020 accepts the path.
 // The bucket IAM test (§12.1, infra D8) is the other half of the guarantee, and
 // neither half is sufficient alone.
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { SOURCES_DIR, effectiveVisibility, readPublishAllowlist } from "../src/lib/hub-content.mjs";
+import { CANONICAL_ORIGIN } from "../src/lib/canonical-url.mjs";
 import { OUTPUT_DIRS } from "./site-output.mjs";
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -102,6 +131,17 @@ export const TEXT_EXTENSIONS = new Set([
   ".html", ".htm", ".xml", ".xhtml", ".txt", ".json", ".jsonld", ".webmanifest",
   ".js", ".mjs", ".cjs", ".css", ".map", ".svg", ".rss", ".atom", ".csv", ".md",
 ]);
+
+/**
+ * Extensions that are ALWAYS binary, whatever the NUL sniff would say (SEAM-P6).
+ *
+ * Pagefind's `.pf_index`, `.pf_fragment` and `.pf_meta` files are gzip streams.
+ * A small one might carry no NUL byte in its first 4 KiB and be misread as
+ * UTF-8, so the sniff alone is not a declaration. Naming them here pins the
+ * documented binary limit and keeps the contents scan from reading compressed
+ * noise as text.
+ */
+export const BINARY_EXTENSIONS = new Set([".pf_index", ".pf_fragment", ".pf_meta"]);
 
 // A needle counts as present only when both neighbours are delimiters -- markup,
 // URL or quoting punctuation. A space or a letter on either side means prose.
@@ -266,7 +306,9 @@ function walkFiles(dir, rel = "") {
 }
 
 function isTextFile(relFile, absFile) {
-  if (TEXT_EXTENSIONS.has(path.extname(relFile).toLowerCase())) return true;
+  const ext = path.extname(relFile).toLowerCase();
+  if (BINARY_EXTENSIONS.has(ext)) return false;
+  if (TEXT_EXTENSIONS.has(ext)) return true;
   // Extensionless or unknown: sniff for a NUL byte in the first 4 KiB.
   try {
     const fd = fs.openSync(absFile, "r");
@@ -355,15 +397,189 @@ export function findLeaks(distDir, items) {
 }
 
 // ---------------------------------------------------------------------------
+// THE DERIVED OUTPUTS, NAMED (Wave 5, SEAM-P6)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every derived output a public build can emit, by kind, for the ones present.
+ *
+ * This does not add coverage — `findLeaks` already walks every file — it makes
+ * the coverage legible. A missing kind (e.g. no RSS in a stripped build) is
+ * simply absent, not a fault.
+ *
+ * @param {string} distDir
+ * @returns {{kind: string, file: string}[]}
+ */
+export function listDerivedOutputs(distDir) {
+  const out = [];
+  const add = (kind, rel) => {
+    if (fs.existsSync(path.join(distDir, rel))) out.push({ kind, file: rel });
+  };
+  for (const rel of walkFiles(distDir)) {
+    if (/^sitemap[^/]*\.xml$/i.test(rel)) out.push({ kind: "sitemap", file: rel });
+    if (rel === "rss.xml" || rel === "feed.xml") out.push({ kind: "rss", file: rel });
+    if (rel === "og-card.png" || rel === "og-card.svg") out.push({ kind: "og-card", file: rel });
+    if (rel.startsWith("pagefind/") && /\.(json|js|mjs|cjs|css)$/i.test(rel)) {
+      out.push({ kind: "search-text", file: rel });
+    }
+  }
+  // `walkFiles` returns sorted order for directories but not guaranteed overall;
+  // sort so the report is stable across filesystems.
+  return out.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+}
+
+/** The `.pf_fragment` files of a Pagefind index, or [] when there is none. */
+export function searchIndexFragments(distDir) {
+  const dir = path.join(distDir, "pagefind", "fragment");
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((name) => name.endsWith(".pf_fragment"))
+    .map((name) => path.join(dir, name));
+}
+
+/** The URLs recorded in one gzip Pagefind fragment. */
+export function fragmentUrls(file) {
+  const raw = zlib.gunzipSync(fs.readFileSync(file)).toString("utf8");
+  const json = JSON.parse(raw.replace(/^pagefind_dcd/, ""));
+  return typeof json?.url === "string" ? [json.url] : [];
+}
+
+/**
+ * The STRUCTURAL half of "the search index was built from dist-public only"
+ * (SEAM-P6).
+ *
+ * A `.pf_*` fragment is gzip, so a private title inside it is invisible to the
+ * byte grep (the documented binary limit). This decompresses each fragment and
+ * asserts what the index CANNOT safely contain even then:
+ *
+ *   - no URL under the private base `/p/`;
+ *   - no off-origin URL (Pagefind emits root-relative URLs);
+ *   - every URL resolves to a file that exists in THIS dist-public.
+ *
+ * The last clause is the one that binds the index to this output: an index built
+ * by mistake from dist-private would name `/p/**` (caught) or paths absent from
+ * dist-public (caught).
+ *
+ * @param {string} distDir
+ * @returns {string[]} problems, empty when the index is absent or public-only
+ */
+export function checkSearchIndexScope(distDir) {
+  const problems = [];
+  const entry = path.join(distDir, "pagefind", "pagefind-entry.json");
+  if (!fs.existsSync(entry)) return problems; // no index in this build; not applicable
+
+  const fragments = searchIndexFragments(distDir);
+  if (fragments.length === 0) {
+    problems.push(
+      `pagefind/pagefind-entry.json exists but there are no .pf_fragment files under ` +
+        `pagefind/fragment/, so the index is incomplete and this check proves nothing.`,
+    );
+    return problems;
+  }
+
+  for (const file of fragments) {
+    const rel = path.relative(distDir, file).split(path.sep).join("/");
+    let urls;
+    try {
+      urls = fragmentUrls(file);
+    } catch (error) {
+      problems.push(`${rel} could not be read as a Pagefind fragment: ${error.message}`);
+      continue;
+    }
+    for (const url of urls) {
+      if (/^https?:\/\//i.test(url)) {
+        const parsed = new URL(url);
+        if (`${parsed.protocol}//${parsed.host}` !== CANONICAL_ORIGIN) {
+          problems.push(`${rel} indexes the off-origin URL ${url}`);
+          continue;
+        }
+      }
+      if (url === "/p/" || url.startsWith("/p/")) {
+        problems.push(
+          `${rel} indexes ${url}, which is under the private gate base /p/ — the index was ` +
+            `built from the private output, not dist-public (SEAM-P1).`,
+        );
+        continue;
+      }
+      const clean = url.split("#")[0].split("?")[0];
+      const relTarget = clean.replace(/^\/+/, "");
+      if (relTarget === "") continue; // the root page
+      const target = /^https?:\/\//i.test(clean) ? new URL(clean).pathname.replace(/^\/+/, "") : relTarget;
+      const absTarget = path.join(distDir, target);
+      const exists =
+        fs.existsSync(absTarget) &&
+        (fs.statSync(absTarget).isDirectory()
+          ? fs.existsSync(path.join(absTarget, "index.html"))
+          : true);
+      if (!exists) {
+        problems.push(
+          `${rel} indexes ${url}, which resolves to no file under dist-public — the index names ` +
+            `a page this build did not emit.`,
+        );
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * Every redirect stub that names a private item's TITLE or SUMMARY (SEAM-P6).
+ *
+ * DELIBERATELY NOT A FULL NEEDLE SCAN. A stub forwards the legacy path, and the
+ * committed map already names the private fellowship paths (ADR-0020 decision 5
+ * and its Risks). A path slug is therefore expected in the ARTIFACT that
+ * reproduces the old URLs; the guard's job is the one thing that must never
+ * appear there: the item's title or summary.
+ *
+ * @param {string} stubsDir
+ * @param {ReturnType<typeof collectPrivateItems>} items
+ * @returns {{file: string, kind: string, needle: string, item: string, context: string}[]}
+ */
+export function findRedirectStubLeaks(stubsDir, items) {
+  const leaks = [];
+  if (!fs.existsSync(stubsDir) || items.length === 0) return leaks;
+  const contentNeedles = items.map((item) => ({
+    item,
+    needles: needlesFor(item).filter((n) => n.kind.startsWith("title") || n.kind.startsWith("summary")),
+  }));
+
+  for (const relFile of walkFiles(stubsDir)) {
+    const absFile = path.join(stubsDir, relFile);
+    if (!isTextFile(relFile, absFile)) continue;
+    let text;
+    try {
+      text = fs.readFileSync(absFile, "utf8");
+    } catch {
+      continue;
+    }
+    for (const { item, needles } of contentNeedles) {
+      for (const needle of needles) {
+        if (!occurs(text, needle)) continue;
+        leaks.push({
+          file: relFile,
+          kind: needle.kind,
+          needle: needle.value,
+          item: `${item.source}/${item.slug}`,
+          context: snippet(text, needle.value),
+        });
+      }
+    }
+  }
+  return leaks;
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const args = { dist: null, sources: null, json: false };
+  const args = { dist: null, sources: null, stubs: null, json: false };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--json") args.json = true;
     else if (argv[i] === "--dist") args.dist = argv[++i];
     else if (argv[i] === "--sources") args.sources = argv[++i];
+    else if (argv[i] === "--stubs") args.stubs = argv[++i];
     else throw new Error(`unknown argument: ${argv[i]}`);
   }
   return args;
@@ -381,7 +597,16 @@ if (isMain) {
 
   const distDir = args.dist ? path.resolve(args.dist) : path.join(SITE_ROOT, OUTPUT_DIRS.public);
   const sourcesDir = args.sources ? path.resolve(args.sources) : path.join(SITE_ROOT, SOURCES_DIR);
+  let stubsDir = args.stubs ? path.resolve(args.stubs) : null;
+  if (stubsDir && !fs.existsSync(stubsDir)) {
+    console.warn(
+      `check:no-private-in-public: --stubs ${stubsDir} does not exist, so no redirect stubs were ` +
+        `scanned; run npm run redirects:stubs first to cover them.`,
+    );
+    stubsDir = null;
+  }
   const shownDist = path.relative(process.cwd(), distDir) || ".";
+  const shownStubs = stubsDir ? path.relative(process.cwd(), stubsDir) || "." : null;
 
   if (!fs.existsSync(distDir) || !fs.statSync(distDir).isDirectory()) {
     console.error(
@@ -393,12 +618,92 @@ if (isMain) {
   const items = collectPrivateItems(sourcesDir);
   const leaks = findLeaks(distDir, items);
   const warnings = weakNeedleWarnings(items);
+  const derived = listDerivedOutputs(distDir);
+  const scopeProblems = checkSearchIndexScope(distDir);
+  const stubLeaks = stubsDir ? findRedirectStubLeaks(stubsDir, items) : [];
 
   if (args.json) {
-    console.log(JSON.stringify({ dist: distDir, privateItems: items, leaks, warnings }, null, 2));
+    console.log(
+      JSON.stringify(
+        { dist: distDir, stubs: stubsDir, privateItems: items, leaks, stubLeaks, scopeProblems, derived, warnings },
+        null,
+        2,
+      ),
+    );
   }
 
   for (const w of warnings) console.warn(`check:no-private-in-public: WARNING ${w}`);
+
+  // The derived outputs the run is aware of (SEAM-P6), named rather than implied.
+  if (derived.length > 0) {
+    const byKind = new Map();
+    for (const { kind, file } of derived) {
+      if (!byKind.has(kind)) byKind.set(kind, []);
+      byKind.get(kind).push(file);
+    }
+    console.log(
+      `check:no-private-in-public: derived outputs scanned in ${shownDist}: ` +
+        `${[...byKind].map(([kind, files]) => `${kind} (${files.length})`).join(", ")}`,
+    );
+  }
+  if (shownStubs) {
+    console.log(
+      `check:no-private-in-public: redirect stubs scanned in ${shownStubs} ` +
+        `(title/summary needles only; paths are ADR-0020 legacy URLs)`,
+    );
+  }
+
+  // REPORT ALL PROBLEM CLASSES, THEN EXIT. An early exit on the first class
+  // hides the rest, and the demo plants into every derived output precisely so a
+  // single run proves the whole guard. The structural search-index assertion
+  // (SEAM-P6) is reported alongside the byte leaks.
+  const leakCount = leaks.length + stubLeaks.length;
+
+  if (leakCount > 0) {
+    console.error(
+      `\ncheck:no-private-in-public: ${leakCount} LEAK(S) of private content into the public ` +
+        `outputs:\n`,
+    );
+    for (const leak of leaks) {
+      console.error(`  ${leak.file}`);
+      console.error(`    ${leak.where}: ${leak.kind} of ${leak.item} — ${JSON.stringify(leak.needle)}`);
+      if (leak.where === "contents") console.error(`    …${leak.context}…`);
+      if (process.env.GITHUB_ACTIONS === "true") {
+        console.log(
+          `::error file=${leak.file}::private ${leak.kind} ${JSON.stringify(leak.needle)} ` +
+            `(${leak.item}) appears in the ${leak.where} of ${leak.file} under the PUBLIC output`,
+        );
+      }
+    }
+    for (const leak of stubLeaks) {
+      console.error(`  ${shownStubs}/${leak.file}  (redirect stub)`);
+      console.error(`    contents: ${leak.kind} of ${leak.item} — ${JSON.stringify(leak.needle)}`);
+      console.error(`    …${leak.context}…`);
+      if (process.env.GITHUB_ACTIONS === "true") {
+        console.log(
+          `::error file=${leak.file}::private ${leak.kind} ${JSON.stringify(leak.needle)} ` +
+            `(${leak.item}) appears in the redirect stub ${leak.file}`,
+        );
+      }
+    }
+    console.error(
+      `\nThe public output must not contain, name or link any private item (ADR-0005, design doc ` +
+        `§12.1). Nothing has been deployed.\n`,
+    );
+  }
+
+  if (scopeProblems.length > 0) {
+    console.error(
+      `\ncheck:no-private-in-public: ${scopeProblems.length} SEARCH-INDEX PROBLEM(S):\n`,
+    );
+    for (const problem of scopeProblems) console.error(`  ${problem}`);
+    console.error(
+      `\nThe Pagefind index must contain public, existing pages only, and be built from ` +
+        `dist-public (SEAM-P1). Nothing has been deployed.\n`,
+    );
+  }
+
+  if (leakCount > 0 || scopeProblems.length > 0) process.exit(1);
 
   // An empty private set is a real and expected state today -- phd-milestones
   // cannot publish until Checkpoint 4 -- but it means this run proved nothing.
@@ -421,31 +726,11 @@ if (isMain) {
     console.log(`  ${item.source}/${item.slug} — needles: ${kinds}`);
   }
 
-  if (leaks.length > 0) {
-    console.error(
-      `\ncheck:no-private-in-public: ${leaks.length} LEAK(S) of private content into ${shownDist}:\n`,
-    );
-    for (const leak of leaks) {
-      console.error(`  ${leak.file}`);
-      console.error(`    ${leak.where}: ${leak.kind} of ${leak.item} — ${JSON.stringify(leak.needle)}`);
-      if (leak.where === "contents") console.error(`    …${leak.context}…`);
-      if (process.env.GITHUB_ACTIONS === "true") {
-        console.log(
-          `::error file=${leak.file}::private ${leak.kind} ${JSON.stringify(leak.needle)} ` +
-            `(${leak.item}) appears in the ${leak.where} of ${leak.file} under the PUBLIC output`,
-        );
-      }
-    }
-    console.error(
-      `\nThe public output must not contain, name or link any private item (ADR-0005, design doc ` +
-        `§12.1). Nothing has been deployed.\n`,
-    );
-    process.exit(1);
-  }
-
   console.log(
     `\ncheck:no-private-in-public: PASS — no private slug, route, payload path, title or summary ` +
-      `appears in any path or any file's contents under ${shownDist} ` +
-      `(${walkFiles(distDir).length} files scanned).`,
+      `appears in any path or any file's contents under ${shownDist}` +
+      `${shownStubs ? ` and no private title or summary appears in any stub under ${shownStubs}` : ""}` +
+      ` (${walkFiles(distDir).length} file(s) scanned in ${shownDist}` +
+      `${shownStubs ? `, ${walkFiles(stubsDir).length} in ${shownStubs}` : ""}).`,
   );
 }
