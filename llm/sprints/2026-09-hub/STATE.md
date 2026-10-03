@@ -3473,7 +3473,27 @@ Ticked only on live evidence. **Not ticked:** every redirect-map entry forwards
 enforced (deferred). The search/RSS/OG/leak criteria are met in the build and
 pending live verification. **Checkpoint 7 is not recorded passed.**
 
+### Exit (2026-10-03)
+
+**PR #99 merged** (`83ff134`); `main` `build-and-deploy` green. Live on
+`jason.cusati.us`: `/search/` 200, `/rss.xml` 200 (`application/xml`, 0 private
+traces), `/404.html` 200, `/pagefind/pagefind-entry.json` 200. Pages root
+`https://djjay0131.github.io/website/` is a **stub** (`<title>Redirecting</title>`)
+— the full site is retired.
+
+**Checkpoint 7 — NOT recorded passed.** Item status: (1) redirects — HTML-
+navigable entries forward via stubs; **file-shaped entries rely on the `404.html`
+JS mapper and are browser-dependent, unverified in a browser**; (2) search
+public-only — met; (3) RSS no private item — met; (4) no private OG — met by
+construction; (5) leak check covers the derived outputs and is shown failing —
+met; (6) `redirects:check` enforced — **DEFERRED** (ADR-0020 decision 4).
+
+**Deferred to the owner/next run:** regenerate `site/redirects/github-pages.json`
+from real content with `_payload/**` excluded from `route-inventory.mjs`, wire
+`redirects:check`, and browser-verify the file-shaped forwarding.
+
 ### Status
 
-**Build complete on `feat/phase-6`; not yet merged/verified live.** Residuals
-above are recorded; `redirects:check` is the one deferred acceptance item.
+**Merged and partially live.** Final report `handoffs/completion-final.md`;
+Governance Audit across Phases 0–6 recorded there; memory bank updated. Residuals
+above are recorded, not hidden.

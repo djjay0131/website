@@ -77,20 +77,27 @@ what a contributor needs to pick up work today.
   fixed. **The roadmap public-page criterion is deferred/partial** (items are
   private until the owner allowlists, D8).
 
+- **Wave 5 (`hub-006`, Phase 6) is merged 2026-10-03** (PR #99). Pagefind search,
+  `rss.xml`, redirect stubs + `404.html`, and stubs-only Pages retirement
+  (ADR-0020) are live. **Checkpoint 7 is not recorded passed**:
+  `redirects:check` is deferred (map staleness) and file-shaped forwarding is
+  browser-dependent. Final report at `handoffs/completion-final.md`.
+
 ## Stop point
 
-Waves 3 and 4 are merged, applied, and verified (Wave 3's owner share-mint and
-Wave 4's public-page decision remain owner steps). The next non-owner work is
-**Wave 5 (`hub-006`)** — Phase 6.
+All waves are merged. Waves 3–4 are applied and verified; Wave 5 is live except
+the deferred `redirects:check`. The run's remaining work is owner-driven or
+recorded deferrals — see `handoffs/completion-final.md` §6 (owner hard-stops) and
+§9 (honest limitations).
 
 ## Next
 
-1. **Wave 5 (`hub-006`)** — Phase 6: Pagefind over `dist-public` only, RSS, OG
-   images, leak check extended to the derived outputs, and Pages retirement per
-   ADR (redirect stubs, `404.html`, delete the full-site Pages job).
-2. **Owner steps:** Wave 3's 14-day share mint (SEAM-S7); decide whether to flip
-   the `construction-ai` items public (satellite visibility + allowlist); the
-   Firestore member seed.
+1. **Owner steps:** Wave 3's 14-day share mint (SEAM-S7); the Firestore member
+   seed; decide whether to flip `construction-ai` public.
+2. **Wave 5 follow-up:** regenerate `site/redirects/github-pages.json` from real
+   content (exclude `_payload/**` from `route-inventory.mjs`), wire
+   `redirects:check`, browser-verify file-shaped forwarding, then record
+   Checkpoint 7 passed.
 
 ## What only the owner can do
 
