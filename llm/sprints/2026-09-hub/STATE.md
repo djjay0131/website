@@ -3316,20 +3316,33 @@ Branch `feat/construction-ai`; scenario `hub-005`; decisions D4/D10 (order) and 
   — a satellite-content follow-up).
 - **Security Tester — 0 FAIL** across all scoped checks; the live prefix proof is
   the Boundary Tester's post-apply step.
+> Note (Chief Reviewer should-fix): the Security Tester and Skeptic Verifier runs
+> predate the `sync-content.sh` fix (`e81ea16`). Their declared scopes did not
+> include `sync-content.sh`; the Red Team re-verified the fix directly (round 2,
+> bypass closed) and the fix's own test is fail-able (site 17/17).
+
 - **Skeptic Verifier — 0 un-failable guards, 2 coverage gaps recorded:** the
   roster variable validations are not invoked in CI (only a manual `terraform
   plan` fails), and nothing tests the satellite workflow's publish gate
   (`actionlint` unavailable). Both recorded as follow-ups.
 
-### Merge and apply record
+### Merge and apply plan — PENDING as of this commit
 
-PR (hub) merged under §8 after all required checks. `terraform apply` from the
-merged commit: `4 to add, 0 to change, 0 to destroy`; second plan clean.
-`construction-ai` satellite PR merged; the four `GCP_*` repo variables set; the
-first publish ran through WIF; the objects land under `sources/construction-ai/`
-and are synced into the private bucket only. The boundary proof
-(`handoffs/boundary-tester-wave-4.md`) passes: forward in-prefix allowed, every
-other prefix refused, no `list`, reverse leg refused.
+Do not read any of this as done until its result is recorded below.
+
+1. Merge hub PR #95 under §8 (checks green, Security 0 FAIL, Red Team bypass
+   closed, Skeptic 0 un-failable, Chief Reviewer must-fix resolved).
+2. `terraform apply` from the merged commit; expected `4 to add, 0 to change,
+   0 to destroy`; then a second plan clean.
+3. Set the four `GCP_*` variables on `djjay0131/construction-ai-proposal`, merge
+   its PR #11, and let the first publish run through WIF. Objects land under
+   `sources/construction-ai/`; the hub syncs them into the private bucket only.
+4. Run the Boundary Tester (SEAM-C6) under a temporary impersonation grant:
+   forward in-prefix allowed, every other prefix refused, no `list`, reverse leg
+   refused. Record the transcript and the removal proof in
+   `handoffs/boundary-tester-wave-4.md`. This is UNVERIFIABLE until then.
+
+**Result:** _pending — recorded when run._
 
 ### Owner-only step — PENDING
 
