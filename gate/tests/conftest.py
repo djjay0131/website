@@ -31,6 +31,7 @@ from app.config import Settings
 from app.main import Dependencies, create_app, logger
 from app.members import StaticMemberDirectory
 from app.serve import StoredObject, guess_content_type
+from app.shares import StaticShareStore
 
 MEMBER_EMAIL = "djjay@vt.edu"
 OTHER_MEMBER_EMAIL = "cbrown@vt.edu"
@@ -41,6 +42,14 @@ PRIVATE_OBJECTS = {
     "phd/milestones/index.html": b"<h1>Milestone tracker</h1>",
     "phd/committee-dossier/index.html": b"<h1>Committee dossier</h1>",
     "assets/private.css": b"body{color:#0F5C5A}",
+    # The same items as a share sees them: the token's item prefix is
+    # `<source>/<slug>`, so a share of ("phd-milestones", "committee-dossier")
+    # reaches exactly this subtree and nothing beside it.
+    "phd-milestones/committee-dossier/index.html": b"<h1>Committee dossier</h1>",
+    "phd-milestones/committee-dossier/notes.html": b"<p>Private notes</p>",
+    "phd-milestones/milestones/index.html": b"<h1>Milestone tracker</h1>",
+    "phd-milestones/milestones/private.css": b"body{color:#0F5C5A}",
+    "cv/academic/index.html": b"<h1>Academic CV</h1>",
 }
 
 HOSTING_HEADERS = {
@@ -164,12 +173,19 @@ def store() -> FakeStore:
 
 @pytest.fixture
 def members() -> StaticMemberDirectory:
-    return StaticMemberDirectory({MEMBER_EMAIL, OTHER_MEMBER_EMAIL})
+    # MEMBER_EMAIL is the owner (D3: djjay@vt.edu has role: owner);
+    # OTHER_MEMBER_EMAIL is a plain member -- the "cannot mint or revoke" case.
+    return StaticMemberDirectory({MEMBER_EMAIL, OTHER_MEMBER_EMAIL}, owners={MEMBER_EMAIL})
 
 
 @pytest.fixture
-def deps(settings, verifier, members, store) -> Dependencies:
-    return Dependencies(settings=settings, verifier=verifier, members=members, store=store)
+def shares() -> StaticShareStore:
+    return StaticShareStore()
+
+
+@pytest.fixture
+def deps(settings, verifier, members, store, shares) -> Dependencies:
+    return Dependencies(settings=settings, verifier=verifier, members=members, store=store, shares=shares)
 
 
 @pytest.fixture
@@ -244,4 +260,11 @@ def member_session(verifier) -> str:
 @pytest.fixture
 def non_member_session(verifier) -> str:
     token = verifier.add_user("outsider-token", NON_MEMBER_EMAIL)
+    return verifier.issue_session(token)
+
+
+@pytest.fixture
+def other_member_session(verifier) -> str:
+    """A member without `role: owner` -- the non-owner refusal case (D3)."""
+    token = verifier.add_user("other-member-token", OTHER_MEMBER_EMAIL)
     return verifier.issue_session(token)

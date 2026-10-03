@@ -1,25 +1,48 @@
 # `gate/` — the hub gate
 
 A FastAPI service on Cloud Run (`hub-gate`, `us-east1`, min-instances 0) that
-puts the milestone tracker and the committee dossier behind sign-in.
+puts the milestone tracker and the committee dossier behind sign-in, and serves
+revocable share links to individual items.
 Design authority: `llm/specs/2026-09-10-research-hub-design.md` §6;
 decision: `llm/governance/adr/0004-private-area-cloud-run-gate-behind-hosting.md`.
 
 ## What it does — and what it deliberately does not
 
-Phase 3 builds §6 responsibilities 1–3, and only those:
+The gate implements §6 responsibilities 1–4, and only those:
 
 | Route | Purpose |
 |---|---|
 | `POST /session` | Verify a Firebase ID token, mint a 14-day session cookie |
 | `POST /session/end` | Sign out: clear `__session`. Origin-checked; identical whether or not a session existed |
 | `GET /p/{path}` | Verify the session, check the allowlist, stream the object |
+| `POST /share` | **Owner only**, origin-checked. Mint a token for one `(source, slug)`; returns `{token, expires_at, url}`. `expires_in_days` is capped at 30; a bad item or expiry is 400, a non-owner is 403 |
+| `GET /share` | **Owner only**. List active shares. Never returns a full token — a short display id (`id`) plus `source`, `slug`, `created_by`, `expires_at` |
+| `DELETE /share/{token}` | **Owner only**, origin-checked. Revoke. Idempotent |
+| `GET /s/{token}/{path}` | **No session.** Serve the token's one item's file inside that item's prefix. Unknown, expired and revoked are all 404; a path that leaves the prefix is 404 |
 | `GET /_health` | Deploy verification; reveals nothing. **Not** `/healthz`: that path never reaches the container on Cloud Run (Google's frontend answers it), verified at Checkpoint 4. |
 
-Share links — §6 responsibility 4, `/s/**` and `/share/**` — are **Phase 4**.
-They are absent rather than stubbed, and `tests/test_scope.py` fails if a route
-for them appears, because a half-built share route that answers at all is a way
-to reach private bytes without a session.
+`tests/test_scope.py` asserts the route table exactly, so a new route cannot
+appear without a test and a README entry.
+
+## Sharing
+
+A share is one item by `(source, slug)`, stored at Firestore `shares/{token}`
+with `{source, slug, exp, revoked, created_by, created_at}` (SEAM-S1). The token
+is the document id, minted with `secrets.token_urlsafe(32)` — 256 bits. `exp` is
+computed server-side and the client may ask for at most 30 days.
+
+Minting, listing and revoking are **owner only**: a verified email that is still
+on the allowlist **and** whose member document carries `role: owner`
+(`members.is_owner`). Mint and revoke are state-changing and therefore carry the
+same allowed-origin check as `/session/end`; listing is a read and does not.
+
+`GET /s/**` needs no session and no origin check, and the handler never reads
+the cookie and never calls `set_cookie` — a share link is opened in a fresh
+browser. Authorisation is the token plus its stored item prefix
+(`<source>/<slug>`), and the served path is resolved with the same allowlist and
+containment logic `/p/**` uses (`safe_object_path(path, prefix)`), so a share
+cannot leave its own item (SEAM-S8). An unknown, expired or revoked token is a
+404, never a 403, so the gate does not confirm a token exists.
 
 ## The two things most likely to make a correct-looking gate wrong
 
@@ -109,7 +132,9 @@ middleware after the route has run so no framework or file-serving default can
 leave a cacheable header behind. Hosting's CDN caches a rewrite response only
 if the gate itself sends `public` or `s-maxage`; `tests/test_headers.py`
 asserts that no `/p/**` response ever does, across served, signed-out,
-non-member, expired, traversal and missing-object outcomes.
+non-member, expired, traversal and missing-object outcomes, and
+`tests/test_shares.py` makes the same assertion for every `/s/**` and
+`/share/**` outcome (A7).
 
 ## Path safety
 
@@ -172,6 +197,8 @@ Set by Cloud Run; the infra stream owns the service's env block.
 | `GOOGLE_CLOUD_PROJECT` | *(from metadata)* | Project for Firebase/Firestore |
 | `GATE_PRIVATE_PREFIX` | *(empty)* | Optional prefix within the bucket |
 | `GATE_MEMBERS_COLLECTION` | `members` | Firestore allowlist collection |
+| `GATE_SHARES_COLLECTION` | `shares` | Firestore collection holding share tokens |
+| `GATE_SHARE_BASE_URL` | *(empty — relative URL)* | Absolute origin for a minted share URL. Empty returns `/s/{token}/` |
 | `GATE_SESSION_DAYS` | `14` | Session lifetime; 14 is Firebase's maximum |
 | `GATE_CHECK_REVOKED` | `true` | Check revocation on every request |
 | `GATE_LOG_OBJECT_PATHS` | `false` | Log object paths (a private slug) |

@@ -3134,3 +3134,33 @@ Live on `https://jason.cusati.us` (2026-10-02):
 
 Spec §5 amended (`--vt-orange-text` `#c34600`), ADR-0015 amended to match.
 **Wave 0c exit: MET.** Fix-later items are the dispositions table above.
+
+## Wave 3 — Phase 4 sharing (2026-10-02, in progress)
+
+Branch `feat/sharing`; issue `hub-004`; decision D2 (§10 Q3 — share links
+wanted). Seams `contracts/phase-4-seams.md`; contracts `gate-wave-3.md` (and
+`site-wave-3.md` to follow). Design authority: design doc §6 responsibility 4 and
+§11 Phase 4.
+
+**Landed: the `gate` stream** (handoff `handoffs/gate-wave-3.md`):
+`gate/app/shares.py` (`ShareStore` Protocol + Firestore and static stores; token
+`secrets.token_urlsafe(32)`; `expires_in_days ∈ [1,30]`); `members.is_owner()`;
+`serve.safe_prefix()` reusing the path allowlist/containment; routes
+`POST /share`, `GET /share`, `DELETE /share/{token}`, `GET /s/{token}/{path:path}`
+(no session; unknown/expired/revoked → 404; prefix-confined); `private, no-store`
+on every share response; `gate/tests/test_shares.py` plus conftest/scope updates.
+`pyproject.toml` test run: **396 passed**; ruff clean.
+
+**Seam defect found and fixed in the seam text (SEAM-S1).** The token must store
+`(section, source, slug)`, not `(source, slug)`: the private address is
+`<section>/<source>/<slug>/` and the gate holds `objects.get` only, so it cannot
+derive the `section` from the bucket. `POST /share` now takes `section`. The gate
+stream shipped the original shape and **must be updated to accept/store
+`section` before the owner's live mint** (SEAM-S7).
+
+**Still to do in Wave 3:** the gate `section` follow-up; the `site` stream
+(`firebase.json` `/share/**` and `/s/**` rewrites, the owner-only Shares React
+island in the private build); the `infra` stream (a Firestore write role for the
+gate SA on `shares/` only; deny-all rules stay released); the adversarial round,
+Security Tester and Chief Reviewer; then the owner mints a real 14-day share,
+opens it signed-out, revokes it, and re-tests (SEAM-S7). Nothing merged yet.

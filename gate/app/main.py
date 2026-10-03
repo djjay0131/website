@@ -1,11 +1,14 @@
-"""The gate application: three responsibilities and nothing else.
+"""The gate application: the design doc §6 responsibilities and nothing else.
 
   1. POST /session   -- verify a Firebase ID token, mint a `__session` cookie.
-  2. The allowlist   -- Firestore members/{email}, id lowercased.
+  2. The allowlist   -- Firestore members/{email}, id lowercased; `role: owner`
+                        gates share management.
   3. GET /p/{path}   -- verify the session, then stream from the private bucket.
-
-Share links (design doc §6 responsibility 4, /s/** and /share/**) are Phase 4.
-They are absent, not stubbed, so that nothing half-built can serve anything.
+  4. Share links     -- POST/GET /share and DELETE /share/{token} (owner only,
+                        origin-checked where state changes) mint, list and revoke
+                        a bounded grant for one item; GET /s/{token}/{path} serves
+                        that item's files with no session, resolving the path
+                        inside the token's item prefix only (SEAM-S1..S3).
 
 Two properties are worth stating up front, because both are easy to break
 without any test going red (ADR-0004):
@@ -26,7 +29,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -37,7 +40,16 @@ from . import pages
 from .auth import FirebaseTokenVerifier, Principal, TokenRejected, TokenVerifier
 from .config import ALLOWED_ORIGINS_VAR, SESSION_COOKIE_NAME, Settings, load_settings, parse_origin
 from .members import FirestoreMemberDirectory, MemberDirectory
-from .serve import GcsObjectStore, ObjectStore, UnsafePath, safe_object_path
+from .serve import GcsObjectStore, ObjectStore, UnsafePath, safe_object_path, safe_prefix
+from .shares import (
+    MAX_SHARE_DAYS,
+    MIN_SHARE_DAYS,
+    FirestoreShareStore,
+    Share,
+    ShareStore,
+    expiry_from_days,
+    mint_token,
+)
 
 logger = logging.getLogger("gate")
 
@@ -110,6 +122,15 @@ SESSION_COOKIE_ATTRS = {
 # attempt, and reading it would be work done on behalf of an anonymous caller.
 MAX_SESSION_BODY_BYTES = 8192
 
+# A mint body is three short fields. The cap is the same discipline as /session:
+# an anonymous caller must never make the gate read an arbitrary amount.
+MAX_SHARE_BODY_BYTES = 4096
+
+# How much of a token a list response may reveal. A prefix is enough to tell two
+# rows apart in owner UI and is not enough to reconstruct the credential; the
+# full token is returned exactly once, from the mint that created it.
+SHARE_ID_CHARS = 12
+
 # Client event ingestion. Smaller than a session body on purpose: this endpoint
 # is UNAUTHENTICATED, because the failures worth capturing happen before a
 # session exists, so these caps are the only thing standing between it and
@@ -155,6 +176,7 @@ class Dependencies:
     verifier: TokenVerifier
     members: MemberDirectory
     store: ObjectStore
+    shares: ShareStore
 
 
 def build_dependencies(settings: Settings | None = None) -> Dependencies:
@@ -167,6 +189,7 @@ def build_dependencies(settings: Settings | None = None) -> Dependencies:
             collection=resolved.members_collection, project_id=resolved.project_id
         ),
         store=GcsObjectStore(resolved.private_bucket),
+        shares=FirestoreShareStore(collection=resolved.shares_collection, project_id=resolved.project_id),
     )
 
 
@@ -463,6 +486,161 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             headers=headers,
         )
 
+    # ---------------------------------------------------------------------
+    # Responsibility 4: share links (SEAM-S1..S3). Owner-only management, and a
+    # session-less public view.
+    #
+    # The two management POSTs and the DELETE are state-changing, so they carry
+    # the same allowed-origin check as /session/end: SameSite=Lax does not stop a
+    # top-level cross-site form POST. GET /share and the /s/** view are reads and
+    # carry no such check.
+    #
+    # Refusals are 403 for management (the caller is authenticated as *someone*;
+    # naming the refused action to them is not an oracle the way a private slug
+    # is) and 404 for /s/** (an unknown token, an expired token and a revoked
+    # token are indistinguishable, so the token's existence is not confirmed).
+    # ---------------------------------------------------------------------
+    @app.post("/share")
+    async def mint_share(request: Request) -> Response:
+        header_only = _refuse_cross_origin("share", request, deps)
+        if header_only is not None:
+            return header_only
+
+        body = await _read_small_body(request, MAX_SHARE_BODY_BYTES)
+        if body is None:
+            logger.info("event=reject scope=share reason=body_too_large")
+            return JSONResponse({"status": "invalid_request"}, status_code=413)
+        payload, bad_request = _share_payload(body)
+        if payload is None:
+            logger.info("event=reject scope=share reason=malformed_request")
+            return bad_request
+
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not _is_owner(principal, deps):
+            logger.info("event=deny scope=share action=mint reason=%s", reason or "not_owner")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        source = payload.get("source")
+        slug = payload.get("slug")
+        days = payload.get("expires_in_days")
+        prefix = (
+            _share_item_prefix(source, slug) if isinstance(source, str) and isinstance(slug, str) else None
+        )
+        if prefix is None or not _valid_days(days):
+            logger.info("event=reject scope=share reason=invalid_item")
+            return JSONResponse({"status": "invalid_request"}, status_code=400)
+
+        now = datetime.now(UTC)
+        share = Share(
+            token=mint_token(),
+            source=source,
+            slug=slug,
+            exp=expiry_from_days(days, now=now),
+            revoked=False,
+            created_by=principal.email,
+            created_at=now,
+        )
+        deps.shares.create(share)
+        logger.info(
+            "event=allow scope=share action=mint item=%s/%s by=%s", share.source, share.slug, principal.email
+        )
+        return JSONResponse(
+            {
+                "token": share.token,
+                "expires_at": share.exp.isoformat(),
+                "url": _share_url(deps.settings, share.token),
+            },
+            status_code=200,
+        )
+
+    @app.get("/share")
+    async def list_shares(request: Request) -> Response:
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not _is_owner(principal, deps):
+            logger.info("event=deny scope=share action=list reason=%s", reason or "not_owner")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        shares = deps.shares.list_active()
+        logger.info("event=allow scope=share action=list count=%d by=%s", len(shares), principal.email)
+        # No `token` field, ever: the full token is returned only by the mint
+        # that created it. A short id is enough for owner UI to tell rows apart.
+        return JSONResponse(
+            {
+                "shares": [
+                    {
+                        "id": _short_share_id(share.token),
+                        "source": share.source,
+                        "slug": share.slug,
+                        "created_by": share.created_by,
+                        "expires_at": share.exp.isoformat(),
+                    }
+                    for share in shares
+                ]
+            },
+            status_code=200,
+        )
+
+    @app.delete("/share/{token}")
+    async def revoke_share(token: str, request: Request) -> Response:
+        header_only = _refuse_cross_origin("share", request, deps)
+        if header_only is not None:
+            return header_only
+
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not _is_owner(principal, deps):
+            logger.info("event=deny scope=share action=revoke reason=%s", reason or "not_owner")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        deps.shares.revoke(token)
+        logger.info(
+            "event=allow scope=share action=revoke id=%s by=%s",
+            _short_share_id(token),
+            principal.email,
+        )
+        return JSONResponse({"status": "ok"}, status_code=200)
+
+    @app.get("/s/{token}/{path:path}")
+    async def serve_share(token: str, path: str, request: Request) -> Response:
+        # NO session, NO origin check and NO cookie. A share link is opened in a
+        # fresh browser; the token is the credential. This handler never calls
+        # _authenticate and never calls set_cookie, so there is nothing to mint
+        # and nothing to time.
+        share = deps.shares.get(token)
+        if share is None or not share.is_active():
+            logger.info(
+                "event=deny scope=share stage=token reason=%s",
+                "unknown" if share is None else "inactive",
+            )
+            return _html(pages.NOT_FOUND, 404)
+
+        prefix = _share_item_prefix(share.source, share.slug)
+        if prefix is None:
+            # A corrupt stored row is refused, never served.
+            logger.warning("event=deny scope=share stage=item reason=invalid_item")
+            return _html(pages.NOT_FOUND, 404)
+        if deps.settings.private_prefix:
+            prefix = f"{deps.settings.private_prefix}/{prefix}"
+
+        try:
+            name = safe_object_path(path, prefix)
+        except UnsafePath as exc:
+            logger.warning("event=deny scope=share stage=path reason=%s", exc.reason)
+            return _html(pages.NOT_FOUND, 404)
+
+        obj = deps.store.fetch(name)
+        if obj is None:
+            logger.info("event=miss scope=share%s", _log_path(name, deps.settings))
+            return _html(pages.NOT_FOUND, 404)
+
+        logger.info("event=allow scope=share%s", _log_path(name, deps.settings))
+        headers = {} if obj.size is None else {"content-length": str(obj.size)}
+        return StreamingResponse(
+            obj.chunks(),
+            status_code=200,
+            media_type=obj.content_type,
+            headers=headers,
+        )
+
     # NOT /healthz. That path never reaches this container on Cloud Run: Google's
     # frontend answers it with its own 1568-byte error page, while the gate's own
     # 404 is 329 bytes, and no such request ever appears in the container log.
@@ -653,3 +831,103 @@ def _authenticate(request: Request, deps: Dependencies) -> tuple[Principal | Non
     except TokenRejected as exc:
         return None, exc.reason
     return principal, None
+
+
+def _refuse_cross_origin(scope: str, request: Request, deps: Dependencies) -> Response | None:
+    """The state-changing route guard shared by the share management routes.
+
+    Returns a 403 response when the origin check fails, or None to continue.
+    Two failures are distinguished in the log and not in the body: an unset
+    allowlist is a deployment fault, a cross-origin request is a caller. Both
+    refuse, and neither sets a cookie.
+    """
+    if not deps.settings.allowed_origins:
+        logger.error(
+            "event=deny scope=%s reason=no_allowed_origins_configured setting=%s",
+            scope,
+            ALLOWED_ORIGINS_VAR,
+        )
+        return JSONResponse({"status": "forbidden"}, status_code=403)
+    if not _same_origin(request, deps.settings):
+        logger.info("event=deny scope=%s reason=cross_origin", scope)
+        return JSONResponse({"status": "forbidden"}, status_code=403)
+    return None
+
+
+async def _read_small_body(request: Request, maximum: int) -> bytes | None:
+    """Read a request body, returning None past the cap before reading it all."""
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > maximum:
+        return None
+    raw = await request.body()
+    if len(raw) > maximum:
+        return None
+    return raw
+
+
+def _share_payload(body: bytes) -> tuple[dict | None, Response | None]:
+    """Parse a mint body, never echoing it: the response is static.
+
+    Returns (payload, None) on a JSON object and (None, response) otherwise.
+    """
+    try:
+        payload = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        return None, JSONResponse({"status": "invalid_request"}, status_code=400)
+    if not isinstance(payload, dict):
+        return None, JSONResponse({"status": "invalid_request"}, status_code=400)
+    return payload, None
+
+
+def _valid_days(value: object) -> bool:
+    """`expires_in_days` must be a real integer inside [1, 30].
+
+    `bool` is an `int` in Python, and `True` must not become a one-day grant.
+    """
+    return (
+        isinstance(value, int) and not isinstance(value, bool) and MIN_SHARE_DAYS <= value <= MAX_SHARE_DAYS
+    )
+
+
+def _is_owner(principal: Principal, deps: Dependencies) -> bool:
+    """May this principal manage shares?
+
+    Verified email, still on the allowlist, and the member document's `role` is
+    `owner`. Membership is re-checked here rather than assumed from the session,
+    exactly as /p/** does, so removing someone from the allowlist ends their
+    share management on the next request.
+    """
+    return (
+        principal.email_verified
+        and deps.members.is_member(principal.email)
+        and deps.members.is_owner(principal.email)
+    )
+
+
+def _share_item_prefix(source: str, slug: str) -> str | None:
+    """The object prefix a token may reach: `<source>/<slug>`, or None.
+
+    Validated with `safe_prefix`, the same segment allowlist a served path
+    passes. `source` must be a single segment (`source: "a/b"` would let one
+    token's prefix overlap another's); `slug` may be several, because the hub's
+    slugs are (`hub/research/soa-agentic-se`).
+    """
+    try:
+        clean_source = safe_prefix(source)
+        clean_slug = safe_prefix(slug)
+    except UnsafePath:
+        return None
+    if "/" in clean_source:
+        return None
+    return f"{clean_source}/{clean_slug}"
+
+
+def _share_url(settings: Settings, token: str) -> str:
+    """The URL a caller hands out. Relative unless a base is configured."""
+    base = settings.share_base_url
+    return f"{base}/s/{token}/" if base else f"/s/{token}/"
+
+
+def _short_share_id(token: str) -> str:
+    """A display id for a token: enough to tell rows apart, not the credential."""
+    return token[:SHARE_ID_CHARS]

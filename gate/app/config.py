@@ -108,6 +108,13 @@ class Settings:
     # The CSRF check's accepted origins. NOT derived from any request header:
     # that was the defect. Empty means /session/end refuses everything.
     allowed_origins: frozenset[str]
+    # Firestore collection holding share tokens (SEAM-S1).
+    shares_collection: str = "shares"
+    # The public base a minted share URL is built from. Empty is deliberate and
+    # safe: the minted `url` is then relative (`/s/{token}/`), which is correct
+    # for the same-origin Shares page and cannot drift from the deployed host.
+    # Set GATE_SHARE_BASE_URL to an absolute origin to return a copyable link.
+    share_base_url: str = ""
 
     @property
     def session_max_age_seconds(self) -> int:
@@ -149,4 +156,6 @@ def load_settings() -> Settings:
         # returns 200, so an unset variable fails the deploy rather than sitting
         # there quietly.
         allowed_origins=_allowed_origins(ALLOWED_ORIGINS_VAR),
+        shares_collection=os.environ.get("GATE_SHARES_COLLECTION", "shares").strip() or "shares",
+        share_base_url=os.environ.get("GATE_SHARE_BASE_URL", "").strip().rstrip("/"),
     )

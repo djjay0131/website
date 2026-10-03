@@ -13,13 +13,26 @@ wrong reports it and stops.
 
 ## SEAM-S1 — What a share is
 
-A share names **one item** by `(source, slug)` and grants read access to that
-item's files for a bounded time. Firestore `shares/{token}`:
+A share names **one item** by `(section, source, slug)` and grants read access
+to that item's files for a bounded time. Firestore `shares/{token}`:
 
 ```
-{ source: string, slug: string, exp: Timestamp, revoked: boolean,
-  created_by: string, created_at: Timestamp }
+{ section: string, source: string, slug: string, exp: Timestamp,
+  revoked: boolean, created_by: string, created_at: Timestamp }
 ```
+
+> **Amended 2026-10-02, on the gate stream's finding, before serving is wired.**
+> As first written the token stored `(source, slug)` only. The private build's
+> address for an item is `<section>/<source>/<slug>/`
+> (`src/lib/frame-content.mjs: routeFor`; e.g.
+> `phd/phd-milestones/committee-dossier/`), and the gate holds
+> `storage.objects.get` only — no `list` — so it cannot derive the `section` from
+> the bucket. Without it `/s/{token}/{path}` cannot build the prefix and would
+> 404 on the real tree. `POST /share` therefore takes `{section, source, slug,
+> expires_in_days}`, and the store keeps `section`. **Follow-up:** the gate
+> stream shipped the original `(source, slug)` shape; it must accept and store
+> `section` before the owner's live mint (SEAM-S7). The `path` served is still
+> confined to `<section>/<source>/<slug>/`.
 
 - **Token**: `secrets.token_urlsafe(32)` (256 bits of entropy; the brief requires
   ≥128). The token is the Firestore document id.
@@ -33,7 +46,7 @@ item's files for a bounded time. Firestore `shares/{token}`:
 
 | Route | Auth | Behaviour |
 |---|---|---|
-| `POST /share` | owner only | body `{source, slug, expires_in_days}` → `{token, expires_at, url}`. 404 if the item is not effectively private; 400 on bad input; 403 for a non-owner. |
+| `POST /share` | owner only | body `{section, source, slug, expires_in_days}` → `{token, expires_at, url}`. 404 if the item does not exist; 400 on bad input; 403 for a non-owner. |
 | `GET /share` | owner only | list active shares (`token` never returned in full; return a short id + metadata) |
 | `DELETE /share/{token}` | owner only | set `revoked: true`; idempotent |
 | `GET /s/{token}/{path:path}` | none | serve the token's item's file at `path`, only inside that item's prefix; expired/revoked/unknown → 404 |
