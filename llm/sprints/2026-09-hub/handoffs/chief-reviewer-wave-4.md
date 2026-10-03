@@ -177,3 +177,45 @@ one, ran no git/cloud mutation, and ran only the governance layout check, the
   `site/src/pages/projects/index.astro`
 - PRs: https://github.com/djjay0131/website/pull/95,
   https://github.com/djjay0131/construction-ai-proposal/pull/11
+
+---
+
+## Re-review — delta only (HEAD `f5a2ae4`)
+
+Scope: the three fixes the author reported, plus a re-check of the prior findings.
+Read-only; `gh pr checks 95` all green (`mergeStateStatus: CLEAN`); governance
+`--layout` re-run **4 of 4 pass**.
+
+**FINAL VERDICT: Request changes — one must-fix remains** (a one-line stale row);
+the prior must-fix and the material part of the record should-fixes are resolved.
+
+- **Must-fix (resolved).** `STATE.md:3326-3332` is now
+  "**Merge and apply plan — PENDING as of this commit**", an explicitly
+  future-tense plan ending "**Result:** _pending — recorded when run._", and it
+  marks the boundary proof UNVERIFIABLE until run. No merge/apply/publish/boundary
+  is claimed done. **Resolved.**
+- **Should-fix #2 (roster records) — part resolved, one must-fix remains.**
+  `governance-delta.md:276-279` now lists `agentic-kgis` #3,
+  `agentic-kg-research` #4, `construction-ai-proposal` #5 (source
+  `construction-ai`, private until allowlisted), and `agentic-kg` later/optional.
+  **But the old row was not deleted:** `governance-delta.md:280` still reads
+  `| construction-ai-proposal | Satellite #4, project page (public). | 5 |`,
+  so the table now carries two conflicting rows for the same repo (#5-private vs
+  #4-public). Delete line 280. This is the exact D2 stale-record class and should
+  not merge as a self-contradiction. **Must-fix.**
+- **Should-fix #3 (verdicts predate the fix) — resolved as a record.**
+  `STATE.md:3319-3322` carries the dated note: Security Tester / Skeptic Verifier
+  predate `e81ea16`, their declared scopes did not include `sync-content.sh`, the
+  Red Team re-verified round 2, and the fix's test is fail-able (17/17).
+  **Resolved.**
+- **Should-fix #4 (`satellite-construction-wave-4.md:132`) — still open, not
+  material.** The stale D1 line ("nothing appears in the public index until an
+  owner-driven allowlist edit") remains; a dated note would close it, but the
+  authoritative seam is corrected and handoffs are point-in-time. Non-blocking.
+- **Previously verified items still hold.** Satellite PR #11 manifest/workflow;
+  ADR-0019 + design §2/§11; SEAM-C1…C6 and the D1 correction; the `sync-content`
+  containment fix and test; index-from-manifests / WIF-only; D3 recorded as
+  deferred, criteria unticked; **L2** unchanged.
+
+**Settled by** deleting `governance-delta.md:280` (and, optionally, the
+`satellite-construction-wave-4.md:132` note); then this wave is Approve.
