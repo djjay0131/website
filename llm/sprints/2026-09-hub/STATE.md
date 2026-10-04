@@ -3515,3 +3515,57 @@ from real content with `_payload/**` excluded from `route-inventory.mjs`, wire
 **Merged and partially live.** Final report `handoffs/completion-final.md`;
 Governance Audit across Phases 0–6 recorded there; memory bank updated. Residuals
 above are recorded, not hidden.
+
+## L1 follow-up "logo" — D16 (2026-10-04)
+
+Branch `feat/logo`, cut from `main` `9bd10ed` after the Phase 6 run. Owner decision **D16**
+(recorded above, with the owner's caveat verbatim). Contract `contracts/logo-wave.md`.
+Reviewers/adversaries: `dissenter-logo`, `skeptic-verifier-logo`, `security-tester-logo`,
+`a11y-tester-logo`, `chief-reviewer-logo`. This is an asset/UI change: no infra, gate or
+Terraform change, and none was needed (the brief's §9 stop was not reached).
+
+### What shipped
+
+- **`SiteBand.astro`** — the research emblem returns as a linked 40px mark (44px hit target) to
+  the LEFT of the wordmark, `alt="Jason Cusati research emblem"`, on every page and both themes.
+- **`index.astro`** — the owner's `vt-badge-hokiebird-laptop-tower-research-today.png` is the
+  identity-block hero where the portrait used to be; 200px, 1x (13.8KB) + `-2x` (38.6KB) srcset,
+  descriptive alt, no lazy loading. Only that one PNG from `assets/research-badges`; **PR #70 is
+  not merged and the other seven badges are not added**.
+- **`Base.astro`** — the default `og:image` is again `/emblem/research-emblem.png` (D16 reverses
+  Wave 0c's generated card for OG). The card generator is retained but no longer the default;
+  its comments were corrected, not its behaviour.
+- **`redirects/github-pages.json`** — the two new public files, sorted.
+- **Replaceable guard caught a real fault:** the 2x file was first named `…@2x.png`; the private
+  build's SD-7 gate-segment check refused `@` (public files are copied into `dist-private`), so
+  it is `…-2x.png`. This is the guard working, not the build breaking.
+
+### Round (site checks + adversaries + testers)
+
+| Agent | Result |
+|---|---|
+| site checks (Lead Architect) | `npm test` **412 passed / 2 skipped**; `contrast` 56 pairs 0 below AA; public + private builds green; leak check PASS (211 files); `check:private-links` PASS; `check:publish-allowlist` PASS; `check:smoke-routes` PASS; `governance --layout` 4/4 |
+| Security Tester | **0 FAIL** — gate/firebase/infra diffs empty; only new public paths are the two badge PNGs; PNGs carry no EXIF/ICC/text; SD-7 green; leak red→green holds |
+| a11y-tester | **0 FAIL** — emblem one-per-page with correct name/role; 44px hit target; band focus ring `--color-on-band` in both themes; badge hero alt/dimensions/no-lazy; ring 3.02:1 and disc 8.86:1 vs band; semantics unchanged |
+| Dissenter | 7 objections, **2 blocking (S1, S2) both fixed**, 5 non-blocking dispositioned below |
+| Skeptic Verifier | **8 guards, all made red by name and restored; 0 un-failable**; 1 guard strengthened (ring-specific) and 6 uncovered claims closed with checks |
+| Chief Reviewer | see below |
+
+### Dissenter dispositions (Lead Architect)
+
+| # | Objection | Disposition |
+|---|---|---|
+| **S1** | No test pinned any of the three new surfaces; a revert stayed green | **Fixed.** `site/scripts/logo.test.ts`: 18 source-level + built-output guards (emblem link/alt/order/44px, badge srcset/alt/no-lazy/size/gate-name/map, emblem OG default + file, ring-specific contrast). Skeptic then broke every one by name |
+| **S2** | `ogCard()` still generated/served and comments still called it "the default" | **Fixed for the record; retention is a follow-up.** The four comments corrected (`og-card.mjs`, `og-card.test.ts`, `site-routes.mjs`, `astro.config.mjs`); retiring `/og-card.png` (and its leak-check/CI-file wiring) is out of this wave's scope and is recorded as the follow-up |
+| S3 | Caveat names only the HokieBird; #70 README says the badges use the VT mark **and** the HokieBird | **Recorded, not silently dropped** — the source-material note sits under D16; the owner's caveat stays verbatim |
+| S4 | The 3.02:1 ring is ~0.6px and the emblem is an exempt logotype | **Accepted as nuance** — the white disc (8.86:1) dominates; the emblem is a logotype, and the owner asked for AA anyway. Claim wording is now measured, not asserted |
+| S5 | A 1200×1200 emblem replaces a 1200×630 OG card, so 1.91:1 unfurlers crop | **Accepted** — the owner asked for the emblem as OG; #71 did the same. Noted, not a defect |
+| S6 | The `-2x` rationale is a category error (the segment allowlist guards `/p/**` only) | **Rejected, with evidence** — public files are copied into `dist-private`, so the private build's SD-7 check applies the allowlist and refused `@`; the Skeptic reproduced it |
+| S7 | `redirects:check` is unwired and exits 1 | **Pre-existing** (STATE U-7, deferred in ADR-0020); the two badge routes are covered by the map and the route-inventory test |
+
+### Exit
+
+Merged under §8 (below) with checks green, Security 0 FAIL, Skeptic no un-failable guard and
+Chief Reviewer approve/comment; branch deleted. Live verification on `jason.cusati.us`: `/`
+shows the badge; every page shows the emblem in the band; `og:image` is the emblem. The PR #70
+draft and the other seven badges are untouched.
