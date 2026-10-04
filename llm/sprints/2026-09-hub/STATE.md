@@ -1,7 +1,7 @@
 # Research Hub — Orchestration State
 
 Status: Active
-Last updated: 2026-10-03
+Last updated: 2026-10-04
 Owner: Chief Architect (Lead Architect)
 
 **Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 for the work streams; **L3 for PR #12** (roadmap requirement changes — delta review 2, Part D)
@@ -493,9 +493,21 @@ them is to be re-asked.
 | D10 | **Satellite order and scope (owner, 2026-09-25, #72).** `agentic-kgis` is satellite 3 (public, source `kgis`), then `agentic-kg-research` satellite 4 (private, for the team). `construction-ai-proposal` later; `agentic-kg` optional. Answers design doc §10 Q6 |
 | D11 | **Apply authority for the satellites run: the harness applies under D9** (owner, 2026-09-25; the brief's stated default, left unfilled) |
 | D12 | **Team members for the private area — ANSWERED (owner, 2026-10-02).** The brief's placeholder is filled with the D3 pair (`djjay@vt.edu`, `cbrown@vt.edu`); the Firestore seed remains owner-run. See §D12 below |
-| D13 | **Licensing declined the VT marks** (owner, 2026-10-01); no VT logo or HokieBird is ever served; the original emblem (#71) is the site mark. Recorded in the completion brief §2; ADR-0015 |
+| D13 | **Licensing declined the VT marks** (owner, 2026-10-01); no VT logo or HokieBird is ever served; the original emblem (#71) is the site mark. Recorded in the completion brief §2; ADR-0015. **Superseded in part by D16 (2026-10-04):** one owner-made HokieBird badge is knowingly served on the home hero; the emblem remains the mark-free fallback |
 | D14 | **The branding plan is design authority for Wave 0c** (owner, 2026-10-01); the spec `llm/specs/2026-10-01-branding-design.md` + ADR-0015 are on `main` (#85) |
 | D15 | **Wave 0c owner wording and portfolio mappings (owner, 2026-10-02).** (1) Role line and department stay as drafted; (2) Elsewhere links, in order: GitHub + LinkedIn from cv-data, Google Scholar `nIp5xC0AAAAJ`, ORCID `0009-0001-7283-4050`, X `djay0131`, Bluesky `djjay0131.bsky.social`, Mastodon `djjay0131@mastodon.social` (amended 2026-10-02, superseding the earlier "no Mastodon"), each `rel=me`; (3) portfolio mappings confirmed — Research.AI `agentic-kg` + Denario, Traffic.AI VTTSI + `vttsi-*`, Baseball.AI the private `baseball-ai` repo (name-only card, status private/in progress, no invented goal); ecology stays a planned card with no link; (4) AI Safety has no MATS card and no public application card (question only, Traffic.AI cross-reference as text); AI-aware architecture stays a thread. All inferred-confirm and owner-to-supply notes removed |
+| D16 | **The emblem returns; one owner-made badge is knowingly served (owner, 2026-10-04; branch `feat/logo`, L1).** (1) The research emblem returns: a linked 40px mark (44px hit target) to the LEFT of the wordmark in the shared `SiteBand`, on every page and in both themes, and the default `og:image` is the emblem again. (2) The owner-made `vt-badge-hokiebird-laptop-tower-research-today.png` (branch `assets/research-badges`, PR #70) is the home-page hero image where the portrait used to sit, optimised under 150KB with a 2x; the OG image stays the emblem. (3) PR #70 is **not** merged and the other seven badges are **not** added. ADR-0015 and the branding spec are amended 2026-10-04 to match |
+
+**D16 — the owner-acknowledged caveat, verbatim.** The owner directed that this be recorded
+word for word:
+
+> the badge depicts the HokieBird, a VT trademark Licensing declined; the owner chose to use
+> his own AI-generated rendering knowingly; the emblem remains the mark-free fallback.
+
+The badge is served on the owner's own authority. It is not a licensing reversal and not a
+precedent for any other VT mark; no permission from the Office of Licensing and Trademarks is
+claimed or implied. `emblem/research-emblem.svg` remains the site mark and the fallback if the
+badge is later withdrawn.
 
 **D8 — the day-one allowlist, exactly.** `cv/academic`, `cv/research-professional`,
 `cv/sde-long`, `cv/cv-data` (the data item the public CV pages render from), `kgis/kgis-docs`,
