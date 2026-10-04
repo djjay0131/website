@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { renderOgCardSvg } from "./og-card.mjs";
 
-// The default og:image is a generated card with NO portrait (ADR-0015 decision
-// 1; spec §6/§9). Before Wave 0c the default was the portrait, so this is the
-// guard that the face does not come back as a link preview. The Skeptic
-// Verifier found the path untested; this is that test.
+// The generated card is RETAINED but no longer the default `og:image` (D16,
+// 2026-10-04 restored the research emblem). Before Wave 0c the default was the
+// portrait, so this remains the guard that the face does not come back as a link
+// preview. The Skeptic Verifier found the path untested; this is that test.
 describe("the generated OpenGraph card", () => {
   const svg = renderOgCardSvg({ name: "Jason Cusati", title: "Research hub", affiliation: "Virginia Tech" });
 

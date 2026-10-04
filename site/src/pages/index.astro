@@ -51,10 +51,25 @@ const waysIn = [
 
 <Base title={meta.name} description="Research hub of Jason Cusati, PhD student in Computer Science at Virginia Tech.">
   <section class="identity" aria-labelledby="identity-name">
-    <h1 id="identity-name">{meta.name}</h1>
-    <p class="role">{footer.role}</p>
-    {academic && <div class="statement" set:html={mdToHtml(academic.text)} />}
-    <hr class="identity-rule" />
+    {/* The owner's research badge, where the portrait used to sit (D16). It is
+        an owner-made, AI-generated rendering: knowingly served on the owner's
+        own authority even though it depicts VT's HokieBird, a mark the Office
+        of Licensing and Trademarks declined. The emblem in the band remains the
+        mark-free fallback. */}
+    <img
+      class="identity-badge"
+      src={`${base}badges/vt-badge-hokiebird-laptop-tower-research-today.png`}
+      srcset={`${base}badges/vt-badge-hokiebird-laptop-tower-research-today.png 1x, ${base}badges/vt-badge-hokiebird-laptop-tower-research-today-2x.png 2x`}
+      width="200"
+      height="200"
+      alt="Illustrated research badge: the HokieBird at a laptop in front of the Virginia Tech tower, captioned “Research today · A brighter tomorrow”."
+    />
+    <div class="identity-text">
+      <h1 id="identity-name">{meta.name}</h1>
+      <p class="role">{footer.role}</p>
+      {academic && <div class="statement" set:html={mdToHtml(academic.text)} />}
+      <hr class="identity-rule" />
+    </div>
   </section>
 
   <section class="block" aria-labelledby="working-on">
@@ -120,7 +135,21 @@ const waysIn = [
 
 <style>
   .identity {
+    display: flex;
+    gap: 1.75rem;
+    align-items: flex-start;
     padding-top: 0.5rem;
+  }
+
+  .identity-badge {
+    width: 200px;
+    height: 200px;
+    flex-shrink: 0;
+  }
+
+  .identity-text {
+    flex: 1;
+    min-width: 0;
   }
 
   .role {
@@ -249,6 +278,16 @@ const waysIn = [
   }
 
   @media (max-width: 700px) {
+    .identity {
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .identity-badge {
+      width: 160px;
+      height: 160px;
+    }
+
     .tenet-grid {
       grid-template-columns: 1fr;
     }

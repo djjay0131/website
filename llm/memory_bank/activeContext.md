@@ -1,7 +1,7 @@
 # Active Context
 
 Status: Active
-Last updated: 2026-10-03
+Last updated: 2026-10-04
 Owner: Chief Architect
 
 What belongs here: the current focus, the current stop point, and next steps —
@@ -82,6 +82,16 @@ what a contributor needs to pick up work today.
   (ADR-0020) are live. **Checkpoint 7 is not recorded passed**:
   `redirects:check` is deferred (map staleness) and file-shaped forwarding is
   browser-dependent. Final report at `handoffs/completion-final.md`.
+
+- **L1 follow-up "logo" (owner decision D16, 2026-10-04) is implemented and in PR**
+  (branch `feat/logo`). The research emblem returns to the shared site band (linked,
+  40px in a 44px hit target, every page, both themes) and is again the default
+  `og:image`; the owner's `vt-badge-hokiebird-laptop-tower-research-today.png` is the
+  home hero where the portrait used to be. D16 records the owner's caveat **verbatim**;
+  ADR-0015 decisions 1/3 and branding spec §3/§6 are amended. Site checks, leak check,
+  a11y (0 FAIL), Security Tester (0 FAIL), Dissenter (2 blocking, fixed) and Skeptic
+  (0 un-failable, residual partial coverage recorded) ran; Chief Reviewer **Comment**.
+  **PR #70 stays a draft; the other seven badges are not added.**
 
 ## Stop point
 

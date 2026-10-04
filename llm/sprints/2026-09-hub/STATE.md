@@ -1,7 +1,7 @@
 # Research Hub — Orchestration State
 
 Status: Active
-Last updated: 2026-10-03
+Last updated: 2026-10-04
 Owner: Chief Architect (Lead Architect)
 
 **Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 for the work streams; **L3 for PR #12** (roadmap requirement changes — delta review 2, Part D)
@@ -493,9 +493,27 @@ them is to be re-asked.
 | D10 | **Satellite order and scope (owner, 2026-09-25, #72).** `agentic-kgis` is satellite 3 (public, source `kgis`), then `agentic-kg-research` satellite 4 (private, for the team). `construction-ai-proposal` later; `agentic-kg` optional. Answers design doc §10 Q6 |
 | D11 | **Apply authority for the satellites run: the harness applies under D9** (owner, 2026-09-25; the brief's stated default, left unfilled) |
 | D12 | **Team members for the private area — ANSWERED (owner, 2026-10-02).** The brief's placeholder is filled with the D3 pair (`djjay@vt.edu`, `cbrown@vt.edu`); the Firestore seed remains owner-run. See §D12 below |
-| D13 | **Licensing declined the VT marks** (owner, 2026-10-01); no VT logo or HokieBird is ever served; the original emblem (#71) is the site mark. Recorded in the completion brief §2; ADR-0015 |
+| D13 | **Licensing declined the VT marks** (owner, 2026-10-01); no VT logo or HokieBird is ever served; the original emblem (#71) is the site mark. Recorded in the completion brief §2; ADR-0015. **Superseded in part by D16 (2026-10-04):** one owner-made HokieBird badge is knowingly served on the home hero; the emblem remains the mark-free fallback |
 | D14 | **The branding plan is design authority for Wave 0c** (owner, 2026-10-01); the spec `llm/specs/2026-10-01-branding-design.md` + ADR-0015 are on `main` (#85) |
 | D15 | **Wave 0c owner wording and portfolio mappings (owner, 2026-10-02).** (1) Role line and department stay as drafted; (2) Elsewhere links, in order: GitHub + LinkedIn from cv-data, Google Scholar `nIp5xC0AAAAJ`, ORCID `0009-0001-7283-4050`, X `djay0131`, Bluesky `djjay0131.bsky.social`, Mastodon `djjay0131@mastodon.social` (amended 2026-10-02, superseding the earlier "no Mastodon"), each `rel=me`; (3) portfolio mappings confirmed — Research.AI `agentic-kg` + Denario, Traffic.AI VTTSI + `vttsi-*`, Baseball.AI the private `baseball-ai` repo (name-only card, status private/in progress, no invented goal); ecology stays a planned card with no link; (4) AI Safety has no MATS card and no public application card (question only, Traffic.AI cross-reference as text); AI-aware architecture stays a thread. All inferred-confirm and owner-to-supply notes removed |
+| D16 | **The emblem returns; one owner-made badge is knowingly served (owner, 2026-10-04; branch `feat/logo`, L1).** (1) The research emblem returns: a linked 40px mark (44px hit target) to the LEFT of the wordmark in the shared `SiteBand`, on every page and in both themes, and the default `og:image` is the emblem again. (2) The owner-made `vt-badge-hokiebird-laptop-tower-research-today.png` (branch `assets/research-badges`, PR #70) is the home-page hero image where the portrait used to sit, optimised under 150KB with a 2x; the OG image stays the emblem. (3) PR #70 is **not** merged and the other seven badges are **not** added. ADR-0015 and the branding spec are amended 2026-10-04 to match |
+
+**D16 — the owner-acknowledged caveat, verbatim.** The owner directed that this be recorded
+word for word:
+
+> the badge depicts the HokieBird, a VT trademark Licensing declined; the owner chose to use
+> his own AI-generated rendering knowingly; the emblem remains the mark-free fallback.
+
+The badge is served on the owner's own authority. It is not a licensing reversal and not a
+precedent for any other VT mark; no permission from the Office of Licensing and Trademarks is
+claimed or implied. `emblem/research-emblem.svg` remains the site mark and the fallback if the
+badge is later withdrawn.
+
+**Source-material note (Dissenter D-S3).** The `assets/research-badges` README states that
+every concept in that directory uses **the Virginia Tech mark and the HokieBird likeness**, so
+the served badge may carry both, not the HokieBird alone. The owner's caveat above is verbatim
+and names the HokieBird; it is not intended to exclude the VT mark, and the owner may confirm
+the exact content. The image is served as committed from #70; no other badge is added.
 
 **D8 — the day-one allowlist, exactly.** `cv/academic`, `cv/research-professional`,
 `cv/sde-long`, `cv/cv-data` (the data item the public CV pages render from), `kgis/kgis-docs`,
@@ -3497,3 +3515,80 @@ from real content with `_payload/**` excluded from `route-inventory.mjs`, wire
 **Merged and partially live.** Final report `handoffs/completion-final.md`;
 Governance Audit across Phases 0–6 recorded there; memory bank updated. Residuals
 above are recorded, not hidden.
+
+## L1 follow-up "logo" — D16 (2026-10-04)
+
+Branch `feat/logo`, cut from `main` `9bd10ed` after the Phase 6 run. Owner decision **D16**
+(recorded above, with the owner's caveat verbatim). Contract `contracts/logo-wave.md`.
+Reviewers/adversaries: `dissenter-logo`, `skeptic-verifier-logo`, `security-tester-logo`,
+`a11y-tester-logo`, `chief-reviewer-logo`. This is an asset/UI change: no infra, gate or
+Terraform change, and none was needed (the brief's §9 stop was not reached).
+
+### What shipped
+
+- **`SiteBand.astro`** — the research emblem returns as a linked 40px mark (44px hit target) to
+  the LEFT of the wordmark, `alt="Jason Cusati research emblem"`, on every page and both themes.
+- **`index.astro`** — the owner's `vt-badge-hokiebird-laptop-tower-research-today.png` is the
+  identity-block hero where the portrait used to be; 200px, 1x (13.8KB) + `-2x` (38.6KB) srcset,
+  descriptive alt, no lazy loading. Only that one PNG from `assets/research-badges`; **PR #70 is
+  not merged and the other seven badges are not added**.
+- **`Base.astro`** — the default `og:image` is again `/emblem/research-emblem.png` (D16 reverses
+  Wave 0c's generated card for OG). The card generator is retained but no longer the default;
+  its comments were corrected, not its behaviour.
+- **`redirects/github-pages.json`** — the two new public files, sorted.
+- **Replaceable guard caught a real fault:** the 2x file was first named `…@2x.png`; the private
+  build's SD-7 gate-segment check refused `@` (public files are copied into `dist-private`), so
+  it is `…-2x.png`. This is the guard working, not the build breaking.
+
+### Round (site checks + adversaries + testers)
+
+| Agent | Result |
+|---|---|
+| site checks (Lead Architect) | `npm test` **421 passed / 2 skipped**; `contrast` 56 pairs 0 below AA; public + private builds green; leak check PASS (211 files); `check:private-links` PASS; `check:publish-allowlist` PASS; `check:smoke-routes` PASS; `governance --layout` 4/4 |
+| Security Tester | **0 FAIL** — gate/firebase/infra diffs empty; only new public paths are the two badge PNGs; PNGs carry no EXIF/ICC/text; SD-7 green; leak red→green holds |
+| a11y-tester | **0 FAIL** — emblem one-per-page with correct name/role; 44px hit target; band focus ring `--color-on-band` in both themes; badge hero alt/dimensions/no-lazy; ring 3.02:1 and disc 8.86:1 vs band; semantics unchanged |
+| Dissenter | 7 objections, **2 blocking (S1, S2) both fixed**, 5 non-blocking dispositioned below |
+| Skeptic Verifier | **Two passes, 16 break→red→restore cycles, 0 un-failable.** Pass 1 broke all 8 wave guards by name and found six uncovered claims and one guard weaker than claimed. Pass 2 (after `a310db8`/`95f3ab5`) re-verified the strengthened ring guard and 7 new built/source guards; D (linked mark), E (OG target), F (focus ring — the dark half already pinned in `tokens.test.ts`) closed. **Residual partial coverage, recorded not hidden:** "emblem on every page" (built guards read only `dist-public/index.html` and `dist-private/index.html`, not all 27/6 pages), `og:image` in built HTML (home only), badge-hidden (only `display:none`; `visibility:hidden` would pass) |
+| Chief Reviewer | **Comment** (approved with comments) — see below |
+
+### Dissenter dispositions (Lead Architect)
+
+| # | Objection | Disposition |
+|---|---|---|
+| **S1** | No test pinned any of the three new surfaces; a revert stayed green | **Fixed.** `site/scripts/logo.test.ts`: 18 source-level + built-output guards (emblem link/alt/order/44px, badge srcset/alt/no-lazy/size/gate-name/map, emblem OG default + file, ring-specific contrast). Skeptic then broke every one by name |
+| **S2** | `ogCard()` still generated/served and comments still called it "the default" | **Fixed for the record; retention is a follow-up.** The four comments corrected (`og-card.mjs`, `og-card.test.ts`, `site-routes.mjs`, `astro.config.mjs`); retiring `/og-card.png` (and its leak-check/CI-file wiring) is out of this wave's scope and is recorded as the follow-up |
+| S3 | Caveat names only the HokieBird; #70 README says the badges use the VT mark **and** the HokieBird | **Recorded, not silently dropped** — the source-material note sits under D16; the owner's caveat stays verbatim |
+| S4 | The 3.02:1 ring is ~0.6px and the emblem is an exempt logotype | **Accepted as nuance** — the white disc (8.86:1) dominates; the emblem is a logotype, and the owner asked for AA anyway. Claim wording is now measured, not asserted |
+| S5 | A 1200×1200 emblem replaces a 1200×630 OG card, so 1.91:1 unfurlers crop | **Accepted** — the owner asked for the emblem as OG; #71 did the same. Noted, not a defect |
+| S6 | The `-2x` rationale is a category error (the segment allowlist guards `/p/**` only) | **Rejected, with evidence** — public files are copied into `dist-private`, so the private build's SD-7 check applies the allowlist and refused `@`; the Skeptic reproduced it |
+| S7 | `redirects:check` is unwired and exits 1 | **Pre-existing** (STATE U-7, deferred in ADR-0020); the two badge routes are covered by the map and the route-inventory test |
+
+### Chief Reviewer dispositions (verdict **Comment**)
+
+The reviewer reproduced the three surfaces independently (27/27 public + 6/6 private chrome
+pages, OG default, badge on public home only; 13,775/38,611 B; 3.0166:1 / 8.8610:1), found the
+gate/infra/contract/workflow diff empty, the four "comment-only" files genuinely comments, the
+authorship clean, and D16 within the owner's authority (it *is* the ADR-amendment mechanism
+ADR-0015 decision 3 prescribes — not a §9 hard stop).
+
+| # | Finding | Disposition |
+|---|---|---|
+| CR-1 | `og-card.mjs` still logged "generated the **default** og:image" | **Fixed** — string corrected, no behaviour change |
+| CR-2 | STATE overclaimed: `npm test` 412/2 (actual **421/2**) and credited the Skeptic with closing six claims it had not verified | **Fixed** — count corrected; the Skeptic re-ran and verified the new guards, and its residual partial coverage is recorded above |
+| N1 | Built-output guards read only the two `index.html` files, so "emblem on every page" is partial | **Accepted as a residual, recorded** (above); the shared `SiteBand` import by both layouts is the structural guarantee |
+| N2 | No PR/CI yet, so §8's "required checks green" and PR-body section are not yet demonstrable | **Addressed by the PR** that follows this record |
+| N3 | `og-card` retention | **Accepted as the contract's follow-up** |
+| N4 | ADR/spec amendments do not cross-reference the STATE VT-mark note | **Noted** — the STATE note is the record; a cross-reference is optional |
+| N5 | Minor count drift | **Fixed with CR-2** |
+
+### Exit
+
+Merged under §8 (below) with checks green, Security 0 FAIL, Skeptic no un-failable guard and
+Chief Reviewer Comment; branch deleted. Live verification on `jason.cusati.us`: `/`
+shows the badge; every page shows the emblem in the band; `og:image` is the emblem. The PR #70
+draft and the other seven badges are untouched.
+
+**Follow-ups recorded, not fixed here:** retire the orphaned `og-card.png`/`svg` (and its
+leak-check and `CI_PUBLIC_FILES` wiring) if the emblem OG is permanent; the three residual
+partial guard gaps above; and the owner may confirm the badge's exact marks (D16 source-material
+note).

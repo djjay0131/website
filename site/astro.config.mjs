@@ -54,8 +54,9 @@ export default defineConfig({
   // only). A sitemap of the private area would be a list of private URLs.
   // publicBuild() stages the payload bytes of the public framed items
   // (scripts/public-build.mjs); the private build's twin is privateBuild().
-  // ogCard() generates the default link-preview card (name, title, maroon band,
-  // orange rule, no portrait) into public/ before the build copies it. It runs
+  // ogCard() generates the link-preview card (name, title, maroon band, orange
+  // rule, no portrait) into public/ before the build copies it. It is RETAINED
+  // but no longer the default — D16 restored the emblem as og:image. It runs
   // only in the public output: private pages are noindex and carry no og:image.
   //
   // THE REACT ISLAND IS PRIVATE-ONLY (SEAM-S6; ADR-0003). The integration is

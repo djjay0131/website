@@ -64,6 +64,14 @@ Wave 0c ships without the mark (plan path 2): affiliation text, the colours, and
 If the owner later secures permission, the mark is added by ADR amendment and placed left
 of the wordmark at cap height.
 
+> **Amended 2026-10-04 (D16, owner).** The **research emblem** — original work, no university
+> mark and no HokieBird — is the site mark and returns here: a linked 40px image (44px hit
+> target) to the **left of the wordmark** in the shared band, on every page and in both
+> themes. This is the mark-free fallback. Separately, and against this section's default, the
+> owner knowingly serves **one** AI-generated HokieBird badge as the home hero image; it is
+> the sole exception, recorded as D16 with the owner's caveat, and not a precedent. The other
+> seven badge concepts (#70) stay unserved.
+
 ## 4. Footer
 
 Traditional three-column footer on a `--color-surface` band with a maroon top rule,
@@ -111,6 +119,11 @@ collapsing to one column on mobile. Data-driven from `cv-data` `meta.contact` pl
   band, and the private navigation.
 - `og:image`: the default stops being the portrait in this wave — a generated card (name,
   title, maroon band, orange rule, no portrait).
+
+  > **Amended 2026-10-04 (D16, owner).** The default `og:image` is the **research emblem**
+  > (`/emblem/research-emblem.png`), as #71 had it, not the generated card. The card
+  > generator remains in the tree but is no longer the default. The portrait is still never
+  > served.
 
 ## 7. Shared chrome (readiness Amendment 1)
 

@@ -66,6 +66,28 @@ styling, each with a reason that outlives the wave:
 - Make the band flip light/dark like other accents — rejected: it is the brand, and
   white-on-maroon is 8.4:1 in both themes.
 
+## Amendment — 2026-10-04 (owner decision D16)
+
+D16 is a small owner-directed L1 follow-up on `feat/logo`. It changes two of this ADR's
+outcomes and knowingly overrides one, each on the owner's own authority:
+
+1. **The research emblem returns to the band and to `og:image`.** Decision 1's generated
+   OG card is superseded: the default `og:image` is again `/emblem/research-emblem.png`,
+   as #71 had it. The emblem is also placed as a linked mark, 40px in a 44px hit target,
+   to the **left of the wordmark** in the shared `SiteBand` (every page, both themes). The
+   emblem is original work and carries no university mark and no HokieBird.
+2. **Decision 3 is overridden for exactly one asset.** The owner knowingly serves his own
+   AI-generated badge `vt-badge-hokiebird-laptop-tower-research-today.png` as the home-page
+   hero image, where the portrait used to sit. It depicts the HokieBird, a VT trademark the
+   Office of Licensing and Trademarks **declined** (D13). This is not a licensing reversal and
+   not a precedent: PR #70 stays unmerged, the other seven badge concepts are **not** added,
+   and no VT mark is added anywhere else. **The emblem remains the mark-free fallback.**
+
+The owner's caveat, recorded verbatim in `STATE.md` D16:
+
+> the badge depicts the HokieBird, a VT trademark Licensing declined; the owner chose to use
+> his own AI-generated rendering knowingly; the emblem remains the mark-free fallback.
+
 ## References
 
 - `llm/specs/2026-10-01-branding-design.md`

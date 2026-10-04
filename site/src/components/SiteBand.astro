@@ -38,14 +38,32 @@ const {
   affiliation = "Virginia Tech",
   navLabel = "Main navigation",
 } = Astro.props;
+
+// The research emblem is the site mark (D13/D16). It sits to the LEFT of the
+// wordmark and links home like the wordmark does. The svg's own maroon outer
+// ring blends with the maroon band by design; the visible rings it encloses --
+// the burnt-orange ring (3.02:1 against --color-band) and the white disc
+// (8.86:1) -- meet the AA non-text 3:1 threshold, and the anchor is 44px square
+// so the hit target clears the 44px minimum (D16).
+const base = import.meta.env.BASE_URL;
 ---
 
 <header class="site-band">
   <div class="band-inner">
-    <a class="band-brand" href={homeHref}>
-      <span class="band-wordmark">{wordmark}</span>
-      <span class="band-affiliation">{affiliation}</span>
-    </a>
+    <div class="band-brand-group">
+      <a class="band-emblem" href={homeHref}>
+        <img
+          src={`${base}emblem/research-emblem.svg`}
+          alt="Jason Cusati research emblem"
+          width="40"
+          height="40"
+        />
+      </a>
+      <a class="band-brand" href={homeHref}>
+        <span class="band-wordmark">{wordmark}</span>
+        <span class="band-affiliation">{affiliation}</span>
+      </a>
+    </div>
 
     {membersTag && <span class="band-members">{membersTag}</span>}
 
@@ -99,12 +117,37 @@ const {
     flex-wrap: wrap;
   }
 
+  .band-brand-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-right: auto;
+  }
+
+  /* A linked mark to the left of the wordmark (D16). The 44px box is the hit
+     target minimum; the emblem itself renders at 40px inside it. */
+  .band-emblem {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    color: var(--color-on-band);
+  }
+
+  .band-emblem img {
+    display: block;
+    width: 40px;
+    height: 40px;
+  }
+
   .band-brand {
     display: flex;
     flex-direction: column;
     line-height: 1.15;
     color: var(--color-on-band);
-    margin-right: auto;
   }
 
   .band-brand:hover {
@@ -223,7 +266,7 @@ const {
       align-items: center;
     }
 
-    .band-brand {
+    .band-brand-group {
       margin-right: 0;
     }
 
