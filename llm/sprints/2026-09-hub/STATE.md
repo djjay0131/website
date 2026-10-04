@@ -3544,12 +3544,12 @@ Terraform change, and none was needed (the brief's §9 stop was not reached).
 
 | Agent | Result |
 |---|---|
-| site checks (Lead Architect) | `npm test` **412 passed / 2 skipped**; `contrast` 56 pairs 0 below AA; public + private builds green; leak check PASS (211 files); `check:private-links` PASS; `check:publish-allowlist` PASS; `check:smoke-routes` PASS; `governance --layout` 4/4 |
+| site checks (Lead Architect) | `npm test` **421 passed / 2 skipped**; `contrast` 56 pairs 0 below AA; public + private builds green; leak check PASS (211 files); `check:private-links` PASS; `check:publish-allowlist` PASS; `check:smoke-routes` PASS; `governance --layout` 4/4 |
 | Security Tester | **0 FAIL** — gate/firebase/infra diffs empty; only new public paths are the two badge PNGs; PNGs carry no EXIF/ICC/text; SD-7 green; leak red→green holds |
 | a11y-tester | **0 FAIL** — emblem one-per-page with correct name/role; 44px hit target; band focus ring `--color-on-band` in both themes; badge hero alt/dimensions/no-lazy; ring 3.02:1 and disc 8.86:1 vs band; semantics unchanged |
 | Dissenter | 7 objections, **2 blocking (S1, S2) both fixed**, 5 non-blocking dispositioned below |
-| Skeptic Verifier | **8 guards, all made red by name and restored; 0 un-failable**; 1 guard strengthened (ring-specific) and 6 uncovered claims closed with checks |
-| Chief Reviewer | see below |
+| Skeptic Verifier | **Two passes, 16 break→red→restore cycles, 0 un-failable.** Pass 1 broke all 8 wave guards by name and found six uncovered claims and one guard weaker than claimed. Pass 2 (after `a310db8`/`95f3ab5`) re-verified the strengthened ring guard and 7 new built/source guards; D (linked mark), E (OG target), F (focus ring — the dark half already pinned in `tokens.test.ts`) closed. **Residual partial coverage, recorded not hidden:** "emblem on every page" (built guards read only `dist-public/index.html` and `dist-private/index.html`, not all 27/6 pages), `og:image` in built HTML (home only), badge-hidden (only `display:none`; `visibility:hidden` would pass) |
+| Chief Reviewer | **Comment** (approved with comments) — see below |
 
 ### Dissenter dispositions (Lead Architect)
 
@@ -3563,9 +3563,32 @@ Terraform change, and none was needed (the brief's §9 stop was not reached).
 | S6 | The `-2x` rationale is a category error (the segment allowlist guards `/p/**` only) | **Rejected, with evidence** — public files are copied into `dist-private`, so the private build's SD-7 check applies the allowlist and refused `@`; the Skeptic reproduced it |
 | S7 | `redirects:check` is unwired and exits 1 | **Pre-existing** (STATE U-7, deferred in ADR-0020); the two badge routes are covered by the map and the route-inventory test |
 
+### Chief Reviewer dispositions (verdict **Comment**)
+
+The reviewer reproduced the three surfaces independently (27/27 public + 6/6 private chrome
+pages, OG default, badge on public home only; 13,775/38,611 B; 3.0166:1 / 8.8610:1), found the
+gate/infra/contract/workflow diff empty, the four "comment-only" files genuinely comments, the
+authorship clean, and D16 within the owner's authority (it *is* the ADR-amendment mechanism
+ADR-0015 decision 3 prescribes — not a §9 hard stop).
+
+| # | Finding | Disposition |
+|---|---|---|
+| CR-1 | `og-card.mjs` still logged "generated the **default** og:image" | **Fixed** — string corrected, no behaviour change |
+| CR-2 | STATE overclaimed: `npm test` 412/2 (actual **421/2**) and credited the Skeptic with closing six claims it had not verified | **Fixed** — count corrected; the Skeptic re-ran and verified the new guards, and its residual partial coverage is recorded above |
+| N1 | Built-output guards read only the two `index.html` files, so "emblem on every page" is partial | **Accepted as a residual, recorded** (above); the shared `SiteBand` import by both layouts is the structural guarantee |
+| N2 | No PR/CI yet, so §8's "required checks green" and PR-body section are not yet demonstrable | **Addressed by the PR** that follows this record |
+| N3 | `og-card` retention | **Accepted as the contract's follow-up** |
+| N4 | ADR/spec amendments do not cross-reference the STATE VT-mark note | **Noted** — the STATE note is the record; a cross-reference is optional |
+| N5 | Minor count drift | **Fixed with CR-2** |
+
 ### Exit
 
 Merged under §8 (below) with checks green, Security 0 FAIL, Skeptic no un-failable guard and
-Chief Reviewer approve/comment; branch deleted. Live verification on `jason.cusati.us`: `/`
+Chief Reviewer Comment; branch deleted. Live verification on `jason.cusati.us`: `/`
 shows the badge; every page shows the emblem in the band; `og:image` is the emblem. The PR #70
 draft and the other seven badges are untouched.
+
+**Follow-ups recorded, not fixed here:** retire the orphaned `og-card.png`/`svg` (and its
+leak-check and `CI_PUBLIC_FILES` wiring) if the emblem OG is permanent; the three residual
+partial guard gaps above; and the owner may confirm the badge's exact marks (D16 source-material
+note).

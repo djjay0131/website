@@ -153,3 +153,60 @@ The dissenter's D-S1 was answered with source-level guards; that closes "revert 
   (`findUnservablePaths`, `GATE_SEGMENT_PATTERN`)
 - `llm/sprints/2026-09-hub/handoffs/dissenter-logo.md` (S1, S4, S6)
 - `git diff main...feat/logo`
+
+## Addendum — 2026-10-04, HEAD `2236c54`
+
+Since the first pass, `95f3ab5` ("close the skeptic's tightened gaps") and `2236c54`
+("round dispositions") added guards. Re-verified with **both builds present** so the
+`describe.runIf` built-output blocks actually run.
+
+Baseline before breaking: `npm run build` green (27 pages); `npm run build:private` green
+("checked 102 emitted path(s) against the gate's allowlist (SD-7)"); `npx vitest run
+scripts/logo.test.ts` **18 passed (18)**; `npm test` **31 files, 421 passed | 2 skipped (423)**.
+All breaks used unique anchors (verified `split(anchor).length - 1 === 1`), then
+`git checkout -- <file>`; final `git status --porcelain` shows only the pre-existing
+`M site/scripts/og-card.mjs` (the Lead Architect's in-flight edit) and the untracked
+`chief-reviewer-logo.md` — neither touched by me.
+
+### New guards defeated by name (8) — plus the ring fix
+
+| Claim | New guard (source) | Break | Exact failing test |
+|---|---|---|---|
+| prior "ring proves less" | `logo.test.ts:113` `r="188"\s+fill="#e5751f"` | repaint **only** the `r="188"` ring to `#861f41` | `… > uses the burnt-orange ring and the white disc the band relies on` |
+| D linked mark | `logo.test.ts:33` `<a class="band-emblem"\s+href=\{homeHref\}>` | `<a …>` → `<span class="band-emblem">` | `… > links the emblem svg with the exact alt text` |
+| F focus ring | `logo.test.ts:38-40` `.site-band :focus-visible … var(--color-on-band)` | `--color-on-band` → `--color-focus` | `… > keeps the band focus ring visible in both themes` |
+| C badge hero | `logo.test.ts:64-67` identity order + not `display:none` | `display: none;` on `.identity-badge` | `… > is the identity block's hero, not hidden` |
+| E OG target exists | `logo.test.ts:102-104` | move `public/emblem/research-emblem.png` out of tree | `… > ships the file the default points at` |
+| A built / | `logo.test.ts:132-137` reads `dist-public/index.html` | comment out the emblem `<a>` block, `npm run build` | `… > has the linked emblem with its alt text` |
+| A built /p/ | `logo.test.ts:148-153` reads `dist-private/index.html` | same, `npm run build:private` | `… > has the emblem with its alt text` |
+| B built og:image | `logo.test.ts:139-141` reads `dist-public/index.html` | comment out the `<meta property="og:image">` line, `npm run build` | `… > has og:image resolving to the emblem` |
+| F dark half (pre-existing) | `src/styles/tokens.test.ts:63,129` (not in `scripts/`) | add `--vt-band: #111413;` inside the dark `:root` | `design tokens > resolves every brand token to the VT ramp, in both themes` |
+
+The ring-specific fix lands: repainting **only** the ring (my prior finding) is now caught, as is
+the linked-mark, focus-ring, hidden-hero, missing-OG-target and built-output regressions. The
+dark-theme half of F was **already** guarded by the pre-existing `tokens.test.ts`
+(`color-band: {light:#861f41, dark:#861f41}`) — my first report missed it by grepping only
+`scripts/*.test.ts`.
+
+### A–F after the addendum
+
+| Claim | Status now | Residual gap |
+|---|---|---|
+| **A** emblem on every page | **Partial** | Built guards read only `dist-public/index.html` **and** `dist-private/index.html`; they do not enumerate all 27/6 built pages. A page that stopped rendering `SiteBand` would evade them. Substantively shielded: every chrome page uses `Base`/`PrivateBase`, both of which import `SiteBand`, so a component regression hits `index` too. |
+| **B** OG resolves in built HTML | **Partial** | Same index-only scope (`dist-public/index.html`). `og:image` lives in shared `Base`, so a regression hits index, but per-page og overrides are unchecked. |
+| **C** badge is the hero | **Partial** | Source guard catches `display: none` and source order. It does **not** catch other hiding: `visibility: hidden` on `.identity-badge` leaves `logo.test.ts` **18/18 green** (demonstrated). `opacity: 0` / off-screen positioning would likewise pass. |
+| **D** emblem is a linked mark | **Closed** | — |
+| **E** OG target file exists | **Closed** | Existence only (not emitted-path/base correctness), but the claim as stated is pinned. |
+| **F** focus ring / dark-theme invariance | **Closed** | Focus ring via the new `logo.test.ts` guard; dark-band invariance via pre-existing `tokens.test.ts`. |
+
+### Claims STILL uncovered after the addendum
+
+- **A — "the emblem is in the band on every page":** covered for the two index pages, **not**
+  enumerated across the full build.
+- **B — "og:image resolves to the emblem in the built HTML":** covered for the home page only,
+  **not** per public page.
+- **C — "the badge is the identity hero (not hidden)":** only `display:none` is caught;
+  **`visibility:hidden` (and other CSS hiding) still passes the whole suite.**
+
+D, E and F are closed. No wholly-unguarded claim remains; the three survivors are
+residual/partial gaps, not blanks.

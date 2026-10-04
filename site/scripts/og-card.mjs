@@ -75,7 +75,7 @@ export function ogCard() {
         fs.writeFileSync(svgPath, svg);
         const { default: sharp } = await import("sharp");
         await sharp(Buffer.from(svg)).png().toFile(pngPath);
-        logger.info(`generated the default og:image (no portrait): public/og-card.png`);
+        logger.info(`generated the retained og card (no longer the default; D16): public/og-card.png`);
       },
     },
   };
