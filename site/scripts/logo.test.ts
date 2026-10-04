@@ -91,13 +91,19 @@ describe("D16 — the default og:image is the emblem, not the generated card", (
 });
 
 describe("D16 — the emblem's visible rings meet AA non-text contrast on the band", () => {
-  it("has the burnt-orange ring and the white disc at >= 3:1 against --color-band", () => {
+  const emblem = read("public/emblem/research-emblem.svg");
+
+  it("uses the burnt-orange ring and the white disc the band relies on", () => {
+    // Read from the committed SVG, so swapping the emblem's colours is caught
+    // here and not only by eye. The outer ring is --color-band by design.
+    expect(emblem).toContain('fill="#e5751f"');
+    expect(emblem).toContain('fill="#fbfbf8"');
+  });
+
+  it("has those two at >= 3:1 against --color-band in the light theme", () => {
     const { light } = parseThemes(read("src/styles/tokens.css"));
     const band = light["color-band"];
     expect(band, "tokens.css must define --color-band").toBeTruthy();
-    // The emblem's outermost ring is --color-band by design; the visible rings
-    // it encloses are burnt orange (#e5751f) and the white disc (#fbfbf8), the
-    // colours SiteBand's comment cites.
     expect(contrastRatio("#e5751f", band)).toBeGreaterThanOrEqual(3);
     expect(contrastRatio("#fbfbf8", band)).toBeGreaterThanOrEqual(3);
   });
