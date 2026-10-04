@@ -509,6 +509,12 @@ precedent for any other VT mark; no permission from the Office of Licensing and 
 claimed or implied. `emblem/research-emblem.svg` remains the site mark and the fallback if the
 badge is later withdrawn.
 
+**Source-material note (Dissenter D-S3).** The `assets/research-badges` README states that
+every concept in that directory uses **the Virginia Tech mark and the HokieBird likeness**, so
+the served badge may carry both, not the HokieBird alone. The owner's caveat above is verbatim
+and names the HokieBird; it is not intended to exclude the VT mark, and the owner may confirm
+the exact content. The image is served as committed from #70; no other badge is added.
+
 **D8 — the day-one allowlist, exactly.** `cv/academic`, `cv/research-professional`,
 `cv/sde-long`, `cv/cv-data` (the data item the public CV pages render from), `kgis/kgis-docs`,
 and the first-party `soa-agentic-se` research digests, keyed `hub/<path>`.

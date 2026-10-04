@@ -1,11 +1,12 @@
-// THE DEFAULT og:image IS A GENERATED CARD (ADR-0015 decision 1; spec §6/§9).
+// THE GENERATED OG CARD — RETAINED, NO LONGER THE DEFAULT (D16, 2026-10-04).
 //
-// Before Wave 0c the default link preview was the portrait; the spec replaces
-// it with a generated card: the name, the site title, a maroon band and an
-// orange rule, and NO portrait. It is written into public/ from an Astro
-// integration at config:setup, so both `npm run build` and `npm run build:public`
-// produce it without a separate prebuild step, and Astro then copies it into the
-// output like any committed public file.
+// ADR-0015 decision 1 replaced the portrait with a generated card. D16 restored
+// the research emblem as the default `og:image`, so this card is no longer
+// referenced by `Base.astro`; the generator and its test remain, and the file is
+// still emitted, pending a decision to retire it. It is written into public/
+// from an Astro integration at config:setup, so both `npm run build` and
+// `npm run build:public` produce it without a separate prebuild step, and Astro
+// then copies it into the output like any committed public file.
 //
 // The card is an SVG (the editable source, also written) rasterised to PNG with
 // sharp, which Astro already depends on. Nothing leaves the origin: the card is

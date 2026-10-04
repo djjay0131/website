@@ -23,6 +23,11 @@ redirect-map entry. No infra, gate, or Terraform change; none is permitted by th
 - `site/src/layouts/Base.astro` — the default `og:image` returns to the emblem
 - `site/public/badges/vt-badge-hokiebird-laptop-tower-research-today{,-2x}.png`
 - `site/redirects/github-pages.json` — the two new public files, sorted
+- `site/scripts/logo.test.ts` — source-level guards for the three new surfaces and the
+  emblem's non-text contrast (added in response to Dissenter D-S1)
+- `site/scripts/og-card.mjs`, `og-card.test.ts`, `site-routes.mjs`, `site/astro.config.mjs`
+  — **comments only**, to record that the generated card is retained but no longer the
+  default (Dissenter D-S2). No behaviour change.
 - `llm/governance/adr/0015-*.md`, `llm/specs/2026-10-01-branding-design.md`, `STATE.md`
 - Wave records under `llm/sprints/2026-09-hub/`
 
@@ -49,8 +54,10 @@ redirect-map entry. No infra, gate, or Terraform change; none is permitted by th
    must satisfy the gate's segment allowlist `[A-Za-z0-9._-]` (so `-2x`, never `@2x`).
 3. **OG stays the emblem (D16.2).** The default `og:image` is `/emblem/research-emblem.png`.
 4. **Record (D16.3).** D16 is a row in STATE's decisions table, with the owner caveat
-   recorded **verbatim**. ADR-0015 and the branding spec carry dated amendments, so no
-   existing source of truth is left contradicted.
+   recorded **verbatim**. ADR-0015 and the branding spec carry dated amendments, and the
+   files that still call the generated card "the default `og:image`" are corrected in
+   comments, so no existing source of truth is left contradicted by the served emblem,
+   badge or OG default. The generated card itself is retained, not retired (a follow-up).
 
 ## Agents (all read-only; they write no source and make no git/gh/cloud mutation)
 
