@@ -3583,10 +3583,26 @@ ADR-0015 decision 3 prescribes — not a §9 hard stop).
 
 ### Exit
 
-Merged under §8 (below) with checks green, Security 0 FAIL, Skeptic no un-failable guard and
-Chief Reviewer Comment; branch deleted. Live verification on `jason.cusati.us`: `/`
-shows the badge; every page shows the emblem in the band; `og:image` is the emblem. The PR #70
-draft and the other seven badges are untouched.
+**Merged under §8** as PR #102 (merge commit `7e7edfd`), branch `feat/logo` deleted. §8 held:
+`governance-checks` and `budget-guard` green; `build`, `build-firebase`, `contract-tests`,
+`leak-check-self-test`, `check`, `deploy-tools` green; Security Tester 0 FAIL; Skeptic no
+un-failable guard (two passes); Dissenter's 2 blocking findings fixed; Chief Reviewer
+**Comment** (its two Fix-now items fixed in `f345734`). Post-merge `main` run 37225962392
+green end to end (`build`, `build-firebase`, `deploy`, `firebase-deploy`, `private-sync`,
+`smoke-test`, `firebase-smoke-test`).
+
+Live on `https://jason.cusati.us` (2026-10-04, `built_from_sha` `7e7edfd`):
+
+| Probe | Result |
+|---|---|
+| `/` badge hero | `class="identity-badge" src="/badges/vt-badge-hokiebird-laptop-tower-research-today.png"`, 1x/2x srcset |
+| Emblem in the band, sampled pages (`/cv/academic/`, `/research/`, `/projects/`, `/writing/`, `/cv/`, `/signin/`, `/privacy/`, `/email/`, `/search/`, `/projects/kgis/kgis-docs/`, `/research/soa-agentic-se/`) | `alt="Jason Cusati research emblem"` **once each** |
+| `/p/` chrome (local `dist-private`) | emblem present (private build, SD-7 green) |
+| `og:image` on `/` | `https://jason.cusati.us/emblem/research-emblem.png` |
+| Assets | badge 200 @13,775 B; badge `-2x` 200 @38,611 B; emblem svg 200; emblem png 200; `og-card.png` still 200 (retained) |
+| Boundary | `/p/` signed-out **404**; `/cv/anthropic-fellow/` **302 → /signin/** (unchanged) |
+
+The PR #70 draft and the other seven badges are untouched.
 
 **Follow-ups recorded, not fixed here:** retire the orphaned `og-card.png`/`svg` (and its
 leak-check and `CI_PUBLIC_FILES` wiring) if the emblem OG is permanent; the three residual
