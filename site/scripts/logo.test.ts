@@ -130,29 +130,30 @@ const PUBLIC_INDEX = path.join(siteRoot, "dist-public/index.html");
 const PRIVATE_INDEX = path.join(siteRoot, "dist-private/index.html");
 
 describe.runIf(fs.existsSync(PUBLIC_INDEX))("built / carries the emblem and the badge", () => {
-  const html = fs.readFileSync(PUBLIC_INDEX, "utf8");
-
   it("has the linked emblem with its alt text", () => {
+    const html = fs.readFileSync(PUBLIC_INDEX, "utf8");
     expect(html).toMatch(/class="band-emblem"[^>]*href="[^"]*"[^>]*>[\s\S]*?alt="Jason Cusati research emblem"/);
   });
 
   it("has og:image resolving to the emblem", () => {
+    const html = fs.readFileSync(PUBLIC_INDEX, "utf8");
     expect(html).toMatch(/property="og:image" content="[^"]*emblem\/research-emblem\.png"/);
   });
 
   it("has the badge hero", () => {
+    const html = fs.readFileSync(PUBLIC_INDEX, "utf8");
     expect(html).toContain("badges/vt-badge-hokiebird-laptop-tower-research-today.png");
   });
 });
 
 describe.runIf(fs.existsSync(PRIVATE_INDEX))("built /p/ carries the emblem but not the badge", () => {
-  const html = fs.readFileSync(PRIVATE_INDEX, "utf8");
-
   it("has the emblem with its alt text", () => {
+    const html = fs.readFileSync(PRIVATE_INDEX, "utf8");
     expect(html).toContain('alt="Jason Cusati research emblem"');
   });
 
   it("does not carry the public home badge hero", () => {
+    const html = fs.readFileSync(PRIVATE_INDEX, "utf8");
     expect(html).not.toContain("identity-badge");
   });
 });
