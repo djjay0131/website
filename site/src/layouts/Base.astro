@@ -42,10 +42,10 @@ const {
 const base = import.meta.env.BASE_URL;
 const siteUrl = Astro.site?.toString().replace(/\/$/, "") ?? "";
 const canonicalUrl = `${siteUrl}${Astro.url.pathname}`;
-// The default link-preview image is a generated card (name, title, maroon band,
-// orange rule, no portrait). The portrait is never served on the public site
-// (ADR-0015 decision 1); scripts/og-card.mjs generates this PNG at build time.
-const ogImageUrl = ogImage ? `${siteUrl}${base}${ogImage}` : `${siteUrl}${base}og-card.png`;
+// The default link-preview image is the research emblem, the site mark
+// (D13/D16). Wave 0c briefly used a generated card here; D16 restores the
+// emblem, as #71 had it. The portrait is never served on the public site.
+const ogImageUrl = ogImage ? `${siteUrl}${base}${ogImage}` : `${siteUrl}${base}emblem/research-emblem.png`;
 
 // Footer and identity data (Amendment 3; spec §9). The handles come from
 // cv-data's meta.contact, never hard-coded here.

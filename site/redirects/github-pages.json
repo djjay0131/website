@@ -4,6 +4,14 @@
     "to": "/"
   },
   {
+    "from": "/website/badges/vt-badge-hokiebird-laptop-tower-research-today-2x.png",
+    "to": "/badges/vt-badge-hokiebird-laptop-tower-research-today-2x.png"
+  },
+  {
+    "from": "/website/badges/vt-badge-hokiebird-laptop-tower-research-today.png",
+    "to": "/badges/vt-badge-hokiebird-laptop-tower-research-today.png"
+  },
+  {
     "from": "/website/build-info.json",
     "to": "/build-info.json"
   },
