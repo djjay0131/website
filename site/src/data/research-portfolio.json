@@ -65,9 +65,17 @@
         {
           "name": "Agentic governance and agentic research",
           "goal": "Make governed, reproducible agent work the default rather than the exception.",
-          "status": "Active; the Springer chapter proposal \"Governed Agentic Research\" is due 2026-10-23.",
+          "status": "Active; the tooling under the Springer chapter proposal below.",
           "href": null,
           "repo": "agentic-governance",
+          "public": true
+        },
+        {
+          "name": "Governed Agentic Empirical Research (Springer chapter)",
+          "goal": "Argue, and show with working tooling, that once agents participate in empirical SE research the research process itself must be governed, provenance-first and reproducible.",
+          "status": "Proposal draft abstract published; one-page proposal due 2026-10-23. Deep-research track on AI across the empirical-SE lifecycle in progress.",
+          "href": "/research/governed-agentic-research/",
+          "repo": "ai-empirical-se-chapter",
           "public": true
         }
       ]

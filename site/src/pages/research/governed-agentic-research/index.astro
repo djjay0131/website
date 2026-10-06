@@ -1,0 +1,126 @@
+---
+// Project page for the Springer book-chapter proposal "Governed Agentic
+// Empirical Research". Source repository: djjay0131/ai-empirical-se-chapter
+// (private until the chapter is accepted). The abstract below is the proposal
+// draft of 6 October 2026, published deliberately as a draft; the research
+// track beneath it is populated from the chapter repo's research store once
+// that store lands (docs/research/ai-in-empirical-se/).
+import Base from "../../../layouts/Base.astro";
+const base = import.meta.env.BASE_URL;
+const research = `${base}research/`;
+const soa = `${base}research/soa-agentic-se/`;
+---
+
+<Base
+  title="Jason Cusati — Governed Agentic Empirical Research"
+  description="A Springer book-chapter proposal arguing that once AI agents participate in empirical software engineering research, the research process itself must be governed, provenance-first and reproducible. Draft abstract and the research tracks behind it."
+>
+  <p class="crumbs"><a href={research}>← Research</a></p>
+  <h1>Governed Agentic Empirical Research</h1>
+  <p class="lede">
+    A chapter proposal for the Springer edited volume <em>Using Artificial
+    Intelligence in Empirical Software Engineering Research</em> (eds. Mäntylä,
+    Mendez, Franch, Kalinowski). Proposal due 23 October 2026; chapter, if
+    accepted, through June 2027.
+  </p>
+
+  <h2>Abstract <span class="badge">proposal draft · 6 October 2026</span></h2>
+  <div class="abstract">
+    <p>
+      AI is no longer a tool that a researcher calls at one step of a study. In
+      empirical software engineering it now plans, retrieves, extracts,
+      critiques, and transforms data, with decisions delegated to it along the
+      way. Current practice answers this by disclosing the model and the prompt,
+      but that captures a sliver of an agentic workflow: the delegated
+      decisions, intermediate artifacts, validation steps, and human
+      interventions that shape a result go unrecorded, so neither the author nor
+      a reader can say with confidence what was produced, by whom, or why. We
+      already know how to keep an engineering process accountable; this chapter
+      argues that the research process needs the same treatment once agents are
+      participants in it. We present Governed Agentic Empirical Research (GAER),
+      a methodological framework in which every agent works under bounded
+      authority with an explicit role and rules, every consequential decision
+      leaves durable provenance in a shared memory bank, and reproducibility is
+      built into the research repository as executable checks rather than
+      written up afterwards. The framework is grounded in working tooling and
+      illustrated by a time-boxed empirical study in which agents drafted every
+      analysis while typed claims, pre-registered thresholds, a human
+      re-derivation ledger, and an adversarial reviewer gated what could be
+      reported. A PhD student or researcher can adopt it with a short setup and
+      no additional infrastructure.
+    </p>
+  </div>
+  <p class="note">
+    This is a working draft ahead of submission, published so that
+    collaborators can read it in context. Wording, the framework's name and
+    the worked example may all change before 23 October.
+  </p>
+
+  <h2>Research tracks</h2>
+  <div class="cards">
+    <div class="card card-planned">
+      <span class="card-title">AI and agents across the empirical-SE lifecycle</span>
+      <span class="card-desc">What has been published on LLMs and agents at each stage of empirical SE research — study design, literature reviews, repository mining, qualitative and quantitative analysis, artifact generation, reporting — and what it says about rigor, validity, reproducibility and the human role. Starts from Gomes et al. (2026).</span>
+      <span class="card-meta">In progress · deep-research pass started 6 October 2026 · synthesis and source explorer to follow</span>
+    </div>
+  </div>
+
+  <h2>How this relates to the other projects</h2>
+  <p>
+    The chapter is the methodological layer on top of work that is reported
+    elsewhere on this site. Each project below supplies one strand of the
+    argument; none of them is the chapter.
+  </p>
+  <ul class="relations">
+    <li>
+      <a href={`${soa}agentic-harnesses/`}>Agentic harnesses</a> and
+      <a href={`${soa}agentic-memory/`}>Agent memory</a> (the
+      <a href={soa}>State of the Art in Agentic SE</a> project) are themselves
+      governed research passes: schema-constrained source records, discovery
+      separated from an adversarially prompted verification pass, provenance
+      fields on every record. They are the method's literature-review stage in
+      practice — one stage of the lifecycle, not the whole process.
+    </li>
+    <li>
+      <strong>Research.AI</strong> (the <code>agentic-kg</code> project under
+      the knowledge-graphs tenet) supplies the chapter's sharpest case for human
+      methodological judgement: reconciling a gold-label schema where the
+      labelling choice itself could distort measured precision and recall, so
+      the evaluation would measure the researchers' decision rather than the
+      system's behaviour.
+    </li>
+    <li>
+      A time-boxed empirical study run in August 2026 under the framework's
+      tooling (<code>agentic-governance</code>, <code>agentic-research</code>)
+      is the worked example in the abstract: typed claims, pre-registered
+      thresholds, a human re-derivation ledger and an adversarial reviewer
+      gating what could be reported. Changes that came out of it flowed back
+      into both tools.
+    </li>
+  </ul>
+
+  <h2>Status</h2>
+  <p>
+    Repository private until the chapter is accepted. The proposal's evidence
+    phase (internal evidence map, literature-gap review, failure-mode
+    inventory) is under way; three competing pitches and an adversarial review
+    precede the final one-page proposal.
+  </p>
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .lede { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 1rem; }
+  .badge { font-family: var(--font-body); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-muted); border: 1px solid var(--color-border); border-radius: 3px; padding: 0.1em 0.5em; vertical-align: middle; margin-left: 0.5em; }
+  .abstract { border-left: 4px solid var(--color-accent); background: var(--color-surface); padding: 1rem 1.25rem; margin: 1rem 0; }
+  .abstract p { margin: 0; }
+  .note { font-size: 0.9rem; color: var(--color-muted); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .card { display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem 1.1rem; border: 1px solid var(--color-border); border-left: 4px solid var(--color-accent); border-radius: 4px; background: var(--color-surface); color: var(--color-text); text-decoration: none; }
+  .card-planned { border-left-style: dashed; }
+  .card-title { font-family: var(--font-body); font-weight: 600; color: var(--color-text); font-size: 1.05rem; }
+  .card-desc { font-size: 0.92rem; color: var(--color-muted); }
+  .card-meta { font-family: var(--font-body); font-size: 0.78rem; color: var(--color-muted); margin-top: 0.25rem; }
+  .relations li { margin-bottom: 0.75rem; }
+  code { font-family: var(--font-mono); font-size: 0.9em; background: var(--color-surface); padding: 0 0.25em; }
+</style>
