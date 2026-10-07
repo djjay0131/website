@@ -150,7 +150,9 @@ locals {
 # - roles/iam.serviceAccountTokenCreator on itself. That is needed to SIGN
 #   blobs -- createCustomToken -- which this gate does not do. Session cookies
 #   are minted by the Identity Toolkit service, not signed locally.
-# - roles/secretmanager.*. There is no secret.
+# - roles/secretmanager.*, with ONE exception: notes-sync.tf grants
+#   `secretmanager.secretAccessor` on the single `notes-export-app-key` secret
+#   (ADR-0022, D18). There is no other secret, and no project-level secret role.
 # ---------------------------------------------------------------------------
 resource "google_service_account" "hub_gate" {
   project      = var.project_id

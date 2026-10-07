@@ -67,6 +67,7 @@ from .notes_sync import (
     RealGitHubAppClient,
     SecretManagerRestProvider,
     parse_routing,
+    sanitize_error,
 )
 from .serve import (
     INDEX_DOCUMENT,
@@ -908,7 +909,12 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         sync = deps.notes_sync
 
         def _row(annotation: Annotation) -> dict:
-            state = sync.state_for(annotation.section, annotation.source, annotation.slug) if sync else None
+            state = None
+            if sync is not None:
+                try:
+                    state = sync.state_for(annotation.section, annotation.source, annotation.slug)
+                except Exception as exc:  # a queue read must never break the list (Dissenter D6)
+                    logger.warning("event=error scope=notes_sync action=state error=%s", sanitize_error(exc))
             return _annotation_row(
                 annotation,
                 include_content=(scope != "all" or annotation.member == owner_member),
@@ -1545,6 +1551,24 @@ def _enqueue_notes_export(deps: Dependencies, section: str, source: str, slug: s
     if deps.notes_sync is None:
         return
     deps.notes_sync.enqueue(section, source, slug)
+    _kick_drain(deps)
+
+
+def _kick_drain(deps: Dependencies) -> None:
+    """Schedule a drain on the running loop's executor (fire-and-forget).
+
+    A cold instance should not wait for the background loop's next tick after
+    the request that queued the job. Best-effort: the queue is in Firestore, so
+    a failure here only delays the write (Dissenter B2).
+    """
+    sync = deps.notes_sync
+    if sync is None or not sync.enabled:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    loop.run_in_executor(None, sync.drain)
 
 
 async def _notes_sync_loop(deps: Dependencies) -> None:
@@ -1560,6 +1584,6 @@ async def _notes_sync_loop(deps: Dependencies) -> None:
     while True:
         try:
             await asyncio.to_thread(sync.drain)
-        except Exception:  # any drain failure is retried by the queue itself
-            logger.exception("event=error scope=notes_sync action=drain")
+        except Exception as exc:  # any drain failure is retried by the queue itself
+            logger.warning("event=error scope=notes_sync action=drain error=%s", sanitize_error(exc))
         await asyncio.sleep(NOTES_SYNC_POLL_SECONDS)

@@ -9,18 +9,22 @@ lifetime, the branch/commit discipline (never `main`), the deterministic render
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.notes_sync import (
     DEAD_LETTER_AFTER,
+    MAX_ATTEMPTS,
+    MAX_ENTRIES_PER_ITEM,
     NOTES_BRANCH,
     ExportEntry,
     NotesSync,
     Route,
     StaticExportQueue,
     StaticGitHubAppClient,
+    _job_from_document,
     _short_error,
     backoff_seconds,
     commit_message,
@@ -28,6 +32,7 @@ from app.notes_sync import (
     destinations,
     job_id,
     notes_path,
+    one_line,
     parse_routing,
     render_item_markdown,
 )
@@ -171,7 +176,7 @@ def test_render_records_a_tombstone_instead_of_dropping_the_entry():
     assert "gone" in text
 
 
-def test_destinations_group_by_intent_and_exclude_question_and_tombstones():
+def test_destinations_group_by_intent_and_include_tombstones_but_not_question():
     entries = [
         entry("paper", "a"),
         entry("experiment", "b"),
@@ -181,8 +186,9 @@ def test_destinations_group_by_intent_and_exclude_question_and_tombstones():
     ]
     by_repo = destinations(entries, ROUTING)
     assert set(by_repo) == {SOA, RESEARCH}
-    assert len(by_repo[SOA]) == 1  # the live paper entry
+    assert len(by_repo[SOA]) == 2  # the live paper entry AND its tombstone
     assert len(by_repo[RESEARCH]) == 2
+    assert any(e.deleted for e in by_repo[SOA])
 
 
 def test_parse_routing_rejects_missing_intent_and_bad_repo():
@@ -315,3 +321,78 @@ def test_a_write_failure_retries_and_stays_visible():
     github.raise_on = set()
     assert sync.drain(now=BASE + timedelta(seconds=105)) == 1
     assert queue.state_for(*ITEM) is None
+
+
+# --- round-1 fixes and coverage -------------------------------------------
+
+
+def test_a_deleted_only_item_still_writes_a_tombstone():
+    """RT6NS-01 / Dissenter B1: deleting the last note must reach the repo."""
+    sync, _queue, github = make_sync(
+        [entry("paper", "gone", deleted=True, deleted_at=BASE + timedelta(days=1))]
+    )
+    sync.enqueue(*ITEM, now=BASE)
+    assert sync.drain(now=BASE + timedelta(seconds=45)) == 1
+    assert len(github.commits) == 1
+    text = github.get_file(SOA, "notes/phd-milestones/committee-dossier.md", NOTES_BRANCH)[0]
+    assert "## tombstone" in text
+    assert "gone" in text
+
+
+def test_notes_branch_is_created_only_once():
+    """Skeptic g-1: the branch-once early return must be fail-able."""
+    entries = [entry("paper", "one")]
+    sync, _queue, github = make_sync(entries)
+    sync.enqueue(*ITEM, now=BASE)
+    sync.drain(now=BASE + timedelta(seconds=45))
+    entries.append(entry("paper", "two", created=BASE + timedelta(minutes=1)))
+    sync.enqueue(*ITEM, now=BASE + timedelta(minutes=5))
+    sync.drain(now=BASE + timedelta(minutes=6))
+    assert github.branches_created == [(SOA, NOTES_BRANCH)]
+    assert len(github.commits) == 2
+
+
+def test_job_document_with_a_tampered_id_is_refused():
+    data = {
+        "section": "phd",
+        "source": "s",
+        "slug": "y",
+        "first_attempt": BASE,
+        "next_attempt": BASE,
+        "not_before": BASE,
+    }
+    assert _job_from_document("wrong-id", data) is None
+    assert _job_from_document(job_id("phd", "s", "y"), data) is not None
+
+
+def test_one_line_collapses_control_characters():
+    assert one_line("a\nb\tc\x00d") == "a b c d"
+
+
+def test_renderer_strips_control_characters_from_a_comment():
+    text = render_item_markdown(
+        [entry("paper", "q", comment="hi\x00\x1b[31mred")],
+        section="s",
+        source="s",
+        slug="y",
+        origin="https://jason.cusati.us",
+    )
+    assert "\x00" not in text
+    assert "\x1b" not in text
+    assert "red" in text
+
+
+def test_queue_dead_letters_at_the_attempt_cap():
+    queue = StaticExportQueue()
+    queue.enqueue(*ITEM, now=BASE, debounce=30)
+    job = queue.due(BASE + timedelta(seconds=30))[0]
+    queue.failure(replace(job, attempts=MAX_ATTEMPTS - 1), now=BASE + timedelta(seconds=31), error="x")
+    assert queue.state_for(*ITEM) == {"state": "dead_letter", "error": "x"}
+
+
+def test_renderer_caps_the_number_of_entries_per_item():
+    many = [
+        entry("paper", f"q{i}", created=BASE + timedelta(seconds=i)) for i in range(MAX_ENTRIES_PER_ITEM + 3)
+    ]
+    text = render_item_markdown(many, section="s", source="s", slug="y", origin="https://jason.cusati.us")
+    assert "earlier entries omitted" in text

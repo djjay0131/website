@@ -83,11 +83,23 @@ Membership only (owner or member) is enough to write and read one's own notes.
 `POST` and `DELETE` are state-changing and carry the same allowed-origin check
 as the share routes; `GET` is a read and does not. `member` is taken from the
 verified session — a client-supplied `member` cannot forge authorship.
-`?scope=all` is **owner only** and is the export data source (`export-notes.mjs`
-applies `site/notes-routing.json`; the gate does no rendering or routing); a
+`?scope=all` is **owner only** and is the export data source; a
 non-owner asking for all is refused, never silently downgraded to their own
 rows. No quote, comment, title, selector or object path is ever logged — the
 lines name the note by a short id and the author by email only.
+
+## Notes export (ADR-0022, D18)
+
+When configured (`GATE_NOTES_EXPORT_ENABLED` plus the GitHub App id and
+installation id), the gate commits annotations to a long-lived `notes` branch in
+each destination repository — never `main`. On a successful create or
+soft-delete it enqueues a job (Firestore `notes_export/`), debounced 30–60s and
+coalesced per item, retried with exponential backoff for ≥24h and then
+dead-lettered (a flag surfaced by `GET /annotations`). Routing comes from
+`site/notes-routing.json` via `GATE_NOTES_ROUTING`; `question` notes are never
+exported. The App private key is read from Secret Manager (`notes-export-app-key`)
+at run time and no credential ever reaches a client. **Dormant by default:** an
+unconfigured gate makes no GitHub call and behaves exactly as before.
 
 **One deliberate `X-Frame-Options` exception.** The capture island reads the
 selection from the item payload iframe at `/p/_payload/<source>/<path>`, same

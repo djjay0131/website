@@ -49,6 +49,13 @@ DEFAULT_ROUTING_DIR = "notes"
 MAX_QUOTE_CHARS = 2000
 MAX_COMMENT_CHARS = 5000
 MAX_ENTRY_MEMBER_CHARS = 320
+# A single item's file is bounded: a member cannot make one commit arbitrarily
+# large. Entries beyond this are omitted from the REPOSITORY projection with a
+# visible note; Firestore keeps them all (it is the source of truth).
+MAX_ENTRIES_PER_ITEM = 2000
+
+# C0 controls except TAB and LF. LF is kept for comments (blockquoted per line).
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 QUOTE_SELECTOR_TYPE = "TextQuoteSelector"
 POSITION_SELECTOR_TYPE = "TextPositionSelector"
@@ -109,9 +116,14 @@ def notes_path(source: str, slug: str) -> str | None:
 
 
 def escape_markdown(value: object) -> str:
-    """HTML + Markdown escaping, matching the site export renderer (RT6-06)."""
+    """HTML + Markdown escaping, matching the site export renderer (RT6-06).
+
+    Control characters (NUL, ESC, CR, …) are removed first, so a comment or quote
+    cannot carry them into a committed file. LF is preserved for the comment
+    blockquote.
+    """
     return (
-        str(value if value is not None else "")
+        _CONTROL.sub("", str(value if value is not None else ""))
         .replace("\\", "\\\\")
         .replace("&", "&amp;")
         .replace("<", "&lt;")
@@ -196,6 +208,10 @@ def render_item_markdown(
     byte-identical content and the writer commits nothing.
     """
     ordered = sorted(entries, key=lambda entry: entry.created)
+    omitted = 0
+    if len(ordered) > MAX_ENTRIES_PER_ITEM:
+        omitted = len(ordered) - MAX_ENTRIES_PER_ITEM
+        ordered = ordered[-MAX_ENTRIES_PER_ITEM:]
     blocks = [
         _tombstone_block(entry, section=section, source=source, slug=slug)
         if entry.deleted
@@ -203,6 +219,10 @@ def render_item_markdown(
         for entry in ordered
     ]
     header = f"# {section}/{source}/{slug}\n\n"
+    if omitted:
+        header += (
+            f"_({omitted} earlier entr{'y' if omitted == 1 else 'ies'} omitted here; see My notes.)_\n\n"
+        )
     return header + "\n".join(blocks)
 
 
@@ -261,11 +281,15 @@ def parse_routing(raw: object) -> dict[str, Route | None]:
 def destinations(
     entries: list[ExportEntry], routing: dict[str, Route | None]
 ) -> dict[str, list[ExportEntry]]:
-    """Group an item's non-tombstone, non-`question` entries by destination repo."""
+    """Group an item's non-`question` entries by destination repo.
+
+    DELETED entries ARE included: a tombstone must reach the repo that carried
+    the live entry, otherwise deleting the last routed note would leave the old
+    content published forever (Red Team RT6NS-01 / Dissenter B1). `question`
+    entries are excluded and never exported.
+    """
     out: dict[str, list[ExportEntry]] = {}
     for entry in entries:
-        if entry.deleted:
-            continue
         route = routing.get(entry.intent)
         if route is None:
             continue
@@ -321,8 +345,15 @@ def _short_error(value: object) -> str:
 
 _TOKEN_PATTERN = re.compile(
     r"(gh[sphou]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+"
-    r"|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)"
+    r"|ya29\.[A-Za-z0-9_\-.]+"
+    r"|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
+    r"|-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----)"
 )
+
+
+def sanitize_error(value: object) -> str:
+    """Public name for the log-safe error text (see `_short_error`)."""
+    return _short_error(value)
 
 
 def _job_from_document(doc_id: str, data: dict[str, Any]) -> ExportJob | None:
