@@ -3725,3 +3725,31 @@ claimed, because it needs a real member session no agent can produce.
 **The export credential (ADR-0022).** No credential, secret, GitHub App, PAT or
 cross-repo IAM was created. The owner must choose the mechanism before automated
 cross-repository delivery exists. Exact ask is in the PR body and ADR-0022.
+
+### Wave 6 — post-merge record (2026-10-07)
+
+- **Merged** as PR **#108**, merge commit **`b2906a6`** (branch `feat/annotations`
+  deleted). §8 held: `governance-checks` + `budget-guard` required checks green,
+  `build`, `build-firebase`, `check`, `contract-tests`, `deploy-tools`,
+  `leak-check-self-test` and `test` green; Security Tester 0 FAIL; Red Team zero
+  unhandled bypass after two rounds; Skeptic no un-failable guard; Chief Reviewer
+  **Approve** on the delta; PR body carries the data/security/privacy section.
+- **No apply.** The only `infra/` change is a comment; a post-merge
+  `terraform plan -detailed-exitcode` from `main` returned **exit 0 / No changes**,
+  so nothing was applied (nothing to apply).
+- **Post-merge workflows green:** `build-and-deploy` run `37657644488` and `gate`
+  run `37657644531` both succeeded on `b2906a6`.
+- **Live signed-out verification (2026-10-07):**
+
+  | Probe | Result |
+  |---|---|
+  | `/annotations` | **403** `cache-control: private, no-store` |
+  | `/annotations?scope=all` | **403** `private, no-store` |
+  | `DELETE /annotations/abcdef` (signed-out, no Origin) | **403** |
+  | `/p/notes/` (signed-out) | **404** `private, no-store` (gate) |
+  | `/notes/` (public) | **404** static, `max-age=3600` (not a public route) |
+  | `sitemap-0.xml`, `/search/` | **0** annotation or notes traces |
+
+- **Owner sign-in check — PENDING.** Sign in as `djjay@vt.edu`, open a private
+  `html` item (e.g. `/p/research/agentic-kg-research/research-store/`), select
+  text, Highlight/Comment, and open `/p/notes/`. Recorded pending; not claimed.
