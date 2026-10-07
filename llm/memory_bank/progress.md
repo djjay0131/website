@@ -1,7 +1,7 @@
 # Progress
 
 Status: Active
-Last updated: 2026-10-01
+Last updated: 2026-10-07
 Owner: Chief Architect
 
 What belongs here: what works, what is left, and known issues — recorded against
@@ -45,11 +45,20 @@ merged reality, not plans.
 - **Four alert policies** are enabled, including "gate started misconfigured" — but
   deliver nothing until the notification channel is verified (owner-only).
 - Governance adopted (agentic-governance v0.9); `main` requires `governance-checks` and
-  `budget-guard`. ADRs 0001–0014 Accepted. The owner's $5 budget alert is live.
+  `budget-guard`. ADRs 0001–0021 Accepted; ADR-0022 Proposed. The owner's $5 budget alert
+  is live.
 - `/email/` and `/privacy/` are live, in the owner's supplied wording (PR #15).
 
 ## Done, most recent first
 
+- **Wave 6 (`#107`, annotations) implemented** 2026-10-07 (branch `feat/annotations`,
+  D17) — private reading-time notes: a capture island on `html`/`bundle` private item
+  frames, gate routes `POST/GET/DELETE /annotations` (owner-only `?scope=all`), My notes
+  at `/p/notes/`, intent routing in `site/notes-routing.json`, and a credential-free
+  export renderer. Two adversarial rounds; Security Tester 0 FAIL; Regression 0; Chief
+  Reviewer Request changes → resolved. **Export delivery is blocked on the ADR-0022
+  credential (hard stop).** The owner-read default is narrowed: the owner enumerates and
+  deletes any note but does not read a member's content.
 - **Wave 0c (branding) DONE and LIVE** 2026-10-02 (PR #91, merge `beb7301`) — maroon
   band header with "Virginia Tech" text (no mark), three-column footer with 7
   `rel="me"` profiles (GitHub, LinkedIn, Google Scholar, ORCID, X, Bluesky, Mastodon),
@@ -95,10 +104,15 @@ merged reality, not plans.
   publishing two private items; index from manifests; a sync-content traversal
   bypass and a leak-check false positive (FP-2) found and fixed. The public
   project page is **deferred** until the owner allowlists the items (D8).
-- **Wave 5 (`hub-006`, Phase 6)** is next: Pagefind over `dist-public` only, RSS,
-  OG images, leak check extended to the derived outputs, and Pages retirement.
+- **Wave 5 (`hub-006`, Phase 6) is merged 2026-10-03** (PR #99): Pagefind over
+  `dist-public` only, RSS, OG images, leak check extended to the derived outputs,
+  and stubs-only Pages retirement (ADR-0020). **Checkpoint 7 is not recorded
+  passed**; `redirects:check` is deferred.
+- **Wave 6 (`#107`, annotations)** is implemented and in PR; the live sign-in
+  check and the export-transport decision are owner-only.
 - Owner steps outstanding: Wave 3's 14-day share mint (SEAM-S7); the
-  `construction-ai` public-page decision; the Firestore member seed.
+  `construction-ai` public-page decision; the Firestore member seed; Wave 6's
+  export transport and live check.
 
 ## Known issues
 
@@ -116,6 +130,9 @@ Every open issue, once:
 - #61 Hosting answers `/p/` null-byte paths with 500 while `run.app` returns the gate's 404.
 - #63 SHA-pinned `latex-action` wraps a mutable `texlive-full:latest` run as root.
 - #72 Satellites run: Wave 1 (`kgis`) done; Wave 2 (`agentic-kg-research`) next.
+- #107 Annotations — implemented in Wave 6; cross-repository export delivery is
+  blocked on the ADR-0022 credential (owner decision, hard stop), and the narrowed
+  owner-read default awaits confirmation.
 
 Closed on this wave's evidence: **#50** (A13 ran; K10 the last proof), **#54** (metric
 forgery fixed — the Red Team disproved the earlier value-only fix, assembled-pair

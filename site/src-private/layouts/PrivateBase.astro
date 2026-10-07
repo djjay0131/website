@@ -40,10 +40,13 @@ const here = Astro.url.pathname;
 // The Shares entry is added HERE, not by each page, so it appears on every
 // /p/** page without touching any page or shared component (contract
 // requirement 5). It is a private route under the base, so no public nav leaks.
+// My notes (Wave 6) sits beside it for the same reason.
 const sharesHref = `${base}shares/`;
+const notesHref = `${base}notes/`;
 const bandNav = [
   ...nav.map((entry) => ({ ...entry, current: here === entry.href })),
   { href: sharesHref, label: "Shares", current: here === sharesHref },
+  { href: notesHref, label: "My notes", current: here === notesHref },
 ];
 
 const footer = readFooterData();

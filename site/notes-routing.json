@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "routes": {
+    "paper": { "repo": "djjay0131/soa-agentic-se", "dir": "notes" },
+    "experiment": { "repo": "djjay0131/agentic-kg-research", "dir": "notes" },
+    "brainstorm": { "repo": "djjay0131/agentic-kg-research", "dir": "notes" },
+    "question": null
+  }
+}

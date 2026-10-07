@@ -26,6 +26,7 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from app.annotations import StaticAnnotationStore
 from app.auth import Principal, TokenRejected, principal_from_claims
 from app.config import Settings
 from app.main import Dependencies, create_app, logger
@@ -213,8 +214,20 @@ def shares() -> StaticShareStore:
 
 
 @pytest.fixture
-def deps(settings, verifier, members, store, shares) -> Dependencies:
-    return Dependencies(settings=settings, verifier=verifier, members=members, store=store, shares=shares)
+def annotations() -> StaticAnnotationStore:
+    return StaticAnnotationStore()
+
+
+@pytest.fixture
+def deps(settings, verifier, members, store, shares, annotations) -> Dependencies:
+    return Dependencies(
+        settings=settings,
+        verifier=verifier,
+        members=members,
+        store=store,
+        shares=shares,
+        annotations=annotations,
+    )
 
 
 @pytest.fixture

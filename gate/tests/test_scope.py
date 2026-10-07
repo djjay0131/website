@@ -33,6 +33,8 @@ def test_the_route_table_is_exactly_this(deps):
         "/share",
         "/share/{token}",
         "/s/{token}/{path:path}",
+        "/annotations",
+        "/annotations/{annotation_id}",
         "/_health",
         "/client-events",
     }

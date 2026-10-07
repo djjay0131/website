@@ -1,7 +1,7 @@
 # Active Context
 
 Status: Active
-Last updated: 2026-10-04
+Last updated: 2026-10-07
 Owner: Chief Architect
 
 What belongs here: the current focus, the current stop point, and next steps —
@@ -90,21 +90,35 @@ what a contributor needs to pick up work today.
   home hero where the portrait used to be. D16 records the owner's caveat **verbatim**;
   ADR-0015 decisions 1/3 and branding spec §3/§6 are amended. Site checks, leak check,
   a11y (0 FAIL), Security Tester (0 FAIL), Dissenter (2 blocking, fixed) and Skeptic
-  (0 un-failable, residual partial coverage recorded) ran; Chief Reviewer **Comment**.
-  **PR #70 stays a draft; the other seven badges are not added.**
+   (0 un-failable, residual partial coverage recorded) ran; Chief Reviewer **Comment**.
+   **PR #70 stays a draft; the other seven badges are not added.**
+
+- **Wave 6 (`#107`, annotations) is implemented and in PR** (branch `feat/annotations`,
+  owner decision **D17**, 2026-10-07). Private reading-time notes: a capture island on
+  `html`/`bundle` private item frames (select → Highlight/Comment, intent chip), a gate
+  store and routes (`POST/GET/DELETE /annotations`, owner-only `?scope=all`), My notes at
+  `/p/notes/`, intent routing in `site/notes-routing.json`, and a credential-free export
+  renderer. Two adversarial rounds (Red Team 8 bypasses found and closed; Security Tester
+  0 FAIL; Regression 0; Dissenter/Skeptic dispositioned); Chief Reviewer Request changes →
+  all must-fixes resolved. **The export delivery credential is a hard stop (ADR-0022,
+  Proposed).** The `X-Frame-Options: SAMEORIGIN` change is confined to served
+  `_payload/**` and fixes a pre-existing latent defect (the item iframe was `DENY`-blocked).
 
 ## Stop point
 
-All waves are merged. Waves 3–4 are applied and verified; Wave 5 is live except
-the deferred `redirects:check`. The run's remaining work is owner-driven or
-recorded deferrals — see `handoffs/completion-final.md` §6 (owner hard-stops) and
-§9 (honest limitations).
+Wave 6 is implemented, reviewed and ready to merge; the only outstanding work is
+owner-driven: the export-transport decision (ADR-0022 hard stop), the live sign-in check
+(select text on a private item, open `/p/notes/`), and confirming the narrowed owner-read
+default. Earlier deferrals stand: Wave 3's share mint, the Firestore member seed, and
+Wave 5's `redirects:check`.
 
 ## Next
 
-1. **Owner steps:** Wave 3's 14-day share mint (SEAM-S7); the Firestore member
+1. **Wave 6 owner steps:** choose the export transport (ADR-0022); sign in and exercise
+   capture + My notes; confirm or widen the owner-read default.
+2. **Owner steps carried:** Wave 3's 14-day share mint (SEAM-S7); the Firestore member
    seed; decide whether to flip `construction-ai` public.
-2. **Wave 5 follow-up:** regenerate `site/redirects/github-pages.json` from real
+3. **Wave 5 follow-up:** regenerate `site/redirects/github-pages.json` from real
    content (exclude `_payload/**` from `route-inventory.mjs`), wire
    `redirects:check`, browser-verify file-shaped forwarding, then record
    Checkpoint 7 passed.
@@ -123,6 +137,10 @@ recorded deferrals — see `handoffs/completion-final.md` §6 (owner hard-stops)
   you" page.
 - **The alert-channel verification link** — four policies are enabled and deliver
   nothing until it is clicked.
+- **Wave 6:** choose the annotation export transport (ADR-0022 — a GitHub App or a
+  fine-grained token; this is a hard stop); then sign in as `djjay@vt.edu`, select
+  text on a private item, and open `https://jason.cusati.us/p/notes/` to close the
+  live check.
 
 ## Decisions on record
 
@@ -133,11 +151,13 @@ recorded deferrals — see `handoffs/completion-final.md` §6 (owner hard-stops)
   seeded, two: `djjay@vt.edu` (owner), `cbrown@vt.edu` (D3). **Q5** the app lives under
   `site/` (ADR-0001). **Q6** satellite order: `agentic-kgis` 3, `agentic-kg-research` 4
   (D10, owner, 2026-09-25, #72).
-- ADRs 0001–0018, all Accepted: `llm/governance/adr/`. The most recent: ADR-0016
+- ADRs 0001–0022: `llm/governance/adr/`. The most recent: ADR-0016
   (private by default — the publish allowlist is the authority; amends design doc
   §4–§5), ADR-0017 (share links serve the item's document under an item-scoped
   `_doc/` namespace), ADR-0018 (the gate's share store uses a project-wide
-  Firestore role).
+  Firestore role), ADR-0021 (annotations are private, item-anchored notes routed
+  by intent — Accepted), ADR-0022 (annotation export transport — **Proposed**,
+  owner decision required).
 - **D12 is answered (owner, 2026-10-02):** the private-area team is the D3 pair; the
   Firestore seed is owner-run.
 - Roadmap: `llm/master-roadmap.md`.

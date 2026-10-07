@@ -165,6 +165,22 @@ resource "google_service_account" "hub_gate" {
 # sharing): datastore.user, so the gate can write shares/{token}. See the
 # comment block at the head of this file for why a collection-scoped grant is
 # not expressible and why the delete permission is accepted.
+#
+# WAVE 6 (annotations; ADR-0021 decision 4). This same project-wide grant also
+# reaches `annotations/{id}` -- the second store the gate writes, after
+# `shares/{token}` -- exactly as it reaches shares/: Firestore data roles are
+# project-level and no collection-scoped spelling exists, so NO second binding
+# is added. A second google_project_iam_member for the same member+role is not a
+# narrower grant; it is the same grant, which the API reports as already present
+# and Terraform shows as a needless plan change. The control is the collection
+# discipline (one writer class per collection; deny-all released rules), exactly
+# as SEAM-S5 records for shares.
+#
+# NO EXPORT CREDENTIAL IS ADDED HERE. The cross-repository export transport is
+# ADR-0022, still Proposed, and a hard stop (§9/§7): this wave creates no GitHub
+# App, PAT, WIF provider, service account or IAM binding for export. v1 ships
+# only the credential-free renderer (site/scripts/export-notes.mjs), which writes
+# local files and contacts no remote.
 resource "google_project_iam_member" "hub_gate_firestore" {
   project = var.project_id
   role    = "roles/datastore.user"

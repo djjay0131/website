@@ -1,0 +1,92 @@
+---
+// MY NOTES (AN-USE; contract site-wave-6 requirement 4).
+//
+// Served by the gate at /p/notes/. Private build only: the public build's srcDir
+// is ./src and never resolves this directory, so the page and its island cannot
+// reach dist-public by any build path (proved by build; see wave-6-structure).
+//
+// The page is static and reveals nothing. The island reads GET /annotations,
+// which returns only the caller's own notes; the gate is the authority.
+import { getCollection } from "astro:content";
+import PrivateBase from "../layouts/PrivateBase.astro";
+import { memberHref } from "../lib/private-content.mjs";
+import NotesIsland from "../components/NotesIsland.tsx";
+
+const items = (await getCollection("sources", ({ data }) => data.format !== "data"))
+  .map((entry) => entry.data)
+  .sort((a, b) => (a.title < b.title ? -1 : 1));
+
+const base = import.meta.env.BASE_URL;
+const site = Astro.site?.toString() ?? "";
+const known = items.map((item) => ({
+  section: item.section,
+  source: item.source,
+  slug: item.slug,
+  title: item.title,
+  href: memberHref(item, { base, site }),
+}));
+const nav = items
+  .map((item) => ({ href: memberHref(item, { base, site }), label: item.title }))
+  .filter((entry): entry is { href: string; label: string } => entry.href !== null);
+---
+
+<PrivateBase title="My notes" nav={nav}>
+  <h1>My notes</h1>
+  <p class="lede">
+    Everything you have highlighted or commented on, grouped by item. Filters
+    narrow by intent and date; a note whose item is no longer in the build is
+    marked orphan and is never lost.
+  </p>
+  <NotesIsland items={known} client:load />
+</PrivateBase>
+
+<style>
+  .lede { color: var(--color-muted); margin-bottom: 1.5rem; max-width: 65ch; }
+  :global(.notes-island) { display: grid; gap: 1.5rem; }
+  :global(.notes-filters) { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
+  :global(.notes-filters label) { display: grid; gap: 0.2rem; font-size: 0.9rem; }
+  :global(.notes-filters select),
+  :global(.notes-filters input) {
+    min-height: 44px;
+    font: inherit;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+  :global(.notes-note) { color: var(--color-muted); }
+  :global(.notes-group h2) { font-size: 1.2rem; margin-bottom: 0.15rem; display: flex; gap: 0.5rem; align-items: center; }
+  :global(.notes-item-id) { font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-muted); margin-bottom: 0.5rem; }
+  :global(.notes-orphan) {
+    font-size: 0.72rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: var(--color-caution-bg);
+    color: var(--color-text);
+  }
+  :global(.notes-group ul) { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
+  :global(.notes-group li) {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.75rem;
+  }
+  :global(.notes-intent) {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
+    margin-right: 0.5rem;
+  }
+  :global(.notes-group time) { font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-muted); }
+  :global(.notes-comment) { margin: 0.35rem 0; white-space: pre-wrap; }
+  :global(.notes-group blockquote) {
+    margin: 0.35rem 0;
+    padding-left: 0.75rem;
+    border-left: 3px solid var(--color-border);
+    color: var(--color-muted);
+    white-space: pre-wrap;
+  }
+</style>

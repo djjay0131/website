@@ -34,12 +34,30 @@ from datetime import UTC, datetime, timedelta
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from starlette.datastructures import QueryParams
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import pages
+from .annotations import (
+    ANNOTATION_INTENTS,
+    DEFAULT_INTENT,
+    MAX_COMMENT_CHARS,
+    MAX_CONTEXT_CHARS,
+    MAX_EXACT_CHARS,
+    MAX_TAG_CHARS,
+    MAX_TAGS,
+    POSITION_SELECTOR_TYPE,
+    QUOTE_SELECTOR_TYPE,
+    Annotation,
+    AnnotationStore,
+    FirestoreAnnotationStore,
+    TextPositionSelector,
+    TextQuoteSelector,
+    new_annotation_id,
+)
 from .auth import FirebaseTokenVerifier, Principal, TokenRejected, TokenVerifier
 from .config import ALLOWED_ORIGINS_VAR, SESSION_COOKIE_NAME, Settings, load_settings, parse_origin
-from .members import FirestoreMemberDirectory, MemberDirectory
+from .members import FirestoreMemberDirectory, MemberDirectory, normalise_email
 from .serve import (
     INDEX_DOCUMENT,
     GcsObjectStore,
@@ -133,6 +151,26 @@ MAX_SESSION_BODY_BYTES = 8192
 # an anonymous caller must never make the gate read an arbitrary amount.
 MAX_SHARE_BODY_BYTES = 4096
 
+# An annotation body carries a quote (up to 2000 chars), context (2 x 64), a
+# comment (up to 5000) and tags (10 x 40), plus JSON overhead. The cap is large
+# enough for the largest valid note and small enough that an authenticated
+# caller cannot make the gate read an arbitrary amount.
+MAX_ANNOTATION_BODY_BYTES = 16384
+
+# How much of an annotation id a log line or list may reveal (mirrors shares).
+ANNOTATION_ID_CHARS = 12
+
+# An annotation id is server-minted URL-safe base64. The DELETE route receives
+# it as a CLIENT-SUPPLIED path segment, so the charset is validated BEFORE the
+# value can reach any log line: a member who requests
+# `/annotations/event=deny` must not be able to put the gate's own `event=`
+# grammar (or a `%0a` newline) into a log line and forge the `hub-gate-denials`
+# metric or an entire log entry (Red Team Wave 6 RT6-08a/08b). The same charset
+# `secrets.token_urlsafe` emits. Anchored with `\A`/`\Z`, NOT `^`/`$`: Python's
+# `$` also matches immediately before a single trailing newline, so `abc%0a`
+# would pass a `^...$` pattern and still reach the log line (Red Team R2-01).
+_ANNOTATION_ID_PATTERN = re.compile(r"\A[A-Za-z0-9_-]{1,64}\Z")
+
 # How much of a token a list response may reveal. A prefix is enough to tell two
 # rows apart in owner UI and is not enough to reconstruct the credential; the
 # full token is returned exactly once, from the mint that created it.
@@ -184,6 +222,7 @@ class Dependencies:
     members: MemberDirectory
     store: ObjectStore
     shares: ShareStore
+    annotations: AnnotationStore
 
 
 def build_dependencies(settings: Settings | None = None) -> Dependencies:
@@ -197,6 +236,9 @@ def build_dependencies(settings: Settings | None = None) -> Dependencies:
         ),
         store=GcsObjectStore(resolved.private_bucket),
         shares=FirestoreShareStore(collection=resolved.shares_collection, project_id=resolved.project_id),
+        annotations=FirestoreAnnotationStore(
+            collection=resolved.annotations_collection, project_id=resolved.project_id
+        ),
     )
 
 
@@ -296,7 +338,18 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         response.headers["Vary"] = "Cookie"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["X-Frame-Options"] = "DENY"
+        # The ONE deliberate exception to DENY (AN-CAP 3 / AN-GUARD-8). The
+        # capture island reads the selection from the item payload iframe at
+        # `/p/_payload/<source>/<path>`, same origin as the frame, so a served
+        # private payload document must be frameable by that same origin; every
+        # other response stays DENY. The decision is made on the SERVED object
+        # name -- set by serve_private only on a 200 -- so a 404, a denial or a
+        # miss keeps DENY. `served_object_name` is absent on every non-/p route.
+        served = getattr(request.state, "served_object_name", None)
+        if isinstance(served, str) and _is_payload_object(served, deps.settings.private_prefix):
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
         return response
 
     # ---------------------------------------------------------------------
@@ -485,6 +538,10 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             return _html(pages.NOT_FOUND, 404)
 
         logger.info("event=allow scope=private member=%s%s", principal.email, _log_path(name, deps.settings))
+        # Record the SERVED object name so the header middleware can decide the
+        # one framing exception on the name actually served, not the request
+        # path shape (a traversal or a miss never reaches this line).
+        request.state.served_object_name = name
         headers = {} if obj.size is None else {"content-length": str(obj.size)}
         return StreamingResponse(
             obj.chunks(),
@@ -517,7 +574,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         if body is None:
             logger.info("event=reject scope=share reason=body_too_large")
             return JSONResponse({"status": "invalid_request"}, status_code=413)
-        payload, bad_request = _share_payload(body)
+        payload, bad_request = _json_object_body(body)
         if payload is None:
             logger.info("event=reject scope=share reason=malformed_request")
             return bad_request
@@ -671,6 +728,171 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             media_type=obj.content_type,
             headers=headers,
         )
+
+    # ---------------------------------------------------------------------
+    # Annotations (AN-ROUTES, issue #107). A member's durable note anchored to
+    # a quote in one private item; membership only (owner or member). The two
+    # state-changing routes carry the same allowed-origin check as the share
+    # management routes. GET is a read and does not.
+    #
+    # `scope=all` is the export data source and is OWNER ONLY: a non-owner that
+    # asks for every member's notes is refused (403), never silently downgraded
+    # to its own rows -- a downgrade would look like success and teach the
+    # caller nothing, and the owner's export would be the only reader that
+    # needs the wider set.
+    #
+    # No quote, comment, title, selector or object path is ever logged; the
+    # lines name the row by a short id and the author by email only (AN-ROUTES,
+    # AN-GUARD-4).
+    # ---------------------------------------------------------------------
+    @app.post("/annotations")
+    async def create_annotation(request: Request) -> Response:
+        header_only = _refuse_cross_origin("annotation", request, deps)
+        if header_only is not None:
+            return header_only
+
+        body = await _read_small_body(request, MAX_ANNOTATION_BODY_BYTES)
+        if body is None:
+            logger.info("event=reject scope=annotation reason=body_too_large")
+            return JSONResponse({"status": "invalid_request"}, status_code=413)
+
+        payload, bad_request = _json_object_body(body)
+        if payload is None:
+            logger.info("event=reject scope=annotation reason=malformed_request")
+            return bad_request
+
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not _is_member(principal, deps):
+            logger.info("event=deny scope=annotation action=create reason=%s", reason or "not_member")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        fields = _annotation_fields(payload)
+        if fields is None:
+            logger.info("event=reject scope=annotation reason=invalid_annotation")
+            return JSONResponse({"status": "invalid_request"}, status_code=400)
+
+        now = datetime.now(UTC)
+        # `member` comes from the verified session ONLY, never from the body
+        # (Red Team target 4): a note cannot be forged as another member.
+        member = normalise_email(principal.email) or principal.email
+        annotation = Annotation(id=new_annotation_id(), member=member, created=now, updated=now, **fields)
+        deps.annotations.create(annotation)
+        logger.info(
+            "event=allow scope=annotation action=create id=%s by=%s",
+            _short_annotation_id(annotation.id),
+            member,
+        )
+        return JSONResponse({"id": annotation.id, "created": annotation.created.isoformat()}, status_code=200)
+
+    @app.get("/annotations")
+    async def list_annotations(request: Request) -> Response:
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not _is_member(principal, deps):
+            logger.info("event=deny scope=annotation action=list reason=%s", reason or "not_member")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        scope = request.query_params.get("scope") or "own"
+        if scope == "all":
+            if not _is_owner(principal, deps):
+                logger.info("event=deny scope=annotation action=list reason=not_owner")
+                return JSONResponse({"status": "forbidden"}, status_code=403)
+            rows = deps.annotations.list_all()
+        elif scope == "own":
+            member = normalise_email(principal.email) or principal.email
+            rows = deps.annotations.list_for(member)
+        else:
+            logger.info("event=reject scope=annotation reason=invalid_scope")
+            return JSONResponse({"status": "invalid_request"}, status_code=400)
+
+        filters = _annotation_filters(request.query_params)
+        if filters is None:
+            logger.info("event=reject scope=annotation reason=invalid_filter")
+            return JSONResponse({"status": "invalid_request"}, status_code=400)
+        intent, source, slug = filters
+        if intent is not None:
+            rows = [row for row in rows if row.intent == intent]
+        if source is not None:
+            rows = [row for row in rows if row.source == source]
+        if slug is not None:
+            rows = [row for row in rows if row.slug == slug]
+
+        logger.info(
+            "event=allow scope=annotation action=list scope=%s count=%d by=%s",
+            scope,
+            len(rows),
+            principal.email,
+        )
+        # PRIVACY DEFAULT (Chief Reviewer Wave 6 must-fix 1; Dissenter D1): the
+        # owner may ENUMERATE and DELETE any note, but does not READ another
+        # member's note content. `scope=all` therefore redacts quote, comment,
+        # selector and tags for rows the owner did not write; the metadata the
+        # owner needs to moderate (id, member, item, intent, dates) is present.
+        # This is the safe default; widening it needs the member's consent and
+        # is recorded in ADR-0021 decision 8.
+        owner_member = normalise_email(principal.email) or principal.email
+        return JSONResponse(
+            {
+                "annotations": [
+                    _annotation_row(
+                        row,
+                        include_content=(scope != "all" or row.member == owner_member),
+                    )
+                    for row in rows
+                ]
+            },
+            status_code=200,
+        )
+
+    @app.delete("/annotations/{annotation_id}")
+    async def delete_annotation(annotation_id: str, request: Request) -> Response:
+        header_only = _refuse_cross_origin("annotation", request, deps)
+        if header_only is not None:
+            return header_only
+
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not _is_member(principal, deps):
+            logger.info("event=deny scope=annotation action=delete reason=%s", reason or "not_member")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        # The id is client-supplied. A value that is not a well-formed id is a
+        # 404 with a FIXED, value-free log line: it must never reach a log line,
+        # where `event=deny` or an embedded newline would forge the gate's log
+        # grammar or a whole physical line (Red Team Wave 6 RT6-08a/08b).
+        if not _valid_annotation_id(annotation_id):
+            logger.info(
+                "event=miss scope=annotation action=delete reason=invalid_id by=%s",
+                principal.email,
+            )
+            return JSONResponse({"status": "not_found"}, status_code=404)
+
+        existing = deps.annotations.get(annotation_id)
+        if existing is None:
+            logger.info(
+                "event=miss scope=annotation action=delete id=%s by=%s",
+                _short_annotation_id(annotation_id),
+                principal.email,
+            )
+            return JSONResponse({"status": "not_found"}, status_code=404)
+
+        # A member may delete only their own note; the owner may delete any
+        # (AN-GUARD-5). The owner-ness is re-checked here, not trusted from the
+        # session.
+        member = normalise_email(principal.email) or principal.email
+        if not _is_owner(principal, deps) and existing.member != member:
+            logger.info(
+                "event=deny scope=annotation action=delete reason=not_owner id=%s by=%s",
+                _short_annotation_id(annotation_id),
+                principal.email,
+            )
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        deps.annotations.delete(annotation_id)
+        logger.info(
+            "event=allow scope=annotation action=delete id=%s by=%s",
+            _short_annotation_id(annotation_id),
+            principal.email,
+        )
+        return JSONResponse({"status": "ok"}, status_code=200)
 
     # NOT /healthz. That path never reaches this container on Cloud Run: Google's
     # frontend answers it with its own 1568-byte error page, while the gate's own
@@ -896,10 +1118,12 @@ async def _read_small_body(request: Request, maximum: int) -> bytes | None:
     return raw
 
 
-def _share_payload(body: bytes) -> tuple[dict | None, Response | None]:
-    """Parse a mint body, never echoing it: the response is static.
+def _json_object_body(body: bytes) -> tuple[dict | None, Response | None]:
+    """Parse a JSON-object body, never echoing it: the response is static.
 
     Returns (payload, None) on a JSON object and (None, response) otherwise.
+    Shared by the share and annotation create routes so both refuse malformed
+    bodies identically.
     """
     try:
         payload = json.loads(body)
@@ -955,6 +1179,33 @@ def _is_owner(principal: Principal, deps: Dependencies) -> bool:
     )
 
 
+def _is_member(principal: Principal, deps: Dependencies) -> bool:
+    """May this principal read and write their own annotations?
+
+    Verified email and still on the allowlist, re-checked per request rather
+    than assumed from the session (AN-GUARD-3), exactly as /p/** and `_is_owner`
+    do, so removing someone ends their annotation access on the next request.
+    """
+    return principal.email_verified and deps.members.is_member(principal.email)
+
+
+def _is_payload_object(name: str, private_prefix: str) -> bool:
+    """Is this served object a private payload document (`_payload/**`)?
+
+    The object name is relative to the bucket root; strip the configured
+    private prefix first, then the payload namespace must be the first segment.
+    This is the served-name check AN-CAP 3 asks for: `/p/_payload/<source>/...`
+    maps to `<prefix>/_payload/<source>/...`, and only that prefix may be
+    framed by its own origin.
+    """
+    cleaned = private_prefix.strip("/")
+    if cleaned:
+        if not name.startswith(f"{cleaned}/"):
+            return False
+        name = name[len(cleaned) + 1 :]
+    return name == "_payload" or name.startswith("_payload/")
+
+
 def _share_item_prefix(section: str, source: str, slug: str) -> str | None:
     """The object prefix a token may reach: `<section>/<source>/<slug>/_doc`, or None.
 
@@ -992,3 +1243,209 @@ def _share_url(settings: Settings, token: str) -> str:
 def _short_share_id(token: str) -> str:
     """A display id for a token: enough to tell rows apart, not the credential."""
     return token[:SHARE_ID_CHARS]
+
+
+def _is_int(value: object) -> bool:
+    """`bool` is an `int` in Python; a boolean bound is not an integer bound."""
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _text_quote_selector(value: object) -> TextQuoteSelector | None:
+    """Validate a `TextQuoteSelector`, or None when it is malformed.
+
+    The type must be exactly `TextQuoteSelector`; `exact` is required and
+    1-2000 chars; `prefix`/`suffix` default to empty and are at most 64 chars.
+    """
+    if not isinstance(value, dict) or value.get("type") != QUOTE_SELECTOR_TYPE:
+        return None
+    exact = value.get("exact")
+    prefix = value.get("prefix", "")
+    suffix = value.get("suffix", "")
+    if not isinstance(exact, str) or not 1 <= len(exact) <= MAX_EXACT_CHARS:
+        return None
+    if not isinstance(prefix, str) or len(prefix) > MAX_CONTEXT_CHARS:
+        return None
+    if not isinstance(suffix, str) or len(suffix) > MAX_CONTEXT_CHARS:
+        return None
+    return TextQuoteSelector(exact=exact, prefix=prefix, suffix=suffix)
+
+
+# Sentinel: `None` is a valid absent position, so malformed needs its own value.
+_MALFORMED_POSITION = object()
+
+
+def _text_position_selector(value: object) -> object:
+    """Validate an optional `TextPositionSelector`, or refuse.
+
+    Absent (`None`) is valid and returns None. A present value must be a
+    `TextPositionSelector` with integer `start`/`end` (not `bool`) and
+    `0 <= start <= end`, else `_MALFORMED_POSITION`.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict) or value.get("type") != POSITION_SELECTOR_TYPE:
+        return _MALFORMED_POSITION
+    start = value.get("start")
+    end = value.get("end")
+    if not _is_int(start) or not _is_int(end) or start < 0 or start > end:
+        return _MALFORMED_POSITION
+    return TextPositionSelector(start=start, end=end)
+
+
+def _annotation_fields(payload: dict) -> dict | None:
+    """Validate a create body into Annotation fields, or None when malformed.
+
+    Item identity uses the shares' segment allowlist: `section`/`source` single
+    safe segments, `slug` one or more. Bounds and the intent enum are enforced
+    here (AN-STORE). The returned dict excludes `id`, `member`, `created` and
+    `updated`, which the route mints from the server and the verified session.
+    """
+    section = payload.get("section")
+    source = payload.get("source")
+    slug = payload.get("slug")
+    if not all(isinstance(value, str) for value in (section, source, slug)):
+        return None
+    try:
+        clean_section = safe_prefix(section)
+        clean_source = safe_prefix(source)
+        clean_slug = safe_prefix(slug)
+    except UnsafePath:
+        return None
+    # `section` and `source` are single segments; a slash would let one item's
+    # identity overlap another's (the same rule as `_share_item_prefix`).
+    if "/" in clean_section or "/" in clean_source:
+        return None
+
+    selector = _text_quote_selector(payload.get("selector"))
+    if selector is None:
+        return None
+
+    declared_quote = payload.get("quote")
+    if declared_quote is not None and declared_quote != selector.exact:
+        # `quote` is a convenience copy of `selector.exact` (AN-STORE). A body
+        # that disagrees with itself is refused rather than silently choosing
+        # one of the two values.
+        return None
+
+    position = _text_position_selector(payload.get("position"))
+    if position is _MALFORMED_POSITION:
+        return None
+
+    comment = payload.get("comment", "")
+    if not isinstance(comment, str) or len(comment) > MAX_COMMENT_CHARS:
+        return None
+
+    intent = payload.get("intent", DEFAULT_INTENT)
+    if not isinstance(intent, str) or intent not in ANNOTATION_INTENTS:
+        return None
+
+    tags = payload.get("tags", [])
+    if not isinstance(tags, list) or len(tags) > MAX_TAGS:
+        return None
+    clean_tags: list[str] = []
+    for tag in tags:
+        if not isinstance(tag, str) or len(tag) > MAX_TAG_CHARS:
+            return None
+        clean_tags.append(tag)
+
+    return {
+        "section": clean_section,
+        "source": clean_source,
+        "slug": clean_slug,
+        "selector": selector,
+        "position": position,
+        "quote": selector.exact,
+        "comment": comment,
+        "intent": intent,
+        "tags": tuple(clean_tags),
+    }
+
+
+def _annotation_filters(
+    query_params: QueryParams,
+) -> tuple[str | None, str | None, str | None] | None:
+    """The `?intent=`/`?source=`/`?slug=` list filters, or None when malformed.
+
+    `intent` must be in the enum; `source` a single safe segment and `slug` one
+    or more, validated with the same allowlist as item identity, so a filter
+    cannot smuggle traversal into a query the store then runs.
+    """
+    intent = query_params.get("intent")
+    if intent is not None and (not intent or intent not in ANNOTATION_INTENTS):
+        return None
+
+    source = query_params.get("source")
+    if source is not None:
+        try:
+            source = safe_prefix(source)
+        except UnsafePath:
+            return None
+        if not source or "/" in source:
+            return None
+
+    slug = query_params.get("slug")
+    if slug is not None:
+        try:
+            slug = safe_prefix(slug)
+        except UnsafePath:
+            return None
+
+    return intent, source, slug
+
+
+def _annotation_row(annotation: Annotation, *, include_content: bool = True) -> dict:
+    """One list row.
+
+    `include_content=False` is the owner moderating another member's note: the
+    row carries the metadata needed to identify and delete it (id, member, item,
+    intent, dates) but NOT the note's quote, comment, selector or tags. A
+    non-owner's list is always their own rows (`list_for`), so this is only ever
+    the owner's view of a member's row.
+    """
+    metadata = {
+        "id": annotation.id,
+        "member": annotation.member,
+        "section": annotation.section,
+        "source": annotation.source,
+        "slug": annotation.slug,
+        "intent": annotation.intent,
+        "created": annotation.created.isoformat(),
+        "updated": annotation.updated.isoformat(),
+    }
+    if not include_content:
+        return {**metadata, "redacted": True}
+    position = annotation.position
+    return {
+        **metadata,
+        "selector": {
+            "type": QUOTE_SELECTOR_TYPE,
+            "exact": annotation.selector.exact,
+            "prefix": annotation.selector.prefix,
+            "suffix": annotation.selector.suffix,
+        },
+        "position": None
+        if position is None
+        else {
+            "type": POSITION_SELECTOR_TYPE,
+            "start": position.start,
+            "end": position.end,
+        },
+        "quote": annotation.quote,
+        "comment": annotation.comment,
+        "tags": list(annotation.tags),
+    }
+
+
+def _short_annotation_id(annotation_id: str) -> str:
+    """A display id for an annotation: enough to tell rows apart, not the id."""
+    return annotation_id[:ANNOTATION_ID_CHARS]
+
+
+def _valid_annotation_id(annotation_id: object) -> bool:
+    """True when `annotation_id` is a well-formed server-minted id.
+
+    Guards the DELETE path segment against the log-grammar/newline forgery in
+    RT6-08: a value that is not `[A-Za-z0-9_-]{1,64}` is refused with a fixed,
+    value-free log line before it can be logged or looked up.
+    """
+    return isinstance(annotation_id, str) and bool(_ANNOTATION_ID_PATTERN.match(annotation_id))

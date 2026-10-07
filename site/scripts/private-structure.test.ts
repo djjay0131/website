@@ -178,8 +178,8 @@ describe("firebase.json routes sharing to the gate without disturbing the rest",
   const rewrites = config.hosting.rewrites as { source: string; run?: { serviceId: string; region: string } }[];
   const bySource = new Map(rewrites.map((r) => [r.source, r]));
 
-  it("adds /share/** and /s/** as us-east1 hub-gate prefix rewrites", () => {
-    for (const source of ["/share/**", "/s/**"]) {
+  it("adds /share/**, /s/** and the annotation routes as us-east1 hub-gate prefix rewrites", () => {
+    for (const source of ["/share/**", "/s/**", "/annotations", "/annotations/**"]) {
       expect(bySource.get(source), `${source} rewrite`).toEqual({
         source,
         run: { serviceId: "hub-gate", region: "us-east1" },
@@ -187,10 +187,12 @@ describe("firebase.json routes sharing to the gate without disturbing the rest",
     }
   });
 
-  it("keeps the existing four gate rewrites in order, with the sharing routes appended", () => {
+  it("keeps the existing four gate rewrites in order, with the sharing and annotation routes appended", () => {
     // The contract Exit names all three sharing rewrites: the exact `/share`
     // for POST/GET, `/share/**` for DELETE by token, and `/s/**` for the
-    // signed-out view. The four pre-existing gate rewrites are unchanged.
+    // signed-out view. Wave 6 appends the annotation routes; the bare
+    // `/annotations` is required because `/annotations/**` does not match it
+    // (AN-REWRITES). The four pre-existing gate rewrites are unchanged.
     expect(rewrites.map((r) => r.source)).toEqual([
       "/p/**",
       "/session",
@@ -199,6 +201,8 @@ describe("firebase.json routes sharing to the gate without disturbing the rest",
       "/share",
       "/share/**",
       "/s/**",
+      "/annotations",
+      "/annotations/**",
     ]);
   });
 

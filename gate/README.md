@@ -19,6 +19,9 @@ The gate implements §6 responsibilities 1–4, and only those:
 | `GET /share` | **Owner only**. List active shares. Never returns a full token — a short display id (`id`) plus `section`, `source`, `slug`, `entry`, `created_by`, `expires_at` |
 | `DELETE /share/{token}` | **Owner only**, origin-checked. Revoke. Idempotent |
 | `GET /s/{token}/{path}` | **No session.** Serve the token's one item's file inside that item's `<section>/<source>/<slug>/_doc/` prefix — the item-scoped document namespace, never the member frame. The empty path serves the stored `entry` (`_doc/<entry>`); a non-empty path resolves inside the prefix. Unknown, expired and revoked are all 404; a path that leaves the prefix is 404 |
+| `POST /annotations` | **Member**, origin-checked. Body `{section, source, slug, selector, position, quote, comment, intent, tags}`; returns `{id, created}`. `member` is taken from the verified session, never the body. 400 malformed, 403 signed-out/non-member |
+| `GET /annotations` | **Member.** Default: the caller's own notes. `?scope=all` is **owner only** and returns every note, with the owning member; a non-owner asking for all is refused (403), not downgraded. Supports `?intent=` and `?source=&slug=` filters (validated with the same segment allowlist) |
+| `DELETE /annotations/{id}` | **Member or owner**, origin-checked. A member deletes only their own; the owner may delete any. 404 unknown id, 403 a member deleting another's |
 | `GET /_health` | Deploy verification; reveals nothing. **Not** `/healthz`: that path never reaches the container on Cloud Run (Google's frontend answers it), verified at Checkpoint 4. |
 
 `tests/test_scope.py` asserts the route table exactly, so a new route cannot
@@ -62,6 +65,37 @@ unreachable. The token root (the empty path) serves the stored `entry` at
 `_doc/<entry>`; every other path resolves inside the prefix as before. An
 unknown, expired or revoked token is a 404, never a 403, so the gate does not
 confirm a token exists.
+
+## Annotations
+
+A note is a member's durable anchor on a quote inside one private item, stored
+at Firestore `annotations/{id}` with `{id, member, section, source, slug,
+selector, position, quote, comment, intent, tags, created, updated}`
+(AN-STORE, issue #107). `selector` is a W3C `TextQuoteSelector`
+(`exact`/`prefix`/`suffix`, the durable anchor); `position` is an optional
+`TextPositionSelector` (`start`/`end`, the fallback). `quote` is a convenience
+copy of `selector.exact`. Item identity uses the shares' segment allowlist:
+`section`/`source` single safe segments, `slug` one or more. Bounds: `exact`
+1–2000, `prefix`/`suffix` 0–64, `comment` 0–5000, `tags` ≤ 10 × ≤ 40,
+`intent` in `{paper, experiment, brainstorm, question}` (default `question`).
+
+Membership only (owner or member) is enough to write and read one's own notes.
+`POST` and `DELETE` are state-changing and carry the same allowed-origin check
+as the share routes; `GET` is a read and does not. `member` is taken from the
+verified session — a client-supplied `member` cannot forge authorship.
+`?scope=all` is **owner only** and is the export data source (`export-notes.mjs`
+applies `site/notes-routing.json`; the gate does no rendering or routing); a
+non-owner asking for all is refused, never silently downgraded to their own
+rows. No quote, comment, title, selector or object path is ever logged — the
+lines name the note by a short id and the author by email only.
+
+**One deliberate `X-Frame-Options` exception.** The capture island reads the
+selection from the item payload iframe at `/p/_payload/<source>/<path>`, same
+origin as the frame, so a **served** private payload document
+(`_payload/**` after the private prefix) is sent `X-Frame-Options: SAMEORIGIN`
+instead of `DENY` (AN-CAP 3 / AN-GUARD-8). The decision is made on the served
+object name, so a 404, a refusal or any non-`_payload` response keeps `DENY`.
+There is no CSP `frame-ancestors` to change.
 
 ## The two things most likely to make a correct-looking gate wrong
 
@@ -217,6 +251,7 @@ Set by Cloud Run; the infra stream owns the service's env block.
 | `GATE_PRIVATE_PREFIX` | *(empty)* | Optional prefix within the bucket |
 | `GATE_MEMBERS_COLLECTION` | `members` | Firestore allowlist collection |
 | `GATE_SHARES_COLLECTION` | `shares` | Firestore collection holding share tokens |
+| `GATE_ANNOTATIONS_COLLECTION` | `annotations` | Firestore collection holding annotations |
 | `GATE_SHARE_BASE_URL` | *(empty — relative URL)* | Absolute origin for a minted share URL. Empty returns `/s/{token}/` |
 | `GATE_SESSION_DAYS` | `14` | Session lifetime; 14 is Firebase's maximum |
 | `GATE_CHECK_REVOKED` | `true` | Check revocation on every request |
