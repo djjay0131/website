@@ -258,3 +258,130 @@ No changed file falls outside a contract's intent; the only path mismatch is the
 - `site/src-private/**`, `site/notes-routing.json`, `site/scripts/export-notes.mjs`,
   `site/scripts/check-no-private-in-public.mjs`, `firebase.json`, `infra/gate.tf`
 - `llm/sprints/2026-09-hub/STATE.md`, `llm/master-roadmap.md`, `llm/memory_bank/`
+
+---
+
+## Delta review — verifying the Lead Architect's resolutions
+
+HEAD `576526b` (`fix(wave-6): resolve Chief Reviewer must-fixes; add the Wave 6
+record`), delta from the round-1 review HEAD `1ea4d3d`. Read-only; this section is
+my only write. I ran the suites and small scratch mutation probes under
+`/tmp/opencode/`; no git/gh mutation and no credential.
+
+**VERDICT: Approve.** Both must-fix items are resolved and independently
+reproduced. Of the four should-fix items, 3/4/5 are resolved and 6 (cosmetic) was
+not touched. No new must-fix. The only owner-facing gate left is the ADR-0022
+export-transport hard stop, which is by design, and the live sign-in check.
+
+### Must-fix 1 (owner-read) — RESOLVED
+
+- **Code.** `list_annotations` (`gate/app/main.py:832-844`) computes
+  `owner_member` from the verified session and calls
+  `_annotation_row(row, include_content=(scope != "all" or row.member == owner_member))`.
+  `_annotation_row` (`main.py:1396-1434`) always emits metadata (`id`, `member`,
+  `section`, `source`, `slug`, `intent`, `created`, `updated`) and, when
+  `include_content=False`, returns `{**metadata, "redacted": True}` with **no**
+  `quote`, `comment`, `selector` or `tags`. The owner's own row in `scope=all`
+  takes the `row.member == owner_member` branch and keeps content; `scope=own`
+  (the only other accepted value) is always `include_content=True`. `member` is
+  still session-derived (`main.py:777`), so a member cannot forge a row into the
+  owner's-content branch.
+- **ADR-0021 decision 8** (`0021-annotations-private-item-notes.md:80-89`) now
+  reads "The owner may enumerate and delete any note, but does not read another
+  member's note content … it **redacts** quote, comment, selector and tags for
+  every row the owner did not write (the owner's own rows keep their content)" and
+  records it as taken without the owner, widen-able only with member consent. This
+  is the narrowing the round-1 must-fix asked for.
+- **Export.** `renderNotesBundle` (`site/scripts/export-notes.mjs:166-175`) skips a
+  row with no non-empty `quote` and no non-empty `selector.exact`
+  (`reason: "no note content (redacted or empty)"`), so the privacy default cannot
+  be undone by the export.
+- **Tests, mutation-verified (not merely present).**
+  `test_the_owner_enumerates_every_note_but_reads_only_their_own`
+  (`gate/tests/test_annotations.py:240`) asserts the owner's own row keeps
+  `quote`/`comment`, the other member's row is `redacted is True`, and
+  `other-comment` is absent from the response text. I copied the gate tree to
+  `/tmp` and forced `include_content=True`: the test fails on both transports at
+  `assert other.get("redacted") is True`. The export test
+  `"skips a redacted row…"` (`site/scripts/export-notes.test.ts:197`) asserts
+  `files` is empty; removing the skip in a `/tmp` copy makes the same redacted row
+  render to one file — so the committed assertion is fail-able. Both committed
+  tests pass on the branch (`2 passed` gate; site targeted 57 passed).
+- **Residual (cosmetic, non-blocking).** ADR-0021's Context still says at line 20
+  "members may read only their own; the owner may read and delete all". Decision 8
+  supersedes it, but the stale clause sits directly above the decision that
+  contradicts it. Worth a one-line edit at merge; it does not affect code, tests
+  or the decision record.
+
+### Must-fix 2 (records) — RESOLVED
+
+- **STATE.** `STATE.md` gains a full `## Wave 6 — Annotations (#107), D17` section
+  (`:3610-3727`): what shipped per stream with honest counts (**626 pytest**,
+  **494 passed / 2 skipped** — both match my runs), the adversarial table
+  (RT6-06/08a/08b/11, R2-01/02/03/04/09, D1-D7, Skeptic f-1..f-3, CR must-fix 1/2,
+  should-fix 3/4, ST note), the testers, the Chief Reviewer verdict, §8/apply
+  (0/0/0), live verification recorded **pending** (not claimed), the five-line
+  status, the four decisions taken without the owner, and the ADR-0022 hard stop.
+- **Memory bank.** `activeContext.md` (status date 2026-10-07) and `progress.md`
+  both add a Wave 6 entry, the stop point/next steps (export transport, live
+  check, confirm the narrowed owner-read), and the ADR range.
+- **ADR range.** `llm/governance/adr/README.md` lists `0021 … Accepted` and
+  `0022 … Proposed`; `activeContext.md` reads "ADRs 0001–0022" and `progress.md`
+  "ADRs 0001–0021 Accepted; ADR-0022 Proposed". Governance `adr-index`/`adr-status`
+  PASS. `master-roadmap.md` is intentionally unchanged and STATE says so ("post-
+  Phase-6 backlog feature, no roadmap box"), which is honest, not an omission.
+- **PR body.** **No PR is open** — `gh pr list --head feat/annotations --state all`
+  returns `[]` (read-only; exit 0). So the PR body's Governance-Level and
+  Data/Security/Privacy section cannot be observed yet; per the task this is not a
+  block, and STATE's §8/apply and "Decisions taken without the owner" carry the
+  substance the PR body will repeat. Flag for merge: open the PR and paste the
+  template sections before requesting merge.
+
+### Should-fix
+
+- **3 — RESOLVED.** The phantom `POST /annotations/export` is gone from every live
+  authority: ADR-0022 (both occurrences replaced with
+  `site/scripts/export-notes.mjs`), the seams AN-EXPORT, and `infra/gate.tf:182`.
+  Remaining occurrences are explicitly retrospective — the round-1 handoff and the
+  Dissenter/infra handoffs (exempt, must not be rewritten) plus the STATE D3
+  disposition row that names it a "phantom … **Fixed**". No live document still
+  asserts the endpoint exists.
+- **4 — RESOLVED.** `site-wave-6.md` Scope now reads "`firebase.json` (repo root;
+  rewrites)", and requirement 1 now says the routing file "is read by the
+  **site** export renderer (`scripts/export-notes.mjs`); the gate never reads it".
+  No residual `site/firebase.json` or gate-consumer claim anywhere under
+  `llm/sprints/**/contracts/`.
+- **5 — RESOLVED, but the round-1 f-1 premise was wrong.** A committed planted
+  `/p/notes` test exists: `"flags every needle including /p/notes planted in
+  CONTENTS"` (`site/scripts/check-no-private-in-public.test.ts:481`) plants
+  `<a href="/p/notes/">` into a temp dist and asserts
+  `needles.toContain("/p/notes")`. `git blame` shows it was authored in `c557485`,
+  i.e. **it was already present at the round-1 HEAD `1ea4d3d`** (and at `c557485`),
+  so f-1's "no committed test plants a `/p/notes` leak" was inaccurate. I confirmed
+  it is non-vacuous anyway: removing `/p/notes` from `ANNOTATION_NEEDLES` in a
+  `/tmp` copy stops `findAnnotationLeaks` reporting it, so the committed assertion
+  is fail-able. No action needed; recorded so the round-1 claim is not carried
+  forward as fact.
+- **6 — NOT ADDRESSED (cosmetic).** `security-tester-wave-6.md:1` still reads
+  "Security Tester, Wave 6 (annotations) — VETO" while line 3 and the table read
+  "8/8 checks PASS, no veto"; the delta did not touch the file. Non-blocking
+  (nobody read the wave as vetoed — the body is unambiguous), but it survives and
+  should be fixed when the file is next touched.
+
+### Suites (this review, at `576526b`)
+
+- gate `gate/.venv/bin/python -m pytest` → **626 passed**, 0 failed.
+- site `npm test` → **494 passed, 2 skipped**, 0 failed; the two named files
+  re-run: 57 passed.
+- `node …/governance-checks.mjs --layout` → **4 of 4 checks passed** (links,
+  adr-index, adr-status, layout).
+
+### Final verdict
+
+**Approve.** Neither must-fix survives as an outstanding block: the owner-read
+model is narrowed in code, tests and ADR-0021 decision 8 (mutation-verified), and
+the §7 record is present in STATE, the memory bank and the ADR range (the PR body
+is unobservable because no PR is open; not a block per the task). Should-fix 3/4/5 are closed. Remaining
+non-blocking items: the ADR-0021 Context line 20 stale clause and the
+`security-tester-wave-6.md` "VETO" title. The ADR-0022 export-transport credential
+and the live owner sign-in remain the owner's calls, recorded as hard stops.
