@@ -163,6 +163,16 @@ export function renderNotesBundle(notes, routing, options = {}) {
       skipped.push({ note, reason: "unknown intent" });
       continue;
     }
+    // A redacted row (the owner's enriched `scope=all` view of a member's note)
+    // has no quote or comment; it is skipped rather than exported empty, so the
+    // privacy default cannot be undone by the export (ADR-0021 decision 8).
+    const hasContent =
+      (typeof note?.quote === "string" && note.quote !== "") ||
+      (typeof note?.selector?.exact === "string" && note.selector.exact !== "");
+    if (!hasContent) {
+      skipped.push({ note, reason: "no note content (redacted or empty)" });
+      continue;
+    }
     const decision = routeNote(note, routing);
     if (!decision.render) {
       skipped.push({ note, reason: decision.reason });

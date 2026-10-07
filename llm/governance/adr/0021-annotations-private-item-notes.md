@@ -77,15 +77,16 @@ The reportable facts that shape it:
    Whether this should instead be a CSP with `frame-ancestors 'self'` is a
    follow-up; the Security Tester owns passing or vetoing the change.
 
-8. **The owner may read every note; that is a recorded judgement call for the
-   owner to confirm.** `?scope=all` is owner-only and is needed both to delete
-   any note (the request's `owner may delete any`) and to render the export. It
-   means the owner — the data controller for this hub — can read a member's
-   notes. The members are owner-seeded (neutral parties do not self-join), and
-   the owner already holds full read of the private bucket and Firestore. This
-   is recorded as a decision taken without the owner and is surfaced for
-   confirmation; if the owner prefers, `?scope=all` can be narrowed to metadata
-   (ids only) and an owner delete-only path added.
+8. **The owner may enumerate and delete any note, but does not read another
+   member's note content.** `?scope=all` is owner-only and returns the metadata
+   needed to moderate (id, member, item, intent, dates); it **redacts** quote,
+   comment, selector and tags for every row the owner did not write (the owner's
+   own rows keep their content). This is the privacy-preserving default chosen
+   when the Dissenter (Wave 6 D1) and the Chief Reviewer (must-fix 1) raised
+   that a real non-owner member (`cbrown@vt.edu`) is seeded. It is a decision
+   taken without the owner and flagged for confirmation; the owner can widen it
+   only with the member's consent, which would be its own decision. The export
+   therefore covers the owner's own notes in v1 (see decision 6).
 
 9. **Known limits, recorded rather than hidden.** `intent` is both a note's
    meaning and its export route, so re-routing an existing note means editing

@@ -179,7 +179,8 @@ resource "google_service_account" "hub_gate" {
 # NO EXPORT CREDENTIAL IS ADDED HERE. The cross-repository export transport is
 # ADR-0022, still Proposed, and a hard stop (§9/§7): this wave creates no GitHub
 # App, PAT, WIF provider, service account or IAM binding for export. v1 ships
-# only the credential-free render (`POST /annotations/export`).
+# only the credential-free renderer (site/scripts/export-notes.mjs), which writes
+# local files and contacts no remote.
 resource "google_project_iam_member" "hub_gate_firestore" {
   project = var.project_id
   role    = "roles/datastore.user"

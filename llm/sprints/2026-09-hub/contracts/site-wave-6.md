@@ -18,7 +18,7 @@ and the routing file.
 ## Scope
 
 - `site/src-private/**` (island, pure logic, page, layout nav)
-- `site/firebase.json` (rewrites)
+- `firebase.json` (repo root; rewrites)
 - `site/notes-routing.json` (new)
 - `site/scripts/check-no-private-in-public.mjs` (+ its test) — annotation needles
 - tests under `site/**`
@@ -40,8 +40,9 @@ Do NOT touch `gate/**` or `infra/**`.
    }
    ```
    A parser/validator with tests: every required intent present; a `null` route
-   means "My notes only"; `repo` matches `owner/name`. This file is what the
-   gate's export is configured from (the gate receives it as JSON; do not import
+   means "My notes only"; `repo` matches `owner/name`. This file is read by the
+   **site** export renderer (`scripts/export-notes.mjs`); the gate never reads it
+   (the gate exposes only the owner-only data source). Do not import
    node:fs into a browser bundle).
 
 2. **Pure logic module** `site/src-private/lib/annotations.mjs`, unit-tested

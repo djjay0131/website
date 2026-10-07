@@ -6,8 +6,9 @@ Date: 2026-10-07
 > **HARD STOP (§9 of the completion brief).** No credential, secret, GitHub
 > App, personal access token, or cross-repository IAM is created until the owner
 > chooses the mechanism below. v1 ships annotation capture, the store, My notes
-> and the credential-free export render (`POST /annotations/export`). The
-> automated cross-repository pull request waits for this decision.
+> and the credential-free renderer (`site/scripts/export-notes.mjs`, which writes
+> local Markdown and contacts no remote). The automated cross-repository pull
+> request waits for this decision.
 
 ## Context
 
@@ -47,7 +48,8 @@ ADR does not propose.
   installation id as variables.
 - A GitHub Actions workflow in `website`, owner-triggered
   (`workflow_dispatch`), mints a **short-lived (≤1 hour) installation token**
-  at run time, renders the notes via the gate export endpoint, pushes one branch
+  at run time, renders the notes with `site/scripts/export-notes.mjs` (fed by
+  the owner's `GET /annotations`), pushes one branch
   per target repository and opens a PR. Tokens are never written to disk or
   logged.
 - The installation is limited to the two repositories by GitHub, so a
@@ -82,8 +84,9 @@ ADR does not propose.
    soa-agentic-se/notes`; `experiment`, `brainstorm → agentic-kg-research/notes`;
    `question → My notes only`).
 
-Until the decision, the export endpoint returns the rendered Markdown bundle so
-the owner can copy it out by hand; no cross-repository write occurs.
+Until the decision, `site/scripts/export-notes.mjs` writes the rendered Markdown
+bundle locally so the owner can copy it out by hand; no cross-repository write
+occurs.
 
 ## Consequences (once accepted)
 

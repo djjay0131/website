@@ -193,6 +193,16 @@ describe("the output path is re-validated, so a malformed note cannot escape --o
     expect(markdown).not.toMatch(/^# injected/m);
     expect(markdown).toContain("- **Created:** 2026-10-01 # injected");
   });
+
+  it("skips a redacted row (no content) rather than exporting it empty", () => {
+    const { files, skipped } = renderNotesBundle(
+      [{ id: "r1", section: "phd", source: "s", slug: "y", intent: "paper", redacted: true }],
+      routing,
+      { origin: ORIGIN },
+    );
+    expect(files).toHaveLength(0);
+    expect(skipped.some((s) => s.reason === "no note content (redacted or empty)")).toBe(true);
+  });
 });
 
 describe("readNotesBundle accepts the shapes the gate and a saved file can take", () => {

@@ -237,13 +237,35 @@ def test_a_non_owner_asking_for_all_is_refused_not_downgraded(
     assert "annotations" not in refused.json()
 
 
-def test_the_owner_lists_every_note_with_its_member(client, member_session, other_member_session, transport):
-    _create_ok(client, transport, member_session, selector={**SELECTOR, "exact": "owner"})
-    _create_ok(client, transport, other_member_session, selector={**SELECTOR, "exact": "other"})
+def test_the_owner_enumerates_every_note_but_reads_only_their_own(
+    client, member_session, other_member_session, transport
+):
+    """Chief Reviewer must-fix 1: the owner moderates, but does not read a member's note."""
+    _create_ok(
+        client, transport, member_session, selector={**SELECTOR, "exact": "owner"}, comment="owner-comment"
+    )
+    _create_ok(
+        client,
+        transport,
+        other_member_session,
+        selector={**SELECTOR, "exact": "other"},
+        comment="other-comment",
+    )
 
-    rows = _rows(_read(client, transport, member_session, "?scope=all"))
+    response = _read(client, transport, member_session, "?scope=all")
+    rows = _rows(response)
+    by_member = {row["member"]: row for row in rows}
+    assert sorted(by_member) == sorted([MEMBER_EMAIL, OTHER_MEMBER_EMAIL])
 
-    assert sorted(row["member"] for row in rows) == sorted([MEMBER_EMAIL, OTHER_MEMBER_EMAIL])
+    # The owner's own note keeps its content.
+    assert by_member[MEMBER_EMAIL]["quote"] == "owner"
+    assert by_member[MEMBER_EMAIL]["comment"] == "owner-comment"
+    # The other member's note is enumerable so the owner can delete it, but its
+    # content is redacted: the owner may not read another member's note.
+    other = by_member[OTHER_MEMBER_EMAIL]
+    assert other.get("redacted") is True
+    assert "quote" not in other and "comment" not in other and "selector" not in other
+    assert "other-comment" not in response.text
 
 
 def test_a_member_cannot_read_another_members_note(client, member_session, other_member_session, transport):

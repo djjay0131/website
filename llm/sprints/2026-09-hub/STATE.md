@@ -3608,3 +3608,120 @@ The PR #70 draft and the other seven badges are untouched.
 leak-check and `CI_PUBLIC_FILES` wiring) if the emblem OG is permanent; the three residual
 partial guard gaps above; and the owner may confirm the badge's exact marks (D16 source-material
 note).
+
+## Wave 6 — Annotations (#107), D17 (2026-10-07)
+
+Branch `feat/annotations`; issue **#107**; owner decision **D17**: build #107 now,
+run to completion under the Waves 3–5 rules, scope v1 tightly, and treat the export
+credential as a hard stop. Seams `contracts/wave-6-annotations-seams.md`; contracts
+`{gate,site,infra}-wave-6.md` and the adversarial/tester/reviewer contracts.
+Design: **ADR-0021** (Accepted) and **ADR-0022** (Proposed — the export transport).
+
+This is a **post-Phase-6 backlog feature**: the master roadmap carries no checkbox
+for it, so **no roadmap box is ticked** (the roadmap's Phase 6 boxes stay as Wave 5
+left them). `#107` is tracked as the unit of record.
+
+### What shipped
+
+- **gate** (`gate/app/annotations.py`, routes in `main.py`, `config.py`): the
+  annotation store (`Annotation`, `AnnotationStore`, Firestore + static, id
+  `secrets.token_urlsafe(16)`); `POST /annotations`, `GET /annotations`
+  (own by default, owner-only `?scope=all`, `?intent/source/slug` filters),
+  `DELETE /annotations/{id}` (member own, owner any); origin-checked state
+  changes; `private, no-store`; no quote/comment/title logged. **One deliberate
+  header change:** a served private payload document (`_payload/**`) is
+  `X-Frame-Options: SAMEORIGIN` (the capture island reads the same-origin frame);
+  every other response stays `DENY`. **626 pytest passed.**
+- **site** (`notes-routing.json`, `src-private/lib/annotations.mjs`,
+  `AnnotationsIsland.tsx`, `NotesIsland.tsx`, `/p/notes/`, the capture mount in
+  `[...itemPath].astro`, `firebase.json`, `scripts/export-notes.mjs`, and the
+  leak-check annotation needles): capture on `html`/`bundle` private item frames;
+  My notes grouped by item, filterable by intent/date, orphan badge; intent routing
+  in one owner-editable file; a **credential-free** export renderer (local files,
+  no remote). **494 passed / 2 skipped** (the skip is a pre-existing build-state
+  `describe.runIf`, unchanged in kind).
+- **infra** (`infra/gate.tf`, comment only): `hub-gate`'s existing project-wide
+  `roles/datastore.user` (ADR-0018) already covers `annotations/`; **no new IAM**.
+  `terraform fmt`/`validate` clean; **plan 0 to add, 0 to change, 0 to destroy**.
+
+### Adversarial round — findings and dispositions
+
+| # | Source | Finding | Disposition |
+|---|---|---|---|
+| RT6-08a/08b | Red Team | DELETE `/annotations/{id}` logged the client id unvalidated → `event=` metric forgery + log-line injection | **Fixed.** Id validated `[A-Za-z0-9_-]{1,64}` (`\A…\Z`) with a value-free 404; test by name |
+| RT6-06 | Red Team | Export Markdown escaping covered only HTML; `[x](javascript:)`, image/data: and unquoted block injection survived | **Fixed.** Brackets/backticks/emphasis/`!` escaped, comment blockquoted; test by name |
+| RT6-11 | Red Team | Leak needles matched case-sensitively; `DATA-ANNOTATION-FRAME`, entity forms and CSS/import spellings passed | **Fixed.** Haystack lowercased + common entities decoded; left boundary widened; tests |
+| R2-01 | Red Team r2 | `$` matched before a trailing `\n`, so `abc%0a` passed validation | **Fixed.** `\A…\Z` |
+| R2-02 | Red Team r2 | A metadata field (`created`) could carry a newline into a top-level block | **Fixed.** Metadata collapsed to one line |
+| R2-03 | Red Team r2 | `data-annotation-` left boundary omitted `. / # ? ; : & \|` | **Fixed.** Boundary widened |
+| R2-09 | Red Team r2 | Multi-segment slugs (the hub's real slugs) were skipped by the export | **Fixed.** Slug segments flattened into directories |
+| R2-04 | Red Team r2 | Delete 403 (another's) vs 404 (unknown) is a theoretical existence oracle | **Recorded, not fixed.** Ids are 128-bit; no enumeration path |
+| D1 | Dissenter | Owner could read every member's note content | **Fixed by narrowing.** `?scope=all` redacts quote/comment/selector/tags for rows the owner did not write; the owner enumerates and deletes, export covers own notes (ADR-0021 dec. 8) |
+| D2 | Dissenter | The `X-Frame-Options` change was under-argued | **Recorded:** ADR-0021 dec. 7, including that it fixes a pre-Wave-6 latent defect (the iframe was `DENY`-blocked) |
+| D3 | Dissenter | Phantom `POST /annotations/export` in the seams/ADR | **Fixed:** ADR-0021/0022, the seams and `infra/gate.tf` now name `site/scripts/export-notes.mjs` |
+| D4/D5 | Dissenter | `intent` overloaded as the routing key; "orphan" has two meanings | **Recorded** in ADR-0021 dec. 9 as known limits |
+| D6/D7 | Dissenter | No `section` filter; `notes-routing.json` plane undecided | **Note.** `(source, slug)` is the item key (unique); the file is a site feature config (ADR-0021 dec. 10) |
+| Skeptic f-1 | Skeptic | `/p/notes` had no committed planted-leak test | **Fixed:** committed planted-needle test added |
+| Skeptic f-2/f-3 | Skeptic | Redundant routing message / masked export `question` skip | **Recorded** as coverage notes; the properties are fail-able via the source branches |
+| CR must-fix 1 | Chief Reviewer | Owner-read model unresolved (real member seeded) | **Fixed** (narrowed, above) |
+| CR must-fix 2 | Chief Reviewer | Records absent at review time | **Fixed** by this section, the memory bank and the PR body |
+| CR should-fix 3/4 | Chief Reviewer | Phantom export endpoint; `site/firebase.json` mislabel | **Fixed** |
+| ST note | Security Tester | Multi-segment slug skipped by the export | **Fixed** (R2-09) |
+
+**Testers.** Security Tester **0 FAIL (no veto)** across all eight checks (cross-member
+isolation, auth both transports, injection, cache, logging, the header change, public
+boundary incl. a planted needle red→green, IAM unchanged). Regression Tester **no
+regressions** (site 421/2 → 494/2; gate 455 → 626; contract 57/0; builds, guards,
+`demo:leak-check`, governance 4/4).
+
+### Chief Reviewer
+
+Verdict **Request changes**, L2 confirmed; two must-fix (owner-read; records) and four
+should-fix. **All resolved** in the fix commits and this record; a delta review is
+recorded in `handoffs/chief-reviewer-wave-6.md`.
+
+### §8 and apply
+
+No apply is required: the only `infra/` change is a comment and the plan is
+**0 to add, 0 to change, 0 to destroy** (no stateful resource in any action). Merge is
+under §8 (checks green, Security 0 FAIL, Red Team zero unhandled BYPASS after two
+rounds, Skeptic no un-failable guard, Chief Reviewer resolved, PR body with the
+data/security/privacy section).
+
+### Live verification — PENDING (owner sign-in)
+
+The capture island, My notes and the export renderer are private-build output; the gate
+routes are unit- and statically proven. The end-to-end owner step is: sign in as
+`djjay@vt.edu`, open a private `html` item such as
+`https://jason.cusati.us/p/research/agentic-kg-research/research-store/`, select text,
+highlight, and open `https://jason.cusati.us/p/notes/`. Recorded **pending**, not
+claimed, because it needs a real member session no agent can produce.
+
+### Five-line status (Wave 6)
+
+- **State:** annotations implemented (gate store + routes; site capture/My notes/export;
+  infra no-op), two adversarial rounds closed, Security 0 FAIL, Regression 0, records in
+  this PR; export delivery is credential-blocked.
+- **What to review:** ADR-0021/0022; the `_payload` `SAMEORIGIN` change; the privacy
+  default for `?scope=all`; the leak needles and export escaping.
+- **What only the owner can do:** the live sign-in check above; choose the export
+  transport (ADR-0022 — hard stop); confirm or widen the owner-read default.
+- **Open questions:** export transport; whether a member's notes may ever be exported
+  (consent); the `R2-04` delete oracle; a normalized/encoded leak check.
+- **Governance:** L2; contracts and handoffs `*-wave-6.md`; checks 4/4 PASS.
+
+### Decisions taken without the owner
+
+1. **Owner-read narrowed** (ADR-0021 dec. 8): the owner enumerates and deletes any
+   note but does not read a member's note content; export covers the owner's own notes.
+2. **`X-Frame-Options: SAMEORIGIN` for served `_payload/**` only** (ADR-0021 dec. 7),
+   fixing a pre-existing latent defect rather than widening framing generally.
+3. **No new Firestore IAM** — ADR-0018's grant already covers `annotations/`
+   (ADR-0021 dec. 4).
+4. **No roadmap box ticked** — #107 is a post-Phase-6 backlog feature with none.
+
+### Hard stop awaiting the owner (§9)
+
+**The export credential (ADR-0022).** No credential, secret, GitHub App, PAT or
+cross-repo IAM was created. The owner must choose the mechanism before automated
+cross-repository delivery exists. Exact ask is in the PR body and ADR-0022.

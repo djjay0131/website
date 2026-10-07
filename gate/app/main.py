@@ -822,7 +822,26 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             len(rows),
             principal.email,
         )
-        return JSONResponse({"annotations": [_annotation_row(row) for row in rows]}, status_code=200)
+        # PRIVACY DEFAULT (Chief Reviewer Wave 6 must-fix 1; Dissenter D1): the
+        # owner may ENUMERATE and DELETE any note, but does not READ another
+        # member's note content. `scope=all` therefore redacts quote, comment,
+        # selector and tags for rows the owner did not write; the metadata the
+        # owner needs to moderate (id, member, item, intent, dates) is present.
+        # This is the safe default; widening it needs the member's consent and
+        # is recorded in ADR-0021 decision 8.
+        owner_member = normalise_email(principal.email) or principal.email
+        return JSONResponse(
+            {
+                "annotations": [
+                    _annotation_row(
+                        row,
+                        include_content=(scope != "all" or row.member == owner_member),
+                    )
+                    for row in rows
+                ]
+            },
+            status_code=200,
+        )
 
     @app.delete("/annotations/{annotation_id}")
     async def delete_annotation(annotation_id: str, request: Request) -> Response:
@@ -1374,20 +1393,30 @@ def _annotation_filters(
     return intent, source, slug
 
 
-def _annotation_row(annotation: Annotation) -> dict:
-    """One list row. The owner sees every field; no other member's row is here.
+def _annotation_row(annotation: Annotation, *, include_content: bool = True) -> dict:
+    """One list row.
 
-    A non-owner's list is always their own rows (`list_for`), so `member` is
-    the caller's own address; the owner's `scope=all` is the only list that
-    carries other members' addresses, and only the owner reaches it.
+    `include_content=False` is the owner moderating another member's note: the
+    row carries the metadata needed to identify and delete it (id, member, item,
+    intent, dates) but NOT the note's quote, comment, selector or tags. A
+    non-owner's list is always their own rows (`list_for`), so this is only ever
+    the owner's view of a member's row.
     """
-    position = annotation.position
-    return {
+    metadata = {
         "id": annotation.id,
         "member": annotation.member,
         "section": annotation.section,
         "source": annotation.source,
         "slug": annotation.slug,
+        "intent": annotation.intent,
+        "created": annotation.created.isoformat(),
+        "updated": annotation.updated.isoformat(),
+    }
+    if not include_content:
+        return {**metadata, "redacted": True}
+    position = annotation.position
+    return {
+        **metadata,
         "selector": {
             "type": QUOTE_SELECTOR_TYPE,
             "exact": annotation.selector.exact,
@@ -1403,10 +1432,7 @@ def _annotation_row(annotation: Annotation) -> dict:
         },
         "quote": annotation.quote,
         "comment": annotation.comment,
-        "intent": annotation.intent,
         "tags": list(annotation.tags),
-        "created": annotation.created.isoformat(),
-        "updated": annotation.updated.isoformat(),
     }
 
 

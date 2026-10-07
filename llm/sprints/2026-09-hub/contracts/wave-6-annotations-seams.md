@@ -146,11 +146,12 @@ an existing member/role pair.)
   and the quoted passage, plus the comment and the intent. Grouped by item.
 - **Delivery is a PR, never a push**, into those two repos only.
 - **Rendering/routing is the site stream's** (`site/scripts/export-notes.mjs`),
-  fed by `GET /annotations?scope=all`; `question` notes are not rendered.
+  fed by the owner's notes (`GET /annotations`; a member's redacted `scope=all`
+  row has no content and is skipped); `question` notes are not rendered.
 - **The credential is a §9 hard stop.** No credential, secret, GitHub App,
   PAT, or cross-repo IAM is created in this wave. The mechanism is proposed in
-  **ADR-0022 (Proposed)** and put to the owner; only `POST
-  /annotations/export` (credential-free rendering) ships in v1.
+  **ADR-0022 (Proposed)** and put to the owner; only the credential-free
+  renderer (`site/scripts/export-notes.mjs`, local files, no remote) ships in v1.
 
 ## AN-LEAK — Leak check
 
