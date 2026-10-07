@@ -17,7 +17,8 @@ The reportable facts that shape it:
 
 - An annotation is **private data about private content**. It must never reach
   `dist-public`, the search index, RSS, OG or any log line, and it is scoped to
-  a member (members may read only their own; the owner may read and delete all).
+  a member (members may read only their own; the owner may enumerate and delete
+  any, but reads only their own — decision 8).
 - An annotation must survive a satellite republishing an item. Byte offsets do
   not; the item's text does. That is the W3C Web Annotation `TextQuoteSelector`
   with a `TextPositionSelector` fallback.
