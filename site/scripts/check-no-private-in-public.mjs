@@ -39,6 +39,16 @@
 //   title          the item's title, raw and HTML-escaped
 //   summary        the item's summary, raw and HTML-escaped
 //
+// ANNOTATION NEEDLES (AN-LEAK; Wave 6). The annotation capture island, the My
+// notes page and the `/annotations` endpoints are PRIVATE build only. If a
+// regression carries any of their tooling or endpoints into dist-public, the
+// public output would name how to reach private, member-scoped notes. Four
+// fixed needles catch that in a path or in a file's contents, independent of any
+// manifest: `/annotations`, `/p/notes`, `hub:annotation:` (a future storage key)
+// and `data-annotation-` (the capture island's DOM attributes). They are
+// checked even when no private item is published, because they guard a tool,
+// not one item.
+//
 // A SOURCE NAME IS NOT A BARE NEEDLE (Wave 4 FP-2). The Wave 4 satellite
 // publishes under source key `construction-ai`, which is also the id of the
 // owner's own public CV project, rendered first-party at /projects/construction-ai/.
@@ -270,6 +280,102 @@ export function weakNeedleWarnings(items) {
     }
   }
   return warnings;
+}
+
+/**
+ * THE ANNOTATION NEEDLES (AN-LEAK; contract site-wave-6 requirement 6).
+ *
+ * The annotation tooling and endpoints are private-build only. These four fixed
+ * strings are not derived from any manifest: they guard the TOOL. A path or a
+ * file under dist-public containing any of them is a regression that would tell
+ * a public visitor how to reach private, member-scoped notes.
+ */
+export const ANNOTATION_NEEDLES = ["/annotations", "/p/notes", "hub:annotation:", "data-annotation-"];
+
+/**
+ * The left-boundary set for `data-annotation-` (AN-LEAK, Wave 6 FP).
+ *
+ * A CLEAN public build already contains the substring `data-annotation-`: the
+ * research data has the citation key `tan-2024-llm-data-annotation-survey`, and
+ * a plain substring search failed the build on it -- the same over-broad-needle
+ * class as Wave 2's `index.html` and Wave 4's `construction-ai` (the guard that
+ * cries wolf is the guard that gets deleted).
+ *
+ * The collision is on the LEFT: in `llm-data-annotation-survey` the needle is
+ * preceded by a hyphen, part of a longer token; a real DOM attribute or code
+ * string is preceded by whitespace, a quote, `<`, an opening bracket, a comma or
+ * a backtick. Requiring one of those left neighbours keeps every real occurrence
+ * (`data-annotation-frame`, `data-annotation-island`, `"data-annotation-..."`)
+ * and drops the hyphenated citation key. The other three needles are
+ * distinctive enough to match as plain substrings.
+ */
+const ANNOTATION_LEFT_BOUNDARY = new Set([" ", "\t", "\n", "\r", "<", '"', "'", "(", "[", "{", ",", "`", "="]);
+
+/**
+ * True when `text` carries `needle`. `data-annotation-` must start a token (see
+ * ANNOTATION_LEFT_BOUNDARY); the others match as substrings.
+ */
+export function containsAnnotationNeedle(text, needle) {
+  const haystack = String(text ?? "");
+  let at = haystack.indexOf(needle);
+  while (at !== -1) {
+    if (needle !== "data-annotation-") return true;
+    const before = at === 0 ? "" : haystack[at - 1];
+    if (before === "" || ANNOTATION_LEFT_BOUNDARY.has(before)) return true;
+    at = haystack.indexOf(needle, at + 1);
+  }
+  return false;
+}
+
+/**
+ * Every trace of annotation tooling under dist-public, in a path or in a file's
+ * contents. Independent of the private-item needles: it runs even when no
+ * private item is published, because it guards a tool rather than one item.
+ *
+ * @param {string} distDir
+ * @returns {{file: string, where: "path"|"contents", item: string, kind: string, needle: string, context: string}[]}
+ */
+export function findAnnotationLeaks(distDir) {
+  const leaks = [];
+  for (const relFile of walkFiles(distDir)) {
+    const absFile = path.join(distDir, relFile);
+    const relPath = `/${relFile}`;
+    for (const needle of ANNOTATION_NEEDLES) {
+      if (relPath.includes(needle)) {
+        leaks.push({
+          file: relFile,
+          where: "path",
+          item: "annotation tooling",
+          kind: "annotation",
+          needle,
+          context: relFile,
+        });
+      }
+    }
+
+    let text = decompressPagefind(relFile, absFile);
+    if (text === null) {
+      if (!isTextFile(relFile, absFile)) continue;
+      try {
+        text = fs.readFileSync(absFile, "utf8");
+      } catch {
+        continue;
+      }
+    }
+    for (const needle of ANNOTATION_NEEDLES) {
+      if (containsAnnotationNeedle(text, needle)) {
+        leaks.push({
+          file: relFile,
+          where: "contents",
+          item: "annotation tooling",
+          kind: "annotation",
+          needle,
+          context: snippet(text, needle),
+        });
+      }
+    }
+  }
+  return leaks;
 }
 
 /** True when `value` occurs in `haystack` delimiter-bounded on both sides. */
@@ -668,11 +774,12 @@ if (isMain) {
   const derived = listDerivedOutputs(distDir);
   const scopeProblems = checkSearchIndexScope(distDir);
   const stubLeaks = stubsDir ? findRedirectStubLeaks(stubsDir, items) : [];
+  const annotationLeaks = findAnnotationLeaks(distDir);
 
   if (args.json) {
     console.log(
       JSON.stringify(
-        { dist: distDir, stubs: stubsDir, privateItems: items, leaks, stubLeaks, scopeProblems, derived, warnings },
+        { dist: distDir, stubs: stubsDir, privateItems: items, leaks, stubLeaks, annotationLeaks, scopeProblems, derived, warnings },
         null,
         2,
       ),
@@ -703,8 +810,9 @@ if (isMain) {
   // REPORT ALL PROBLEM CLASSES, THEN EXIT. An early exit on the first class
   // hides the rest, and the demo plants into every derived output precisely so a
   // single run proves the whole guard. The structural search-index assertion
-  // (SEAM-P6) is reported alongside the byte leaks.
-  const leakCount = leaks.length + stubLeaks.length;
+  // (SEAM-P6) is reported alongside the byte leaks. The annotation needles
+  // (AN-LEAK) guard a tool, so they are counted here too.
+  const leakCount = leaks.length + stubLeaks.length + annotationLeaks.length;
 
   if (leakCount > 0) {
     console.error(
@@ -733,6 +841,17 @@ if (isMain) {
         );
       }
     }
+    for (const leak of annotationLeaks) {
+      console.error(`  ${leak.file}  (annotation tooling)`);
+      console.error(`    ${leak.where}: ${JSON.stringify(leak.needle)} (AN-LEAK)`);
+      if (leak.where === "contents") console.error(`    …${leak.context}…`);
+      if (process.env.GITHUB_ACTIONS === "true") {
+        console.log(
+          `::error file=${leak.file}::annotation needle ${JSON.stringify(leak.needle)} appears in ` +
+            `the ${leak.where} of ${leak.file} under the PUBLIC output`,
+        );
+      }
+    }
     console.error(
       `\nThe public output must not contain, name or link any private item (ADR-0005, design doc ` +
         `§12.1). Nothing has been deployed.\n`,
@@ -757,10 +876,11 @@ if (isMain) {
   // Say so loudly rather than printing a reassuring "passed".
   if (items.length === 0) {
     console.log(
-      `check:no-private-in-public: NO PRIVATE ITEMS are published, so there was nothing to look ` +
-        `for and this run proves nothing about ${shownDist}. This is expected until ` +
-        `phd-milestones first publishes (Checkpoint 4). Run npm run demo:leak-check to see the ` +
-        `check actually fail.`,
+      `check:no-private-in-public: NO PRIVATE ITEMS are published, so this run proves nothing ` +
+        `about ${shownDist} with the item needles. The annotation needles ` +
+        `(${ANNOTATION_NEEDLES.join(", ")}) WERE checked and none was found. This is expected ` +
+        `until phd-milestones first publishes (Checkpoint 4). Run npm run demo:leak-check to see ` +
+        `the check actually fail.`,
     );
     process.exit(0);
   }
@@ -772,11 +892,15 @@ if (isMain) {
     const kinds = needlesFor(item).map((n) => n.kind).join(", ");
     console.log(`  ${item.source}/${item.slug} — needles: ${kinds}`);
   }
+  console.log(
+    `check:no-private-in-public: annotation needles scanned: ${ANNOTATION_NEEDLES.join(", ")}`,
+  );
 
   console.log(
     `\ncheck:no-private-in-public: PASS — no private slug, route, payload path, title or summary ` +
       `appears in any path or any file's contents under ${shownDist}` +
       `${shownStubs ? ` and no private title or summary appears in any stub under ${shownStubs}` : ""}` +
+      `, and none of the annotation needles (${ANNOTATION_NEEDLES.join(", ")}) appears` +
       ` (${walkFiles(distDir).length} file(s) scanned in ${shownDist}` +
       `${shownStubs ? `, ${walkFiles(stubsDir).length} in ${shownStubs}` : ""}).`,
   );

@@ -3,9 +3,13 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import zlib from "node:zlib";
 import {
+  ANNOTATION_NEEDLES,
   collectPrivateItems,
+  containsAnnotationNeedle,
   containsBounded,
+  findAnnotationLeaks,
   findLeaks,
   htmlEscape,
   needlesFor,
@@ -396,6 +400,83 @@ describe("needles and their limits are declared, not implied", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// AN-LEAK — annotation tooling never reaches dist-public
+// ---------------------------------------------------------------------------
+describe("annotation tooling and endpoints never reach the public output", () => {
+  it("declares exactly the four AN-LEAK needles", () => {
+    expect(ANNOTATION_NEEDLES).toEqual(["/annotations", "/p/notes", "hub:annotation:", "data-annotation-"]);
+  });
+
+  it("passes a clean public output", () => {
+    const dist = tree({
+      "index.html": "<h1>Jason Cusati</h1><p>Software engineer and researcher.</p>",
+      "cv/academic/index.html": "<h1>Academic CV</h1>",
+    });
+    try {
+      expect(findAnnotationLeaks(dist)).toEqual([]);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("flags a planted needle in CONTENTS and in a PATH", () => {
+    const dist = tree({
+      "index.html": '<script src="/annotations"></script><div data-annotation-island></div>',
+      "annotations/index.html": "<p>My notes</p>",
+      "page.html": "<p>hub:annotation:abc</p>",
+    });
+    try {
+      const leaks = findAnnotationLeaks(dist);
+      const needles = leaks.map((l) => l.needle);
+      expect(needles).toContain("/annotations");
+      expect(needles).toContain("data-annotation-");
+      expect(needles).toContain("hub:annotation:");
+      expect(leaks.some((l) => l.where === "path" && l.file.startsWith("annotations/"))).toBe(true);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("does NOT fire on the public citation key llm-data-annotation-survey (Wave 6 FP)", () => {
+    // A CLEAN public build legitimately contains `data-annotation-` inside the
+    // research citation key `tan-2024-llm-data-annotation-survey`. A plain
+    // substring search failed the clean build; the left-boundary rule keeps the
+    // real DOM attributes and drops the hyphenated citation token.
+    const dist = tree({
+      "research/sources/index.html":
+        '<a href="#tan-2024-llm-data-annotation-survey">[tan-2024-llm-data-annotation-survey]</a>',
+    });
+    try {
+      expect(findAnnotationLeaks(dist)).toEqual([]);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("containsAnnotationNeedle still catches a real data-annotation- attribute", () => {
+    expect(containsAnnotationNeedle('<div data-annotation-island>', "data-annotation-")).toBe(true);
+    expect(containsAnnotationNeedle('"iframe[data-annotation-frame]"', "data-annotation-")).toBe(true);
+    expect(containsAnnotationNeedle("llm-data-annotation-survey", "data-annotation-")).toBe(false);
+    // The other three are plain substring needles.
+    expect(containsAnnotationNeedle("see /annotations now", "/annotations")).toBe(true);
+  });
+
+  it("scans gzip Pagefind payloads, so a needle inside one is caught", () => {
+    const dist = tree({ "index.html": "<h1>clean</h1>" });
+    try {
+      fs.mkdirSync(path.join(dist, "pagefind", "fragment"), { recursive: true });
+      fs.writeFileSync(
+        path.join(dist, "pagefind", "fragment", "en_x.pf_fragment"),
+        zlib.gzipSync(Buffer.from("pagefind_dcd/annotations")),
+      );
+      expect(findAnnotationLeaks(dist).some((l) => l.needle === "/annotations")).toBe(true);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("the CLI", () => {
   let dist: string;
   beforeEach(() => {
@@ -423,6 +504,15 @@ describe("the CLI", () => {
     expect(run.status).toBe(1);
     expect(run.stderr).toContain("LEAK(S)");
     expect(run.stderr).toContain("index.html");
+  });
+
+  it("exits 1 when an annotation needle is planted in the public output", () => {
+    fs.writeFileSync(path.join(dist, "index.html"), '<a href="/annotations">notes</a>');
+    const run = spawnSync(process.execPath, [SCRIPT, "--dist", dist, "--sources", FIXTURE_SOURCES], {
+      encoding: "utf8",
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("/annotations");
   });
 
   it("exits 2 when there is no build output", () => {

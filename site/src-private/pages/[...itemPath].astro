@@ -9,6 +9,7 @@
 import { getCollection } from "astro:content";
 import PrivateBase from "../layouts/PrivateBase.astro";
 import { memberHref, payloadUrlFor } from "../lib/private-content.mjs";
+import AnnotationsIsland from "../components/AnnotationsIsland.tsx";
 
 export async function getStaticPaths() {
   // Only effectively-private items get a frame under /p/. The nav is built from
@@ -43,9 +44,15 @@ const payload = payloadUrlFor(item, base);
   </p>
   {item.summary && <p class="summary">{item.summary}</p>}
 
-  {item.format === "html" ? (
+  {item.format === "html" || item.format === "bundle" ? (
     <>
-      <iframe class="payload" src={payload} title={item.title} loading="lazy"></iframe>
+      <iframe
+        class="payload"
+        data-annotation-frame
+        src={payload}
+        title={item.title}
+        loading="lazy"></iframe>
+      <AnnotationsIsland section={item.section} source={item.source} slug={item.slug} client:load />
       <p class="fallback"><a href={payload}>Open this document on its own</a></p>
     </>
   ) : (
@@ -70,4 +77,107 @@ const payload = payloadUrlFor(item, base);
     background: var(--color-bg);
   }
   .fallback { margin-top: 0.75rem; font-size: 0.9rem; }
+
+  /* The capture island (AN-CAP). Touch targets are >=44px and the floating
+     toolbar is reachable by keyboard; the panel renders every note as text. */
+  :global(.annotations-island) { margin-top: 1rem; display: grid; gap: 0.75rem; }
+  :global(.annotation-toolbar) {
+    position: fixed;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    max-width: min(92vw, 40rem);
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  }
+  :global(.annotation-toolbar button) {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.5rem 0.9rem;
+    font: inherit;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  :global(.annotation-toolbar button:disabled) { opacity: 0.6; cursor: progress; }
+  :global(.annotation-form) { flex-direction: column; align-items: stretch; }
+  :global(.annotation-form textarea) {
+    width: 100%;
+    min-height: 5rem;
+    font: inherit;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+  :global(.annotation-form fieldset) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.4rem 0.6rem;
+  }
+  :global(.annotation-intent-option) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 44px;
+    font-size: 0.9rem;
+  }
+  :global(.annotation-actions) { display: flex; gap: 0.5rem; }
+  :global(.annotation-notes h2) { font-size: 1.2rem; margin-bottom: 0.5rem; }
+  :global(.annotation-notes ul) { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
+  :global(.annotation-notes li) {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.75rem;
+  }
+  :global(.annotation-intent) {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
+    margin-right: 0.5rem;
+  }
+  :global(.annotation-orphan) {
+    display: inline-block;
+    font-size: 0.72rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: var(--color-caution-bg);
+    color: var(--color-text);
+  }
+  :global(.annotation-comment) { margin: 0.35rem 0; white-space: pre-wrap; }
+  :global(.annotation-notes blockquote) {
+    margin: 0.35rem 0;
+    padding-left: 0.75rem;
+    border-left: 3px solid var(--color-border);
+    color: var(--color-muted);
+    white-space: pre-wrap;
+  }
+  :global(.annotation-notes button) {
+    min-height: 44px;
+    font: inherit;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  :global(.annotation-message) { color: var(--color-risk); }
 </style>

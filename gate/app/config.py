@@ -110,6 +110,9 @@ class Settings:
     allowed_origins: frozenset[str]
     # Firestore collection holding share tokens (SEAM-S1).
     shares_collection: str = "shares"
+    # Firestore collection holding annotations (AN-STORE). Same project-wide
+    # `datastore.user` grant as `shares/`; no separate IAM spelling exists.
+    annotations_collection: str = "annotations"
     # The public base a minted share URL is built from. Empty is deliberate and
     # safe: the minted `url` is then relative (`/s/{token}/`), which is correct
     # for the same-origin Shares page and cannot drift from the deployed host.
@@ -157,5 +160,8 @@ def load_settings() -> Settings:
         # there quietly.
         allowed_origins=_allowed_origins(ALLOWED_ORIGINS_VAR),
         shares_collection=os.environ.get("GATE_SHARES_COLLECTION", "shares").strip() or "shares",
+        annotations_collection=(
+            os.environ.get("GATE_ANNOTATIONS_COLLECTION", "annotations").strip() or "annotations"
+        ),
         share_base_url=os.environ.get("GATE_SHARE_BASE_URL", "").strip().rstrip("/"),
     )
