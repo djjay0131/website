@@ -1,0 +1,626 @@
+<blockquote>
+<p><strong>This is a derived digest of the store, not a source of truth.</strong> Every claim below cites a record id in <code>sources.json</code>. Where a number comes from an UNCHECKED record it is flagged as such where it matters. Claims that a record itself marks as coming from search snippets only are never used as load-bearing. No record here is citable in the proposal until it has gone through <code>/research:add-paper</code>.</p>
+<p><strong>Id note.</strong> The memos sometimes use pre-merge ids, such as "bertran-2026-many-ai-analysts", "demartino-…" or "angermeir-2026-…" (quoted here, not cited). This digest uses only the merged ids in <code>sources.json</code>, for example <a class="cite" href="../sources/#fogliato-2026-many-ai-analysts" title="Many AI analysts, one dataset: Navigating the agentic data s…">[fogliato-2026-many-ai-analysts]</a>, <a class="cite" href="../sources/#de-martino-2025-primes2-llm-msr" title="A Methodological Framework for LLM-Based Mining of Software …">[de-martino-2025-primes2-llm-msr]</a> and <a class="cite" href="../sources/#angermeir-2025-reproducibility-commercial-llm-ese" title="Reflections on the Reproducibility of Commercial LLM Perform…">[angermeir-2025-reproducibility-commercial-llm-ese]</a>.</p>
+</blockquote>
+<hr />
+<h2>1. The lifecycle map</h2>
+<p>The anchor SLR, <a class="cite" href="../sources/#gomes-2026-llm-assisted-ese-slr" title="LLM-Assisted Empirical Software Engineering: Systematic Lite…">[gomes-2026-llm-assisted-ese-slr]</a> (MINOR-FIX), maps 50 primary studies in 12 SE venues covering 2020–2025. It finds 69 LLM-assisted tasks, which cluster in repository mining and controlled experiments and focus on classification, filtering and evaluation. LLM use sits mostly in the data-processing and analysis phases. Integration is "largely automation-oriented, with limited decision-support use", and reporting is often incomplete. The rest of the store fills in the stages that SLR touches lightly.</p>
+<p><strong>Stage 1: question formulation and study design.</strong>
+- <strong>What AI does in SE:</strong> it proposes problem attributes and refines research questions (<a class="cite" href="../sources/#pereira-2025-ai-agents-research-problem-formulation" title="Towards AI Agents Supported Research Problem Formulation">[pereira-2025-ai-agents-research-problem-formulation]</a>, a vision paper). One tool runs a five-phase research-idea workflow in which every AI suggestion is accepted, edited or discarded, ending in a Go/Pivot/Abort decision (<a class="cite" href="../sources/#theodoro-2026-lri-co-assistant" title="LRI Co-Assistant: Artifact Package for an AI-Assisted Tool f…">[theodoro-2026-lri-co-assistant]</a>, CONFIRMED). AI can also stand in for participants at the design stage (<a class="cite" href="../sources/#gerosa-2024-ai-substitute-human-subjects" title="Can AI serve as a substitute for human subjects in software …">[gerosa-2024-ai-substitute-human-subjects]</a>), and GPT-4 can plan analyses for published ESE studies (<a class="cite" href="../sources/#liang-2024-gpt4-replicate-ese" title="Can GPT-4 Replicate Empirical Software Engineering Research?">[liang-2024-gpt4-replicate-ese]</a>).
+- <strong>Evidence outside SE:</strong> this is stronger. LLM ideas were rated more novel than expert ideas (<a class="cite" href="../sources/#si-2024-llm-novel-research-ideas" title="Can LLMs Generate Novel Research Ideas? A Large-Scale Human …">[si-2024-llm-novel-research-ideas]</a>). Once 43 experts executed the ideas, that advantage shrank or reversed (<a class="cite" href="../sources/#si-2025-ideation-execution-gap" title="The Ideation-Execution Gap: Execution Outcomes of LLM-Genera…">[si-2025-ideation-execution-gap]</a>, CONFIRMED). Agentic systems design experiments themselves (<a class="cite" href="../sources/#baek-2025-researchagent" title="ResearchAgent: Iterative Research Idea Generation over Scien…">[baek-2025-researchagent]</a>, <a class="cite" href="../sources/#schmidgall-2025-agent-laboratory" title="Agent Laboratory: Using LLM Agents as Research Assistants">[schmidgall-2025-agent-laboratory]</a>), and one runs human-participant studies end to end (<a class="cite" href="../sources/#wehr-2026-closing-empirical-loop" title="Closing the Empirical Loop: Autonomous AI Agents Conduct End…">[wehr-2026-closing-empirical-loop]</a>, CONFIRMED).
+- <strong>Maturity:</strong> vision and tool level in SE. No SE study evaluates AI-generated research questions (agent-a memo; consensus memo q1 "effectively empty").</p>
+<p><strong>Stage 2: literature reviews (SLRs, mapping studies, MLRs).</strong>
+- <strong>Screening has the most evidence in SE.</strong> Single-LLM recall reached 98% at 27% precision (<a class="cite" href="../sources/#thode-2025-llm-selection-phase-slr" title="Exploring the use of LLMs for the selection phase in systema…">[thode-2025-llm-selection-phase-slr]</a>, CONFIRMED). Some LLM and prompt combinations match human screeners but are not significantly more accurate (<a class="cite" href="../sources/#huotala-2024-llm-screening-sr-ease" title="The Promise and Challenges of Using LLMs to Accelerate the S…">[huotala-2024-llm-screening-sr-ease]</a>, CONFIRMED). A 34,528-study benchmark concludes LLMs are "not yet recommended" for automating title-abstract screening (<a class="cite" href="../sources/#huotala-2025-sesr-eval" title="SESR-Eval: Dataset for Evaluating LLMs in the Title-Abstract…">[huotala-2025-sesr-eval]</a>). Disagreement analysis finds κ of 0.52–0.77 (<a class="cite" href="../sources/#mantyla-2026-llm-screening-disagreements" title="Understanding LLMs in Title-Abstract Screening: From Disagre…">[mantyla-2026-llm-screening-disagreements]</a>).
+- <strong>Variability is a recurring finding.</strong> Screening is non-deterministic even at temperature zero (<a class="cite" href="../sources/#hida-2026-llm-variability-screening" title="Beyond Accuracy: LLM Variability in Evidence Screening for S…">[hida-2026-llm-variability-screening]</a>), and batching changes decisions (<a class="cite" href="../sources/#hida-2026-class-imbalance-batch-screening" title="Class Imbalance and Batch Effects in LLM-Based Screening for…">[hida-2026-class-imbalance-batch-screening]</a>, CONFIRMED).
+- <strong>Other review steps have been studied too:</strong> search strings (<a class="cite" href="../sources/#marassi-2025-llm-search-string-generation" title="Comparing LLMs and Proposing an ML-Based Approach for Search…">[marassi-2025-llm-search-string-generation]</a>), mapping studies (<a class="cite" href="../sources/#petersen-2024-interactive-llm-mapping-studies" title="On the road to interactive LLM-based systematic mapping stud…">[petersen-2024-interactive-llm-mapping-studies]</a>), fully automated SLR pipelines (<a class="cite" href="../sources/#sami-2024-multi-agent-slr-system" title="System for systematic literature review using multiple AI ag…">[sami-2024-multi-agent-slr-system]</a>), and agentic rapid reviews (<a class="cite" href="../sources/#nyyssola-2026-llm-rapid-reviews-tool-discovery" title="Towards LLM Accelerated Rapid Reviews for Software Tool Disc…">[nyyssola-2026-llm-rapid-reviews-tool-discovery]</a>).
+- <strong>Outside SE:</strong> a 63-study review shows good agreement on mechanical tasks and weak agreement on judgement tasks (<a class="cite" href="../sources/#laignelot-2026-llm-systematic-review-sr" title="Large language models show promising performance for some sy…">[laignelot-2026-llm-systematic-review-sr]</a>, CONFIRMED). Agentic SR pipelines exist (<a class="cite" href="../sources/#cao-2025-otto-sr" title="Automation of Systematic Reviews with Large Language Models">[cao-2025-otto-sr]</a>, MINOR-FIX).
+- <strong>Maturity:</strong> empirical evaluation for screening, emerging guidance (GUEST, ARISMA, RAISE; §3), and no methodology papers for AI-supported multivocal reviews (agent-a memo).</p>
+<p><strong>Stage 3: repository mining and data curation.</strong>
+- <strong>LLMs replace manual annotation.</strong> In SE, LLM–human agreement is equal or close to human–human agreement on some tasks (<a class="cite" href="../sources/#ahmed-2025-llm-replace-manual-annotation-se" title="Can LLMs Replace Manual Annotation of Software Engineering A…">[ahmed-2025-llm-replace-manual-annotation-se]</a>). Outside SE, ChatGPT beat crowd workers by about 25 percentage points (<a class="cite" href="../sources/#gilardi-2023-chatgpt-outperforms-crowd-workers" title="ChatGPT outperforms crowd workers for text-annotation tasks">[gilardi-2023-chatgpt-outperforms-crowd-workers]</a>, CONFIRMED).
+- <strong>LLMs also label MSR artifacts directly:</strong> issues (<a class="cite" href="../sources/#colavito-2025-benchmarking-llm-labeling" title="Benchmarking large language models for automated labeling: T…">[colavito-2025-benchmarking-llm-labeling]</a>) and code-review comments, where zero-shot macro-F1 was 0.36–0.37 (<a class="cite" href="../sources/#caglar-2026-code-review-comment-classification" title="Automated Classification of Human Code Review Comments with …">[caglar-2026-code-review-comment-classification]</a>).
+- <strong>Agents now curate data autonomously.</strong> Bash-exploring agents produced 4,943 classifications while retrieving their own context (<a class="cite" href="../sources/#hartel-2026-agentic-repository-mining" title="Agentic Repository Mining: A Multi-Task Evaluation">[hartel-2026-agentic-repository-mining]</a>). One EMSE pipeline uses LLM labels with no human input at all (<a class="cite" href="../sources/#senthilkumar-2026-synthcore-llm-labels" title="From brittle to robust: Improving LLM annotations for SE opt…">[senthilkumar-2026-synthcore-llm-labels]</a>).
+- <strong>Process frameworks exist:</strong> PRIMES (<a class="cite" href="../sources/#de-martino-2025-primes-llm-msr-framework" title="A Framework for Using LLMs for Repository Mining Studies in …">[de-martino-2025-primes-llm-msr-framework]</a>), PRIMES 2.0 with 6 stages, 23 substeps, 9 threats and 25 mitigations (<a class="cite" href="../sources/#de-martino-2025-primes2-llm-msr" title="A Methodological Framework for LLM-Based Mining of Software …">[de-martino-2025-primes2-llm-msr]</a>), and OLAF (<a class="cite" href="../sources/#imran-2026-olaf-llm-annotation" title="OLAF: Towards Robust LLM-Based Annotation Framework in Empir…">[imran-2026-olaf-llm-annotation]</a>).
+- <strong>Maturity:</strong> empirical evaluation plus SE-specific process guidance. Agentic MSR is just emerging, in 2026.</p>
+<p><strong>Stage 4: qualitative analysis.</strong>
+- <strong>Deductive coding is well studied:</strong>
+  - Cohen's κ 0.57 for inductive coding and Fleiss' κ 0.46 for deductive coding (<a class="cite" href="../sources/#zhang-2025-qualigpt-irr" title="Exploring Inductive and Deductive Qualitative Coding with AI…">[zhang-2025-qualigpt-irr]</a>, CONFIRMED)
+  - 160 repeated runs per text to measure variation (<a class="cite" href="../sources/#tai-2024-llm-aid-textual-analysis" title="An Examination of the Use of Large Language Models to Aid An…">[tai-2024-llm-aid-textual-analysis]</a>, CONFIRMED)
+  - a decision rule for when to delegate coding (<a class="cite" href="../sources/#chew-2023-llm-assisted-content-analysis" title="LLM-Assisted Content Analysis: Using Large Language Models t…">[chew-2023-llm-assisted-content-analysis]</a>)
+- <strong>Inductive thematic analysis in SE:</strong> experts preferred LLM codes 61% of the time, but the LLMs missed latent meaning (<a class="cite" href="../sources/#martinez-montes-2025-llm-thematic-analysis-se" title="Large Language Models in Thematic Analysis: Prompt Engineeri…">[martinez-montes-2025-llm-thematic-analysis-se]</a>).
+- <strong>The SE community is active:</strong> a mapping study (<a class="cite" href="../sources/#leca-2025-llm-qualitative-analysis-ese-mapping" title="Applications and Implications of Large Language Models in Qu…">[leca-2025-llm-qualitative-analysis-ese-mapping]</a>), a 25-person ISERN workshop (<a class="cite" href="../sources/#alves-2026-llm-thematic-analysis-isern-workshop" title="LLM-Assisted Thematic Analysis: Opportunities, Limitations, …">[alves-2026-llm-thematic-analysis-isern-workshop]</a>), a TOSEM position (<a class="cite" href="../sources/#ernst-2026-genai-no-silver-bullet-qualitative" title="GenAI Is No Silver Bullet for Qualitative Research in Softwa…">[ernst-2026-genai-no-silver-bullet-qualitative]</a>) and an antipattern catalogue (<a class="cite" href="../sources/#hoda-2026-antipatterns-ai-qda" title="Antipatterns in AI-assisted Qualitative Data Analysis: A Cat…">[hoda-2026-antipatterns-ai-qda]</a>, CONFIRMED).
+- <strong>Auditability work is very recent:</strong> <a class="cite" href="../sources/#jeldtoft-2026-auditable-llm-ta-workflow" title="Designing an Auditable LLM-Supported Workflow for Qualitativ…">[jeldtoft-2026-auditable-llm-ta-workflow]</a>, <a class="cite" href="../sources/#nyaaba-2026-hacita-interpretive-authority" title="Human-AI Collaborative Inductive Thematic Analysis: AI Guide…">[nyaaba-2026-hacita-interpretive-authority]</a> and <a class="cite" href="../sources/#prahl-2025-arc" title="The AI-Reflexivity Checklist (ARC): A Pre-Analysis Pause for…">[prahl-2025-arc]</a> (CONFIRMED).
+- <strong>Maturity:</strong> empirical evaluation for deductive coding; guidance is forming (2025–26 workshops).</p>
+<p><strong>Stage 5: quantitative analysis, statistics and simulation.</strong>
+- <strong>Agents run analyses end to end, and their conclusions depend on delegated choices.</strong> AI analysts reproduce the dispersion of human many-analyst studies, and the choice of persona or LLM steers the results (<a class="cite" href="../sources/#fogliato-2026-many-ai-analysts" title="Many AI analysts, one dataset: Navigating the agentic data s…">[fogliato-2026-many-ai-analysts]</a>, PNAS, UNCHECKED). Identical configurations give considerably different results across 480 attempts (<a class="cite" href="../sources/#cui-2026-same-prompt-different-outcomes" title="Same Prompt, Different Outcomes: Evaluating the Reproducibil…">[cui-2026-same-prompt-different-outcomes]</a>, MINOR-FIX). Configuration choices yield wrong conclusions for about 31% of hypotheses (<a class="cite" href="../sources/#baumann-2025-llm-hacking" title="Large Language Model Hacking: Quantifying the Hidden Risks o…">[baumann-2025-llm-hacking]</a>).
+- <strong>Capability on realistic tasks is 25–65%:</strong>
+  - 25% (<a class="cite" href="../sources/#majumder-2024-discoverybench" title="DiscoveryBench: Towards Data-Driven Discovery with Large Lan…">[majumder-2024-discoverybench]</a>, CONFIRMED)
+  - 64.83% (<a class="cite" href="../sources/#zhu-2024-statqa" title="Are Large Language Models Good Statisticians?">[zhu-2024-statqa]</a>)
+  - 34.12% (<a class="cite" href="../sources/#jing-2024-dsbench" title="DSBench: How Far Are Data Science Agents from Becoming Data …">[jing-2024-dsbench]</a>)
+- <strong>Synthetic participants are contested.</strong> Supporters: <a class="cite" href="../sources/#argyle-2023-out-of-one-many" title="Out of One, Many: Using Language Models to Simulate Human Sa…">[argyle-2023-out-of-one-many]</a>, <a class="cite" href="../sources/#aher-2023-turing-experiments" title="Using Large Language Models to Simulate Multiple Humans and …">[aher-2023-turing-experiments]</a>. Critics: <a class="cite" href="../sources/#bisbee-2024-synthetic-survey-perils" title="Synthetic Replacements for Human Survey Data? The Perils of …">[bisbee-2024-synthetic-survey-perils]</a>, <a class="cite" href="../sources/#cummins-2025-analytic-flexibility-silicon" title="The threat of analytic flexibility in using large language m…">[cummins-2025-analytic-flexibility-silicon]</a>. One study reconciles both sides: aggregate fidelity is not individual-level fidelity, with only 3.05% of respondent-specific variance explained (<a class="cite" href="../sources/#ahn-2026-item-mean-surrogates" title="Item-Mean Surrogates: Why Richer Persona Data Fail to Improv…">[ahn-2026-item-mean-surrogates]</a>, CONFIRMED).
+- <strong>SE has a specific version of the problem:</strong> AI-written responses now enter SE surveys through the participants themselves (<a class="cite" href="../sources/#desouzasantos-2026-fraudulent-ai-se-surveys" title="The Influence of Fraudulent AI-Generated Responses on Softwa…">[desouzasantos-2026-fraudulent-ai-se-surveys]</a>).
+- <strong>Maturity:</strong> benchmarks plus empirical evaluation; low to medium.</p>
+<p><strong>Stage 6: artifact generation and agentic science.</strong>
+- <strong>AI-scientist systems produce whole papers.</strong> Systems include <a class="cite" href="../sources/#lu-2024-ai-scientist" title="The AI Scientist: Towards Fully Automated Open-Ended Scienti…">[lu-2024-ai-scientist]</a> (CONFIRMED), <a class="cite" href="../sources/#yamada-2025-ai-scientist-v2" title="The AI Scientist-v2: Workshop-Level Automated Scientific Dis…">[yamada-2025-ai-scientist-v2]</a>, <a class="cite" href="../sources/#yamada-2026-ai-scientist-nature" title="Towards end-to-end automation of AI research">[yamada-2026-ai-scientist-nature]</a>, <a class="cite" href="../sources/#mitchener-2025-kosmos" title="Kosmos: An AI Scientist for Autonomous Discovery">[mitchener-2025-kosmos]</a> (CONFIRMED) and <a class="cite" href="../sources/#ifargan-2024-data-to-paper" title="Autonomous LLM-driven research from data to human-verifiable…">[ifargan-2024-data-to-paper]</a>. A generated manuscript passed the first review round of a workshop with a 70% acceptance rate (<a class="cite" href="../sources/#yamada-2026-ai-scientist-nature" title="Towards end-to-end automation of AI research">[yamada-2026-ai-scientist-nature]</a>).
+- <strong>Reproduction and replication agents are improving:</strong>
+  - <a class="cite" href="../sources/#starace-2025-paperbench" title="PaperBench: Evaluating AI&#x27;s Ability to Replicate AI Research">[starace-2025-paperbench]</a>: 21.0%
+  - <a class="cite" href="../sources/#siegel-2024-core-bench" title="CORE-Bench: Fostering the Credibility of Published Research …">[siegel-2024-core-bench]</a>: 21% on the hardest tasks
+  - <a class="cite" href="../sources/#alizadeh-2026-socsci-repro-bench" title="AI Coding Agents Can Reproduce Social Science Findings">[alizadeh-2026-socsci-repro-bench]</a>: "a large share" of social-science findings reproduced
+- <strong>SE-specific artifact agents</strong> check replication-package quality and evaluate ACM badges: <a class="cite" href="../sources/#mbida-2026-agentic-replication-package-quality" title="An Agentic Approach Towards Replication Package Quality Eval…">[mbida-2026-agentic-replication-package-quality]</a>, <a class="cite" href="../sources/#wu-2026-artifactcopilot" title="Agent-Based Software Artifact Evaluation">[wu-2026-artifactcopilot]</a> (CONFIRMED) and <a class="cite" href="../sources/#baek-2026-artisan-table-reproduction" title="Automated Table Reproduction via Code Generation">[baek-2026-artisan-table-reproduction]</a>.
+- <strong>Critiques find verification is the bottleneck:</strong>
+  - <a class="cite" href="../sources/#zhu-2025-ai-scientists-implementation" title="AI Scientists Fail Without Strong Implementation Capability">[zhu-2025-ai-scientists-implementation]</a> (CONFIRMED)
+  - <a class="cite" href="../sources/#ding-2026-autonomous-research-agents-verification-gap" title="Autonomous Research Agents: A Survey of AI Scientists and th…">[ding-2026-autonomous-research-agents-verification-gap]</a> (CONFIRMED)
+  - <a class="cite" href="../sources/#beel-2025-evaluating-sakana-ai-scientist" title="Evaluating Sakana&#x27;s AI Scientist: Bold Claims, Mixed Results…">[beel-2025-evaluating-sakana-ai-scientist]</a>: 42% of experiments failed
+  - <a class="cite" href="../sources/#chen-2025-mlr-bench" title="MLR-Bench: Evaluating AI Agents on Open-Ended Machine Learni…">[chen-2025-mlr-bench]</a>: about 80% of cases had fabricated or invalidated results
+- <strong>Maturity:</strong> working tools and benchmarks. Computational reproduction is maturing fast; open-ended AI research is fluent but unreliable.</p>
+<p><strong>Stage 7: reporting and reproducibility.</strong>
+- <strong>SE has real guidance:</strong> <a class="cite" href="../sources/#baltes-2025-llm-guidelines-ese" title="Guidelines for Empirical Studies in Software Engineering inv…">[baltes-2025-llm-guidelines-ese]</a> with its living site <a class="cite" href="../sources/#llmguidelines-2026-session-traces" title="Report Session Traces (LLM Guidelines, version 2026.09)">[llmguidelines-2026-session-traces]</a>, the precursor <a class="cite" href="../sources/#wagner-2025-evaluation-guidelines-llm-studies" title="Towards Evaluation Guidelines for Empirical Studies Involvin…">[wagner-2025-evaluation-guidelines-llm-studies]</a>, and a prompting guideline (<a class="cite" href="../sources/#korn-2026-reporting-llm-prompting-ase" title="Reporting LLM Prompting in Automated Software Engineering: A…">[korn-2026-reporting-llm-prompting-ase]</a>, CONFIRMED).
+- <strong>Audits show reproduction failing.</strong> Of 18 ICSE studies attempted, 5 were executable and none fully reproduced (<a class="cite" href="../sources/#angermeir-2025-reproducibility-commercial-llm-ese" title="Reflections on the Reproducibility of Commercial LLM Perform…">[angermeir-2025-reproducibility-commercial-llm-ese]</a>). An audit of 640 papers found that badges do not guarantee reproducibility (<a class="cite" href="../sources/#siddiq-2025-llm4se-reproducibility-crisis" title="Large Language Models for Software Engineering: A Reproducib…">[siddiq-2025-llm4se-reproducibility-crisis]</a>). Non-determinism persists at temperature 0 (<a class="cite" href="../sources/#ouyang-2025-nondeterminism-chatgpt" title="An Empirical Study of the Non-determinism of ChatGPT in Code…">[ouyang-2025-nondeterminism-chatgpt]</a>).
+- <strong>The ACM SIGSOFT Empirical Standards have no AI standard</strong> (<a class="cite" href="../sources/#ralph-2020-acm-sigsoft-empirical-standards" title="ACM SIGSOFT Empirical Standards">[ralph-2020-acm-sigsoft-empirical-standards]</a>, checked 2026-10-06).
+- <strong>Maturity:</strong> guidance exists; it is versioned but not enforced by any venue found (agent-d memo).</p>
+<p><strong>Stage 8: human-in-the-loop, provenance and audit.</strong>
+- <strong>Provenance standards are mature:</strong> <a class="cite" href="../sources/#w3c-2013-prov-overview" title="PROV-Overview: An Overview of the PROV Family of Documents">[w3c-2013-prov-overview]</a> (2013) and <a class="cite" href="../sources/#souza-2019-prov-ml" title="Provenance Data in the Machine Learning Lifecycle in Computa…">[souza-2019-prov-ml]</a> (CONFIRMED). Agent-specific provenance is new (2025–26): <a class="cite" href="../sources/#souza-2025-prov-agent" title="PROV-AGENT: Unified Provenance for Tracking AI Agent Interac…">[souza-2025-prov-agent]</a> (CONFIRMED), <a class="cite" href="../sources/#wu-2026-agenttrails" title="AgentTrails: Towards Trust and Reuse for Agentic Tasks">[wu-2026-agenttrails]</a> and <a class="cite" href="../sources/#rosen-2026-execution-lineage" title="From Agent Loops to Deterministic Graphs: Execution Lineage …">[rosen-2026-execution-lineage]</a>.
+- <strong>Gated agentic-research architectures appear in 2026 preprints</strong>, mostly outside SE: <a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a>, <a class="cite" href="../sources/#krebs-2026-fai2r" title="F(AI)2R: Who Did What, and Who Checked? Verifiable AI Proven…">[krebs-2026-fai2r]</a>, <a class="cite" href="../sources/#dong-2026-crossaudit" title="CrossAudit: A Git-Native, Cross-Vendor Audit Loop for Agenti…">[dong-2026-crossaudit]</a> and <a class="cite" href="../sources/#jha-2026-paper-pilot" title="Paper Pilot: A Human-in-the-Loop Expert System for Evidence-…">[jha-2026-paper-pilot]</a>.
+- <strong>Oversight research is sceptical</strong> that nominal human-in-the-loop works (<a class="cite" href="../sources/#grundemclaughlin-2026-overseeing-agents" title="Overseeing Agents Without Constant Oversight: Challenges and…">[grundemclaughlin-2026-overseeing-agents]</a>; <a class="cite" href="../sources/#mitchell-2026-agents-push-humans-out" title="AI Agents Push Humans Out of the Loop">[mitchell-2026-agents-push-humans-out]</a>, CONFIRMED).
+- <strong>Maturity:</strong> standards are mature; agentic provenance and gating are at tool or early-empirical level, and none of it comes from SE research methods.</p>
+<h3>Compact table</h3>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What AI does</th>
+<th>Maturity (SE)</th>
+<th>Key records</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 Question design</td>
+<td>Proposes and refines RQs, ideation, experiment design, synthetic participants</td>
+<td>Vision / tool (SE); empirical evaluation outside SE</td>
+<td><a class="cite" href="../sources/#pereira-2025-ai-agents-research-problem-formulation" title="Towards AI Agents Supported Research Problem Formulation">[pereira-2025-ai-agents-research-problem-formulation]</a>, <a class="cite" href="../sources/#theodoro-2026-lri-co-assistant" title="LRI Co-Assistant: Artifact Package for an AI-Assisted Tool f…">[theodoro-2026-lri-co-assistant]</a>, <a class="cite" href="../sources/#si-2025-ideation-execution-gap" title="The Ideation-Execution Gap: Execution Outcomes of LLM-Genera…">[si-2025-ideation-execution-gap]</a>, <a class="cite" href="../sources/#gerosa-2024-ai-substitute-human-subjects" title="Can AI serve as a substitute for human subjects in software …">[gerosa-2024-ai-substitute-human-subjects]</a>, <a class="cite" href="../sources/#liang-2024-gpt4-replicate-ese" title="Can GPT-4 Replicate Empirical Software Engineering Research?">[liang-2024-gpt4-replicate-ese]</a></td>
+</tr>
+<tr>
+<td>2 Literature review</td>
+<td>Screening, search strings, extraction, full agentic SR</td>
+<td>Empirical evaluation (screening) + guidance</td>
+<td><a class="cite" href="../sources/#thode-2025-llm-selection-phase-slr" title="Exploring the use of LLMs for the selection phase in systema…">[thode-2025-llm-selection-phase-slr]</a>, <a class="cite" href="../sources/#huotala-2025-sesr-eval" title="SESR-Eval: Dataset for Evaluating LLMs in the Title-Abstract…">[huotala-2025-sesr-eval]</a>, <a class="cite" href="../sources/#hida-2026-llm-variability-screening" title="Beyond Accuracy: LLM Variability in Evidence Screening for S…">[hida-2026-llm-variability-screening]</a>, <a class="cite" href="../sources/#kitchenham-2026-guest-genai-slr-guidelines" title="Preliminary Guidelines for Using and Evaluating GenAI Tools …">[kitchenham-2026-guest-genai-slr-guidelines]</a>, <a class="cite" href="../sources/#cao-2025-otto-sr" title="Automation of Systematic Reviews with Large Language Models">[cao-2025-otto-sr]</a></td>
+</tr>
+<tr>
+<td>3 Repository mining</td>
+<td>Annotation and labelling, agentic data collection</td>
+<td>Empirical evaluation + process guidance</td>
+<td><a class="cite" href="../sources/#ahmed-2025-llm-replace-manual-annotation-se" title="Can LLMs Replace Manual Annotation of Software Engineering A…">[ahmed-2025-llm-replace-manual-annotation-se]</a>, <a class="cite" href="../sources/#de-martino-2025-primes2-llm-msr" title="A Methodological Framework for LLM-Based Mining of Software …">[de-martino-2025-primes2-llm-msr]</a>, <a class="cite" href="../sources/#imran-2026-olaf-llm-annotation" title="OLAF: Towards Robust LLM-Based Annotation Framework in Empir…">[imran-2026-olaf-llm-annotation]</a>, <a class="cite" href="../sources/#hartel-2026-agentic-repository-mining" title="Agentic Repository Mining: A Multi-Task Evaluation">[hartel-2026-agentic-repository-mining]</a></td>
+</tr>
+<tr>
+<td>4 Qualitative analysis</td>
+<td>Deductive and inductive coding, thematic analysis, multi-agent coding</td>
+<td>Empirical evaluation (deductive) + emerging guidance</td>
+<td><a class="cite" href="../sources/#martinez-montes-2025-llm-thematic-analysis-se" title="Large Language Models in Thematic Analysis: Prompt Engineeri…">[martinez-montes-2025-llm-thematic-analysis-se]</a>, <a class="cite" href="../sources/#hoda-2026-antipatterns-ai-qda" title="Antipatterns in AI-assisted Qualitative Data Analysis: A Cat…">[hoda-2026-antipatterns-ai-qda]</a>, <a class="cite" href="../sources/#jeldtoft-2026-auditable-llm-ta-workflow" title="Designing an Auditable LLM-Supported Workflow for Qualitativ…">[jeldtoft-2026-auditable-llm-ta-workflow]</a>, <a class="cite" href="../sources/#prahl-2025-arc" title="The AI-Reflexivity Checklist (ARC): A Pre-Analysis Pause for…">[prahl-2025-arc]</a></td>
+</tr>
+<tr>
+<td>5 Quantitative analysis</td>
+<td>End-to-end analysis, test selection, synthetic samples</td>
+<td>Benchmarks + empirical evaluation (mostly outside SE)</td>
+<td><a class="cite" href="../sources/#fogliato-2026-many-ai-analysts" title="Many AI analysts, one dataset: Navigating the agentic data s…">[fogliato-2026-many-ai-analysts]</a>, <a class="cite" href="../sources/#cui-2026-same-prompt-different-outcomes" title="Same Prompt, Different Outcomes: Evaluating the Reproducibil…">[cui-2026-same-prompt-different-outcomes]</a>, <a class="cite" href="../sources/#baumann-2025-llm-hacking" title="Large Language Model Hacking: Quantifying the Hidden Risks o…">[baumann-2025-llm-hacking]</a>, <a class="cite" href="../sources/#ahn-2026-item-mean-surrogates" title="Item-Mean Surrogates: Why Richer Persona Data Fail to Improv…">[ahn-2026-item-mean-surrogates]</a></td>
+</tr>
+<tr>
+<td>6 Artifacts / agentic science</td>
+<td>Whole papers, reproduction, artifact evaluation</td>
+<td>Tools + benchmarks; SE-specific agents emerging</td>
+<td><a class="cite" href="../sources/#lu-2024-ai-scientist" title="The AI Scientist: Towards Fully Automated Open-Ended Scienti…">[lu-2024-ai-scientist]</a>, <a class="cite" href="../sources/#ifargan-2024-data-to-paper" title="Autonomous LLM-driven research from data to human-verifiable…">[ifargan-2024-data-to-paper]</a>, <a class="cite" href="../sources/#ding-2026-autonomous-research-agents-verification-gap" title="Autonomous Research Agents: A Survey of AI Scientists and th…">[ding-2026-autonomous-research-agents-verification-gap]</a>, <a class="cite" href="../sources/#baek-2026-artisan-table-reproduction" title="Automated Table Reproduction via Code Generation">[baek-2026-artisan-table-reproduction]</a>, <a class="cite" href="../sources/#wu-2026-artifactcopilot" title="Agent-Based Software Artifact Evaluation">[wu-2026-artifactcopilot]</a></td>
+</tr>
+<tr>
+<td>7 Reporting / reproducibility</td>
+<td>(object of guidance)</td>
+<td>Guidance, not enforced</td>
+<td><a class="cite" href="../sources/#baltes-2025-llm-guidelines-ese" title="Guidelines for Empirical Studies in Software Engineering inv…">[baltes-2025-llm-guidelines-ese]</a>, <a class="cite" href="../sources/#llmguidelines-2026-session-traces" title="Report Session Traces (LLM Guidelines, version 2026.09)">[llmguidelines-2026-session-traces]</a>, <a class="cite" href="../sources/#angermeir-2025-reproducibility-commercial-llm-ese" title="Reflections on the Reproducibility of Commercial LLM Perform…">[angermeir-2025-reproducibility-commercial-llm-ese]</a>, <a class="cite" href="../sources/#ralph-2020-acm-sigsoft-empirical-standards" title="ACM SIGSOFT Empirical Standards">[ralph-2020-acm-sigsoft-empirical-standards]</a></td>
+</tr>
+<tr>
+<td>8 HITL / provenance</td>
+<td>Trace capture, gated workflows, oversight</td>
+<td>Standards mature; agentic gating at tool / early-empirical level, outside SE</td>
+<td><a class="cite" href="../sources/#souza-2025-prov-agent" title="PROV-AGENT: Unified Provenance for Tracking AI Agent Interac…">[souza-2025-prov-agent]</a>, <a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a>, <a class="cite" href="../sources/#krebs-2026-fai2r" title="F(AI)2R: Who Did What, and Who Checked? Verifiable AI Proven…">[krebs-2026-fai2r]</a>, <a class="cite" href="../sources/#grundemclaughlin-2026-overseeing-agents" title="Overseeing Agents Without Constant Oversight: Challenges and…">[grundemclaughlin-2026-overseeing-agents]</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>2. Rigor, validity and reproducibility, stage by stage</h2>
+<p><strong>Stage 1.</strong>
+- <strong>Novelty judged before execution does not survive execution.</strong> LLM ideas lost significantly more score than human ideas once executed, and on many metrics the rankings flipped (<a class="cite" href="../sources/#si-2025-ideation-execution-gap" title="The Ideation-Execution Gap: Execution Outcomes of LLM-Genera…">[si-2025-ideation-execution-gap]</a>, CONFIRMED). The SE record says reproducibility becomes contingent on model updates and prompt context, and that core constructs ("developer", "artifact") are challenged (<a class="cite" href="../sources/#treude-2025-genai-empirical-se-paradigm-shift" title="Generative AI and Empirical Software Engineering: A Paradigm…">[treude-2025-genai-empirical-se-paradigm-shift]</a>, MINOR-FIX).
+- <strong>Expert review catches subtle errors.</strong> GPT-4 surfaced correct assumptions but made many small implementation errors that reflect a lack of SE knowledge (<a class="cite" href="../sources/#liang-2024-gpt4-replicate-ese" title="Can GPT-4 Replicate Empirical Software Engineering Research?">[liang-2024-gpt4-replicate-ese]</a>).
+- <strong>No source treats the acceptance of an AI-proposed question as a recorded decision</strong> (agent-a memo).</p>
+<p><strong>Stage 2.</strong>
+- <strong>Accuracy metrics mislead.</strong> Apparent human-par accuracy was inflated by chance agreement and class imbalance (<a class="cite" href="../sources/#khraisha-2024-gpt4-systematic-review-screening" title="Can large language models replace humans in systematic revie…">[khraisha-2024-gpt4-systematic-review-screening]</a>, MINOR-FIX). Only 10% of 29 SE screening papers report MCC, and a model optimised for accuracy lost 63.3% of the relevant evidence (<a class="cite" href="../sources/#madeyski-2026-llm4screenlit" title="LLM4SCREENLIT: Recommendations on Assessing the Performance …">[madeyski-2026-llm4screenlit]</a>, UNCHECKED).
+- <strong>Operational parameters change outcomes:</strong> batching (<a class="cite" href="../sources/#hida-2026-class-imbalance-batch-screening" title="Class Imbalance and Batch Effects in LLM-Based Screening for…">[hida-2026-class-imbalance-batch-screening]</a>, CONFIRMED), prompt wording and rating scale (<a class="cite" href="../sources/#dennstadt-2024-llm-title-abstract-screening" title="Title and abstract screening for literature reviews using la…">[dennstadt-2024-llm-title-abstract-screening]</a>, CONFIRMED), and run-to-run inconsistency in extraction (<a class="cite" href="../sources/#oami-2026-llm-data-extraction-prompting" title="Performance of large language models and prompt engineering …">[oami-2026-llm-data-extraction-prompting]</a>, CONFIRMED).
+- <strong>Unrecorded steps blocked reproduction.</strong> A reproduction of LLM Boolean-query generation diverged from the original because query validation, output formatting and the choice of chain-of-thought examples went unreported (<a class="cite" href="../sources/#wang-2025-reassessing-llm-boolean-query" title="Reassessing Large Language Model Boolean Query Generation fo…">[wang-2025-reassessing-llm-boolean-query]</a>, UNCHECKED). This is the most direct evidence in the store for the chapter's thesis.
+- <strong>Case-study observation:</strong> "excessive delegation" and "superficial validation" (<a class="cite" href="../sources/#ribeiro-2026-slr-genai-graduate-course" title="Observing the Conduct of Systematic Reviews with Generative …">[ribeiro-2026-slr-genai-graduate-course]</a>, CONFIRMED).</p>
+<p><strong>Stage 3.</strong>
+- <strong>Validation is task by task.</strong> LLM annotation is "highly contingent on dataset and task type" (<a class="cite" href="../sources/#pangakis-2023-automated-annotation-validation" title="Automated Annotation with Generative AI Requires Validation">[pangakis-2023-automated-annotation-validation]</a>). Non-determinism can fall below reliability thresholds (<a class="cite" href="../sources/#reiss-2023-chatgpt-annotation-reliability" title="Testing the Reliability of ChatGPT for Text Annotation and C…">[reiss-2023-chatgpt-annotation-reliability]</a>). There is a formal statistical test for justifying the substitution of human annotators (<a class="cite" href="../sources/#calderon-2025-alternative-annotator-test" title="The Alternative Annotator Test for LLM-as-a-Judge: How to St…">[calderon-2025-alternative-annotator-test]</a>, CONFIRMED).
+- <strong>Threats:</strong> closed models, leakage and non-determinism (<a class="cite" href="../sources/#sallou-2024-breaking-the-silence" title="Breaking the Silence: the Threats of Using LLMs in Software …">[sallou-2024-breaking-the-silence]</a>). Contamination averages 0.7–4.8% by language but reaches 100% for QuixBugs (<a class="cite" href="../sources/#zhou-2025-lessleak-bench" title="LessLeak-Bench: A First Investigation of Data Leakage in LLM…">[zhou-2025-lessleak-bench]</a>).
+- <strong>Analysis choices change MSR conclusions.</strong> Trend direction flips under equally defensible analysis choices (<a class="cite" href="../sources/#agarwal-2026-3100-opinions-code-review" title="3100 Opinions on Code Review in an AI World: Building Causal…">[agarwal-2026-3100-opinions-code-review]</a>, CONFIRMED). The "ground truth" behind agentic labelling is itself context-limited (<a class="cite" href="../sources/#hartel-2026-agentic-repository-mining" title="Agentic Repository Mining: A Multi-Task Evaluation">[hartel-2026-agentic-repository-mining]</a>).</p>
+<p><strong>Stage 4.</strong>
+- <strong>Agreement is not validity.</strong> Agreement with human annotators leaves construct validity untouched, so validation should target the process (<a class="cite" href="../sources/#pita-2026-correct-codes-wrong-reasons" title="Correct codes for the wrong reasons? validating LLMs as meas…">[pita-2026-correct-codes-wrong-reasons]</a>). High run-to-run κ (above 0.8) is self-consistency, not validity (<a class="cite" href="../sources/#jain-2025-multi-llm-thematic-analysis-kappa" title="Multi-LLM Thematic Analysis with Dual Reliability Metrics: C…">[jain-2025-multi-llm-thematic-analysis-kappa]</a>, CONFIRMED). Prompt strategy changes agreement and causes systematic label bias of up to 5.25× (<a class="cite" href="../sources/#alshaikh-2026-prompt-llm-qual-coding-psych-safety" title="Prompt Engineering Strategies for LLM-based Qualitative Codi…">[alshaikh-2026-prompt-llm-qual-coding-psych-safety]</a>).
+- <strong>Every SE source keeps interpretive authority with humans:</strong> <a class="cite" href="../sources/#leca-2025-llm-qualitative-analysis-ese-mapping" title="Applications and Implications of Large Language Models in Qu…">[leca-2025-llm-qualitative-analysis-ese-mapping]</a>, <a class="cite" href="../sources/#alves-2026-llm-thematic-analysis-isern-workshop" title="LLM-Assisted Thematic Analysis: Opportunities, Limitations, …">[alves-2026-llm-thematic-analysis-isern-workshop]</a>, <a class="cite" href="../sources/#dunivin-2025-scaling-hermeneutics" title="Scaling hermeneutics: a guide to qualitative coding with LLM…">[dunivin-2025-scaling-hermeneutics]</a> (CONFIRMED), <a class="cite" href="../sources/#schroeder-2025-llms-qualitative-uses-tensions" title="Large Language Models in Qualitative Research: Uses, Tension…">[schroeder-2025-llms-qualitative-uses-tensions]</a> (CONFIRMED; "urgent lack of norms and tooling").</p>
+<p><strong>Stage 5.</strong>
+- <strong>Conclusions depend on delegated analytic decisions.</strong>
+  - Many-analyst dispersion is reproduced and can be steered (<a class="cite" href="../sources/#fogliato-2026-many-ai-analysts" title="Many AI analysts, one dataset: Navigating the agentic data s…">[fogliato-2026-many-ai-analysts]</a>).
+  - In 6 of 11 datasets, a single run's affirmative conclusion was not stable (<a class="cite" href="../sources/#rewolinski-2026-sanity-checks-agentic-ds" title="Sanity Checks for Agentic Data Science">[rewolinski-2026-sanity-checks-agentic-ds]</a>).
+  - A confirmatory prompt flips verdicts from 10% to 90% support while leaving the coefficients unchanged (<a class="cite" href="../sources/#alizadeh-2026-coding-agents-social-science" title="AI Coding Agents in Social Science: Methodologically Diverse…">[alizadeh-2026-coding-agents-social-science]</a>).
+- <strong>LLMs make characteristic errors.</strong> They mostly choose tests whose assumptions do not hold (<a class="cite" href="../sources/#zhu-2024-statqa" title="Are Large Language Models Good Statisticians?">[zhu-2024-statqa]</a>).
+- <strong>Process-level remedies:</strong>
+  - preregister, then run on the next model released (<a class="cite" href="../sources/#thomas-2026-preregister-next-llm" title="Mitigating LLM-based p-Hacking by Preregistering for the Nex…">[thomas-2026-preregister-next-llm]</a>, MINOR-FIX)
+  - a preregistration template for AI-agent experiments (<a class="cite" href="../sources/#vaccaro-2026-preregistration-ai-agents" title="Preregistration for Experiments with AI Agents">[vaccaro-2026-preregistration-ai-agents]</a>)
+  - protocol enforcement plus deterministic computation (<a class="cite" href="../sources/#lee-2026-autometa" title="AutoMETA: A Multi-Agent LLM System for Autonomous Meta-Analy…">[lee-2026-autometa]</a>, MINOR-FIX)
+  - reproducibility-enhancing workflow prompts (<a class="cite" href="../sources/#zeng-2025-airepr" title="AIRepr: An Analyst-Inspector Framework for Evaluating Reprod…">[zeng-2025-airepr]</a>, CONFIRMED)
+- <strong>Synthetic data drifts.</strong> The same prompt gave significantly different results over three months (<a class="cite" href="../sources/#bisbee-2024-synthetic-survey-perils" title="Synthetic Replacements for Human Survey Data? The Perils of …">[bisbee-2024-synthetic-survey-perils]</a>).</p>
+<p><strong>Stage 6.</strong>
+- <strong>The final paper hides failures.</strong>
+  - Trace logs and code detect failures far better than the paper does (<a class="cite" href="../sources/#luo-2025-hidden-pitfalls-ai-scientist" title="The More You Automate, the Less You See: Hidden Pitfalls of …">[luo-2025-hidden-pitfalls-ai-scientist]</a>, MINOR-FIX).
+  - Agents reach right-looking results through wrong mechanisms (<a class="cite" href="../sources/#eulig-2026-correct-answer-wrong-mechanism" title="Position: Correct Answer, Wrong Mechanism -- When AI Scienti…">[eulig-2026-correct-answer-wrong-mechanism]</a>).
+  - With data missing, all seven models synthesise data rather than acknowledge infeasibility (<a class="cite" href="../sources/#yang-2026-sciintegrity-bench" title="SciIntegrity-Bench: A Benchmark for Evaluating Academic Inte…">[yang-2026-sciintegrity-bench]</a>, CONFIRMED).
+  - Automated review accepted work that humans found flawed: 59% of accepted automated reviews contained fabricated or unsupported claims (<a class="cite" href="../sources/#gaddipati-2026-mlreplicate" title="MLReplicate: Benchmarking Autonomous Research Systems for Ma…">[gaddipati-2026-mlreplicate]</a>, CONFIRMED).
+  - 38% of 24 runnable systems release seeds or traces, and none demonstrates an externally validated in-loop oracle (<a class="cite" href="../sources/#ding-2026-autonomous-research-agents-verification-gap" title="Autonomous Research Agents: A Survey of AI Scientists and th…">[ding-2026-autonomous-research-agents-verification-gap]</a>, CONFIRMED).</p>
+<p><strong>Stage 7.</strong>
+- <strong>Reproducibility audits (above) give hard numbers:</strong> <a class="cite" href="../sources/#angermeir-2025-reproducibility-commercial-llm-ese" title="Reflections on the Reproducibility of Commercial LLM Perform…">[angermeir-2025-reproducibility-commercial-llm-ese]</a>, <a class="cite" href="../sources/#siddiq-2025-llm4se-reproducibility-crisis" title="Large Language Models for Software Engineering: A Reproducib…">[siddiq-2025-llm4se-reproducibility-crisis]</a>.
+- <strong>Reporting practice diverges from what reviewers expect</strong> on version disclosure, prompt justification and threats to validity (<a class="cite" href="../sources/#korn-2026-reporting-llm-prompting-ase" title="Reporting LLM Prompting in Automated Software Engineering: A…">[korn-2026-reporting-llm-prompting-ase]</a>, CONFIRMED).
+- <strong>Single-output reporting hides variance</strong> (<a class="cite" href="../sources/#ortin-2026-safellm4se" title="SafeLLM4SE: Statistical Evaluation and Reporting for LLM-bas…">[ortin-2026-safellm4se]</a>).
+- <strong>One recommendation set separates data paths:</strong> keep the LLM off the data path where possible, preserve LLM-generated artifacts, and verify by methods suited to the LLM's role (<a class="cite" href="../sources/#dunn-2026-reproducible-llm-analyses" title="Designing reproducible large-language-model-assisted scienti…">[dunn-2026-reproducible-llm-analyses]</a>, CONFIRMED).</p>
+<p><strong>Stage 8.</strong>
+- <strong>Better traces improved speed and confidence, not accuracy</strong> (<a class="cite" href="../sources/#grundemclaughlin-2026-overseeing-agents" title="Overseeing Agents Without Constant Oversight: Challenges and…">[grundemclaughlin-2026-overseeing-agents]</a>).
+- <strong>Automation bias</strong> is the named failure mode of nominal oversight (<a class="cite" href="../sources/#eu-2024-ai-act-article-14" title="Regulation (EU) 2024/1689 (AI Act), Article 14: Human oversi…">[eu-2024-ai-act-article-14]</a>, an analogy only; <a class="cite" href="../sources/#laux-2025-automation-bias-ai-act" title="Automation Bias in the AI Act: On the Legal Implications of …">[laux-2025-automation-bias-ai-act]</a>, whose claim is snippet-sourced).
+- <strong>Gates plus deterministic computation measurably reduce failures.</strong> Critical failures fell from 72% to 16% over 280 runs (<a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a>, MINOR-FIX). Evidence-locked rules cut fabricated citations from up to 25% to zero (<a class="cite" href="../sources/#jha-2026-paper-pilot" title="Paper Pilot: A Human-in-the-Loop Expert System for Evidence-…">[jha-2026-paper-pilot]</a>, CONFIRMED).</p>
+<hr />
+<h2>3. Reporting and reproducibility guidance that already exists</h2>
+<p>The draft gap sentence ("disclosing model + prompt captures a sliver") <strong>understates existing guidance</strong>. Here is what each guideline already asks for:</p>
+<p><strong>SE-specific.</strong>
+- <strong><a class="cite" href="../sources/#baltes-2025-llm-guidelines-ese" title="Guidelines for Empirical Studies in Software Engineering inv…">[baltes-2025-llm-guidelines-ese]</a> (UNCHECKED; accepted in EMSE per the record).</strong> Eight guidelines across seven study types:
+  1. declare LLM usage and role
+  2. report model versions, configurations and customizations
+  3. document system and prompt design beyond the model
+  4. <strong>report session traces (interaction logs and runtime traces)</strong>
+  5. use suitable baselines, benchmarks and metrics
+  6. include an open LLM as a baseline
+  7. <strong>validate LLM outputs against human judgment</strong>
+  8. articulate limitations and mitigations</p>
+<p>The study types include LLMs as annotators, as judges and for synthesis, which are uses inside the research process.
+- <strong><a class="cite" href="../sources/#llmguidelines-2026-session-traces" title="Report Session Traces (LLM Guidelines, version 2026.09)">[llmguidelines-2026-session-traces]</a> (UNCHECKED; version 2026.09).</strong>
+  - Researchers <em>should</em> provide full interaction logs.
+  - <strong>For agentic systems, they should report "human-in-the-loop feedback, approval or rejection decisions, and iterative refinements"</strong>.
+  - For tool-using agents, they report each tool call's name, arguments, result and ordering.
+  - It notes that non-determinism persists at temperature 0.</p>
+<p>This is the strongest pre-emption of the draft gap sentence.
+- <strong><a class="cite" href="../sources/#wagner-2025-evaluation-guidelines-llm-studies" title="Towards Evaluation Guidelines for Empirical Studies Involvin…">[wagner-2025-evaluation-guidelines-llm-studies]</a> (UNCHECKED).</strong> Explicitly scopes in studies that use LLMs "as part of the research process".
+- <strong><a class="cite" href="../sources/#korn-2026-reporting-llm-prompting-ase" title="Reporting LLM Prompting in Automated Software Engineering: A…">[korn-2026-reporting-llm-prompting-ase]</a> (CONFIRMED).</strong> A prompting-report guideline built from about 300 papers and 105 PC members.
+- <strong><a class="cite" href="../sources/#kitchenham-2026-guest-genai-slr-guidelines" title="Preliminary Guidelines for Using and Evaluating GenAI Tools …">[kitchenham-2026-guest-genai-slr-guidelines]</a> (GUEST; UNCHECKED).</strong> Process-level guidance for <em>planning, conducting and reporting</em> GenAI-supported SLRs. It holds that GenAI "requires human oversight and is not currently capable of unsupervised systematic studies". It is limited to one stage.
+- <strong>PRIMES and PRIMES 2.0.</strong> PRIMES calls for mechanisms to track model results (<a class="cite" href="../sources/#de-martino-2025-primes-llm-msr-framework" title="A Framework for Using LLMs for Repository Mining Studies in …">[de-martino-2025-primes-llm-msr-framework]</a>). PRIMES 2.0 maps each of 23 MSR substeps to threats and mitigations (<a class="cite" href="../sources/#de-martino-2025-primes2-llm-msr" title="A Methodological Framework for LLM-Based Mining of Software …">[de-martino-2025-primes2-llm-msr]</a>). Both cover one stage.
+- <strong><a class="cite" href="../sources/#imran-2026-olaf-llm-annotation" title="OLAF: Towards Robust LLM-Based Annotation Framework in Empir…">[imran-2026-olaf-llm-annotation]</a>.</strong> Annotation as measurement: reliability, calibration, drift, consensus, aggregation, transparency.
+- <strong><a class="cite" href="../sources/#ortin-2026-safellm4se" title="SafeLLM4SE: Statistical Evaluation and Reporting for LLM-bas…">[ortin-2026-safellm4se]</a>.</strong> A minimum statistical reporting standard.
+- <strong><a class="cite" href="../sources/#ralph-2020-acm-sigsoft-empirical-standards" title="ACM SIGSOFT Empirical Standards">[ralph-2020-acm-sigsoft-empirical-standards]</a>.</strong> None of the 19 standards is LLM- or AI-specific, and no LLM mention was found in the four files searched (checked 2026-10-06).</p>
+<p><strong>Evidence synthesis (outside SE).</strong>
+- <strong><a class="cite" href="../sources/#flemyng-2025-ai-evidence-synthesis-position-statement" title="Position Statement on Artificial Intelligence (AI) Use in Ev…">[flemyng-2025-ai-evidence-synthesis-position-statement]</a> (UNCHECKED; Campbell/Cochrane joint).</strong>
+  - The author is accountable for "the decision to use AI".
+  - AI should be used with human oversight.
+  - "Any use of AI or automation that makes or suggests judgements should be fully and transparently reported".
+  - Required disclosures: name, version and date; <strong>purpose and stages affected; justification of methodological soundness</strong>; limitations.
+- <strong><code>thomas-raise-recommendations</code> (RAISE; UNCHECKED).</strong> Assigns responsibilities to eight roles across the evidence-synthesis ecosystem.
+- <strong><a class="cite" href="../sources/#moghaddam-2026-arisma" title="ARISMA: Guidelines for AI- and LLM-Assisted Systematic Revie…">[moghaddam-2026-arisma]</a> (MINOR-FIX).</strong> "Every consequential scientific decision must remain human-interpretable, human-auditable, and human-accountable". It states that the PRISMA family provides no end-to-end operational standard for AI use.
+- <strong><a class="cite" href="../sources/#gallifant-2025-tripod-llm" title="The TRIPOD-LLM reporting guideline for studies using large l…">[gallifant-2025-tripod-llm]</a> (CONFIRMED).</strong> A modular reporting checklist (19 main items) that emphasises human oversight.</p>
+<p><strong>Integrity bodies and policy.</strong>
+- <strong><a class="cite" href="../sources/#ec-2026-living-guidelines-genai-research" title="Living guidelines on the responsible use of generative AI in…">[ec-2026-living-guidelines-genai-research]</a> (UNCHECKED).</strong>
+  - Counts literature review, identifying gaps, formulating aims and developing hypotheses as "substantial use".
+  - Asks how the tool "was used and affected the research process".
+  - Asks for FAIR release of prompts and outputs "if relevant".
+- <strong><a class="cite" href="../sources/#allea-2023-european-code-of-conduct" title="The European Code of Conduct for Research Integrity (Revised…">[allea-2023-european-code-of-conduct]</a>.</strong> Asks that AI use be reported "in a way that facilitates verification or replication", and treats hiding AI use as a violation.
+- <strong><a class="cite" href="../sources/#blau-2024-protecting-scientific-integrity" title="Protecting scientific integrity in an age of generative AI">[blau-2024-protecting-scientific-integrity]</a>.</strong> Asks for AI-generated inferences to be marked "with provenance information about the role of AI".
+- <strong><a class="cite" href="../sources/#cope-2023-authorship-ai-tools" title="Authorship and AI tools (COPE position statement)">[cope-2023-authorship-ai-tools]</a>.</strong> Disclosure goes in Methods. The content is snippet-sourced.</p>
+<p><strong>Venue and publisher.</strong> These cover authorship and text disclosure only:
+- <strong><a class="cite" href="../sources/#icse-2027-research-track-genai-policy" title="ICSE 2027 Research Track call for papers (generative AI and …">[icse-2027-research-track-genai-policy]</a>.</strong> Relays the ACM and IEEE policies and desk-rejects hallucinated references.
+- <strong><code>ieee-ai-generated-text-guidelines</code>.</strong> Disclosure in the acknowledgements.
+- <strong><code>springernature-ai-guidance</code>.</strong> Book authors disclose in the acknowledgements, introduction or preface. This governs the chapter itself. The record flags the copy-editing disclosure rule as unresolved.</p>
+<p><strong>Analogues.</strong>
+- <strong><a class="cite" href="../sources/#kapoor-2024-reforms" title="REFORMS: Consensus-based Recommendations for Machine-learnin…">[kapoor-2024-reforms]</a>:</strong> a 32-item checklist.
+- <strong><a class="cite" href="../sources/#mitchell-2019-model-cards" title="Model Cards for Model Reporting">[mitchell-2019-model-cards]</a>:</strong> artifact cards.
+- <strong><a class="cite" href="../sources/#gebru-2021-datasheets-for-datasets" title="Datasheets for Datasets">[gebru-2021-datasheets-for-datasets]</a> (CONFIRMED):</strong> documents the collection process.</p>
+<p><strong>Bottom line for the gap.</strong>
+- <strong>Already demanded in SE:</strong> the role of the LLM, configurations, prompts, interaction and session traces, human validation of outputs, and, at "should" strength, human approval and rejection decisions in agentic studies.
+- <strong>Already demanded in evidence synthesis:</strong> the stages affected, a justification, and accountability for the decision to use AI.
+- <strong>Missing everywhere (§6):</strong>
+  - delegated decisions as structured records (rather than raw logs or narrative)
+  - declared authority bounds
+  - gate semantics: what the human checked, against what criteria, and where in the lifecycle
+  - any of the above spanning more than one stage of the empirical-SE lifecycle</p>
+<hr />
+<h2>4. Human-in-the-loop and provenance work</h2>
+<p><strong>Gates and HITL inside single stages.</strong>
+- <strong>Literature review:</strong>
+  - boundary cases routed to humans (<a class="cite" href="../sources/#huotala-2025-aisysrev" title="AISysRev -- LLM-based Tool for Title-abstract Screening">[huotala-2025-aisysrev]</a>)
+  - prioritised review of borderline decisions plus semantic validation (<a class="cite" href="../sources/#mantyla-2026-llm-screening-disagreements" title="Understanding LLMs in Title-Abstract Screening: From Disagre…">[mantyla-2026-llm-screening-disagreements]</a>)
+  - a workflow that records disagreements and exclusion rationales (<a class="cite" href="../sources/#li-2025-genai-slr-hitl" title="Enhancing systematic literature reviews with generative arti…">[li-2025-genai-slr-hitl]</a>, CONFIRMED)
+  - agent trajectories made visible for live monitoring (<a class="cite" href="../sources/#qiu-2025-insightagent" title="Completing A Systematic Review in Hours instead of Months wi…">[qiu-2025-insightagent]</a>)
+- <strong>Qualitative analysis:</strong>
+  - coding decision data (keywords, certainty) recorded (<a class="cite" href="../sources/#gao-2024-collabcoder" title="CollabCoder: A Lower-barrier, Rigorous Workflow for Inductiv…">[gao-2024-collabcoder]</a>)
+  - human modify, reject and insert actions treated as research data (<a class="cite" href="../sources/#nyaaba-2026-hacita-interpretive-authority" title="Human-AI Collaborative Inductive Thematic Analysis: AI Guide…">[nyaaba-2026-hacita-interpretive-authority]</a>)
+  - delegation levels studied as researcher preferences (<a class="cite" href="../sources/#puranik-2025-assistant-not-collaborator-qda" title="Not a Collaborator or a Supervisor, but an Assistant: Striki…">[puranik-2025-assistant-not-collaborator-qda]</a>)
+  - a pre-analysis checklist that turns the delegation decision into a brief reviewable record, where lack of reversibility is a blocker (<a class="cite" href="../sources/#prahl-2025-arc" title="The AI-Reflexivity Checklist (ARC): A Pre-Analysis Pause for…">[prahl-2025-arc]</a>, CONFIRMED)
+- <strong>Question design:</strong> an accept/edit/discard step plus a Go/Pivot/Abort gate (<a class="cite" href="../sources/#theodoro-2026-lri-co-assistant" title="LRI Co-Assistant: Artifact Package for an AI-Assisted Tool f…">[theodoro-2026-lri-co-assistant]</a>, CONFIRMED). The record does not say whether those decisions are logged.</p>
+<p><strong>Gated agentic-research architectures (mostly 2026 preprints, outside SE).</strong>
+- <strong><a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a> (MINOR-FIX).</strong> LLMs reason but do not execute data work, estimation is deterministic, and three human decision gates bind the workflow. Critical failures fell from 72% to 16% (p&lt;0.001), and an ablation suggests the gates and the deterministic computation contribute independently.
+- <strong><a class="cite" href="../sources/#zhu-2026-pai-econ-gated" title="pAI-Econ-claude: A Gated Human-in-the-Loop Multi-Agent Archi…">[zhu-2026-pai-econ-gated]</a> (CONFIRMED).</strong> Blinded evaluators preferred the gated architecture in 4 of 5 tasks. Small n.
+- <strong><a class="cite" href="../sources/#jha-2026-paper-pilot" title="Paper Pilot: A Human-in-the-Loop Expert System for Evidence-…">[jha-2026-paper-pilot]</a> (CONFIRMED).</strong> Evidence-locked drafting produced zero fabricated citations.
+- <strong><a class="cite" href="../sources/#krebs-2026-fai2r" title="F(AI)2R: Who Did What, and Who Checked? Verifiable AI Proven…">[krebs-2026-fai2r]</a> (UNCHECKED).</strong> Two invariants: "no parentless claim", and verification rungs only humans may grant.
+- <strong><a class="cite" href="../sources/#dong-2026-crossaudit" title="CrossAudit: A Git-Native, Cross-Vendor Audit Loop for Agenti…">[dong-2026-crossaudit]</a> (MINOR-FIX).</strong> A git-native, cross-vendor audit loop with eight invariants. The authors are candid about limited evidence.
+- <strong><a class="cite" href="../sources/#zhou-2026-auditable-ai-research-writing" title="Auditable AI-Assisted Research Writing: An Engineering Disci…">[zhou-2026-auditable-ai-research-writing]</a> (MINOR-FIX).</strong> Pre-registered process observation. A frozen stopping rule halted work on a No-Go result, and a third party can recompute every primary metric.
+- <strong><a class="cite" href="../sources/#guo-2026-clarus" title="Clarus: Coordinating Autonomous Research Agents toward Web-S…">[guo-2026-clarus]</a> (UNCHECKED).</strong> Claims a traceable, attributable collaboration network.</p>
+<p><strong>Provenance infrastructure.</strong>
+- W3C PROV vocabulary (<a class="cite" href="../sources/#w3c-2013-prov-overview" title="PROV-Overview: An Overview of the PROV Family of Documents">[w3c-2013-prov-overview]</a>)
+- domain profiles: <a class="cite" href="../sources/#souza-2019-prov-ml" title="Provenance Data in the Machine Learning Lifecycle in Computa…">[souza-2019-prov-ml]</a> (CONFIRMED), <a class="cite" href="../sources/#padovani-2025-yprov4ml" title="yProv4ML: Effortless Provenance Tracking for Machine Learnin…">[padovani-2025-yprov4ml]</a>
+- script-level provenance, prospective and retrospective (<a class="cite" href="../sources/#pimentel-2017-noworkflow" title="noWorkflow: a tool for collecting, analyzing, and managing p…">[pimentel-2017-noworkflow]</a>)
+- agent-specific provenance:
+  - <a class="cite" href="../sources/#souza-2025-prov-agent" title="PROV-AGENT: Unified Provenance for Tracking AI Agent Interac…">[souza-2025-prov-agent]</a> (CONFIRMED) relates prompts, responses and decisions to the workflow and its outcomes
+  - <a class="cite" href="../sources/#wu-2026-agenttrails" title="AgentTrails: Towards Trust and Reuse for Agentic Tasks">[wu-2026-agenttrails]</a> notes that chronological logs obscure dataflow
+  - <a class="cite" href="../sources/#rosen-2026-execution-lineage" title="From Agent Loops to Deterministic Graphs: Execution Lineage …">[rosen-2026-execution-lineage]</a> treats intermediate artifacts as a replayable DAG
+- surveys and taxonomies: <a class="cite" href="../sources/#wang-2026-agent-traces-to-trust-survey" title="From Agent Traces to Trust: A Survey of Evidence Tracing and…">[wang-2026-agent-traces-to-trust-survey]</a> (CONFIRMED), <a class="cite" href="../sources/#dong-2024-agentops-taxonomy" title="AgentOps: Enabling Observability of LLM Agents">[dong-2024-agentops-taxonomy]</a>
+- governance of agents: activity logging and agent identifiers (<a class="cite" href="../sources/#chan-2024-visibility-into-ai-agents" title="Visibility into AI Agents">[chan-2024-visibility-into-ai-agents]</a>)
+- the research-object approach (<a class="cite" href="../sources/#binkyte-2026-airo" title="Inspectable AI for Science: A Research Object Approach to Ge…">[binkyte-2026-airo]</a>, CONFIRMED) argues that generic disclosure does not meet auditability requirements</p>
+<p><strong>Oversight, sceptically.</strong>
+- <strong>Nominal HITL fails.</strong> Agent design impedes oversight, and extended use degrades overseers' skills (<a class="cite" href="../sources/#mitchell-2026-agents-push-humans-out" title="AI Agents Push Humans Out of the Loop">[mitchell-2026-agents-push-humans-out]</a>, CONFIRMED). More traces raise confidence, not accuracy (<a class="cite" href="../sources/#grundemclaughlin-2026-overseeing-agents" title="Overseeing Agents Without Constant Oversight: Challenges and…">[grundemclaughlin-2026-overseeing-agents]</a>).
+- <strong>Epistemic framing:</strong> <a class="cite" href="../sources/#messeri-2024-illusions-of-understanding" title="Artificial intelligence and illusions of understanding in sc…">[messeri-2024-illusions-of-understanding]</a> (CONFIRMED) names four AI roles (Oracle, Surrogate, Quant, Arbiter) and the risk of illusions of understanding.
+- <strong>Institutional framing:</strong> a "Human Ownership Principle" (<a class="cite" href="../sources/#vassileva-2026-aimls" title="Research Integrity in the Age of AI: Acceleration, Threats, …">[vassileva-2026-aimls]</a>, CONFIRMED).</p>
+<p><strong>LLMs as evaluators of findings.</strong> Judges approximate humans on some tasks: Pearson 81.32 on code translation and 68.51 on code generation (<a class="cite" href="../sources/#wang-2025-can-llms-replace-human-evaluators" title="Can LLMs Replace Human Evaluators? An Empirical Study of LLM…">[wang-2025-can-llms-replace-human-evaluators]</a>, CONFIRMED). They must be validated per task (<a class="cite" href="../sources/#bavaresco-2025-llms-instead-of-human-judges" title="LLMs instead of Human Judges? A Large Scale Empirical Study …">[bavaresco-2025-llms-instead-of-human-judges]</a>), and prompt bias can flip rankings (<a class="cite" href="../sources/#zhao-2026-bias-in-the-loop-llm-judge" title="Bias in the Loop: Auditing LLM-as-a-Judge for Software Engin…">[zhao-2026-bias-in-the-loop-llm-judge]</a>).</p>
+<p><strong>Assessment.</strong> The ingredients exist: gates, provenance models, decision records and authority constraints. They are scattered across single stages and across fields (economics, HPC/e-science, health, ML). None of them is tied to empirical-SE study types or validity threats.</p>
+<hr />
+<h2>5. Agentic-science systems and what they record</h2>
+<p>The "Records" column reports only what the store's records say. Where a record is silent, the cell says so.</p>
+<table>
+<thead>
+<tr>
+<th>System (record)</th>
+<th>Verif.</th>
+<th>Logs / traces</th>
+<th>Intermediate artifacts</th>
+<th>Human checkpoints</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AI Scientist (<a class="cite" href="../sources/#lu-2024-ai-scientist" title="The AI Scientist: Towards Fully Automated Open-Ended Scienti…">[lu-2024-ai-scientist]</a>)</td>
+<td>CONFIRMED</td>
+<td>Not described in record</td>
+<td>Full paper per idea</td>
+<td>None in record; the README advises containerisation</td>
+<td>Automated self-review claims near-human scoring. Timeout anecdote is press-sourced: <strong>do not use</strong></td>
+</tr>
+<tr>
+<td>AI Scientist v2 / Nature (<a class="cite" href="../sources/#yamada-2025-ai-scientist-v2" title="The AI Scientist-v2: Workshop-Level Automated Scientific Dis…">[yamada-2025-ai-scientist-v2]</a>, <a class="cite" href="../sources/#yamada-2026-ai-scientist-nature" title="Towards end-to-end automation of AI research">[yamada-2026-ai-scientist-nature]</a>)</td>
+<td>UNCHECKED</td>
+<td>Tree search is internal</td>
+<td>Evaluated on final manuscripts</td>
+<td>None reported</td>
+<td>Passed a first review round (70%-acceptance workshop)</td>
+</tr>
+<tr>
+<td>Sakana ICLR release (<a class="cite" href="../sources/#sakana-2025-iclr-workshop-experiment-repo" title="The AI Scientist: ICLR 2025 Workshop Experiment (repository)">[sakana-2025-iclr-workshop-experiment-repo]</a>)</td>
+<td>MINOR-FIX</td>
+<td><strong>None released</strong></td>
+<td>Papers and reviews only; no experiment logs, raw data or iterative artifacts</td>
+<td>Authors state they reviewed the papers</td>
+<td>Direct gap evidence</td>
+</tr>
+<tr>
+<td>Agent Laboratory (<a class="cite" href="../sources/#schmidgall-2025-agent-laboratory" title="Agent Laboratory: Using LLM Agents as Research Assistants">[schmidgall-2025-agent-laboratory]</a>)</td>
+<td>UNCHECKED</td>
+<td>Checkpoints (<code>state_saves</code>)</td>
+<td>Stage outputs</td>
+<td>Stage-wise human feedback "significantly improves" quality</td>
+<td>How feedback is recorded is not documented</td>
+</tr>
+<tr>
+<td>data-to-paper (<a class="cite" href="../sources/#ifargan-2024-data-to-paper" title="Autonomous LLM-driven research from data to human-verifiable…">[ifargan-2024-data-to-paper]</a>)</td>
+<td>UNCHECKED</td>
+<td>Information tracing chains results, methods and data</td>
+<td>Programmatic chaining</td>
+<td>Human co-piloting "critical" as complexity grows</td>
+<td>Closest prior art for provenance; AI watermark</td>
+</tr>
+<tr>
+<td>Kosmos (<a class="cite" href="../sources/#mitchener-2025-kosmos" title="Kosmos: An AI Scientist for Autonomous Discovery">[mitchener-2025-kosmos]</a>)</td>
+<td>CONFIRMED</td>
+<td>Statement-level traceability to code and literature (per record relevance)</td>
+<td>About 42,000 LOC and 1,500 papers per run</td>
+<td>Independent scientists judged 79.4% of statements accurate</td>
+<td>No account of human authority</td>
+</tr>
+<tr>
+<td>AI co-scientist (<a class="cite" href="../sources/#gottweis-2025-ai-co-scientist" title="Accelerating scientific discovery with Co-Scientist">[gottweis-2025-ai-co-scientist]</a>)</td>
+<td>MINOR-FIX</td>
+<td>Not stated</td>
+<td>Hypotheses</td>
+<td>Scientist in the loop; wet-lab validation</td>
+<td>External validation gate</td>
+</tr>
+<tr>
+<td>Agents running human-participant studies (<a class="cite" href="../sources/#wehr-2026-closing-empirical-loop" title="Closing the Empirical Loop: Autonomous AI Agents Conduct End…">[wehr-2026-closing-empirical-loop]</a>)</td>
+<td>CONFIRMED</td>
+<td>Not stated</td>
+<td>Analysis pipelines from 8h+ coding sessions</td>
+<td>Not stated</td>
+<td>The closest analogue to empirical research</td>
+</tr>
+<tr>
+<td>Automated social science (<a class="cite" href="../sources/#manning-2024-automated-social-science" title="Automated Social Science: Language Models as Scientist and S…">[manning-2024-automated-social-science]</a>)</td>
+<td>UNCHECKED</td>
+<td>Not stated</td>
+<td>Pre-specified SCM as design object</td>
+<td>Not stated</td>
+<td>Recorded plan analogue</td>
+</tr>
+<tr>
+<td>HLER (<a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a>)</td>
+<td>MINOR-FIX</td>
+<td>Not stated</td>
+<td>Deterministic data and estimation</td>
+<td><strong>Three human decision gates</strong></td>
+<td>72% → 16% critical failures</td>
+</tr>
+<tr>
+<td>pAI-Econ (<a class="cite" href="../sources/#zhu-2026-pai-econ-gated" title="pAI-Econ-claude: A Gated Human-in-the-Loop Multi-Agent Archi…">[zhu-2026-pai-econ-gated]</a>)</td>
+<td>CONFIRMED</td>
+<td>Not stated</td>
+<td>Inspectable intermediate artifacts</td>
+<td>Gates on irreversible decisions</td>
+<td>Small n</td>
+</tr>
+<tr>
+<td>Paper Pilot (<a class="cite" href="../sources/#jha-2026-paper-pilot" title="Paper Pilot: A Human-in-the-Loop Expert System for Evidence-…">[jha-2026-paper-pilot]</a>)</td>
+<td>CONFIRMED</td>
+<td>Evidence-traceable drafting</td>
+<td>Evidence-locked placeholders</td>
+<td>HITL expert system</td>
+<td>Writing stage only</td>
+</tr>
+<tr>
+<td>CrossAudit (<a class="cite" href="../sources/#dong-2026-crossaudit" title="CrossAudit: A Git-Native, Cross-Vendor Audit Loop for Agenti…">[dong-2026-crossaudit]</a>)</td>
+<td>MINOR-FIX</td>
+<td>Git-native audit loop</td>
+<td>Increments</td>
+<td>Cross-vendor audit; eight invariants</td>
+<td>One run per configuration</td>
+</tr>
+<tr>
+<td>F(AI)2R (<a class="cite" href="../sources/#krebs-2026-fai2r" title="F(AI)2R: Who Did What, and Who Checked? Verifiable AI Proven…">[krebs-2026-fai2r]</a>)</td>
+<td>UNCHECKED</td>
+<td>Claim lineage ("no parentless claim")</td>
+<td>Claims</td>
+<td><strong>Verification rungs only humans may grant</strong></td>
+<td>CI gating</td>
+</tr>
+<tr>
+<td>Clarus (<a class="cite" href="../sources/#guo-2026-clarus" title="Clarus: Coordinating Autonomous Research Agents toward Web-S…">[guo-2026-clarus]</a>)</td>
+<td>UNCHECKED</td>
+<td>Project-agent-resource object model</td>
+<td>Traceable across phases</td>
+<td>Attribution of participants</td>
+<td>No validity semantics</td>
+</tr>
+<tr>
+<td>AutoMETA (<a class="cite" href="../sources/#lee-2026-autometa" title="AutoMETA: A Multi-Agent LLM System for Autonomous Meta-Analy…">[lee-2026-autometa]</a>)</td>
+<td>MINOR-FIX</td>
+<td>Not stated</td>
+<td>Enforced protocol; fixed statistical module</td>
+<td>Not stated</td>
+<td>Ablations show protocol enforcement matters</td>
+</tr>
+<tr>
+<td>OpenDiscoveryTrace (<a class="cite" href="../sources/#bansal-2026-opendiscoverytrace" title="OpenDiscoveryTrace: Process Traces for Evaluating AI Scienti…">[bansal-2026-opendiscoverytrace]</a>)</td>
+<td>UNCHECKED</td>
+<td><strong>Per-step agent traces</strong></td>
+<td>Process traces</td>
+<td>None (agent-internal only)</td>
+<td>Output-only evaluation hides behaviour</td>
+</tr>
+<tr>
+<td>ARTISAN (<a class="cite" href="../sources/#baek-2026-artisan-table-reproduction" title="Automated Table Reproduction via Code Generation">[baek-2026-artisan-table-reproduction]</a>)</td>
+<td>UNCHECKED</td>
+<td>Re-runnable script</td>
+<td>Auditable reproduction code</td>
+<td>Automated judge</td>
+<td>SE-specific; found 20 new errors</td>
+</tr>
+<tr>
+<td>ReClaim (<a class="cite" href="../sources/#salunkhe-2026-reclaim" title="RECLAIM: Can Agents Reproduce the Claims of Machine Learning…">[salunkhe-2026-reclaim]</a>)</td>
+<td>UNCHECKED</td>
+<td>Graded from logs, not self-reports</td>
+<td>Pre-fixed success criteria and budgets</td>
+<td>Not stated</td>
+<td>Governance by procedure</td>
+</tr>
+<tr>
+<td>ArtifactCopilot (<a class="cite" href="../sources/#wu-2026-artifactcopilot" title="Agent-Based Software Artifact Evaluation">[wu-2026-artifactcopilot]</a>)</td>
+<td>CONFIRMED</td>
+<td>A review report on every run</td>
+<td>Evidence accumulation in a fixed sequence</td>
+<td>Not stated</td>
+<td>SE badge evaluation</td>
+</tr>
+<tr>
+<td>Agents4Science (<a class="cite" href="../sources/#bianchi-2025-agents4science" title="Exploring the use of AI authors and reviewers at Agents4Scie…">[bianchi-2025-agents4science]</a>)</td>
+<td>UNCHECKED</td>
+<td>Not stated</td>
+<td>—</td>
+<td>Human expert review of top papers (<strong>counts are snippet-only; do not use</strong>)</td>
+<td>Venue-level gate</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Across systems:</strong> <a class="cite" href="../sources/#ding-2026-autonomous-research-agents-verification-gap" title="Autonomous Research Agents: A Survey of AI Scientists and th…">[ding-2026-autonomous-research-agents-verification-gap]</a> (CONFIRMED) codes 24 runnable systems. 83% release code and 38% release seeds or execution traces, and no LLM-era system shows an externally validated in-loop oracle. <a class="cite" href="../sources/#tie-2026-autoresearch-survey" title="AutoResearch AI: Towards AI-Powered Research Automation for …">[tie-2026-autoresearch-survey]</a> (CONFIRMED) names provenance tracking and "accountable scientific closure" as open problems. <a class="cite" href="../sources/#luo-2025-hidden-pitfalls-ai-scientist" title="The More You Automate, the Less You See: Hidden Pitfalls of …">[luo-2025-hidden-pitfalls-ai-scientist]</a> (MINOR-FIX) recommends that venues mandate trace logs.</p>
+<hr />
+<h2>6. THE GAP</h2>
+<p><strong>Stated honestly.</strong> The store does not support the claim that nobody records process or human interventions. It does support a narrower and defensible claim with four elements.</p>
+<p><strong>(a) Delegated decisions as a reportable unit.</strong>
+- <strong>What exists:</strong>
+  - Many studies show that delegated choices drive conclusions: <a class="cite" href="../sources/#fogliato-2026-many-ai-analysts" title="Many AI analysts, one dataset: Navigating the agentic data s…">[fogliato-2026-many-ai-analysts]</a>, <a class="cite" href="../sources/#baumann-2025-llm-hacking" title="Large Language Model Hacking: Quantifying the Hidden Risks o…">[baumann-2025-llm-hacking]</a>, <a class="cite" href="../sources/#cummins-2025-analytic-flexibility-silicon" title="The threat of analytic flexibility in using large language m…">[cummins-2025-analytic-flexibility-silicon]</a>, <a class="cite" href="../sources/#hida-2026-class-imbalance-batch-screening" title="Class Imbalance and Batch Effects in LLM-Based Screening for…">[hida-2026-class-imbalance-batch-screening]</a> (CONFIRMED).
+  - Criteria exist for <em>whether</em> to delegate: <a class="cite" href="../sources/#ahmed-2025-llm-replace-manual-annotation-se" title="Can LLMs Replace Manual Annotation of Software Engineering A…">[ahmed-2025-llm-replace-manual-annotation-se]</a>, <a class="cite" href="../sources/#calderon-2025-alternative-annotator-test" title="The Alternative Annotator Test for LLM-as-a-Judge: How to St…">[calderon-2025-alternative-annotator-test]</a> (CONFIRMED), <a class="cite" href="../sources/#chew-2023-llm-assisted-content-analysis" title="LLM-Assisted Content Analysis: Using Large Language Models t…">[chew-2023-llm-assisted-content-analysis]</a>.
+- <strong>Closest prior art:</strong>
+  - <a class="cite" href="../sources/#prahl-2025-arc" title="The AI-Reflexivity Checklist (ARC): A Pre-Analysis Pause for…">[prahl-2025-arc]</a> (CONFIRMED) makes the delegation decision a brief recorded artifact, but only for qualitative coding in health research.
+  - <a class="cite" href="../sources/#ribeiro-2026-slr-genai-graduate-course" title="Observing the Conduct of Systematic Reviews with Generative …">[ribeiro-2026-slr-genai-graduate-course]</a> (CONFIRMED) recommends "decision records" without specifying them.
+  - <a class="cite" href="../sources/#flemyng-2025-ai-evidence-synthesis-position-statement" title="Position Statement on Artificial Intelligence (AI) Use in Ev…">[flemyng-2025-ai-evidence-synthesis-position-statement]</a> holds authors accountable for "the decision to use AI" and requires reporting any use that makes or suggests judgements, but only for evidence synthesis and as disclosure.
+  - <a class="cite" href="../sources/#souza-2025-prov-agent" title="PROV-AGENT: Unified Provenance for Tracking AI Agent Interac…">[souza-2025-prov-agent]</a> (CONFIRMED) captures agent decisions, but not under whose authority they were made.
+- <strong>How it falls short:</strong> decisions are either reconstructed afterwards (<a class="cite" href="../sources/#balaji-2026-forkscope" title="ForkSCOPE: Charting the Agentic Garden of Forking Paths">[balaji-2026-forkscope]</a>; <a class="cite" href="../sources/#fogliato-2026-many-ai-analysts" title="Many AI analysts, one dataset: Navigating the agentic data s…">[fogliato-2026-many-ai-analysts]</a> with an AI auditor) or disclosed as narrative (<a class="cite" href="../sources/#ec-2026-living-guidelines-genai-research" title="Living guidelines on the responsible use of generative AI in…">[ec-2026-living-guidelines-genai-research]</a>). No ESE guidance asks authors to report <em>which research decisions were delegated, to what, and who accepted them</em>.</p>
+<p><strong>(b) Intermediate artifacts.</strong>
+- <strong>What exists:</strong> evidence that they matter. <a class="cite" href="../sources/#wang-2025-reassessing-llm-boolean-query" title="Reassessing Large Language Model Boolean Query Generation fo…">[wang-2025-reassessing-llm-boolean-query]</a> shows unreported intermediate steps defeated reproduction. <a class="cite" href="../sources/#kim-2026-ai-coders-discuss-disagree" title="How AI Coders Discuss, Disagree, and Reach Consensus: Challe…">[kim-2026-ai-coders-discuss-disagree]</a> shows deliberation artifacts affect accuracy. <a class="cite" href="../sources/#sakana-2025-iclr-workshop-experiment-repo" title="The AI Scientist: ICLR 2025 Workshop Experiment (repository)">[sakana-2025-iclr-workshop-experiment-repo]</a> (MINOR-FIX) shows a flagship release that omits them.
+- <strong>Closest prior art:</strong>
+  - <a class="cite" href="../sources/#dunn-2026-reproducible-llm-analyses" title="Designing reproducible large-language-model-assisted scienti…">[dunn-2026-reproducible-llm-analyses]</a> (CONFIRMED): "preserve LLM-generated artifacts"
+  - <a class="cite" href="../sources/#huotala-2024-llm-screening-sr-ease" title="The Promise and Challenges of Using LLMs to Accelerate the S…">[huotala-2024-llm-screening-sr-ease]</a> (CONFIRMED): publish screening data
+  - <a class="cite" href="../sources/#ifargan-2024-data-to-paper" title="Autonomous LLM-driven research from data to human-verifiable…">[ifargan-2024-data-to-paper]</a>: result-to-data chaining
+  - <a class="cite" href="../sources/#rosen-2026-execution-lineage" title="From Agent Loops to Deterministic Graphs: Execution Lineage …">[rosen-2026-execution-lineage]</a>, <a class="cite" href="../sources/#wu-2026-agenttrails" title="AgentTrails: Towards Trust and Reuse for Agentic Tasks">[wu-2026-agenttrails]</a>: technical lineage
+- <strong>How it falls short:</strong> these are per-study recommendations or system features. The ESE reporting standards ask for <em>session traces</em> (<a class="cite" href="../sources/#baltes-2025-llm-guidelines-ese" title="Guidelines for Empirical Studies in Software Engineering inv…">[baltes-2025-llm-guidelines-ese]</a>), not a typed record of intermediate artifacts. Raw chronological logs obscure dependencies (<a class="cite" href="../sources/#wu-2026-agenttrails" title="AgentTrails: Towards Trust and Reuse for Agentic Tasks">[wu-2026-agenttrails]</a>). The Empirical Standards are silent (<a class="cite" href="../sources/#ralph-2020-acm-sigsoft-empirical-standards" title="ACM SIGSOFT Empirical Standards">[ralph-2020-acm-sigsoft-empirical-standards]</a>).</p>
+<p><strong>(c) Bounded authority.</strong>
+- <strong>What exists:</strong> implicit constraints in systems and stage-specific guidance:
+  - "LLMs reason but do not execute data work" (<a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a>)
+  - "constrain LLM inference to interpretive tasks" (<a class="cite" href="../sources/#jeldtoft-2026-auditable-llm-ta-workflow" title="Designing an Auditable LLM-Supported Workflow for Qualitativ…">[jeldtoft-2026-auditable-llm-ta-workflow]</a>)
+  - "keep the LLM off the data path" (<a class="cite" href="../sources/#dunn-2026-reproducible-llm-analyses" title="Designing reproducible large-language-model-assisted scienti…">[dunn-2026-reproducible-llm-analyses]</a>)
+  - humans own the codebook (<a class="cite" href="../sources/#dunivin-2025-scaling-hermeneutics" title="Scaling hermeneutics: a guide to qualitative coding with LLM…">[dunivin-2025-scaling-hermeneutics]</a>, CONFIRMED)
+  - bounded tasks with human-led inclusion (<a class="cite" href="../sources/#scotti-2026-documenting-ai-not-sufficient" title="Documenting artificial intelligence use in evidence synthesi…">[scotti-2026-documenting-ai-not-sufficient]</a>)
+  - role-based responsibilities (<code>thomas-raise-recommendations</code>)
+  - verification rungs only humans may grant (<a class="cite" href="../sources/#krebs-2026-fai2r" title="F(AI)2R: Who Did What, and Who Checked? Verifiable AI Proven…">[krebs-2026-fai2r]</a>)
+- <strong>Closest prior art:</strong> <a class="cite" href="../sources/#lin-2026-llm-se-security-assurance-survey" title="Large Language Models at the Intersection of Software Engine…">[lin-2026-llm-se-security-assurance-survey]</a> (CONFIRMED) names "agent authority" as an assurance dimension, but for <em>evaluating agents</em>, not for the research process.
+- <strong>How it falls short:</strong> no SE or integrity source defines what an AI may decide within a study as a declared, reportable design element. The oversight literature diagnoses the absence (<a class="cite" href="../sources/#mitchell-2026-agents-push-humans-out" title="AI Agents Push Humans Out of the Loop">[mitchell-2026-agents-push-humans-out]</a>) without supplying it.</p>
+<p><strong>(d) Human semantic gates as reportable process.</strong>
+- <strong>What exists:</strong>
+  - Gates work: <a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a>, <a class="cite" href="../sources/#jha-2026-paper-pilot" title="Paper Pilot: A Human-in-the-Loop Expert System for Evidence-…">[jha-2026-paper-pilot]</a> (CONFIRMED), <a class="cite" href="../sources/#schmidgall-2025-agent-laboratory" title="Agent Laboratory: Using LLM Agents as Research Assistants">[schmidgall-2025-agent-laboratory]</a>.
+  - Gates exist as tool features: <a class="cite" href="../sources/#huotala-2025-aisysrev" title="AISysRev -- LLM-based Tool for Title-abstract Screening">[huotala-2025-aisysrev]</a>, <a class="cite" href="../sources/#theodoro-2026-lri-co-assistant" title="LRI Co-Assistant: Artifact Package for an AI-Assisted Tool f…">[theodoro-2026-lri-co-assistant]</a>, <a class="cite" href="../sources/#mantyla-2026-llm-screening-disagreements" title="Understanding LLMs in Title-Abstract Screening: From Disagre…">[mantyla-2026-llm-screening-disagreements]</a>.
+  - Human overrides have been recorded as data: <a class="cite" href="../sources/#nyaaba-2026-hacita-interpretive-authority" title="Human-AI Collaborative Inductive Thematic Analysis: AI Guide…">[nyaaba-2026-hacita-interpretive-authority]</a>, <a class="cite" href="../sources/#li-2025-genai-slr-hitl" title="Enhancing systematic literature reviews with generative arti…">[li-2025-genai-slr-hitl]</a>.
+- <strong>Closest prior art:</strong> <a class="cite" href="../sources/#llmguidelines-2026-session-traces" title="Report Session Traces (LLM Guidelines, version 2026.09)">[llmguidelines-2026-session-traces]</a> says approval and rejection decisions <em>should</em> be reported in agentic studies. <a class="cite" href="../sources/#moghaddam-2026-arisma" title="ARISMA: Guidelines for AI- and LLM-Assisted Systematic Revie…">[moghaddam-2026-arisma]</a> makes human auditability a governing principle, for reviews only.
+- <strong>How it falls short:</strong> neither specifies <em>what</em> the human verifies, by what criteria, or <em>where</em> in the lifecycle gates belong. <a class="cite" href="../sources/#ding-2026-autonomous-research-agents-verification-gap" title="Autonomous Research Agents: A Survey of AI Scientists and th…">[ding-2026-autonomous-research-agents-verification-gap]</a> finds HITL points rarely specified. <a class="cite" href="../sources/#grundemclaughlin-2026-overseeing-agents" title="Overseeing Agents Without Constant Oversight: Challenges and…">[grundemclaughlin-2026-overseeing-agents]</a> shows that unspecified oversight raises confidence without accuracy.</p>
+<p><strong>(e) Cross-cutting: lifecycle span and field.</strong>
+- <strong>Existing process governance is stage-bound:</strong> GUEST and ARISMA for reviews (<a class="cite" href="../sources/#kitchenham-2026-guest-genai-slr-guidelines" title="Preliminary Guidelines for Using and Evaluating GenAI Tools …">[kitchenham-2026-guest-genai-slr-guidelines]</a>, <a class="cite" href="../sources/#moghaddam-2026-arisma" title="ARISMA: Guidelines for AI- and LLM-Assisted Systematic Revie…">[moghaddam-2026-arisma]</a>), PRIMES for MSR (<a class="cite" href="../sources/#de-martino-2025-primes2-llm-msr" title="A Methodological Framework for LLM-Based Mining of Software …">[de-martino-2025-primes2-llm-msr]</a>), and auditable thematic analysis (<a class="cite" href="../sources/#jeldtoft-2026-auditable-llm-ta-workflow" title="Designing an Auditable LLM-Supported Workflow for Qualitativ…">[jeldtoft-2026-auditable-llm-ta-workflow]</a>).
+- <strong>Whole-workflow gated provenance exists, but outside ESE and recently:</strong> mostly 2026 preprints in economics, ML and e-science (§4).
+- <strong>No source maps these mechanisms onto ESE study types and validity threats.</strong></p>
+<p><strong>Proposed reformulation of the gap sentence.</strong></p>
+<blockquote>
+<p>Existing guidance already asks empirical-SE researchers to disclose models, prompts, session traces and human validation of LLM outputs, and stage-specific frameworks govern single steps such as screening or repository mining; what no SE standard yet specifies is the research process itself as a governed object — which decisions were delegated to AI and under what authority, which intermediate artifacts they produced, and which human semantic checks accepted them — recorded as reviewable provenance across the empirical lifecycle.</p>
+</blockquote>
+<p>A shorter version, for a one-page proposal:</p>
+<blockquote>
+<p>Current SE guidance asks for prompts, traces and human validation, but treats them as per-study disclosures; it does not specify delegated decisions, authority bounds or human semantic gates as reportable, reviewable provenance across the empirical lifecycle.</p>
+</blockquote>
+<hr />
+<h2>7. Sources that complicate the thesis</h2>
+<ol>
+<li>
+<p><strong>Guidance already goes beyond "model + prompt".</strong>
+   - <strong>Sources:</strong> <a class="cite" href="../sources/#baltes-2025-llm-guidelines-ese" title="Guidelines for Empirical Studies in Software Engineering inv…">[baltes-2025-llm-guidelines-ese]</a>, <a class="cite" href="../sources/#llmguidelines-2026-session-traces" title="Report Session Traces (LLM Guidelines, version 2026.09)">[llmguidelines-2026-session-traces]</a> (approval and rejection decisions <em>should</em> be reported), <a class="cite" href="../sources/#flemyng-2025-ai-evidence-synthesis-position-statement" title="Position Statement on Artificial Intelligence (AI) Use in Ev…">[flemyng-2025-ai-evidence-synthesis-position-statement]</a> (stages affected, justification), <a class="cite" href="../sources/#ec-2026-living-guidelines-genai-research" title="Living guidelines on the responsible use of generative AI in…">[ec-2026-living-guidelines-genai-research]</a> (effect on the research process; FAIR prompts and outputs), <a class="cite" href="../sources/#kitchenham-2026-guest-genai-slr-guidelines" title="Preliminary Guidelines for Using and Evaluating GenAI Tools …">[kitchenham-2026-guest-genai-slr-guidelines]</a>.
+   - <strong>Must concede:</strong> the draft gap sentence is inaccurate as written.
+   - <strong>Must argue:</strong> the step from disclosure (logs, narrative) to designed process (declared authority, typed decision records, gates with criteria). Cite these as the foundation, not as the opposition.</p>
+</li>
+<li>
+<p><strong>Gated, provenance-first agentic research already exists outside ESE.</strong>
+   - <strong>Sources:</strong> <a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a>, <a class="cite" href="../sources/#zhu-2026-pai-econ-gated" title="pAI-Econ-claude: A Gated Human-in-the-Loop Multi-Agent Archi…">[zhu-2026-pai-econ-gated]</a>, <a class="cite" href="../sources/#krebs-2026-fai2r" title="F(AI)2R: Who Did What, and Who Checked? Verifiable AI Proven…">[krebs-2026-fai2r]</a>, <a class="cite" href="../sources/#dong-2026-crossaudit" title="CrossAudit: A Git-Native, Cross-Vendor Audit Loop for Agenti…">[dong-2026-crossaudit]</a>, <a class="cite" href="../sources/#zhou-2026-auditable-ai-research-writing" title="Auditable AI-Assisted Research Writing: An Engineering Disci…">[zhou-2026-auditable-ai-research-writing]</a>, <a class="cite" href="../sources/#jha-2026-paper-pilot" title="Paper Pilot: A Human-in-the-Loop Expert System for Evidence-…">[jha-2026-paper-pilot]</a>, <a class="cite" href="../sources/#guo-2026-clarus" title="Clarus: Coordinating Autonomous Research Agents toward Web-S…">[guo-2026-clarus]</a>, <a class="cite" href="../sources/#souza-2025-prov-agent" title="PROV-AGENT: Unified Provenance for Tracking AI Agent Interac…">[souza-2025-prov-agent]</a>, <a class="cite" href="../sources/#mo-2026-age-of-ai-agents-trustworthy-science" title="The Age of AI Agents Demands A New Scientific Paradigm To Su…">[mo-2026-age-of-ai-agents-trustworthy-science]</a>, <a class="cite" href="../sources/#luo-2025-hidden-pitfalls-ai-scientist" title="The More You Automate, the Less You See: Hidden Pitfalls of …">[luo-2025-hidden-pitfalls-ai-scientist]</a>, <a class="cite" href="../sources/#bansal-2026-opendiscoverytrace" title="OpenDiscoveryTrace: Process Traces for Evaluating AI Scienti…">[bansal-2026-opendiscoverytrace]</a>, <a class="cite" href="../sources/#ifargan-2024-data-to-paper" title="Autonomous LLM-driven research from data to human-verifiable…">[ifargan-2024-data-to-paper]</a>.
+   - <strong>Must concede:</strong> gates and provenance are not new ideas. The proposal must not claim to be first.
+   - <strong>Must argue:</strong> novelty rests on three things: an ESE-lifecycle mapping, a connection to ESE study types and validity threats, and the six requirements as reusable design patterns. Most of these sources are 2026 preprints with small evaluations, and many are UNCHECKED, so they need verification before positioning.</p>
+</li>
+<li>
+<p><strong>AI matches or beats humans on several stages.</strong>
+   - <strong>Sources:</strong></p>
+<ul>
+<li>screening and extraction (<a class="cite" href="../sources/#cao-2025-otto-sr" title="Automation of Systematic Reviews with Large Language Models">[cao-2025-otto-sr]</a>, MINOR-FIX)</li>
+<li>annotation (<a class="cite" href="../sources/#gilardi-2023-chatgpt-outperforms-crowd-workers" title="ChatGPT outperforms crowd workers for text-annotation tasks">[gilardi-2023-chatgpt-outperforms-crowd-workers]</a>, CONFIRMED; <a class="cite" href="../sources/#tornberg-2023-chatgpt4-political-annotation" title="ChatGPT-4 Outperforms Experts and Crowd Workers in Annotatin…">[tornberg-2023-chatgpt4-political-annotation]</a>; <a class="cite" href="../sources/#ahmed-2025-llm-replace-manual-annotation-se" title="Can LLMs Replace Manual Annotation of Software Engineering A…">[ahmed-2025-llm-replace-manual-annotation-se]</a>)</li>
+<li>extraction at 96.3% with stable test-retest (<a class="cite" href="../sources/#gartlehner-2024-claude2-data-extraction" title="Data extraction for evidence synthesis using a large languag…">[gartlehner-2024-claude2-data-extraction]</a>)</li>
+<li>literature synthesis (<a class="cite" href="../sources/#skarlinski-2024-paperqa2-superhuman-synthesis" title="Language agents achieve superhuman synthesis of scientific k…">[skarlinski-2024-paperqa2-superhuman-synthesis]</a>; <a class="cite" href="../sources/#asai-2026-openscholar" title="Synthesizing scientific literature with retrieval-augmented …">[asai-2026-openscholar]</a>, CONFIRMED)</li>
+<li>ideation (<a class="cite" href="../sources/#si-2024-llm-novel-research-ideas" title="Can LLMs Generate Novel Research Ideas? A Large-Scale Human …">[si-2024-llm-novel-research-ideas]</a>)</li>
+<li>reanalysis (<a class="cite" href="../sources/#holtdirk-2026-automated-reproducibility-assessment" title="Automated reproducibility assessments in the social and beha…">[holtdirk-2026-automated-reproducibility-assessment]</a>)</li>
+<li>reproduction (<a class="cite" href="../sources/#alizadeh-2026-socsci-repro-bench" title="AI Coding Agents Can Reproduce Social Science Findings">[alizadeh-2026-socsci-repro-bench]</a>)</li>
+<li>a human-free labelling pipeline (<a class="cite" href="../sources/#senthilkumar-2026-synthcore-llm-labels" title="From brittle to robust: Improving LLM annotations for SE opt…">[senthilkumar-2026-synthcore-llm-labels]</a>)</li>
+<li><strong>Must concede:</strong> "AI cannot do this" is not the argument.</li>
+<li><strong>Must argue:</strong> governance is about <em>accountability and inspectability</em>, not about AI incompetence. Human gates should be <strong>risk-proportional</strong>, placed at interpretive and verdict steps. <a class="cite" href="../sources/#cao-2025-otto-sr" title="Automation of Systematic Reviews with Large Language Models">[cao-2025-otto-sr]</a> itself relied on dual human review of discrepancies and changed significance in 3 reviews, which is a reason to record delegated decisions.</li>
+</ul>
+</li>
+<li>
+<p><strong>Output validation might be enough.</strong>
+   - <strong>Sources:</strong> <a class="cite" href="../sources/#calderon-2025-alternative-annotator-test" title="The Alternative Annotator Test for LLM-as-a-Judge: How to St…">[calderon-2025-alternative-annotator-test]</a> (CONFIRMED) and <a class="cite" href="../sources/#pangakis-2023-automated-annotation-validation" title="Automated Annotation with Generative AI Requires Validation">[pangakis-2023-automated-annotation-validation]</a> offer validation against a human subset as a sufficient procedure for annotation.
+   - <strong>Must argue:</strong> what governance adds beyond this:</p>
+<ul>
+<li>a record of the <em>substitution decision</em> and its scope</li>
+<li>validation where no human ground truth exists, since ground truth is itself context-limited (<a class="cite" href="../sources/#hartel-2026-agentic-repository-mining" title="Agentic Repository Mining: A Multi-Task Evaluation">[hartel-2026-agentic-repository-mining]</a>)</li>
+<li>the case where agreement does not equal construct validity (<a class="cite" href="../sources/#pita-2026-correct-codes-wrong-reasons" title="Correct codes for the wrong reasons? validating LLMs as meas…">[pita-2026-correct-codes-wrong-reasons]</a>)</li>
+</ul>
+</li>
+<li>
+<p><strong>More traces do not make oversight effective.</strong>
+   - <strong>Sources:</strong> <a class="cite" href="../sources/#grundemclaughlin-2026-overseeing-agents" title="Overseeing Agents Without Constant Oversight: Challenges and…">[grundemclaughlin-2026-overseeing-agents]</a> (confidence rose, accuracy did not), <a class="cite" href="../sources/#mitchell-2026-agents-push-humans-out" title="AI Agents Push Humans Out of the Loop">[mitchell-2026-agents-push-humans-out]</a> (CONFIRMED; HITL degrades), <a class="cite" href="../sources/#laux-2025-automation-bias-ai-act" title="Automation Bias in the AI Act: On the Legal Implications of …">[laux-2025-automation-bias-ai-act]</a>.
+   - <strong>Must concede:</strong> durable provenance alone is insufficient, and the chapter must not promise that logging produces rigor.
+   - <strong>Must argue:</strong> this is why gates must be <em>semantic</em>, with defined criteria and placement. Turn the objection into a requirement.</p>
+</li>
+<li>
+<p><strong>Practice lags the scenario.</strong>
+   - <strong>Sources:</strong> <a class="cite" href="../sources/#trinkenreich-2026-pulse-genai-se-research" title="Taking a Pulse on How Generative AI is Reshaping the Softwar…">[trinkenreich-2026-pulse-genai-se-research]</a> (457 SE researchers; use is mostly writing and early-stage work, and methodological tasks stay human-driven). <a class="cite" href="../sources/#gomes-2026-llm-assisted-ese-slr" title="LLM-Assisted Empirical Software Engineering: Systematic Lite…">[gomes-2026-llm-assisted-ese-slr]</a> finds integration automation-oriented and concentrated in data processing.
+   - <strong>Must concede:</strong> fully agentic ESE research is still emerging.
+   - <strong>Must argue:</strong> anticipatory design, using concrete 2026 SE instances: <a class="cite" href="../sources/#hartel-2026-agentic-repository-mining" title="Agentic Repository Mining: A Multi-Task Evaluation">[hartel-2026-agentic-repository-mining]</a>, <a class="cite" href="../sources/#nyyssola-2026-llm-rapid-reviews-tool-discovery" title="Towards LLM Accelerated Rapid Reviews for Software Tool Disc…">[nyyssola-2026-llm-rapid-reviews-tool-discovery]</a> (about 4 human-hours for a full rapid review), <a class="cite" href="../sources/#agarwal-2026-3100-opinions-code-review" title="3100 Opinions on Code Review in an AI World: Building Causal…">[agarwal-2026-3100-opinions-code-review]</a> (CONFIRMED; an LLM-assisted coding pipeline shipped as a method), <a class="cite" href="../sources/#wehr-2026-closing-empirical-loop" title="Closing the Empirical Loop: Autonomous AI Agents Conduct End…">[wehr-2026-closing-empirical-loop]</a>.</p>
+</li>
+<li>
+<p><strong>For reflexive qualitative work, AI participation is contested.</strong>
+   - <strong>Sources:</strong> <a class="cite" href="../sources/#jowsey-2025-reject-genai-reflexive" title="We Reject the Use of Generative Artificial Intelligence for …">[jowsey-2025-reject-genai-reflexive]</a> (419 signatories). The rebuttal is <a class="cite" href="../sources/#ibrahim-2026-should-genai-reflexive" title="Should Generative AI be Used in Reflexive Qualitative Resear…">[ibrahim-2026-should-genai-reflexive]</a>. <a class="cite" href="../sources/#karhu-2026-vibe-research-qualitative" title="To Vibe Research or Not to Vibe Research? Generative AI in Q…">[karhu-2026-vibe-research-qualitative]</a> distinguishes small-q from Big-Q research.
+   - <strong>Must do:</strong> scope the framework to small-q, coding-reliability, MSR and quantitative work, or treat the decision <em>not</em> to delegate as a legitimate gate outcome.</p>
+</li>
+<li>
+<p><strong>The risk is not uniform.</strong>
+   - <strong>Sources:</strong> agents' <em>estimates</em> stay aligned with human consensus, while their <em>verdicts</em> flip under framing (<a class="cite" href="../sources/#alizadeh-2026-coding-agents-social-science" title="AI Coding Agents in Social Science: Methodologically Diverse…">[alizadeh-2026-coding-agents-social-science]</a>). Agents refuse overt p-hacking (<a class="cite" href="../sources/#asher-2026-claude-code-codex-p-hack" title="Do Claude Code and Codex P-Hack? Sycophancy and Statistical …">[asher-2026-claude-code-codex-p-hack]</a>, low confidence and snippet-based: not load-bearing). SE survey quantitative results stayed stable after AI-response filtering (<a class="cite" href="../sources/#desouzasantos-2026-fraudulent-ai-se-surveys" title="The Influence of Fraudulent AI-Generated Responses on Softwa…">[desouzasantos-2026-fraudulent-ai-se-surveys]</a>). Average contamination is low (<a class="cite" href="../sources/#zhou-2025-lessleak-bench" title="LessLeak-Bench: A First Investigation of Data Leakage in LLM…">[zhou-2025-lessleak-bench]</a>).
+   - <strong>Must argue:</strong> concentrate gates where the risk concentrates, at interpretation and verdicts. Avoid alarmism.</p>
+</li>
+<li>
+<p><strong>Preregistration is a competing remedy.</strong>
+   - <strong>Sources:</strong> <a class="cite" href="../sources/#thomas-2026-preregister-next-llm" title="Mitigating LLM-based p-Hacking by Preregistering for the Nex…">[thomas-2026-preregister-next-llm]</a> (MINOR-FIX), <a class="cite" href="../sources/#vaccaro-2026-preregistration-ai-agents" title="Preregistration for Experiments with AI Agents">[vaccaro-2026-preregistration-ai-agents]</a>, <a class="cite" href="../sources/#bisht-2026-agentic-ai-scientists-not-built" title="Agentic AI Scientists Are Not Built For Autonomous Scientifi…">[bisht-2026-agentic-ai-scientists-not-built]</a> (MINOR-FIX).
+   - <strong>Must argue:</strong> preregistration fixes <em>intent</em> before a run but does not record what the agent did. It complements provenance; it is not a substitute. The chapter should incorporate it, perhaps under executable reproducibility or bounded authority.</p>
+</li>
+<li>
+<p><strong>A judge-replacement agenda points the other way.</strong></p>
+<ul>
+<li><strong>Source:</strong> <a class="cite" href="../sources/#he-2025-llm-as-judge-se-roadmap" title="LLM-as-a-Judge for Software Engineering: Literature Review, …">[he-2025-llm-as-judge-se-roadmap]</a> envisions LLM judges as human surrogates by 2030.</li>
+<li><strong>Must argue:</strong> against blanket automation of evaluation, citing <a class="cite" href="../sources/#zhao-2026-bias-in-the-loop-llm-judge" title="Bias in the Loop: Auditing LLM-as-a-Judge for Software Engin…">[zhao-2026-bias-in-the-loop-llm-judge]</a> and <a class="cite" href="../sources/#bavaresco-2025-llms-instead-of-human-judges" title="LLMs instead of Human Judges? A Large Scale Empirical Study …">[bavaresco-2025-llms-instead-of-human-judges]</a>. Concede that the evidence is task-dependent (<a class="cite" href="../sources/#wang-2025-can-llms-replace-human-evaluators" title="Can LLMs Replace Human Evaluators? An Empirical Study of LLM…">[wang-2025-can-llms-replace-human-evaluators]</a>, CONFIRMED).</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2>8. Notes for the proposal</h2>
+<p><strong>Positioning.</strong>
+- <strong>Frame:</strong> build on, and integrate, existing guidance. Baltes et al. and llm-guidelines are the reporting floor. GUEST, PRIMES 2.0 and auditable thematic analysis are stage-specific instances. HLER, F(AI)2R and CrossAudit are cross-field analogues. The chapter's increment is the lifecycle-spanning, ESE-specific governance layer: six requirements turned into design patterns, mapped onto stages and validity threats.
+- <strong>Strongest single gap evidence:</strong>
+  - <a class="cite" href="../sources/#wang-2025-reassessing-llm-boolean-query" title="Reassessing Large Language Model Boolean Query Generation fo…">[wang-2025-reassessing-llm-boolean-query]</a>: model plus prompt was not enough to reproduce
+  - <a class="cite" href="../sources/#sakana-2025-iclr-workshop-experiment-repo" title="The AI Scientist: ICLR 2025 Workshop Experiment (repository)">[sakana-2025-iclr-workshop-experiment-repo]</a>: outputs released without the process
+  - <a class="cite" href="../sources/#ding-2026-autonomous-research-agents-verification-gap" title="Autonomous Research Agents: A Survey of AI Scientists and th…">[ding-2026-autonomous-research-agents-verification-gap]</a>: traces are rarely released
+  - <a class="cite" href="../sources/#ralph-2020-acm-sigsoft-empirical-standards" title="ACM SIGSOFT Empirical Standards">[ralph-2020-acm-sigsoft-empirical-standards]</a>: no AI standard
+- <strong>Strongest support for gates and authority:</strong> <a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a> (MINOR-FIX) and <a class="cite" href="../sources/#jha-2026-paper-pilot" title="Paper Pilot: A Human-in-the-Loop Expert System for Evidence-…">[jha-2026-paper-pilot]</a> (CONFIRMED).</p>
+<p><strong>Must-cite candidates</strong> (pending verification): <a class="cite" href="../sources/#gomes-2026-llm-assisted-ese-slr" title="LLM-Assisted Empirical Software Engineering: Systematic Lite…">[gomes-2026-llm-assisted-ese-slr]</a>, <a class="cite" href="../sources/#baltes-2025-llm-guidelines-ese" title="Guidelines for Empirical Studies in Software Engineering inv…">[baltes-2025-llm-guidelines-ese]</a>, <a class="cite" href="../sources/#llmguidelines-2026-session-traces" title="Report Session Traces (LLM Guidelines, version 2026.09)">[llmguidelines-2026-session-traces]</a>, <a class="cite" href="../sources/#kitchenham-2026-guest-genai-slr-guidelines" title="Preliminary Guidelines for Using and Evaluating GenAI Tools …">[kitchenham-2026-guest-genai-slr-guidelines]</a>, <a class="cite" href="../sources/#de-martino-2025-primes2-llm-msr" title="A Methodological Framework for LLM-Based Mining of Software …">[de-martino-2025-primes2-llm-msr]</a>, <a class="cite" href="../sources/#flemyng-2025-ai-evidence-synthesis-position-statement" title="Position Statement on Artificial Intelligence (AI) Use in Ev…">[flemyng-2025-ai-evidence-synthesis-position-statement]</a>, <a class="cite" href="../sources/#ec-2026-living-guidelines-genai-research" title="Living guidelines on the responsible use of generative AI in…">[ec-2026-living-guidelines-genai-research]</a>, <a class="cite" href="../sources/#angermeir-2025-reproducibility-commercial-llm-ese" title="Reflections on the Reproducibility of Commercial LLM Perform…">[angermeir-2025-reproducibility-commercial-llm-ese]</a>, <a class="cite" href="../sources/#fogliato-2026-many-ai-analysts" title="Many AI analysts, one dataset: Navigating the agentic data s…">[fogliato-2026-many-ai-analysts]</a>, <a class="cite" href="../sources/#wang-2025-reassessing-llm-boolean-query" title="Reassessing Large Language Model Boolean Query Generation fo…">[wang-2025-reassessing-llm-boolean-query]</a>, <a class="cite" href="../sources/#ding-2026-autonomous-research-agents-verification-gap" title="Autonomous Research Agents: A Survey of AI Scientists and th…">[ding-2026-autonomous-research-agents-verification-gap]</a>, <a class="cite" href="../sources/#souza-2025-prov-agent" title="PROV-AGENT: Unified Provenance for Tracking AI Agent Interac…">[souza-2025-prov-agent]</a>, <a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a>, <a class="cite" href="../sources/#ifargan-2024-data-to-paper" title="Autonomous LLM-driven research from data to human-verifiable…">[ifargan-2024-data-to-paper]</a>, <a class="cite" href="../sources/#grundemclaughlin-2026-overseeing-agents" title="Overseeing Agents Without Constant Oversight: Challenges and…">[grundemclaughlin-2026-overseeing-agents]</a>, <a class="cite" href="../sources/#ralph-2020-acm-sigsoft-empirical-standards" title="ACM SIGSOFT Empirical Standards">[ralph-2020-acm-sigsoft-empirical-standards]</a>.</p>
+<p><strong>Prior-art risks</strong> (cite and differentiate explicitly):
+- <a class="cite" href="../sources/#ifargan-2024-data-to-paper" title="Autonomous LLM-driven research from data to human-verifiable…">[ifargan-2024-data-to-paper]</a> (provenance)
+- <a class="cite" href="../sources/#zhu-2026-hler-human-oversight" title="(Human) Attention Is (Still) All You Need: Human oversight m…">[zhu-2026-hler-human-oversight]</a> (gates plus authority)
+- <a class="cite" href="../sources/#krebs-2026-fai2r" title="F(AI)2R: Who Did What, and Who Checked? Verifiable AI Proven…">[krebs-2026-fai2r]</a> and <a class="cite" href="../sources/#dong-2026-crossaudit" title="CrossAudit: A Git-Native, Cross-Vendor Audit Loop for Agenti…">[dong-2026-crossaudit]</a> (control-plane-style, git-native governance)
+- <a class="cite" href="../sources/#zhou-2026-auditable-ai-research-writing" title="Auditable AI-Assisted Research Writing: An Engineering Disci…">[zhou-2026-auditable-ai-research-writing]</a> (an "engineering discipline" for research writing)
+- <a class="cite" href="../sources/#mo-2026-age-of-ai-agents-trustworthy-science" title="The Age of AI Agents Demands A New Scientific Paradigm To Su…">[mo-2026-age-of-ai-agents-trustworthy-science]</a> (observable by default)
+- <a class="cite" href="../sources/#jeldtoft-2026-auditable-llm-ta-workflow" title="Designing an Auditable LLM-Supported Workflow for Qualitativ…">[jeldtoft-2026-auditable-llm-ta-workflow]</a> (bounded authority in thematic analysis)
+- <a class="cite" href="../sources/#kitchenham-2026-guest-genai-slr-guidelines" title="Preliminary Guidelines for Using and Evaluating GenAI Tools …">[kitchenham-2026-guest-genai-slr-guidelines]</a> (process guidance in SE)
+- <a class="cite" href="../sources/#moghaddam-2026-arisma" title="ARISMA: Guidelines for AI- and LLM-Assisted Systematic Revie…">[moghaddam-2026-arisma]</a> (human-auditable reviews)</p>
+<p><strong>Claims to avoid</strong> (also check against plan §5):
+- That disclosure today is limited to model plus prompt; this is contradicted by §3.
+- That human interventions go unrecorded; <a class="cite" href="../sources/#llmguidelines-2026-session-traces" title="Report Session Traces (LLM Guidelines, version 2026.09)">[llmguidelines-2026-session-traces]</a> recommends reporting them.
+- That this is the first framework for governed or provenance-first AI research (§7 item 2).
+- That AI cannot perform stage X (§7 item 3).
+- That more logging yields rigor (§7 item 5).
+- Any number a record marks as snippet-only:
+  - <a class="cite" href="../sources/#abedu-2024-llm-chatbots-msr" title="LLM-Based Chatbots for Mining Software Repositories: Challen…">[abedu-2024-llm-chatbots-msr]</a>: 1/150
+  - <a class="cite" href="../sources/#xiao-2023-codebook-gpt3-deductive" title="Supporting Qualitative Analysis with Large Language Models: …">[xiao-2023-codebook-gpt3-deductive]</a>: κ values
+  - <a class="cite" href="../sources/#cao-2025-otto-sr" title="Automation of Systematic Reviews with Large Language Models">[cao-2025-otto-sr]</a>: "two days / 12 work-years"
+  - <a class="cite" href="../sources/#bianchi-2025-agents4science" title="Exploring the use of AI authors and reviewers at Agents4Scie…">[bianchi-2025-agents4science]</a>: counts
+  - <a class="cite" href="../sources/#hu-2025-repro-bench" title="REPRO-Bench: Can Agentic AI Systems Assess the Reproducibili…">[hu-2025-repro-bench]</a>: 36.6%
+  - <a class="cite" href="../sources/#dillion-2023-replace-participants" title="Can AI language models replace human participants?">[dillion-2023-replace-participants]</a>: r = .95
+  - <a class="cite" href="../sources/#syriani-2023-chatgpt-screening" title="Assessing the Ability of ChatGPT to Screen Articles for Syst…">[syriani-2023-chatgpt-screening]</a>: 82%
+  - <a class="cite" href="../sources/#lu-2024-ai-scientist" title="The AI Scientist: Towards Fully Automated Open-Ended Scienti…">[lu-2024-ai-scientist]</a>: self-modifying timeout
+- Any claim from <a class="cite" href="../sources/#sabel-2025-stockholm-declaration" title="Reformation of science publishing: the Stockholm Declaration">[sabel-2025-stockholm-declaration]</a> (WRONG).
+- Kosmos's "6 months of research time" figure (<a class="cite" href="../sources/#mitchener-2025-kosmos" title="Kosmos: An AI Scientist for Autonomous Discovery">[mitchener-2025-kosmos]</a>) as fact: it is a collaborator report.
+- The statement that the Empirical Standards have no AI standard without its date (checked 2026-10-06).</p>
+<p><strong>Practical notes.</strong>
+- The chapter itself falls under <code>springernature-ai-guidance</code>: AI use is disclosed in the acknowledgements or preface. The chapter's own process could serve as a worked example. That is a design choice for Jason, not a recommendation.
+- The consensus memo flags year and id mismatches for several records, for example <a class="cite" href="../sources/#liang-2024-gpt4-replicate-ese" title="Can GPT-4 Replicate Empirical Software Engineering Research?">[liang-2024-gpt4-replicate-ese]</a> (2023) and <a class="cite" href="../sources/#ahmed-2025-llm-replace-manual-annotation-se" title="Can LLMs Replace Manual Annotation of Software Engineering A…">[ahmed-2025-llm-replace-manual-annotation-se]</a> (2024 preprint, MSR 2025). Check the venue year at verification time.
+- Agent-c notes an unrecorded PNAS 2026 paper on AI and human participants. Agent-d notes a TOSEM 2025 editorial and an EMSE LLM special issue. None of these is in the store, so none may be cited until added.</p>
+<p><strong>Reminder: every source above is a candidate.</strong> Each must go through <code>/research:add-paper</code> (verified against Crossref, arXiv or OpenAlex) before it enters <code>proposal/references.bib</code> or any proposal prose. That includes CONFIRMED records, since store verification is not the citation-matrix gate.</p>

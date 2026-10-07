@@ -21,3 +21,4 @@ site/public/photo_jason_1.jpeg
 # The default og:image card, generated at build time (site/scripts/og-card.mjs).
 site/public/og-card.png
 site/public/og-card.svg
+.aiese-raw/
