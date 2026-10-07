@@ -31,7 +31,7 @@ may be created.
 from __future__ import annotations
 
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -101,6 +101,11 @@ class Annotation:
     tags: tuple[str, ...]
     created: datetime
     updated: datetime
+    # A delete is a SOFT delete (ADR-0022/D18): the row is kept as a tombstone so
+    # the repository export can record `_(deleted …)_` and never silently drops
+    # an entry. `GET`/`list_for` exclude deleted rows; the exporter includes them.
+    deleted: bool = False
+    deleted_at: datetime | None = None
 
 
 class AnnotationStore(Protocol):
@@ -110,11 +115,13 @@ class AnnotationStore(Protocol):
 
     def get(self, annotation_id: str) -> Annotation | None: ...
 
+    def all_for_item(self, section: str, source: str, slug: str) -> list[Annotation]: ...
+
     def list_all(self) -> list[Annotation]: ...
 
     def list_for(self, member: str) -> list[Annotation]: ...
 
-    def delete(self, annotation_id: str) -> None: ...
+    def soft_delete(self, annotation_id: str, *, now: datetime) -> None: ...
 
 
 def _quote_from_document(value: object) -> TextQuoteSelector | None:
@@ -201,6 +208,13 @@ def _annotation_from_document(annotation_id: str, data: dict[str, Any]) -> Annot
     if not isinstance(tags, (list, tuple)) or not all(isinstance(tag, str) for tag in tags):
         return None
 
+    deleted = bool(data.get("deleted", False))
+    deleted_at = data.get("deleted_at")
+    if deleted and not isinstance(deleted_at, datetime):
+        return None
+    if not deleted:
+        deleted_at = None
+
     return Annotation(
         id=annotation_id,
         member=member,
@@ -215,6 +229,8 @@ def _annotation_from_document(annotation_id: str, data: dict[str, Any]) -> Annot
         tags=tuple(tags),
         created=created,
         updated=updated,
+        deleted=deleted,
+        deleted_at=deleted_at,
     )
 
 
@@ -246,6 +262,8 @@ def _document_from_annotation(annotation: Annotation) -> dict[str, Any]:
         "tags": list(annotation.tags),
         "created": annotation.created,
         "updated": annotation.updated,
+        "deleted": annotation.deleted,
+        "deleted_at": annotation.deleted_at,
     }
 
 
@@ -295,6 +313,7 @@ class FirestoreAnnotationStore:
             annotation
             for doc in stream
             if (annotation := _annotation_from_document(doc.id, doc.to_dict() or {}))
+            and not annotation.deleted
         ]
         return _newest_first(annotations)
 
@@ -307,14 +326,29 @@ class FirestoreAnnotationStore:
             annotation
             for doc in query.stream()
             if (annotation := _annotation_from_document(doc.id, doc.to_dict() or {}))
+            and not annotation.deleted
         ]
         return _newest_first(annotations)
 
-    def delete(self, annotation_id: str) -> None:
-        # The route has already read the row and decided the caller may delete
-        # it; this is non-creating, so a repeat delete is already done as far as
-        # a caller can observe.
-        self._ensure_client().collection(self._collection).document(annotation_id).delete()
+    def all_for_item(self, section: str, source: str, slug: str) -> list[Annotation]:
+        """Every row for one item, INCLUDING tombstones (the exporter's source)."""
+        query = self._ensure_client().collection(self._collection).where("source", "==", source)
+        out = [
+            annotation
+            for doc in query.stream()
+            if (annotation := _annotation_from_document(doc.id, doc.to_dict() or {}))
+            and annotation.section == section
+            and annotation.slug == slug
+        ]
+        return sorted(out, key=lambda annotation: annotation.created)
+
+    def soft_delete(self, annotation_id: str, *, now: datetime) -> None:
+        # A delete is a soft delete (ADR-0022/D18): the row stays as a tombstone
+        # for the export. Non-creating, so a repeat is already done as far as a
+        # caller can observe.
+        reference = self._ensure_client().collection(self._collection).document(annotation_id)
+        if reference.get().exists:
+            reference.update({"deleted": True, "deleted_at": now, "updated": now})
 
 
 class StaticAnnotationStore:
@@ -333,12 +367,20 @@ class StaticAnnotationStore:
         return self._annotations.get(annotation_id)
 
     def list_all(self) -> list[Annotation]:
-        return _newest_first(list(self._annotations.values()))
+        return _newest_first([a for a in self._annotations.values() if not a.deleted])
 
     def list_for(self, member: str) -> list[Annotation]:
-        return _newest_first(
-            [annotation for annotation in self._annotations.values() if annotation.member == member]
-        )
+        return _newest_first([a for a in self._annotations.values() if a.member == member and not a.deleted])
 
-    def delete(self, annotation_id: str) -> None:
-        self._annotations.pop(annotation_id, None)
+    def all_for_item(self, section: str, source: str, slug: str) -> list[Annotation]:
+        out = [
+            a
+            for a in self._annotations.values()
+            if a.section == section and a.source == source and a.slug == slug
+        ]
+        return sorted(out, key=lambda annotation: annotation.created)
+
+    def soft_delete(self, annotation_id: str, *, now: datetime) -> None:
+        existing = self._annotations.get(annotation_id)
+        if existing is not None:
+            self._annotations[annotation_id] = replace(existing, deleted=True, deleted_at=now, updated=now)

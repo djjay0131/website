@@ -307,6 +307,35 @@ resource "google_cloud_run_v2_service" "gate" {
         name  = "GATE_ALLOWED_ORIGINS"
         value = local.gate_allowed_origins
       }
+
+      # Notes-sync (ADR-0022, D18). Dormant by default: GATE_NOTES_EXPORT_ENABLED
+      # is "0" until the owner completes the two hard stops. The App id,
+      # installation id and routing are identifiers/config, not secrets; the App
+      # PRIVATE KEY is read from Secret Manager at runtime and never appears here.
+      env {
+        name  = "GATE_NOTES_EXPORT_ENABLED"
+        value = var.notes_export_enabled ? "1" : "0"
+      }
+
+      env {
+        name  = "GATE_NOTES_APP_ID"
+        value = var.notes_export_app_id
+      }
+
+      env {
+        name  = "GATE_NOTES_INSTALLATION_ID"
+        value = var.notes_export_installation_id
+      }
+
+      env {
+        name  = "GATE_NOTES_SECRET_NAME"
+        value = "notes-export-app-key"
+      }
+
+      env {
+        name  = "GATE_NOTES_ROUTING"
+        value = local.notes_routing_json
+      }
     }
   }
 
