@@ -54,8 +54,8 @@ MAX_ENTRY_MEMBER_CHARS = 320
 # visible note; Firestore keeps them all (it is the source of truth).
 MAX_ENTRIES_PER_ITEM = 2000
 
-# C0 controls except TAB and LF. LF is kept for comments (blockquoted per line).
-_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+# C0 controls except TAB (0x09) and LF (0x0A). CR (0x0D) IS stripped.
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
 QUOTE_SELECTOR_TYPE = "TextQuoteSelector"
 POSITION_SELECTOR_TYPE = "TextPositionSelector"
@@ -344,7 +344,7 @@ def _short_error(value: object) -> str:
 
 
 _TOKEN_PATTERN = re.compile(
-    r"(gh[sphou]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+"
+    r"(gh[sphour]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+"
     r"|ya29\.[A-Za-z0-9_\-.]+"
     r"|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
     r"|-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----)"
@@ -788,16 +788,26 @@ class NotesSync:
         if not self._enabled:
             return 0
         moment = now or datetime.now(UTC)
+        try:
+            jobs = self._queue.due(moment)
+        except Exception as exc:  # a queue read failure is not a per-job failure
+            logger.warning("event=error scope=notes_sync action=due error=%s", _short_error(exc))
+            return 0
         delivered = 0
-        for job in self._queue.due(moment):
+        for job in jobs:
             try:
-                self._write_job(job)
+                wrote = self._write_job(job)
                 self._queue.success(job)
-                delivered += 1
-                logger.info(
-                    "event=allow scope=notes_sync action=commit repo_jobs=1 item_hash=%s",
-                    job.doc_id[:12],
-                )
+                delivered += 1 if wrote else 0
+                if wrote:
+                    logger.info(
+                        "event=allow scope=notes_sync action=commit repos=%d item_hash=%s",
+                        wrote,
+                        job.doc_id[:12],
+                    )
+                else:
+                    # A question-only item: queued, coalesced, and honestly a no-op.
+                    logger.info("event=allow scope=notes_sync action=noop item_hash=%s", job.doc_id[:12])
             except Exception as exc:  # any failure is a retry, by design
                 self._queue.failure(job, now=moment, error=_short_error(exc))
                 logger.warning(
@@ -808,15 +818,17 @@ class NotesSync:
                 )
         return delivered
 
-    def _write_job(self, job: ExportJob) -> None:
+    def _write_job(self, job: ExportJob) -> int:
+        """Write the item's file(s); return how many repositories were written."""
         entries = self._entries_for_item(job.section, job.source, job.slug)
         by_repo = destinations(entries, self._routing)
         if not by_repo:
-            # Every entry is a question or a tombstone; nothing to publish.
-            return
+            # Every entry is a question (never exported): nothing to publish.
+            return 0
         path = notes_path(job.source, job.slug)
         if path is None:
             raise RuntimeError("unsafe item identity")
+        commits = 0
         for repo in sorted(by_repo):
             install_notes_branch(self._github, repo)
             # The file for a repo carries exactly the entries (and their
@@ -841,3 +853,5 @@ class NotesSync:
                 commit_message(job.section, job.source, job.slug),
                 existing[1] if existing else None,
             )
+            commits += 1
+        return commits

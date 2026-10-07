@@ -269,3 +269,218 @@ only pre-existing untracked handoffs.
 | RT6NS-01..05, 08, 13..17 (routes, JWT, dormant, no-main) | `cd gate && .venv/bin/python /tmp/opencode/redteam-w6ns/probe_routes.py` |
 | RT6NS-03 dead-letter response-body exposure | `cd gate && .venv/bin/python /tmp/opencode/redteam-w6ns/probe_deadletter.py` |
 | Context (must-not-regress) | `cd gate && .venv/bin/python -m pytest` → `643 passed` |
+
+---
+
+# Round 2 — re-attack the landed fixes (D18, #107)
+
+Agent: Red Team (independent; report only, **no fixes**). Branch
+`feat/annotations-sync` HEAD `293dc3a` ("fix(wave-6 notes-sync): close Red Team
+round-1 bypasses"), hub `/home/djjay/code/website`. Re-ran Round 1's five
+attacks against the fixed tree, then attacked the fix code itself.
+
+Artifacts under test (sha256, current tree):
+
+```
+notes_sync.py 271b5a9b74b608b7553095f7a51b348ce942cab8198d5d1b52f716c5deb79042
+main.py       d1fc5c47a3aa9280eba2c2690b4e5f5ae5c7d8d1b90b7ec243d9afe185867c5f
+annotations.py e89eee40e2eee1b8737cf8167dfd790dcce5ebffda5e9f5fc93cc9c4b4e31f25
+notes-sync.tf 0fdcfcc056e25be079caaff541fc39e37f090d9321868f117f546e636462b262
+```
+
+Working tree: I changed **no tracked file** except this handoff and ran **no
+git/gh mutation**. Scratch is `/tmp/opencode/redteam-w6ns-r2/`
+(`probe_unit.py`, `probe_routes.py`, `probe_cr_route.py`). No credential was
+created and no production system was contacted; probes drove `NotesSync` and
+`create_app()` against the in-memory `Static*` fakes. `cd gate && .venv/bin/python
+-m pytest` → **650 passed** (round 1: 643; +7 committed tests). The increase does
+not include a CR test — see R2-04.
+
+## Verdict on the five fixes
+
+| Fix | Verdict | Why |
+|---|---|---|
+| RT6NS-01 tombstones | **CLOSED** | `destinations()` now includes `deleted` entries (`notes_sync.py:281-297`); `_write_job` renders them. Tombstone-only item commits a tombstone; a delete replaces the live passage with a struck-through tombstone, both unit and through `POST`→`DELETE`→drain. One residual audit defect (R2-N1), no stale content. |
+| RT6NS-03 credential redactor | **CLOSED (for the named secrets)** | `ya29.`, PEM (`RSA`/`EC`/`OPENSSH`), `ghs_` and JWT are all replaced by `[redacted]` in `_short_error`, in the `event=retry` log line, and in `_job_from_document`/dead-letter `export.error`. One denylist gap remains (R2-N2: `ghr_`). |
+| RT6NS-04 control bytes | **NOT CLOSED** | `_CONTROL` (`notes_sync.py:58`) omits `\x0d` (CR). NUL and ESC are now stripped, but a CR planted in a **comment** survives to the committed file end-to-end. This is exactly round 1's `\x0d` byte. See R2-04 / new BYPASS. |
+| RT6NS-05 per-item cap | **CLOSED (stated goal)** | `MAX_ENTRIES_PER_ITEM = 2000` (`notes_sync.py:55`, applied `:210-226`). 2500 entries → 2000 blocks, 247 561 bytes, omission note `_(500 earlier entries omitted here; see My notes.)_`. Boundary exact: 2000 → no note, 2001 → singular note. Residuals are by-design (R2-N3). |
+| Dissenter B2 `_kick_drain` | **CLOSED as specified** | Fires only when `sync is not None and sync.enabled`; returns without raising (disabled, `None`, no running loop, and a raising `drain` all safe). One new latent log-redaction gap (R2-N4). |
+
+**4 of 5 CLOSED. RT6NS-04 is NOT CLOSED.** One genuinely new bypass in the fix
+code (the CR that the fix's own docstring claims to remove); three lower-severity
+new defects (unredacted kick-future traceback, false `action=commit` audit line,
+`ghr_` denylist gap); the round-1 section/slug collision is still open and
+owner-specified.
+
+## R2-04 (new BYPASS) — `_CONTROL` skips CR, so `\r` still reaches the commit
+
+`escape_markdown`'s docstring (`notes_sync.py:121-123`) says "Control characters
+(NUL, ESC, CR, …) are removed first". The regex does not remove CR:
+
+```python
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")   # notes_sync.py:58
+```
+
+The ranges are `\x00-\x08`, `\x0b`, `\x0c`, `\x0e-\x1f`, `\x7f`. TAB (`\x09`)
+and LF (`\x0a`) are intentionally kept; **CR (`\x0d`)** is skipped by the
+`\x0c`→`\x0e` jump, so it survives. The comment above the regex only claims the
+TAB/LF exemption, so the code also disagrees with that comment.
+
+Per-byte check of `escape_markdown`:
+
+```
+\x00 stripped   \x08 stripped   \x09 TAB kept   \x0a LF kept
+\x0b stripped   \x0c stripped   \x0d CR KEPT    \x0e stripped   \x1f stripped   \x7f stripped
+```
+
+End-to-end through the real route (no network; `Static*` fakes):
+
+```
+POST /annotations comment = "A\x00B\x1b[31mC\x0dD"  -> 200
+drain -> 1 commit
+committed file control bytes (excl. TAB/LF): ['0xd']
+NUL present: False   ESC present: False   CR present: True
+comment region: 'Comment**\n\n> AB\\[31mC\rD\n\n- **Item:** phd/…'
+```
+
+The quote path is safe only incidentally: `_entry_block` runs `one_line()` on the
+quote before `escape_markdown`, and `one_line` collapses `\r` to a space. The
+comment path is `escape_markdown(entry.comment)` with no `one_line`
+(`notes_sync.py:167-168`), so the CR reaches the blob. `_annotation_fields`
+accepts the CR (comment is length-checked only, `main.py:1415-1417`), so this is
+member-triggerable.
+
+Fix shape (for the author, not applied here): make the regex match the stated
+intent, e.g. `[\x00-\x08\x0b\x0c\x0d\x0e-\x1f\x7f]` (or `[\x00-\x08\x0b-\x1f\x7f]`
+with TAB/LF carved out), and add `\x0d` to `test_renderer_strips_control_characters_from_a_comment`.
+The committed test plants only `\x00` and `\x1b` (`test_notes_sync.py:374`), so
+it cannot catch this; the Skeptic Verifier's round-2 note (g-9 style, separate
+handoff) makes the same point about the redaction test.
+
+## New BYPASSes and defects found in the fix code
+
+### R2-N4 (MEDIUM, new) — `_kick_drain`'s un-awaited future logs a raw, unredacted exception
+
+`_kick_drain` (`main.py:1557-1571`) does `loop.run_in_executor(None, sync.drain)`
+and drops the returned future. If `sync.drain` raises **outside** its per-job
+`try` — i.e. from `self._queue.due(moment)` (`notes_sync.py:792`), which is not
+wrapped — the exception is stored on the never-awaited future and CPython's
+asyncio handler logs it verbatim:
+
+```
+Future exception was never retrieved
+future: <Future finished exception=RuntimeError('boom ya29.LEAKEDKICK_abc')>
+RuntimeError: boom ya29.LEAKEDKICK_abc
+```
+
+This bypasses `sanitize_error`: the per-job retry path redacts, and the
+background loop wraps the same call in `try/except … sanitize_error` (`main.py:1584-1588`),
+but the kick path has no such wrapper. I demonstrated the mechanism with a
+credential in the escaping exception; I did not find a real `due()` error that
+carries a token, so this is a latent redaction gap rather than a proven token
+leak. Fix shape: `asyncio.ensure_future(sync.drain())` plus an awaited wrapper
+that logs via `sanitize_error`, or a done-callback that consumes the exception.
+
+Also observed: a fresh job is enqueued with `next_attempt = now + debounce`
+(45 s default, `notes_sync.py:410`), so the immediate kick finds nothing due and
+drains 0; the docstring's "should not wait for the background loop's next tick"
+holds only for a job already past its debounce (e.g. one a crashed instance
+left behind). Not a security defect.
+
+### R2-N1 (LOW, new) — `action=commit` is logged with zero commits for a no-repo item
+
+`_write_job` returns early when `by_repo` is empty (`notes_sync.py:814-816`), but
+`drain` still calls `queue.success(job)` and logs `action=commit` unconditionally
+(`notes_sync.py:793-800`). A `question`-only item — the **default** intent — is
+the common case:
+
+```
+question-only item: drain -> delivered=1, actual commits=0
+log: event=allow scope=notes_sync action=commit repo_jobs=1 item_hash=cf5032c678a4
+```
+
+The RT6NS-01 fix removed the *stale-content* half of the false audit trail but
+not this half. Impact: the export commit signal over-counts for notes that are
+never exported. Fix shape: distinguish "wrote nothing because there was nothing
+to publish" from "committed", and log it differently (or return a bool from
+`_write_job`).
+
+### R2-N2 (LOW, new) — `ghr_` GitHub refresh tokens are not in the denylist
+
+`_TOKEN_PATTERN` (`notes_sync.py:346-351`) covers `gh[sphou]_`, which omits the
+documented `ghr_` (GitHub App refresh-token) prefix:
+
+```
+_short_error("boom ghr_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 head")
+  -> 'boom ghr_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 head'   # leaked
+```
+
+This subsystem mints only `ghs_` installation tokens and does not itself hold a
+`ghr_`, so relevance is limited; recorded because the module is a denylist whose
+whole purpose is to fail safe. Fix shape: `gh[sphour]_`.
+
+### R2-N3 (LOW / by-design, new) — the cap is a member-controllable suppression lever
+
+The cap keeps the **newest** 2000 entries by `created` (`notes_sync.py:210-214`).
+Any member may annotate any item (the create validator does not check item access,
+`main.py:1376-1442`), so a member can add 2000 junk notes to an item and push
+another member's older entry — or an old tombstone — out of the repository
+projection. Verified: an old live entry is dropped once 2000 newer entries exist;
+its tombstone (`created` unchanged by deletion, same sort rank) is dropped with
+it, so **no stale live text survives**. Firestore keeps every row and the
+omission note is present, so this is repository-projection loss, not source-of-
+truth loss. Worst-case file with maximum-size entries is **14 272 008 bytes
+(~14.3 MB) per repo file** — bounded, but the cap is count-based, not byte-based.
+Recorded as an accepted design tradeoff with a member-triggerable trigger.
+
+## Round-2 attack table
+
+| # | Attack | Setup | Observed | Verdict |
+|---|---|---|---|---|
+| R2-01a | Tombstone-only item | `NotesSync` with `[paper(deleted)]` | `delivered=1`, 1 commit, `## tombstone` + quote in file | **CLOSED** |
+| R2-01b | Live → delete replaces text | one `paper` note, commit, `replace(deleted=True)`, drain | before has live; after has `~~…~~` struck-through, no `> live` line | **CLOSED** |
+| R2-01c | Route end-to-end | `POST`→drain→`DELETE`→drain via `create_app` | commit log on create and delete; tombstone replaces live | **CLOSED** |
+| R2-03a | `_short_error` coverage | plant `ghs_`/`ghp_`/`github_pat_`/`eyJ`/`ya29.`/PEM×3 | all `boom [redacted] head` | **CLOSED** |
+| R2-03b | Log + dead-letter + document | raising `put_file` with `ya29.`+PEM; `_job_from_document` with raw `last_error` | log `error=403 Bearer [redacted] and [redacted]`; doc `last_error` fully redacted | **CLOSED** |
+| R2-04a | NUL/ESC/CR in comment+quote | render `quote\x00\x1b\rQ`, `comment="ok\x00…\x0dCR"` | NUL/ESC gone; **CR present** | **BYPASS** |
+| R2-04b | CR via real route | `POST` comment `"A\x00B\x1b[31mC\x0dD"`, drain | committed file control bytes `['0xd']` | **BYPASS** |
+| R2-05a | 2500 entries | render | 2000 blocks, 247 561 B, `(500 earlier entries omitted here; see My notes.)` | **CLOSED** |
+| R2-05b | Boundary | 2000 / 2001 | no note / `(1 earlier entry omitted here; see My notes.)` | **CLOSED** |
+| R2-05c | Worst-case size | 2000 max quote+comment | 14 272 008 B | **OBSERVED** |
+| R2-B2a | kick only when enabled | `_kick_drain` enabled/disabled/`None` | 1 call / 0 calls / returns | **CLOSED** |
+| R2-B2b | kick cannot raise | raising `drain` | `_kick_drain` returns; future logs raw `RuntimeError('…ya29…')` | **CLOSED (but R2-N4)** |
+| R2-A | Tombstone intent routes nowhere | `destinations([question(deleted)])` | `{}`; full drain writes nothing | **REFUSED** (R2-N1 log defect) |
+| R2-B | Live question + deleted paper | both in one item | file = paper tombstone; live question absent | **REFUSED** |
+| R2-C | Omission note spoofed by content | comment = the omission sentence | `_` escaped (`\_(`), exact bytes not forgeable | **REFUSED** |
+| R2-D | Cap drops a tombstone | old tombstone + 2000 newer | tombstone omitted, but its live text omitted in the same render | **OBSERVED** (no stale content) |
+| R2-E | Very long single quote | 50 000-char quote | truncated to 2000 | **REFUSED** |
+| R2-F | `MAX_ENTRIES_PER_ITEM` boundary | 2000 / 2001 | no note / singular note | **REFUSED** |
+| R2-G | `section`/`slug` collision | two items differ only by `section`, same `source`+`slug` | second clobbers first (`notes_path` ignores `section`) | **BYPASS (unchanged, owner-specified)** |
+| R2-N1 | False audit «commit» | question-only item drain | `delivered=1`, `commits=0`, `action=commit` logged | **BYPASS (new, low)** |
+| R2-N2 | `ghr_` token | `_short_error("ghr_…")` | token returned verbatim | **BYPASS (new, low)** |
+| R2-N4 | Kick future traceback | `drain` raises with `ya29.` in message | asyncio logs the raw exception | **BYPASS (new, medium)** |
+
+Counts: 22 rows (R2-04a/R2-04b are the same defect, sampled twice) — **9 CLOSED,
+5 REFUSED, 2 OBSERVED, 6 BYPASS rows**, i.e. **5 distinct new-or-remaining
+bypasses**: R2-04 (CR), R2-G (section collision, unchanged/owner-specified),
+R2-N1 (false commit), R2-N2 (`ghr_`), R2-N4 (unredacted kick traceback).
+
+## Reproduction index (round 2)
+
+| Pointer | Command |
+|---|---|
+| R2-01, R2-03, R2-04, R2-05, R2-A..G (unit) | `cd gate && .venv/bin/python /tmp/opencode/redteam-w6ns-r2/probe_unit.py` |
+| R2-01 route, R2-03 log/doc, R2-B2 (kick) | `cd gate && .venv/bin/python /tmp/opencode/redteam-w6ns-r2/probe_routes.py` |
+| R2-04 end-to-end CR through `POST /annotations` | `cd gate && .venv/bin/python /tmp/opencode/redteam-w6ns-r2/probe_cr_route.py` |
+| Context (must-not-regress) | `cd gate && .venv/bin/python -m pytest` → `650 passed` |
+
+## Disclosures / side effects (round 2)
+
+None. No credential, secret, GitHub App, PAT, WIF provider or IAM binding was
+created. No `git`/`gh` mutation; the only tracked file I changed is this handoff
+section. No production endpoint was contacted: the probes drove `NotesSync`,
+`render_item_markdown`, `_short_error`, `_job_from_document` and `_kick_drain`
+directly, and `create_app()` with `Static*`/`Fake*` doubles. `git status
+--porcelain` before writing this section showed only an uncommitted change to
+`handoffs/skeptic-verifier-wave-6-notes-sync.md` made by a concurrent agent (its
+own round-2 section); I did not touch that file.

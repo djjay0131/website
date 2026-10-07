@@ -1568,7 +1568,14 @@ def _kick_drain(deps: Dependencies) -> None:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         return
-    loop.run_in_executor(None, sync.drain)
+
+    def _safe_drain() -> None:
+        try:
+            sync.drain()
+        except Exception as exc:  # never let a background failure log raw
+            logger.warning("event=error scope=notes_sync action=drain error=%s", sanitize_error(exc))
+
+    loop.run_in_executor(None, _safe_drain)
 
 
 async def _notes_sync_loop(deps: Dependencies) -> None:

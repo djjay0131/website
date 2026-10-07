@@ -121,3 +121,97 @@ harness would have aborted on a tie.
 - Post-restore: `gate/app/notes_sync.py` sha256
   `796cf3f34d12c54194510df780f4fb226dae16855635cddffd51c8607c6eb844`;
   `git status --porcelain` empty; `tests/test_notes_sync.py` → `17 passed`.
+
+---
+
+## Round 2
+
+Status: Complete
+Date: 2026-10-07
+Source under test: `gate/app/notes_sync.py` (sha256
+`271b5a9b74b608b7553095f7a51b348ce942cab8198d5d1b52f716c5deb79042`)
+Tests: `gate/tests/test_notes_sync.py` (sha256
+`367e860ad22120f40187f966823896eb7577dddca6a351d1bf83999225763f9d`, 24 tests,
+green before and after)
+
+The sha values differ from Round 1 (`796cf3f3…`) because the Round-1 fix commit
+`293dc3a` landed after the first section was written; this section verifies the
+fixed tree. Method is unchanged: break an anchor asserted to occur **exactly
+once** (`content.count(anchor) == 1`) before editing, run the named test(s) from
+`gate/` with `.venv/bin/python -m pytest`, record the by-name failure, restore,
+and re-verify the sha256. `git diff` empty, no tracked file left changed, no
+git/gh ran. Scratch: `/tmp/opencode/skeptic_wave6_round2.py`,
+`/tmp/opencode/skeptic_wave6_round2_probes.py`,
+`/tmp/opencode/skeptic_wave6_round2_result.json`.
+
+### Round-2 requested checks (a)–(e)
+
+| # | Check | Break (anchor → replacement) | Test that must fail by name | Result |
+|---|---|---|---|---|
+| a | branch created **once** (AN-SYNC-3) | `if github.branch_sha(repo, NOTES_BRANCH) is not None:\n        return` → `if False:\n        return` | `test_notes_branch_is_created_only_once` | **fail-able** (FAILED by name) |
+| b | tombstone reaches the repo (RT6NS-01) | insert `if entry.deleted:\n            continue` into the `destinations` loop | `test_a_deleted_only_item_still_writes_a_tombstone` (also `test_destinations_…include_tombstones…`) | **fail-able** |
+| c | token redaction, `ya29.`/PEM (RT6NS-03) | delete the `ya29\.…` and `-----BEGIN … PRIVATE KEY-----` alternations | `test_commit_message_and_error_text_carry_no_content_or_credential` | **UN-FAILABLE** — gap g-9 |
+| d | C0 control stripping (RT6NS-04) | `_CONTROL.sub("", str(value …))` → `str(value …)` in `escape_markdown` | `test_renderer_strips_control_characters_from_a_comment` | **fail-able** |
+| e | attempt cap (MAX_ATTEMPTS) | `… or attempts >= MAX_ATTEMPTS:` → drop the disjunct (Static queue) | `test_queue_dead_letters_at_the_attempt_cap` | **fail-able** |
+| e | entries cap (MAX_ENTRIES_PER_ITEM) | delete the `if len(ordered) > MAX_ENTRIES_PER_ITEM:` slice + omission count | `test_renderer_caps_the_number_of_entries_per_item` | **fail-able** |
+
+**(a)–(d) and both caps are fail-able except (c).** (c) is the remaining
+un-failable guard: the committed redaction test feeds only `ghs_…`, `ghp_…` and
+`eyJ…`, so removing the `ya29.`/PEM alternations leaves all 24 tests green. The
+patterns themselves are correct — a probe confirms `_short_error("ya29.…") ==
+"[redacted]"` and a PEM block is stripped — but no committed test exercises
+them, so the RT6NS-03 addition has no falsifier.
+
+### Re-checked Round-1 guards (all re-verified against the fixed source)
+
+| Round-1 row | Break | Test that failed by name | Result |
+|---|---|---|---|
+| #1 debounce clamp | `high=MAX_DEBOUNCE_SECONDS` → `high=10**9` | `test_debounce_and_backoff_are_bounded_and_deterministic` | fail-able |
+| #2 backoff | drop `min(…, MAX_BACKOFF_SECONDS)` | `test_debounce_and_backoff_are_bounded_and_deterministic` | fail-able |
+| #3 dead-letter at 24h | `if … or attempts >= MAX_ATTEMPTS:` → `if False:` (Static) | `test_queue_retries_with_backoff_then_dead_letters_after_24h` (+ attempt-cap test) | fail-able |
+| #4 branch from default HEAD | `create_branch(repo, NOTES_BRANCH, head)` → `…(repo, default, head)` | `test_drain_creates_notes_branch_from_default_once_and_commits` (+ branch-once test) | fail-able |
+| #6 idempotent no-op | byte-equal `continue` → `if False:` | `test_drain_is_idempotent_when_content_is_unchanged` | fail-able |
+| #7 path sanitisation | `notes_path` safety block → unchecked join | `test_notes_path_is_nested_and_refuses_traversal` | fail-able |
+| #8 message sanitisation | `item_is_safe(…) else "item"` → unconditional identity | `test_commit_message_and_error_text_carry_no_content_or_credential` | fail-able |
+| #8b render escaping | drop `escape_markdown` around the quote | `test_render_neutralises_link_and_block_injection` | fail-able |
+| #9 token redaction (all classes) | `_TOKEN_PATTERN.sub(…)` → `text = text` | `test_commit_message_and_error_text_carry_no_content_or_credential` | fail-able |
+| #10 disabled mode | drop `if not self._enabled: return` in `enqueue` | `test_disabled_sync_is_a_noop` | fail-able |
+| #11 routing validation | repo-shape check → `if False:` | `test_parse_routing_rejects_missing_intent_and_bad_repo` | fail-able |
+| g-5 tamper check | drop `job_id(…) != doc_id → None` | `test_job_document_with_a_tampered_id_is_refused` | fail-able |
+| g-8 `one_line` collapse | `one_line` returns raw `str(value)` | `test_one_line_collapses_control_characters` | fail-able |
+
+All 19 breaks in this round asserted `anchor count == 1` and restored to the
+pre-break sha256; every expectation above is a by-name pytest failure. Round-1
+gaps now **closed**: g-1 (branch-once), g-3 (`MAX_ATTEMPTS`), g-5 (tamper), g-8
+(`one_line`), plus the new entries cap.
+
+### Round-2 result
+
+- **Un-failable count: 1 (target 0).** The `ya29.`/PEM redaction alternations
+  (gap g-9).
+- **Remaining coverage gaps:**
+  - **g-9 (new) — `ya29.`/PEM redaction un-failable.** Add a `ya29.…` and a
+    `-----BEGIN … PRIVATE KEY-----` sample to the input of
+    `test_commit_message_and_error_text_carry_no_content_or_credential` (and a
+    matching absence assertion). Without it, RT6NS-03 rests on a pattern no
+    committed test exercises.
+  - **g-2 (carried) — `FirestoreExportQueue.failure` replica un-failable.**
+    Breaking its `reference.update` dead-letter branch leaves the suite green
+    (the fake queue is the only one exercised).
+  - **g-4 (carried) — content caps `MAX_QUOTE_CHARS`/`MAX_COMMENT_CHARS`
+    un-failable.** Removing all three `[:MAX_…_CHARS]` slices leaves the suite
+    green; only the entries cap is tested.
+  - **g-7 (carried) — `StaticExportQueue.enqueue` identity guard un-failable.**
+    Removing its `item_is_safe` early return leaves the suite green.
+- **Non-finding:** (a)–(d), both caps, and all re-checked Round-1 guards are
+  genuinely fail-able.
+
+### Evidence
+
+- Harness + supplementary probes + machine-readable result:
+  `/tmp/opencode/skeptic_wave6_round2.py`,
+  `/tmp/opencode/skeptic_wave6_round2_probes.py`,
+  `/tmp/opencode/skeptic_wave6_round2_result.json`.
+- Post-restore: `gate/app/notes_sync.py` sha256
+  `271b5a9b74b608b7553095f7a51b348ce942cab8198d5d1b52f716c5deb79042`; `git
+  status --porcelain` empty; `tests/test_notes_sync.py` → `24 passed`.

@@ -205,11 +205,16 @@ def test_commit_message_and_error_text_carry_no_content_or_credential():
     assert commit_message(*ITEM) == "notes: update phd/phd-milestones/committee-dossier"
     # A dangerous identity never reaches the message.
     assert commit_message("phd", "s", "../evil") == "notes: update item"
-    redacted = _short_error("boom\nghs_abc123xyz eyJhbGci.abc.def ghp_secret")
+    redacted = _short_error(
+        "boom\nghs_abc123xyz eyJhbGci.abc.def ghp_secret ya29.Gls_abc "
+        "-----BEGIN PRIVATE KEY----- MIIEvQIBADANBgkq -----END PRIVATE KEY-----"
+    )
     assert "\n" not in redacted
     assert "ghs_abc123xyz" not in redacted
     assert "ghp_secret" not in redacted
     assert "eyJhbGci.abc.def" not in redacted
+    assert "ya29.Gls_abc" not in redacted
+    assert "MIIEvQIBADANBgkq" not in redacted
     assert "[redacted]" in redacted
 
 
@@ -371,7 +376,7 @@ def test_one_line_collapses_control_characters():
 
 def test_renderer_strips_control_characters_from_a_comment():
     text = render_item_markdown(
-        [entry("paper", "q", comment="hi\x00\x1b[31mred")],
+        [entry("paper", "q\x0d", comment="hi\x00\x1b\r[31mred")],
         section="s",
         source="s",
         slug="y",
@@ -379,6 +384,7 @@ def test_renderer_strips_control_characters_from_a_comment():
     )
     assert "\x00" not in text
     assert "\x1b" not in text
+    assert "\r" not in text
     assert "red" in text
 
 
@@ -396,3 +402,24 @@ def test_renderer_caps_the_number_of_entries_per_item():
     ]
     text = render_item_markdown(many, section="s", source="s", slug="y", origin="https://jason.cusati.us")
     assert "earlier entries omitted" in text
+
+
+def test_renderer_caps_quote_and_comment_length():
+    from app.notes_sync import MAX_COMMENT_CHARS, MAX_QUOTE_CHARS
+
+    text = render_item_markdown(
+        [entry("paper", "q" * (MAX_QUOTE_CHARS + 50), comment="c" * (MAX_COMMENT_CHARS + 50))],
+        section="s",
+        source="s",
+        slug="y",
+        origin="https://jason.cusati.us",
+    )
+    assert "q" * MAX_QUOTE_CHARS in text
+    assert "q" * (MAX_QUOTE_CHARS + 1) not in text
+    assert "c" * (MAX_COMMENT_CHARS + 1) not in text
+
+
+def test_static_queue_enqueue_refuses_an_unsafe_identity():
+    queue = StaticExportQueue()
+    queue.enqueue("phd", "s", "../evil", now=BASE, debounce=30)
+    assert queue.due(BASE + timedelta(days=1)) == []
