@@ -1,0 +1,115 @@
+---
+// Track landing page. Data is generated from the research store in
+// djjay0131/ai-empirical-se-chapter (docs/research/ai-in-empirical-se/) by
+// site/scripts/build-aiese-track.py; edit the store, then rebuild.
+import Base from "../../../../layouts/Base.astro";
+import sources from "../../../../data/governed-agentic-research/ai-in-empirical-se/sources.json";
+const base = import.meta.env.BASE_URL;
+const project = `${base}research/governed-agentic-research/`;
+const here = `${project}ai-in-empirical-se/`;
+type Rec = (typeof sources)[number];
+const count = (f: (r: Rec) => boolean) => sources.filter(f).length;
+const total = sources.length;
+const bySector = { academic: count((r) => r.sector === "academic"), industry: count((r) => r.sector === "industry"), standards: count((r) => r.sector === "standards-body") };
+const years = [2026, 2025, 2024, 2023];
+const byYear = years.map((y) => [y, count((r) => r.year === y)] as const);
+const consensusSurfaced = count((r) => (r.found_via ?? "").includes("consensus"));
+const consensusOnly = count((r) => r.found_via === "consensus");
+const verified = count((r) => r.verification?.verdict === "CONFIRMED");
+const minorFix = count((r) => r.verification?.verdict === "MINOR-FIX");
+const wrong = count((r) => r.verification?.verdict === "WRONG");
+const checked = verified + minorFix + wrong;
+const empirical = count((r) => r.evidence_type === "empirical" || r.evidence_type === "benchmark-result");
+const guidance = count((r) => r.evidence_type === "guideline");
+const agentic = count((r) => (r.ai_role ?? []).some((a: string) => a === "autonomous-agent" || a === "multi-agent"));
+---
+
+<Base
+  title="Jason Cusati — AI across the Empirical-SE Lifecycle"
+  description="What has been published on LLMs and AI agents at each stage of empirical software engineering research, what it says about rigor, reproducibility and the human role, and where the gap is — a 219-record source explorer and synthesis."
+>
+  <p class="crumbs"><a href={project}>← Governed Agentic Empirical Research</a></p>
+  <h1>AI and Agents across the Empirical-SE Research Lifecycle</h1>
+  <p class="lede">
+    What has been published on LLMs and AI agents at each stage of empirical
+    software engineering research — question design, literature reviews,
+    repository mining, qualitative and quantitative analysis, artifact
+    generation, reporting — and what those sources say about rigor, validity,
+    reproducibility and the human role. A research digest as of
+    <strong>6 October 2026</strong>, gathered for the chapter proposal.
+  </p>
+
+  <div class="cards">
+    <a class="card" href={`${here}synthesis/`}><span class="card-title">Read the synthesis</span><span class="card-desc">Eight sections: the lifecycle map, rigor stage by stage, the reporting guidance that already exists, human-in-the-loop and provenance work, agentic-science systems, the gap, the sources that complicate the thesis, notes for the proposal.</span></a>
+    <a class="card" href={`${here}sources/`}><span class="card-title">Explore the {total} sources</span><span class="card-desc">Filter by lifecycle stage, year, evidence type, AI role, discovery channel and verification status. Every claim in the synthesis links here.</span></a>
+    <a class="card" href={`${here}consensus/`}><span class="card-title">Consensus searches</span><span class="card-desc">The eight consensus.app queries, one per lifecycle stage, with the ranked results and the channel agent's synthesis of each.</span></a>
+    <a class="card" href={`${here}literature-gap/`}><span class="card-title">Literature-gap table</span><span class="card-desc">The plan's Task 1 view: for each key source, what it establishes, where it falls short, and whether the proposal cites it or positions against it.</span></a>
+  </div>
+
+  <h2>The one-paragraph answer</h2>
+  <p>
+    AI is already a participant in empirical SE research, concentrated in
+    data processing and analysis and used mostly to automate rather than to
+    support decisions; reporting of that use is often incomplete. The field's
+    guidance has moved past "disclose the model and the prompt": the 2025 ESE
+    guidelines ask for session traces and human validation, 2026 guidance says
+    approval and rejection decisions in agentic studies should be reported, and
+    stage-specific frameworks now govern literature screening and repository
+    mining. Gated, provenance-first agentic research exists, mostly as 2026
+    preprints outside SE. What no standard yet specifies is the research
+    process itself as a governed object: which decisions were delegated to AI
+    and under what authority, which intermediate artifacts they produced, and
+    which human checks accepted them, recorded as reviewable provenance across
+    the whole lifecycle. The store also shows that more traces do not make
+    oversight more effective on their own, which is the argument for human
+    gates that are semantic, placed and criterioned rather than merely logged.
+  </p>
+
+  <h2>Dataset at a glance</h2>
+  <table class="stats"><tbody>
+    <tr><th scope="row">Records</th><td>{total} — {bySector.academic} academic, {bySector.industry} industry, {bySector.standards} standards-body</td></tr>
+    <tr><th scope="row">By year</th><td>{byYear.map(([y, n], i) => <span>{y}: {n}{i < byYear.length - 1 ? " · " : ""}</span>)}</td></tr>
+    <tr><th scope="row">Empirical or benchmark evidence</th><td>{empirical} records · {guidance} guidelines or standards</td></tr>
+    <tr><th scope="row">AI acting as an autonomous or multi-agent system</th><td>{agentic} records</td></tr>
+    <tr><th scope="row">Surfaced by Consensus</th><td>{consensusSurfaced} records ({consensusOnly} found only there)</td></tr>
+    <tr><th scope="row">Independently re-verified</th><td>{checked} of {total} re-fetched from primary pages: {verified} confirmed, {minorFix} minor metadata fixes applied, {wrong} wrong, 0 not found</td></tr>
+  </tbody></table>
+
+  <h2>Method</h2>
+  <p>
+    The anchor was Gomes et al. (2026), the systematic review of LLM-assisted
+    empirical SE, recorded first and chased through its references and citing
+    work. Two channels then ran in parallel: eight Consensus searches, one per
+    lifecycle stage, and four discovery agents covering two stages each through
+    web and arXiv search, publisher pages, Crossref, OpenAlex and Semantic
+    Scholar. Records were written only from pages actually fetched; 265 raw
+    records were deduplicated by identifier and title to 219. A separate agent
+    that had written no records, prompted to find errors rather than confirm
+    them, re-fetched a stratified 37% sample — every low-confidence record,
+    every Consensus-only record in the sample, the anchor — and its corrections
+    were applied in place. The synthesis was written by a further agent that
+    read only the records and the channel memos. No record here is citable in
+    the proposal until it has been verified again through the chapter
+    repository's citation tooling.
+  </p>
+  <p class="note">
+    Caveats: 139 records remain unchecked; the field is preprint-heavy
+    (104 of 219) and very recent (91 from 2026); one record was found to be
+    wrong and is not used in the synthesis; no LLM-use policy specific to
+    ESEM, EMSE or TOSEM was found.
+  </p>
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .lede { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 1.5rem; }
+  .note { font-size: 0.9rem; color: var(--color-muted); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .card { display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem 1.1rem; border: 1px solid var(--color-border); border-left: 4px solid var(--color-accent); border-radius: 4px; background: var(--color-surface); color: var(--color-text); text-decoration: none; }
+  .card:hover { border-left-color: var(--color-link); text-decoration: none; }
+  .card-title { font-family: var(--font-body); font-weight: 600; color: var(--color-link); }
+  .card-desc { font-size: 0.9rem; color: var(--color-muted); }
+  .stats { border-collapse: collapse; width: 100%; font-family: var(--font-body); font-size: 0.95rem; }
+  .stats th, .stats td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+  .stats th { width: 40%; font-weight: 600; color: var(--color-muted); }
+</style>

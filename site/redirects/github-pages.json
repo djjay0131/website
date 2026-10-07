@@ -172,6 +172,26 @@
     "to": "/research/governed-agentic-research/"
   },
   {
+    "from": "/website/research/governed-agentic-research/ai-in-empirical-se/",
+    "to": "/research/governed-agentic-research/ai-in-empirical-se/"
+  },
+  {
+    "from": "/website/research/governed-agentic-research/ai-in-empirical-se/consensus/",
+    "to": "/research/governed-agentic-research/ai-in-empirical-se/consensus/"
+  },
+  {
+    "from": "/website/research/governed-agentic-research/ai-in-empirical-se/literature-gap/",
+    "to": "/research/governed-agentic-research/ai-in-empirical-se/literature-gap/"
+  },
+  {
+    "from": "/website/research/governed-agentic-research/ai-in-empirical-se/sources/",
+    "to": "/research/governed-agentic-research/ai-in-empirical-se/sources/"
+  },
+  {
+    "from": "/website/research/governed-agentic-research/ai-in-empirical-se/synthesis/",
+    "to": "/research/governed-agentic-research/ai-in-empirical-se/synthesis/"
+  },
+  {
     "from": "/website/research/soa-agentic-se/",
     "to": "/research/soa-agentic-se/"
   },

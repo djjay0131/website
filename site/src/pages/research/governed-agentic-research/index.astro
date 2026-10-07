@@ -6,6 +6,7 @@
 // track beneath it is populated from the chapter repo's research store once
 // that store lands (docs/research/ai-in-empirical-se/).
 import Base from "../../../layouts/Base.astro";
+import lifecycle from "../../../data/governed-agentic-research/ai-in-empirical-se/sources.json";
 const base = import.meta.env.BASE_URL;
 const research = `${base}research/`;
 const soa = `${base}research/soa-agentic-se/`;
@@ -24,18 +25,21 @@ const soa = `${base}research/soa-agentic-se/`;
     accepted, through June 2027.
   </p>
 
-  <h2>Abstract <span class="badge">proposal draft · 6 October 2026</span></h2>
+  <h2>Abstract <span class="badge">proposal draft v3 · 7 October 2026</span></h2>
   <div class="abstract">
     <p>
       AI is no longer a tool that a researcher calls at one step of a study. In
       empirical software engineering it now plans, retrieves, extracts,
       critiques, and transforms data, with decisions delegated to it along the
-      way. Current practice answers this by disclosing the model and the prompt,
-      but that captures a sliver of an agentic workflow: the delegated
-      decisions, intermediate artifacts, validation steps, and human
-      interventions that shape a result go unrecorded, so neither the author nor
-      a reader can say with confidence what was produced, by whom, or why. We
-      already know how to keep an engineering process accountable; this chapter
+      way. Current guidance asks researchers to disclose the models and prompts
+      they used, to keep session traces, and to validate AI output by hand;
+      stage-specific frameworks now govern single steps such as literature
+      screening or repository mining. What no standard yet specifies is the
+      research process itself as a governed object: which decisions were
+      delegated to AI and under what authority, which intermediate artifacts
+      they produced, and which human checks accepted them, recorded as
+      reviewable provenance across the whole study. We already know how to keep
+      an engineering process accountable; this chapter
       argues that the research process needs the same treatment once agents are
       participants in it. We present Governed Agentic Empirical Research (GAER),
       a methodological framework in which every agent works under bounded
@@ -58,11 +62,11 @@ const soa = `${base}research/soa-agentic-se/`;
 
   <h2>Research tracks</h2>
   <div class="cards">
-    <div class="card card-planned">
+    <a class="card" href={`${base}research/governed-agentic-research/ai-in-empirical-se/`}>
       <span class="card-title">AI and agents across the empirical-SE lifecycle</span>
-      <span class="card-desc">What has been published on LLMs and agents at each stage of empirical SE research — study design, literature reviews, repository mining, qualitative and quantitative analysis, artifact generation, reporting — and what it says about rigor, validity, reproducibility and the human role. Starts from Gomes et al. (2026).</span>
-      <span class="card-meta">In progress · deep-research pass started 6 October 2026 · synthesis and source explorer to follow</span>
-    </div>
+      <span class="card-desc">What has been published on LLMs and agents at each stage of empirical SE research — study design, literature reviews, repository mining, qualitative and quantitative analysis, artifact generation, reporting — and what it says about rigor, validity, reproducibility and the human role. Anchored on Gomes et al. (2026).</span>
+      <span class="card-meta">{lifecycle.length} sources · 6 October 2026 · synthesis, source explorer, Consensus searches, literature-gap table</span>
+    </a>
   </div>
 
   <h2>How this relates to the other projects</h2>
@@ -117,8 +121,8 @@ const soa = `${base}research/soa-agentic-se/`;
   .note { font-size: 0.9rem; color: var(--color-muted); }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
   .card { display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem 1.1rem; border: 1px solid var(--color-border); border-left: 4px solid var(--color-accent); border-radius: 4px; background: var(--color-surface); color: var(--color-text); text-decoration: none; }
-  .card-planned { border-left-style: dashed; }
-  .card-title { font-family: var(--font-body); font-weight: 600; color: var(--color-text); font-size: 1.05rem; }
+  .card:hover { border-left-color: var(--color-link); text-decoration: none; }
+  .card-title { font-family: var(--font-body); font-weight: 600; color: var(--color-link); font-size: 1.05rem; }
   .card-desc { font-size: 0.92rem; color: var(--color-muted); }
   .card-meta { font-family: var(--font-body); font-size: 0.78rem; color: var(--color-muted); margin-top: 0.25rem; }
   .relations li { margin-bottom: 0.75rem; }

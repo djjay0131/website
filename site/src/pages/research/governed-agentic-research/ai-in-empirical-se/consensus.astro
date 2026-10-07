@@ -1,0 +1,38 @@
+---
+import Base from "../../../../layouts/Base.astro";
+import queries from "../../../../data/governed-agentic-research/ai-in-empirical-se/consensus.json";
+const base = import.meta.env.BASE_URL;
+const here = `${base}research/governed-agentic-research/ai-in-empirical-se/`;
+---
+
+<Base
+  title="Jason Cusati — AI across the Empirical-SE Lifecycle: Consensus Searches"
+  description="The eight Consensus searches run for the digest on AI across the empirical-SE research lifecycle, one per lifecycle stage, with ranked results and the channel agent's synthesis of each."
+>
+  <p class="crumbs"><a href={here}>← AI across the empirical-SE lifecycle</a></p>
+  <h1>Consensus Searches</h1>
+  <p class="lede">Eight queries run through the consensus.app connector on 6 October 2026, one per lifecycle stage. Unlike the earlier tracks, these ran through the connector's ranked search rather than a shareable "Deep" page, so there are no permalinks; the synthesis under each query was written by the channel agent from the ranked results, as a lead-finder. Every cited paper was then resolved to its primary page and recorded in the <a href={`${here}sources/`}>source explorer</a> (filter <em>Found via → Consensus</em>).</p>
+  <nav class="toc" aria-label="Queries"><ol>{queries.map((q) => <li><a href={`#${q.slug}`}>{q.label} — {q.title}</a></li>)}</ol></nav>
+  {queries.map((q) => (
+    <section class="query" id={q.slug}>
+      <h2>{q.label} — {q.title}</h2>
+      <p class="qmeta">Query: <em>{q.query}</em></p>
+      <div class="synth" set:html={q.synthesis_html} />
+      <details><summary>Ranked results returned by this search</summary><div class="cited" set:html={q.cited_html} /></details>
+    </section>
+  ))}
+</Base>
+
+<style is:global>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .lede { color: var(--color-muted); margin-bottom: 1.25rem; }
+  .toc { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; padding: 0.75rem 1.25rem; margin-bottom: 1.5rem; font-family: var(--font-body); font-size: 0.9rem; }
+  .toc ol { margin: 0 0 0 1.25rem; padding: 0; }
+  .qmeta { font-family: var(--font-body); font-size: 0.85rem; color: var(--color-muted); margin-bottom: 0.75rem; }
+  .synth p { margin-bottom: 0.9rem; }
+  .synth a.cite { font-family: var(--font-mono); font-size: 0.78em; color: var(--color-accent); overflow-wrap: anywhere; }
+  details { margin: 0.5rem 0 1.5rem; font-family: var(--font-body); font-size: 0.85rem; }
+  summary { cursor: pointer; color: var(--color-link); }
+  .cited ol { margin: 0.5rem 0 0 1.25rem; }
+  .cited li { font-size: 0.82rem; margin-bottom: 0.3rem; }
+</style>
