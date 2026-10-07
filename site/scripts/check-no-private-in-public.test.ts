@@ -471,6 +471,9 @@ describe("annotation tooling and endpoints never reach the public output", () =>
     expect(containsAnnotationNeedle("&#47;annotations", "/annotations")).toBe(true);
     expect(containsAnnotationNeedle("&#x2f;annotations", "/annotations")).toBe(true);
     expect(containsAnnotationNeedle("data&#45;annotation&#45;frame", "data-annotation-")).toBe(true);
+    // A CSS rule or an import path is a real leak too (R2-03).
+    expect(containsAnnotationNeedle(".data-annotation-frame{}", "data-annotation-")).toBe(true);
+    expect(containsAnnotationNeedle('"./data-annotation-frame.js"', "data-annotation-")).toBe(true);
     // The citation-key false positive still passes under normalisation.
     expect(containsAnnotationNeedle("tan-2024-llm-data-annotation-survey", "data-annotation-")).toBe(false);
   });

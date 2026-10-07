@@ -63,6 +63,11 @@ export function escapeMarkdownText(value) {
     .replace(/([`*_[\]!])/g, "\\$1");
 }
 
+/** Collapse a metadata value to ONE line, so it cannot open a block either. */
+function oneLine(value) {
+  return String(value ?? "").replace(/[\r\n\u0000-\u001f\u007f]+/g, " ");
+}
+
 /** The private item's deep link, the shape ADR-0021 decision 5 fixes. */
 export function deepLink(note, origin = CANONICAL_ORIGIN) {
   const base = String(origin ?? CANONICAL_ORIGIN).replace(/\/+$/, "");
@@ -97,14 +102,14 @@ export function renderNoteMarkdown(note, route, options = {}) {
       ? ""
       : ["**Comment**", "", ...comment.split("\n").map((line) => `> ${line}`)].join("\n");
   return [
-    `# ${escapeMarkdownText(qualifiedId(note))}`,
+    `# ${escapeMarkdownText(oneLine(qualifiedId(note)))}`,
     "",
     `- **Intent:** ${intent}`,
-    `- **Item:** ${escapeMarkdownText(qualifiedId(note))}`,
-    `- **Link:** ${deepLink(note, options.origin)}`,
-    `- **Created:** ${escapeMarkdownText(note?.created ?? "")}`,
-    `- **Note id:** ${escapeMarkdownText(note?.id ?? "")}`,
-    `- **Route:** ${escapeMarkdownText(route?.repo ?? "")}/${escapeMarkdownText(route?.dir ?? "")}`,
+    `- **Item:** ${escapeMarkdownText(oneLine(qualifiedId(note)))}`,
+    `- **Link:** ${escapeMarkdownText(oneLine(deepLink(note, options.origin)))}`,
+    `- **Created:** ${escapeMarkdownText(oneLine(note?.created ?? ""))}`,
+    `- **Note id:** ${escapeMarkdownText(oneLine(note?.id ?? ""))}`,
+    `- **Route:** ${escapeMarkdownText(oneLine(route?.repo ?? ""))}/${escapeMarkdownText(oneLine(route?.dir ?? ""))}`,
     "",
     blockquote,
     "",
@@ -123,7 +128,19 @@ export function renderNoteMarkdown(note, route, options = {}) {
 export function noteOutputPath(note, route) {
   const [owner, name] = String(route?.repo ?? "").split("/");
   const id = String(note?.id ?? "");
-  const segments = [owner, name, ...String(route?.dir ?? "").split("/"), note?.section, note?.source, note?.slug];
+  // `slug` may be several segments (the hub's real slugs are, e.g.
+  // `research/soa-agentic-se`); flatten them so a multi-segment slug is written
+  // as nested directories rather than rejected as one unsafe segment (Red Team
+  // R2-09). Each segment is still checked by `segments.every(isSafeSegment)`.
+  const slugSegments = String(note?.slug ?? "").split("/");
+  const segments = [
+    owner,
+    name,
+    ...String(route?.dir ?? "").split("/"),
+    note?.section,
+    note?.source,
+    ...slugSegments,
+  ];
   if (!isSafeItemIdentity(note) || !isSafeSegment(id)) return null;
   if (!segments.every(isSafeSegment)) return null;
   return path.posix.join(...segments, `${id}.md`);

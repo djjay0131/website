@@ -166,8 +166,10 @@ ANNOTATION_ID_CHARS = 12
 # `/annotations/event=deny` must not be able to put the gate's own `event=`
 # grammar (or a `%0a` newline) into a log line and forge the `hub-gate-denials`
 # metric or an entire log entry (Red Team Wave 6 RT6-08a/08b). The same charset
-# `secrets.token_urlsafe` emits.
-_ANNOTATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+# `secrets.token_urlsafe` emits. Anchored with `\A`/`\Z`, NOT `^`/`$`: Python's
+# `$` also matches immediately before a single trailing newline, so `abc%0a`
+# would pass a `^...$` pattern and still reach the log line (Red Team R2-01).
+_ANNOTATION_ID_PATTERN = re.compile(r"\A[A-Za-z0-9_-]{1,64}\Z")
 
 # How much of a token a list response may reveal. A prefix is enough to tell two
 # rows apart in owner UI and is not enough to reconstruct the credential; the

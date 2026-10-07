@@ -173,6 +173,26 @@ describe("the output path is re-validated, so a malformed note cannot escape --o
     expect(files).toHaveLength(1);
     expect(skipped.some((s) => s.reason === "unsafe item identity")).toBe(true);
   });
+
+  it("writes a multi-segment slug as nested directories (R2-09)", () => {
+    const route = { repo: "djjay0131/soa-agentic-se", dir: "notes" };
+    expect(
+      noteOutputPath(
+        { id: "n1", section: "hub", source: "hub", slug: "research/soa-agentic-se" },
+        route,
+      ),
+    ).toBe("djjay0131/soa-agentic-se/notes/hub/hub/research/soa-agentic-se/n1.md");
+  });
+
+  it("collapses a newline in a metadata field so it cannot open a block (R2-02)", () => {
+    const markdown = renderNoteMarkdown(
+      { ...NOTES[0], id: "n1", created: "2026-10-01\n# injected" },
+      { repo: "a/b", dir: "notes" },
+      { origin: ORIGIN },
+    );
+    expect(markdown).not.toMatch(/^# injected/m);
+    expect(markdown).toContain("- **Created:** 2026-10-01 # injected");
+  });
 });
 
 describe("readNotesBundle accepts the shapes the gate and a saved file can take", () => {

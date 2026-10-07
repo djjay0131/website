@@ -566,9 +566,13 @@ def test_delete_id_cannot_forge_the_log_grammar_or_inject_a_line(
         injected = client.delete(
             "/annotations/%0aevent=deny", headers=_write_headers(transport, member_session)
         )
+        trailing = client.delete(
+            "/annotations/abc%0a", headers=_write_headers(transport, member_session)
+        )
 
     assert forged.status_code == 404
     assert injected.status_code == 404
+    assert trailing.status_code == 404
     # Only the GATE's own records: httpx logs its request line, which contains
     # the forged path and would otherwise false-positive this assertion.
     lines = [record.getMessage() for record in caplog.records if record.name == "gate"]

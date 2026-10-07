@@ -309,7 +309,12 @@ export const ANNOTATION_NEEDLES = ["/annotations", "/p/notes", "hub:annotation:"
  * and drops the hyphenated citation key. The other three needles are
  * distinctive enough to match as plain substrings.
  */
-const ANNOTATION_LEFT_BOUNDARY = new Set([" ", "\t", "\n", "\r", "<", '"', "'", "(", "[", "{", ",", "`", "="]);
+const ANNOTATION_LEFT_BOUNDARY = new Set([
+  " ", "\t", "\n", "\r", "<", '"', "'", "(", "[", "{", ",", "`", "=",
+  // R2-03: a CSS rule `.data-annotation-frame{}` or an import
+  // `"./data-annotation-frame.js"` is a real leak too.
+  ".", "/", "#", "?", ";", ":", "&", "|",
+]);
 
 /**
  * HTML entities a browser decodes before an attribute value or URL is used.

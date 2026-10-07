@@ -214,3 +214,176 @@ the site probes ran the checked-in Node modules against `/tmp` copies. The expor
 | T6 (CLI + disk artifact) | `cd site && node scripts/export-notes.mjs --notes /tmp/opencode/notes.json --out <tmp>` |
 | T11, T12 | `cd site && node /tmp/opencode/probe_leak.mjs` |
 | Context | `cd gate && .venv/bin/python -m pytest -q` → 608 passed |
+
+---
+
+# Round 2 — re-attack the four fixes (annotations, #107)
+
+Agent: Red Team (independent; report only, **no fixes**). Round 1 found 4 BYPASSes; the author landed
+four fixes; this round re-runs each original attack and then attacks the fix code itself.
+Branch `feat/annotations`, hub `/home/djjay/code/website`. I changed **no tracked file** except this
+handoff, ran **no git/gh mutation**, created **no credential**, contacted **no production system**.
+All scratch is under `/tmp/opencode/` (`r2-notes.json`, `r2out.*/`, and the probes below).
+Focused tests are green as context, not as evidence: gate `tests/test_annotations.py` (157 passed),
+site `vitest run scripts/check-no-private-in-public.test.ts scripts/export-notes.test.ts
+scripts/private-structure.test.ts` (66 passed).
+
+## Fix verification table
+
+| Fix (code) | Original attack | Re-run result | New attack in the fix code | Verdict |
+|---|---|---|---|---|
+| **1** `_valid_annotation_id` (`main.py:840,1416`) | RT6-08a grammar, RT6-08b newline | `event=deny`, `event=client_signin_failed`, `%0aevent=deny`, `%65vent%3Ddeny`, double-encoded, `%00`, `%2e%2e`, `abc%20def`, `abc%2Fdef`, overlong 70, all hit the fixed `reason=invalid_id` line; `event=` never appears, one physical line | Python `$` matches **before a single trailing `\n`**, so `abc%0a` / `A%0a` pass validation and emit **two** physical lines (`id=abc` then ` by=<email>`) | **PARTIAL — R2-01** |
+| **2** `escapeMarkdownText` + blockquoted comment (`export-notes.mjs:57-113`) | RT6-06 link/image/data:/ref/autolink/fence/block/entity/newline in quote+comment | all neutralised: `\[x\]\(javascript:…\)`, `\!\[beacon\]\(…\)`, `&lt;http://…&gt;`, fences escaped, every line `> `-prefixed, entities `&amp;`-escaped | `created` is escaped with the same function (no newline/`#` neutralisation) and is **not** blockquoted or segment-checked; a crafted `created` injects a **top-level `#` heading** end-to-end | **PARTIAL — R2-02** |
+| **3** lowercase + decode needles (`check-no-private-in-public.mjs:326-360`) | RT6-11 case / entity / upper-attribute | `DATA-ANNOTATION-FRAME`, `/Annotations`, `/P/NOTES`, `HUB:ANNOTATION:`, `&#47;annotations`, `&#x2f;annotations`, `&#X2F;`, `data&#45;annotation&#45;frame`, `&sol;`/`&colon;` all caught; citation-key FP still green | the `data-annotation-` left boundary lacks `. / # ? ; : & | -`, so realistic `.data-annotation-frame{}` (CSS) and `"./data-annotation-frame.js"` (import) stay green | **PARTIAL — R2-03** |
+| **4** Dissenter D1/D2 documented, no code change | — | no code to re-attack | none in code; only the **R2-04** existence oracle is adjacent to D1 | **ACKNOWLEDGED (docs)** |
+
+**Bottom line: 3 of 4 fixes are closed for exactly the round-1 bypass they targeted; all three carry a
+new, narrower bypass in the surrounding code. Fix 4 is documentation and holds. No round-1 bypass
+survives in its original form.** The most serious new finding is **R2-02** (top-level block injection
+via `created`), but it needs a hand-crafted `--notes` bundle; **R2-01** is reachable by any member but
+can only add a server-authored ` by=` line, so it is not a metric forgery.
+
+## Round 2 attack table
+
+| # | Target | Exact setup | Observed | Verdict | Code path |
+|---|---|---|---|---|---|
+| R2-01 | DELETE id trailing newline | member `DELETE /annotations/abc%0a`, `/A%0a`, `/AAAAAAAAAAAAA%0a` | `abc%0a` and `A%0a` → 2 physical lines: `… id=abc` + ` by=djjay@vt.edu`; 13-char form truncated to 12 so single line; `%0D%0A`, mid-string `%0a`, `\r` all refused | **BYPASS (new, low)** | `main.py:170,840,849-853,1416` |
+| R2-02 | Export `created` top-level block | offline bundle with `created:"2026-01-01\n# FINAL REPORT (injected heading)\n[click](javascript:…)"` | CLI wrote real `.md` with an unquoted **`# FINAL REPORT`** top-level heading; the link is `\[click\]\(…\)` (inert) | **BYPASS (new, needs crafted bundle)** | `export-notes.mjs:105` |
+| R2-03 | Leak needle left boundary | temp dist contents `.data-annotation-frame{color:red}`, `import x from "./data-annotation-frame.js"`, `#data-annotation-frame`, `?data-annotation-frame`, `;…`, `:…`, `&…=`, `\|…\|` | all seven green; only real-attribute neighbours (space, `<`, quote, `[`, `(`, `{`, `,`, backtick, `=`) match | **BYPASS (new, partial)** | `check-no-private-in-public.mjs:312,349-360` |
+| R2-04 | Id existence oracle | member B deletes (a) owner's real id, (b) a random 22-char id, (c) own id | (a) `403` (exists, not mine), (b) `404` (unknown), (c) `200` | **INFORMATION LEAK (theoretical)** — 22-char `token_urlsafe(16)` = 128 bits, brute force infeasible. Adjacent to D1, not a code defect | `main.py:847-866` |
+| R2-05 | Forge `member` = owner in body | member POST with `member:"djjay@vt.edu"`, `member_email:"djjay@vt.edu"` | stored `member=cbrown@vt.edu`; row only in owner `scope=all` under B's address | **REFUSED** | `main.py:775-776` |
+| R2-06 | `scope=all` + filters as non-owner | B: `?scope=all`, `+source`, `+slug`, `+intent`, `+section` | every case `403` before filters; owner quote never in body | **REFUSED** | `main.py:793-796` |
+| R2-07 | `section=section` filter gap | own list `?section=phd`, `?section=../secrets` | `section` is not a filter: all own rows returned, `../secrets` ignored, `200` | **OBSERVED (benign)** — no client value reaches SQL/Firestore; functionality gap only | `main.py:1343-1372` |
+| R2-08 | Export path traversal | `noteOutputPath`/`parseRouting` with `repo:"owner/.."`, `repo:"a/../../etc"`, `dir:"../x"`, `dir:"a/../../b"`, `slug:"../evil"`, `slug:"a/../../b"`, `slug:"/abs"`, `id:"../evil"`, `id:"..%2fevil"`, `section:"../../etc"` | every `noteOutputPath` → `null`; `parseRouting` refuses all hostile `dir`; `repo:"owner/.."` is accepted by `parseRouting` but `noteOutputPath` nulls it (`isSafeSegment("..")=false`) | **REFUSED** | `export-notes.mjs:123-130`, `annotations.mjs:671-677` |
+| R2-09 | Multi-segment hub slug export | `slug:"hub/research/soa-agentic-se"` | `noteOutputPath` → `null` (`segments.every(isSafeSegment)` rejects the `/`), note skipped "unsafe item identity" | **OBSERVED (functionality regression, not security)** — real nested hub slugs cannot export | `export-notes.mjs:126-128` |
+
+Counts: **9 attacks — 4 REFUSED, 3 BYPASS (new), 1 INFORMATION LEAK (theoretical), 1 OBSERVED-benign,
+plus R2-09 functionality.**
+
+## New bypass reproductions
+
+### R2-01 — `_valid_annotation_id` accepts a trailing `\n` (Python `$`), injecting a second log line
+
+The fix comment (`main.py:163-170`) promises the id charset stops "a `%0a` newline". Python's `$`
+matches at the end of the string **or just before a newline at the end**, and `_valid_annotation_id`
+uses `_ANNOTATION_ID_PATTERN.match(...)` with no control-character pre-strip — so a value ending in one
+`\n` passes, reaches the *valid-id* miss branch, and is logged *with* the newline.
+
+```
+$ cd gate && .venv/bin/python -c "
+import re; p=re.compile(r'^[A-Za-z0-9_-]{1,64}$')
+for v in ['abc\n','abc\n\n','abc\nevent=deny','x\r\n']: print(repr(v), bool(p.match(v)))"
+'abc\n' True
+'abc\n\n' False
+'abc\nevent=deny' False
+'x\r\n' False
+
+$ .venv/bin/python /tmp/opencode/probe_r2_gate.py    # R2-F1
+'event=deny'                 status=404 lines=1 forged_metric=False
+'%0aevent=deny' is refused as invalid_id (fixed): one value-free line
+'abc%0a'                     status=404 lines=2 forged_metric=False
+     'INFO gate event=miss scope=annotation action=delete id=abc'
+     ' by=djjay@vt.edu'                      <-- second physical line
+'A%0a'                       status=404 lines=2 forged_metric=False
+     'INFO gate event=miss scope=annotation action=delete id=A'
+     ' by=djjay@vt.edu'
+'AAAAAAAAAAAAA%0a'           status=404 lines=1  (12-char truncation drops it)
+```
+
+Why it is not a metric forgery: the only attacker-controlled byte is the trailing `\n`; the second
+line is the server's own ` by=<email>`, so no `event=` substring and no metric filter matches. Impact
+is log-integrity (one request can produce two lines) and the fix's "value-free" claim. The existing
+test `test_delete_id_cannot_forge_the_log_grammar_or_inject_a_line` (`test_annotations.py:552-577`)
+probes only `%0aevent=deny`, which the fix does refuse, so it misses this. `_valid_annotation_id` and
+the sibling `_SEGMENT`/`safe_prefix` differ in the right way: `_checked_segments` strips control
+characters *before* the regex (`serve.py:55-56`), which is why `safe_prefix` is not exposed.
+
+### R2-02 — export `created` is not neutralised for newlines, so a top-level block survives
+
+`escapeMarkdownText()` now escapes backslash, `& < >`, and `` ` * _ [ ] ! ``; the quote and the comment
+are each blockquoted. But `created` is emitted as `- **Created:** ${escapeMarkdownText(created)}`
+(`export-notes.mjs:105`), which does **not** escape `\n` or `#`, and `created` is neither blockquoted
+nor validated by `noteOutputPath` (only the item identity and `id` are). A crafted offline bundle
+therefore injects an unquoted top-level heading:
+
+```
+$ cd site && OUT=$(mktemp -d /tmp/opencode/r2out.XXXXXX)
+$ node scripts/export-notes.mjs --notes /tmp/opencode/r2-notes.json --out "$OUT"
+export-notes: wrote 1 Markdown file(s) … (djjay0131/soa-agentic-se: 1)
+$ cat "$OUT/…/abc123.md"
+- **Created:** 2026-01-01
+# FINAL REPORT (injected heading)          <-- top-level block, not in a blockquote
+\[click\](javascript:alert(document.cookie))   <-- escaped brackets: link inert
+- **Note id:** abc123
+…
+**Comment**
+> safe
+> # Not a heading                          <-- quote/comment side is correctly contained
+> \[click\](javascript:alert(document.cookie))
+> \!\[beacon\](https://evil.example/p?u=1)
+> \`\`\`
+```
+
+All RT6-06 payloads in `quote` and `comment` are now correctly neutralised (re-verified:
+`[x](javascript:)`, `![beacon]`, `data:` image, reference-style, autolink, fence, `#`/`-`/`1.`/`>`
+starts, entities, embedded newline). The residual is only the fields that bypass the escaping
+contract: `created` (reachable through `--notes`, the supported offline path), and `id`/`route.repo`/
+`route.dir` in `renderNoteMarkdown` isolation — those three are gated by `noteOutputPath`'s
+`isSafeSegment` check, `created` is not. Via the **live gate** `created` is a server `datetime`
+(`main.py:772`, `isoformat()` never contains `\n`), so a note created by a member cannot reach this;
+severity is limited to a hand-crafted bundle.
+
+### R2-03 — `data-annotation-` still has left-boundary blind spots
+
+`containsAnnotationNeedle` (`check-no-private-in-public.mjs:349-360`) now lowercases and decodes, which
+closes every round-1 spelling. But the `data-annotation-` left-boundary set
+(`ANNOTATION_LEFT_BOUNDARY`, line 312) omits `. / # ? ; : & |` (and `-`, deliberately, for the
+citation-key FP). Those are exactly the neighbours in CSS selectors and module paths:
+
+```
+$ cd site && node /tmp/opencode/probe_r2_leak.mjs
+   CAUGHT  case.html / entity.html / upper_attr.html / mix.html / hexupper.html / nosemi.html / named.html
+   green   real_note.html   green hsla.json (citation-key FP)   green partial.html
+   green   css_selector.css      ".data-annotation-frame{color:red}"
+   green   import_ref.js         "import x from \"./data-annotation-frame.js\""
+   green   fragment.html         '<a href="#data-annotation-frame">'
+   green   query.html            '<a href="?data-annotation-frame">'
+   green   semicolon.js / colon.js / amp_ref.html / pipe.txt
+   green   double.html           "&amp;#47;annotations"   (single-decode limit, correct)
+```
+
+The other three needles are boundary-free and unaffected. The `.` CSS-selector and `/` module-path
+forms are plausible regressions that a public build could carry while staying green; the `/` form's
+*path* is caught by the path check only if the file itself is named that way — an in-file import
+reference is not. The citation-key FP remains green, so the fix did not trade the FP for this gap.
+
+## Refused / observed reproductions (highlights)
+
+```
+R2-05 member body member="djjay@vt.edu": stored.member = cbrown@vt.edu  (forgery dropped)
+R2-06 non-owner ?scope=all[&source|&slug|&intent|&section]: every case 403, owner quote absent
+R2-07 own ?section=../secrets -> 200, section not a filter (all own rows)
+R2-08 every noteOutputPath traversal (repo/dir/slug/id/section) -> null; parseRouting refuses hostile dir
+R2-09 slug "hub/research/soa-agentic-se" -> null (multi-segment slug is skipped, not traversed)
+R2-F1b list ?scope=EVENT=DENY / ?intent=event=3Ddeny / ?slug=%0aevent=deny -> fixed
+        event=reject reason=invalid_scope|invalid_filter, no client value in any event= line
+```
+
+## Fix 4 — Dissenter D1/D2
+
+No code changed for D1 (owner reads every member's notes) or D2 (`X-Frame-Options: SAMEORIGIN`); they
+are recorded as policy/documentation. No residual **code** concern arises from either. The only
+adjacent code observation is **R2-04**, the `403`-vs-`404` delete oracle that lets a member confirm
+whether a *guessed* id exists; with 128-bit server-minted ids this is unreachable in practice and is
+not a defect in the D1/D2 decisions.
+
+## Round 2 reproduction index
+
+| Pointer | Command |
+|---|---|
+| R2-F1, R2-F1b, R2-N1..N4 | `cd gate && .venv/bin/python /tmp/opencode/probe_r2_gate.py` |
+| R2-F2, R2-N5..R2-N9 | `cd site && node /tmp/opencode/probe_r2_export.mjs` |
+| R2-F3, R2-03 | `cd site && node /tmp/opencode/probe_r2_leak.mjs` |
+| R2-02 (CLI + disk artifact) | `cd site && node scripts/export-notes.mjs --notes /tmp/opencode/r2-notes.json --out <tmp>` |
+| Context (gate) | `cd gate && .venv/bin/python -m pytest tests/test_annotations.py -q` → 157 passed |
+| Context (site) | `cd site && npx vitest run scripts/check-no-private-in-public.test.ts scripts/export-notes.test.ts scripts/private-structure.test.ts` → 66 passed |
