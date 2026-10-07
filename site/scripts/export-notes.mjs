@@ -43,12 +43,24 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = path.resolve(HERE, "..");
 const DEFAULT_ROUTING = path.join(SITE_ROOT, "notes-routing.json");
 
-/** Minimal Markdown text escaping, so a note can never inject HTML. */
+/** Markdown text escaping, so a note can inject neither HTML nor Markdown.
+ *
+ * Escaping only `& < >` leaves the note's OWN contract unsafe: a quote or
+ * comment keeps `[x](javascript:…)`, `![beacon](https://evil…)`, `data:` image
+ * URIs, inline code and fences, and a Markdown→HTML step without URL
+ * sanitisation turns that into stored XSS or a tracking beacon (Red Team
+ * Wave 6 RT6-06). So the Markdown control characters that build links, images,
+ * code, emphasis and autolinks are backslash-escaped too; the passage and the
+ * comment are additionally emitted as blockquotes, so no line can start a
+ * top-level heading, list or fence.
+ */
 export function escapeMarkdownText(value) {
   return String(value ?? "")
+    .replace(/\\/g, "\\\\")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/([`*_[\]!])/g, "\\$1");
 }
 
 /** The private item's deep link, the shape ADR-0021 decision 5 fixes. */
@@ -77,6 +89,13 @@ export function renderNoteMarkdown(note, route, options = {}) {
     .split("\n")
     .map((line) => `> ${line}`)
     .join("\n");
+  // The comment is a blockquote too, under a bold label: a comment that starts
+  // `#`, `-`, `1.` or a fence cannot open a top-level block when every line is
+  // quoted (RT6-06). An empty comment adds nothing.
+  const commentBlock =
+    comment.trim() === ""
+      ? ""
+      : ["**Comment**", "", ...comment.split("\n").map((line) => `> ${line}`)].join("\n");
   return [
     `# ${escapeMarkdownText(qualifiedId(note))}`,
     "",
@@ -89,8 +108,7 @@ export function renderNoteMarkdown(note, route, options = {}) {
     "",
     blockquote,
     "",
-    comment,
-    "",
+    ...(commentBlock ? [commentBlock, ""] : []),
   ].join("\n");
 }
 

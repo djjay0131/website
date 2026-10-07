@@ -160,6 +160,15 @@ MAX_ANNOTATION_BODY_BYTES = 16384
 # How much of an annotation id a log line or list may reveal (mirrors shares).
 ANNOTATION_ID_CHARS = 12
 
+# An annotation id is server-minted URL-safe base64. The DELETE route receives
+# it as a CLIENT-SUPPLIED path segment, so the charset is validated BEFORE the
+# value can reach any log line: a member who requests
+# `/annotations/event=deny` must not be able to put the gate's own `event=`
+# grammar (or a `%0a` newline) into a log line and forge the `hub-gate-denials`
+# metric or an entire log entry (Red Team Wave 6 RT6-08a/08b). The same charset
+# `secrets.token_urlsafe` emits.
+_ANNOTATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
 # How much of a token a list response may reveal. A prefix is enough to tell two
 # rows apart in owner UI and is not enough to reconstruct the credential; the
 # full token is returned exactly once, from the mint that created it.
@@ -824,6 +833,17 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             logger.info("event=deny scope=annotation action=delete reason=%s", reason or "not_member")
             return JSONResponse({"status": "forbidden"}, status_code=403)
 
+        # The id is client-supplied. A value that is not a well-formed id is a
+        # 404 with a FIXED, value-free log line: it must never reach a log line,
+        # where `event=deny` or an embedded newline would forge the gate's log
+        # grammar or a whole physical line (Red Team Wave 6 RT6-08a/08b).
+        if not _valid_annotation_id(annotation_id):
+            logger.info(
+                "event=miss scope=annotation action=delete reason=invalid_id by=%s",
+                principal.email,
+            )
+            return JSONResponse({"status": "not_found"}, status_code=404)
+
         existing = deps.annotations.get(annotation_id)
         if existing is None:
             logger.info(
@@ -1391,3 +1411,13 @@ def _annotation_row(annotation: Annotation) -> dict:
 def _short_annotation_id(annotation_id: str) -> str:
     """A display id for an annotation: enough to tell rows apart, not the id."""
     return annotation_id[:ANNOTATION_ID_CHARS]
+
+
+def _valid_annotation_id(annotation_id: object) -> bool:
+    """True when `annotation_id` is a well-formed server-minted id.
+
+    Guards the DELETE path segment against the log-grammar/newline forgery in
+    RT6-08: a value that is not `[A-Za-z0-9_-]{1,64}` is refused with a fixed,
+    value-free log line before it can be logged or looked up.
+    """
+    return isinstance(annotation_id, str) and bool(_ANNOTATION_ID_PATTERN.match(annotation_id))

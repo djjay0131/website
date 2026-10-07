@@ -462,6 +462,34 @@ describe("annotation tooling and endpoints never reach the public output", () =>
     expect(containsAnnotationNeedle("see /annotations now", "/annotations")).toBe(true);
   });
 
+  it("catches case and HTML-entity spellings (RT6-11)", () => {
+    // Attribute names are case-insensitive in HTML, so this is a live capture
+    // frame; an `href` entity is decoded by the browser before it is used.
+    expect(containsAnnotationNeedle("<div DATA-ANNOTATION-FRAME>", "data-annotation-")).toBe(true);
+    expect(containsAnnotationNeedle("href=/Annotations", "/annotations")).toBe(true);
+    expect(containsAnnotationNeedle("HUB:ANNOTATION:x", "hub:annotation:")).toBe(true);
+    expect(containsAnnotationNeedle("&#47;annotations", "/annotations")).toBe(true);
+    expect(containsAnnotationNeedle("&#x2f;annotations", "/annotations")).toBe(true);
+    expect(containsAnnotationNeedle("data&#45;annotation&#45;frame", "data-annotation-")).toBe(true);
+    // The citation-key false positive still passes under normalisation.
+    expect(containsAnnotationNeedle("tan-2024-llm-data-annotation-survey", "data-annotation-")).toBe(false);
+  });
+
+  it("flags every needle including /p/notes planted in CONTENTS", () => {
+    const dist = tree({
+      "index.html": "<a href=\"/p/notes/\">My notes</a><p>hub:annotation:abc</p>",
+      "notes.html": "<p>/annotations</p>",
+    });
+    try {
+      const needles = findAnnotationLeaks(dist).map((l) => l.needle);
+      expect(needles).toContain("/p/notes");
+      expect(needles).toContain("/annotations");
+      expect(needles).toContain("hub:annotation:");
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
   it("scans gzip Pagefind payloads, so a needle inside one is caught", () => {
     const dist = tree({ "index.html": "<h1>clean</h1>" });
     try {

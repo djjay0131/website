@@ -549,6 +549,34 @@ def test_the_create_log_carries_no_quote_or_comment(client, member_session, tran
     assert response.json()["id"] not in records  # full id is returned once, not logged
 
 
+def test_delete_id_cannot_forge_the_log_grammar_or_inject_a_line(
+    client, member_session, transport, caplog
+):
+    """RT6-08a/08b: the DELETE id is client-supplied and must not reach a log line.
+
+    A member requesting `/annotations/event=deny` must not put `event=deny` into
+    the gate's log grammar (which would forge the `hub-gate-denials` metric),
+    and `%0a` must not inject a second physical log line. Both are refused as a
+    malformed id with a fixed, value-free line.
+    """
+    with caplog.at_level(logging.INFO):
+        forged = client.delete(
+            "/annotations/event=deny", headers=_write_headers(transport, member_session)
+        )
+        injected = client.delete(
+            "/annotations/%0aevent=deny", headers=_write_headers(transport, member_session)
+        )
+
+    assert forged.status_code == 404
+    assert injected.status_code == 404
+    # Only the GATE's own records: httpx logs its request line, which contains
+    # the forged path and would otherwise false-positive this assertion.
+    lines = [record.getMessage() for record in caplog.records if record.name == "gate"]
+    assert any("reason=invalid_id" in line for line in lines), "the refusal was not logged"
+    assert all("event=deny" not in line for line in lines), "the log grammar was forged"
+    assert all("\n" not in line for line in lines), "a log line was injected"
+
+
 # --- Stored-document parsing (FirestoreAnnotationStore's parser) -----------
 #
 # `StaticAnnotationStore` hands whole `Annotation` objects to the gate, so the

@@ -312,17 +312,49 @@ export const ANNOTATION_NEEDLES = ["/annotations", "/p/notes", "hub:annotation:"
 const ANNOTATION_LEFT_BOUNDARY = new Set([" ", "\t", "\n", "\r", "<", '"', "'", "(", "[", "{", ",", "`", "="]);
 
 /**
- * True when `text` carries `needle`. `data-annotation-` must start a token (see
+ * HTML entities a browser decodes before an attribute value or URL is used.
+ *
+ * The needles are compared against a NORMALISED haystack so the check does not
+ * depend on the spelling a regression happened to use (Red Team Wave 6 RT6-11):
+ * attribute names are case-insensitive (`DATA-ANNOTATION-FRAME` is a live
+ * capture frame), and an `href="&#47;annotations"` is decoded to `/annotations`
+ * by the browser. A small, explicit set of numeric and named entities is
+ * decoded and the whole haystack lowercased; the fully general encoded form
+ * remains a documented coverage limit (ADR-0005 Risks), as it is for the
+ * existing item needles.
+ */
+const ANNOTATION_ENTITIES = [
+  [/&#x([0-9a-f]+);?/gi, (_match, hex) => String.fromCodePoint(parseInt(hex, 16))],
+  [/&#(\d+);?/g, (_match, dec) => String.fromCodePoint(parseInt(dec, 10))],
+  [/&sol;/gi, "/"],
+  [/&num;/gi, "#"],
+  [/&colon;/gi, ":"],
+  [/&equals;/gi, "="],
+  [/&hyphen;/gi, "-"],
+  [/&dash;/gi, "-"],
+];
+
+/** Lowercase and decode the common HTML entities, for needle matching. */
+export function normalizeAnnotationHaystack(text) {
+  let out = String(text ?? "");
+  for (const [pattern, replacement] of ANNOTATION_ENTITIES) out = out.replace(pattern, replacement);
+  return out.toLowerCase();
+}
+
+/**
+ * True when `text` carries `needle`, case-insensitively and after decoding the
+ * common HTML entities. `data-annotation-` must still start a token (see
  * ANNOTATION_LEFT_BOUNDARY); the others match as substrings.
  */
 export function containsAnnotationNeedle(text, needle) {
-  const haystack = String(text ?? "");
-  let at = haystack.indexOf(needle);
+  const haystack = normalizeAnnotationHaystack(text);
+  const lowered = String(needle).toLowerCase();
+  let at = haystack.indexOf(lowered);
   while (at !== -1) {
     if (needle !== "data-annotation-") return true;
     const before = at === 0 ? "" : haystack[at - 1];
     if (before === "" || ANNOTATION_LEFT_BOUNDARY.has(before)) return true;
-    at = haystack.indexOf(needle, at + 1);
+    at = haystack.indexOf(lowered, at + 1);
   }
   return false;
 }
@@ -339,7 +371,7 @@ export function findAnnotationLeaks(distDir) {
   const leaks = [];
   for (const relFile of walkFiles(distDir)) {
     const absFile = path.join(distDir, relFile);
-    const relPath = `/${relFile}`;
+    const relPath = `/${relFile}`.toLowerCase();
     for (const needle of ANNOTATION_NEEDLES) {
       if (relPath.includes(needle)) {
         leaks.push({

@@ -132,6 +132,28 @@ describe("the export renderer routes by intent and skips question", () => {
     expect(markdown).toContain("&lt;script&gt;");
     expect(markdown).not.toContain("<script>");
   });
+
+  it("neutralises Markdown link, image, code and block injection (RT6-06)", () => {
+    const markdown = renderNoteMarkdown(
+      {
+        ...NOTES[0],
+        quote: "[x](javascript:alert(1))",
+        comment: "# not a heading\n- not a list\n![beacon](https://evil.example/p?u=1)\n`code`",
+      },
+      { repo: "a/b", dir: "notes" },
+      { origin: ORIGIN },
+    );
+    // The brackets are escaped, so no link/image can form; the parens are then
+    // ordinary text. Assert the unescaped openers are absent.
+    expect(markdown).not.toContain("[x](");
+    expect(markdown).not.toContain("![beacon](");
+    expect(markdown).toContain("\\[x\\](javascript:");
+    expect(markdown).not.toContain("`code`");
+    // Every comment line is quoted, so nothing opens a top-level block.
+    expect(markdown).not.toMatch(/^# not a heading/m);
+    expect(markdown).not.toMatch(/^- not a list/m);
+    expect(markdown).toContain("> # not a heading");
+  });
 });
 
 describe("the output path is re-validated, so a malformed note cannot escape --out", () => {

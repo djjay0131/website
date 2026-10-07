@@ -39,12 +39,13 @@ The reportable facts that shape it:
    never deleted. v1 computes orphan state at read time.
 
 3. **The gate is the only writer, as with shares.** `POST /annotations`,
-   `GET /annotations`, `DELETE /annotations/{id}` and `POST
-   /annotations/export` live in the gate. State-changing routes carry the
-   allowed-origin check. Every response is `private, no-store` (the shared
-   middleware). `GET` returns the caller's own rows; `?scope=all` is owner-only.
-   A member deletes only their own; the owner deletes any. Quotes, comments and
-   titles are never logged.
+   `GET /annotations` and `DELETE /annotations/{id}` live in the gate.
+   State-changing routes carry the allowed-origin check. Every response is
+   `private, no-store` (the shared middleware). `GET` returns the caller's own
+   rows; `?scope=all` is owner-only. A member deletes only their own; the owner
+   deletes any. Quotes, comments and titles are never logged. The export reads
+   the owner-only `GET /annotations?scope=all`; there is no separate gate export
+   endpoint (the renderer is `site/scripts/export-notes.mjs`, decision 6).
 
 4. **No new Firestore IAM.** ADR-0018's project-wide `roles/datastore.user` on
    `hub-gate` already covers `annotations/`; Firestore cannot scope a role to a
@@ -58,12 +59,48 @@ The reportable facts that shape it:
    deep link and the quoted passage. Delivery is **always a PR, never a
    push**, and only into those two repositories.
 
-6. **The export credential is not created here.** The transport is ADR-0022
-   (Proposed). v1 ships the credential-free render (`POST
-   /annotations/export`); the automated cross-repository PR waits for the owner.
+6. **The export transport is not created here.** The transport and its
+   credential are ADR-0022 (Proposed). v1 ships the credential-free renderer
+   `site/scripts/export-notes.mjs` (fed by the owner-only
+   `GET /annotations?scope=all`, writing local Markdown and contacting no
+   remote); the automated cross-repository PR waits for the owner.
 
-7. **Not in v1.** PDF annotation; public annotations; sharing notes between
-   members; Hypothes.is integration.
+7. **The capture island reads the payload frame, and that one header changes.**
+   The private item frame renders the item in a same-origin `<iframe>` at
+   `/p/_payload/<source>/<path>`. Pre-Wave-6 the gate sent
+   `X-Frame-Options: DENY` on every response, so that frame could not render;
+   Wave 6 is where the latent defect is fixed, not a new weakening. The gate now
+   sends `SAMEORIGIN` for a **served private payload document** only (the object
+   name, after the private prefix, begins `_payload/`, set only on a successful
+   serve); every other `/p/**` response — frames, refusals, misses, traversals,
+   non-`/p` routes — keeps `DENY`. There is no CSP `frame-ancestors` to change.
+   Whether this should instead be a CSP with `frame-ancestors 'self'` is a
+   follow-up; the Security Tester owns passing or vetoing the change.
+
+8. **The owner may read every note; that is a recorded judgement call for the
+   owner to confirm.** `?scope=all` is owner-only and is needed both to delete
+   any note (the request's `owner may delete any`) and to render the export. It
+   means the owner — the data controller for this hub — can read a member's
+   notes. The members are owner-seeded (neutral parties do not self-join), and
+   the owner already holds full read of the private bucket and Firestore. This
+   is recorded as a decision taken without the owner and is surfaced for
+   confirmation; if the owner prefers, `?scope=all` can be narrowed to metadata
+   (ids only) and an owner delete-only path added.
+
+9. **Known limits, recorded rather than hidden.** `intent` is both a note's
+   meaning and its export route, so re-routing an existing note means editing
+   its `intent` (no separate `route` field or migration in v1). "Orphan" means
+   the quote no longer resolves in the item (capture) and, separately, the item
+   is absent from this build (My notes); the two are distinct states. A list
+   filter is by `(source, slug)`, which is the item key; `section` is not a
+   filter because `(source, slug)` is unique across the hub.
+
+10. **`site/notes-routing.json` is a site feature config** (the owner's chosen
+    path), read by the export renderer; it is not governance policy and does not
+    belong in `llm/` (Q2).
+
+11. **Not in v1.** PDF annotation; public annotations; sharing notes between
+    members; Hypothes.is integration.
 
 ## Rationale
 
