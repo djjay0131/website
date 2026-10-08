@@ -19,6 +19,12 @@ plan` reproduction under `/tmp/opencode/`. No apply. `git status` is clean.
 
 ## Verdict
 
+**Round 3 (final, 2026-10-08, head `96a8406`): Approve — merge unblocked, zero
+must-fix.** MF-1, MF-2 and MF-3 are all fixed and independently reproduced; with
+the real repository variables the tfvars-free targeted plan is `1 to add, 1 to
+change, 0 to destroy` with **no `GATE_ALLOWED_ORIGINS` diff**. Only residual
+advisories remain, in `# Round 3` at the end of this file.
+
 **Round 2 (2026-10-08, head `df728bb`): Request changes — one remaining
 must-fix (MF-3).** Both round-1 must-fixes are fixed and independently
 reproduced: **MF-1** (the CI Terraform job could not run) and **MF-2** (a live
@@ -529,3 +535,138 @@ committed tree and the live state. No fix applied in this round.
   will revert the attributes owned by values that live only on an operator's
   machine. The general form of MF-3, and the reason "adds-only" and "-target'd"
   are not sufficient safety statements on their own.
+
+# Round 3 (final)
+
+Status: Delivered (final re-verification)
+Date: 2026-10-08
+Role: Chief Reviewer (authored nothing; review and report only)
+Branch: `feat/secrets-sync` · PR **#116** · head **`96a8406`** (4 commits ahead
+of `main`; round 2 reviewed `df728bb`).
+
+Read-only statement: no git/gh/gcloud/firebase mutation; no repository file
+moved. Reproduction ran in a scratch mirror under `/tmp/opencode/d19-r3root/`
+(`infra/` copy + `site/notes-routing.json`, `terraform.tfvars` and local state
+removed). Only this handoff is modified. No apply.
+
+## Final verdict
+
+**Approve — merge is unblocked; zero remaining must-fix.** All three must-fixes
+are fixed and independently reproduced. Residual items are advisories only.
+
+## Must-fix dispositions (all closed)
+
+| # | Fixed in | Re-verification |
+|---|---|---|
+| MF-1 | `df728bb` | Re-run in the scratch mirror (no `terraform.tfvars`): plan `1 to add, 1 to change, 0 to destroy`, RC=0. `TF_VAR_project_id` from `vars.GCP_PROJECT_ID`; `TF_VAR_billing_account` derived from state and masked. |
+| MF-2 | `df728bb` | `grep -rn "gcloud secrets" infra/` → only the prose at `infra/secrets-sync.tf:3`; `infra/notes-sync.tf:1-19` is D19-correct. |
+| MF-3 | `96a8406` | Reproduced with the real repo variables: `GATE_ALLOWED_ORIGINS` is **unchanged** by the plan, and the legacy hash origin is preserved. See below. |
+| A-10 | `96a8406` | `echo "::add-mask::${BILLING}"` precedes `TF_VAR_billing_account` (`.github/workflows/secrets-sync.yml:254`). |
+
+## MF-3 — fixed (reproduced with the real repository variables)
+
+The new "Supply the required Terraform variables" step reconstructs
+`TF_VAR_gate_extra_allowed_origins` from the live state: it takes the service's
+current `GATE_ALLOWED_ORIGINS`, subtracts the two bases Terraform renders
+(`https://${SITE_URL%/}` and
+`https://${GCP_GATE_SERVICE}-<project number>.<GCP_GATE_REGION>.run.app`, the
+number parsed from `GCP_WIF_PROVIDER`), and writes the remainder.
+
+Repository variables (read via `gh api`, **14 total** — a first unpaginated list
+showed only 10 and briefly hid `SITE_URL`; `--paginate` is required):
+
+```
+GCP_PROJECT_ID=cusati-hub
+GCP_WIF_PROVIDER=projects/410552878319/locations/global/workloadIdentityPools/github-actions/providers/website
+GCP_GATE_SERVICE=hub-gate   GCP_GATE_REGION=us-east1
+SITE_URL=https://jason.cusati.us
+```
+
+Exact derivation reproduced in the scratch mirror (no `terraform.tfvars`):
+
+```
+CURRENT = https://jason.cusati.us,https://hub-gate-410552878319.us-east1.run.app,https://hub-gate-ywkmredngq-ue.a.run.app
+BASE_DOMAIN = https://jason.cusati.us        BASE_NUMBER = https://hub-gate-410552878319.us-east1.run.app
+EXTRAS = ["https://hub-gate-ywkmredngq-ue.a.run.app"]
+```
+
+Plan with `TF_VAR_project_id`, `TF_VAR_billing_account`,
+`TF_VAR_gate_extra_allowed_origins`, and the notes vars:
+
+```
+Plan: 1 to add, 1 to change, 0 to destroy.        # RC=0
+origins_same = true
+changed env vars on google_cloud_run_v2_service.gate:
+  GATE_NOTES_APP_ID:            (none) -> <id>
+  GATE_NOTES_INSTALLATION_ID:   (none) -> <id>
+  GATE_NOTES_EXPORT_ENABLED:    0 -> 1
+```
+
+The "1 to change" is exactly the notes env — `GATE_ALLOWED_ORIGINS` is not in the
+diff, and the hash origin (#62) survives. MF-3 is closed. (This also means my
+round-1/2 concern about the origin being reverted is fully resolved now that the
+Terraform job can actually run.)
+
+## Confirmations requested
+
+- `terraform fmt -check -recursive` → exit 0; `terraform validate` → success.
+- YAML parses; `on:` = `['workflow_dispatch', 'push']`; `push` =
+  `{branches: [main], paths: [.github/workflows/secrets-sync.yml]}`; no other
+  trigger.
+- No destructive action: `1 to add, 1 to change, 0 to destroy`.
+- Committed workflow sha `1a15cf1e…`; `grep "gcloud secrets" infra/` clean.
+
+## Residual advisories (non-blocking; carry forward)
+
+All round-1/2 advisories not previously closed remain, unchanged:
+**A-1** (Security Tester / Red Team rounds still attach to pre-`df728bb`
+revisions — the billing derivation and origin reconstruction were never
+adversarially tested; I reviewed both and found no value-leak path), **A-2**
+(`-target` comment overstates — `.github/workflows/secrets-sync.yml:273-280`),
+**A-3** (`serviceusage.serviceUsageAdmin` project-wide, not named by #112),
+**A-4** (disable loop swallows `versions list` failure — `:161-163`), **A-5** (no
+secret-sync failure alarm), **A-6** (Terraform CLI version not pinned), **A-7**
+(pattern invariant vs its own reference implementation), **A-8** (same-repo
+secret trust boundary). A-9 and A-10 are closed.
+
+New (round 3):
+
+- **A-11 — the reconstruction silently depends on `SITE_URL` exactly equalling
+  `https://<var.domain>`.** If `SITE_URL` is unset or different, the base
+  site-domain is not subtracted and `GATE_ALLOWED_ORIGINS` gains a **duplicate**
+  that then grows on every dispatch. Measured in the scratch mirror: with
+  `SITE_URL` empty, `EXTRAS` = `[https://jason.cusati.us, <hash>]`,
+  `origins_same=false`, and `AFTER` = base + number + **duplicate site-domain** +
+  hash. The repo sets `SITE_URL=https://jason.cusati.us` today, so this is not
+  live; a guard (or subtracting the known `var.domain` default) would harden it.
+  It also makes `SITE_URL`, `GCP_GATE_SERVICE` and `GCP_GATE_REGION` load-bearing
+  for `secrets-sync`, worth a line in the workflow header's owner/config notes.
+- **A-12 — `terraform show -json` is invoked twice** in the step (billing, then
+  origins); compute it once.
+
+## Governance level
+
+Unchanged: **L2** — agree.
+
+## What waits on the owner (unchanged)
+
+The three GitHub names in `djjay0131/website` — secret `NOTES_EXPORT_APP_KEY`,
+variables `NOTES_EXPORT_APP_ID` and `NOTES_EXPORT_INSTALLATION_ID` — then
+`gh workflow run secrets-sync.yml`. No fix applied in this round.
+
+## Related docs (Round 3)
+
+- `.github/workflows/secrets-sync.yml` (supply step `:235-271`, plan `:281-287`)
+- `infra/gate.tf:55-58` (`local.gate_allowed_origins`), `infra/variables.tf:365`,
+  `infra/README.md:99,455-482`
+- round-1/2 sections of this handoff
+
+## ADR candidates (Round 3)
+
+- **C-D19-5** (carried): a CI apply targeting a whole resource to set one
+  attribute must carry every variable that resource's config reads.
+- **C-D19-6** (new, from A-11): a CI job that reconstructs an input from
+  configuration that lives on an operator's machine (here, an origin list in a
+  git-ignored `terraform.tfvars`) should derive it from the same source of truth
+  the configuration uses (the `var.domain` default), not from a second variable
+  (`SITE_URL`) that must be kept in exact agreement.
