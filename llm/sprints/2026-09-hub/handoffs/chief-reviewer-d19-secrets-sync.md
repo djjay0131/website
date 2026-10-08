@@ -19,14 +19,25 @@ plan` reproduction under `/tmp/opencode/`. No apply. `git status` is clean.
 
 ## Verdict
 
-**Request changes** — two must-fix. The security posture of the workflow is
-sound and independently re-verified, but (1) the workflow's Terraform job
-**cannot execute in CI as written**, so D19's central "the workflow runs the
-adds-only apply" claim is false today; and (2) a **live infra file still ships
-the exact manual `gcloud secrets` command D19 removes**. Neither is a reachable
-secret-exposure; both are correctness/record defects the adversarial rounds
-missed. With MF-1 and MF-2 fixed, this is mergeable and the security reasoning
-stands.
+**Round 2 (2026-10-08, head `df728bb`): Request changes — one remaining
+must-fix (MF-3).** Both round-1 must-fixes are fixed and independently
+reproduced: **MF-1** (the CI Terraform job could not run) and **MF-2** (a live
+infra file still printed the removed manual `gcloud` command). Making the job
+runnable exposed a third defect: the targeted
+`google_cloud_run_v2_service.gate` apply **reverts `GATE_ALLOWED_ORIGINS`**,
+because `gate_extra_allowed_origins` exists only in the local, git-ignored
+`terraform.tfvars`. Evidence, reproduction, and advisory re-checks are in
+`# Round 2` at the end of this file. All round-1 content below is retained
+unchanged for the record.
+
+**Round 1 (2026-10-08, head `672cb0e`): Request changes — two must-fix.** The
+security posture of the workflow is sound and independently re-verified, but
+(1) the workflow's Terraform job **cannot execute in CI as written**, so D19's
+central "the workflow runs the adds-only apply" claim is false today; and (2) a
+**live infra file still ships the exact manual `gcloud secrets` command D19
+removes**. Neither is a reachable secret-exposure; both are correctness/record
+defects the adversarial rounds missed. With MF-1 and MF-2 fixed, this is
+mergeable and the security reasoning stands.
 
 Must-fix vs advisory summary:
 
@@ -319,3 +330,202 @@ change does not alter roadmap acceptance criteria (which is what escalated PR
 ---
 
 Reviewer: Chief Reviewer · report-only, no fix applied.
+
+# Round 2
+
+Status: Delivered (re-verification)
+Date: 2026-10-08
+Role: Chief Reviewer (authored nothing in this wave; review and report only)
+Branch: `feat/secrets-sync` · PR **#116** · head **`df728bb`** (3 commits ahead
+of `main`; round 1 reviewed `672cb0e`).
+Scope: re-verify MF-1 and MF-2 against the updated tree; re-check the round-1
+advisories; confirm `fmt`/`validate`, YAML, and triggers.
+
+Read-only statement: no git/gh/gcloud/firebase mutation. I created no tracked
+file except this append. For the CI reproduction I copied `infra/` to a scratch
+directory under `/tmp/opencode/d19-r2root/` (with a copy of
+`site/notes-routing.json`) and removed the copy's `terraform.tfvars` and local
+state files — **no repository file was moved**. `git status` shows only this
+handoff modified. I ran only `terraform fmt -check`, `terraform validate`,
+`terraform show -json`, and read-only `terraform plan` (no apply).
+
+## Round-2 verdict
+
+**Request changes — one remaining must-fix (MF-3).** MF-1 and MF-2 are fixed and
+reproduced; MF-3 is new and was exposed precisely because the Terraform job now
+runs: the targeted gate apply reverts an unrelated, live env value. The security
+posture is unchanged and still sound.
+
+| # | Sev | Finding | Pointer |
+|---|---|---|---|
+| MF-1 | **fixed** | The TF job now exports `TF_VAR_project_id` and derives `TF_VAR_billing_account` from state; fails loudly if absent. Reproduced: tfvars-free targeted plan **1 to add, 1 to change, 0 to destroy, RC=0**. | `.github/workflows/secrets-sync.yml:229-243` |
+| MF-2 | **fixed** | `infra/notes-sync.tf` header rewritten for D19; no `gcloud secrets` command anywhere in `infra/` (only prose describing its removal). | `infra/notes-sync.tf:1-19`; `infra/secrets-sync.tf:3` |
+| MF-3 | **must-fix (new)** | The CI apply reverts `GATE_ALLOWED_ORIGINS` (drops the legacy `…a.run.app` hash spelling) because `gate_extra_allowed_origins` is only in the local, git-ignored `terraform.tfvars`. | `.github/workflows/secrets-sync.yml:229-259`; `infra/variables.tf:365`; `infra/terraform.tfvars` (local) |
+| A-1 | remains (re-scoped) | The Security Tester / Red Team round-2 verdicts still attach to a pre-`df728bb` workflow (reviewed hash `95db1a31…`; now `8dfa39c4…`); the new billing-derivation step was not adversarially tested. | see below |
+| A-2 | remains | `-target` comment still overstates ("no other resource can be modified"). | `.github/workflows/secrets-sync.yml:245-249` |
+| A-4 | remains | Disable loop still swallows a `versions list` failure with `|| true`. | `.github/workflows/secrets-sync.yml:161-163` |
+| A-9 | **resolved** | STATE now marks D18 hard stop 2 "since replaced by D19". | `STATE.md:3896` |
+| A-10 | new (advisory) | `TF_VAR_billing_account` is written to `$GITHUB_ENV` without `::add-mask::`, though `billing_account` is declared `sensitive`. | `.github/workflows/secrets-sync.yml:243`; `infra/variables.tf:54` |
+| A-3/A-5/A-6/A-7/A-8 | remain | unchanged from round 1 (serviceusage breadth; no sync-failure alarm; CLI version unpinned; pattern invariant vs reference implementation; repo-secret trust boundary). | round-1 tables |
+
+## MF-1 — fixed (reproduced)
+
+The new step (`.github/workflows/secrets-sync.yml:229-243`) runs after
+`terraform init`, exports `TF_VAR_project_id=${GCP_PROJECT_ID}`, and derives
+`TF_VAR_billing_account` from state via
+`terraform show -json | jq -r '.. | objects | select(.type? == "google_billing_budget") | .values.billing_account? // empty'`,
+exiting non-zero with `::error::` if empty. I confirmed the derivation against
+the live state and re-ran the exact CI plan from a tfvars-free copy:
+
+```
+$ terraform show -json | jq -r '… google_billing_budget … .values.billing_account' | head -n1
+011A3C-…-8B0DB7
+
+$ TF_VAR_project_id=cusati-hub TF_VAR_billing_account=… \
+    TF_VAR_notes_export_app_id=… TF_VAR_notes_export_installation_id=… \
+    TF_VAR_notes_export_enabled=true \
+    terraform plan -input=false -refresh=false -lock=false \
+      -target=google_secret_manager_secret_iam_member.hub_gate_notes_export_key \
+      -target=google_cloud_run_v2_service.gate -out=/tmp/opencode/d19-r2-plan.tfplan
+Plan: 1 to add, 1 to change, 0 to destroy.        # RC=0, no terraform.tfvars present
+```
+
+The failure path is sound: `set -euo pipefail` plus the explicit `-z` guard means
+a state read that cannot find the budget aborts the job rather than proceeding
+with an unset required variable. MF-1 is closed.
+
+## MF-2 — fixed (confirmed)
+
+```
+$ grep -rn "gcloud secrets" infra/
+infra/secrets-sync.tf:3:# Owner decision D19 replaces the manual `gcloud secrets create` hard stop with
+```
+
+The only hit is prose stating that the manual command is **replaced**. The
+`infra/notes-sync.tf` header (`:1-19`) now describes D19: the owner pastes the
+three GitHub names and dispatches `secrets-sync.yml`, which creates the secret,
+adds a version, disables priors, and applies this binding; Terraform owns only
+the `secretAccessor` binding and holds no key. MF-2 is closed.
+
+## MF-3 — new must-fix: the CI apply reverts `GATE_ALLOWED_ORIGINS`
+
+Making the TF job runnable reveals what it will actually apply. The saved plan
+from the reproduction above changes the gate service env as follows:
+
+```
+BEFORE  GATE_ALLOWED_ORIGINS=https://jason.cusati.us,https://hub-gate-410552878319.us-east1.run.app,https://hub-gate-ywkmredngq-ue.a.run.app
+AFTER   GATE_ALLOWED_ORIGINS=https://jason.cusati.us,https://hub-gate-410552878319.us-east1.run.app
+```
+
+The "1 to change" is therefore **not** just setting `GATE_NOTES_*`; it also
+**drops the legacy hash spelling** of the gate URL. Cause: the only source of
+that value is the local, git-ignored `infra/terraform.tfvars` —
+
+```
+# Issue #62: the hash spelling of the gate URL (status.url) that gate.yml sends as Origin.
+# Passed on the CLI at the Wave 0 apply; without it here, every plan tries to drop it.
+gate_extra_allowed_origins = ["https://hub-gate-ywkmredngq-ue.a.run.app"]
+```
+
+— and the variable defaults to `[]` (`infra/variables.tf:365`). CI has no
+`terraform.tfvars`, and the workflow supplies no
+`TF_VAR_gate_extra_allowed_origins`, so the targeted
+`google_cloud_run_v2_service.gate` apply writes the default set.
+
+Why it matters: `gate_extra_allowed_origins` is the issue-#62 fix; README records
+that the gate has two live `*.run.app` spellings and that "if the service answers
+on the older one, sign-out from that host is refused until it is added to
+`var.gate_extra_allowed_origins`" (`infra/README.md:99,479-482`), and STATE's live
+verification used `hub-gate-ywkmredngq-ue.a.run.app`. After the owner dispatches
+`secrets-sync`, the gate's CSRF accepted-origin set loses that host, so sign-out
+(and any origin check) from it is refused — a silent, live regression delivered
+by the D19 apply.
+
+Fix: carry the value through CI too. Add a repository **variable**
+(e.g. `GATE_EXTRA_ALLOWED_ORIGINS`, not secret) holding the hash spelling, and
+export `TF_VAR_gate_extra_allowed_origins` in the variable-supply step next to
+`TF_VAR_project_id` (parse it into a list, or use the JSON form
+`-var 'gate_extra_allowed_origins=[…]'`). This is an owner-visible config value,
+so it also belongs in the workflow header's "what the owner sets" list. Until
+then, the workflow's apply is not "the notes-sync binding + the gate env" only;
+it also reverts a documented setting.
+
+## Advisory re-checks
+
+- **A-1 — remains, re-scoped.** Neither adversarial handoff was touched by
+  `df728bb` (`git show df728bb --stat` lists only the workflow, `notes-sync.tf`,
+  `STATE.md`, and the round-1 chief-reviewer file). Their round-2 "no new
+  bypass" therefore certifies a workflow (sha `95db1a31…`) that is no longer the
+  committed one (`8dfa39c4…`). The two deltas since — save-then-apply, and the
+  new billing/state read — were not adversarially tested; I reviewed both here.
+  The billing step reads the whole state JSON into `jq` (never echoed, no
+  `set -x`), so it introduces no value-leak path, but it is a new
+  credential-adjacent surface and should be named in the adversarial record (or
+  re-run at `df728bb`).
+- **A-2 — remains.** The `-target` comment
+  (`.github/workflows/secrets-sync.yml:245-249`) still says "so no other resource
+  can be modified even if the state drifts"; `-target` includes the dependency
+  closure. Reword. MF-3 is a related reminder: targeting a resource applies its
+  whole config, not just the intended attribute.
+- **A-4 — remains.** `:161-163` still appends `|| true` to the `versions list`
+  substitution; a failed list silently leaves prior versions enabled (no leak).
+- **A-9 — resolved.** `STATE.md:3896` now reads "(the D18 hard stop 2, **since
+  replaced by D19**)".
+- **A-3, A-5, A-6, A-7, A-8 — remain** unchanged (project-wide
+  `serviceusage.serviceUsageAdmin`; no secret-sync failure alarm; Terraform CLI
+  version not pinned; pattern invariant `:57-59` vs its own reference
+  implementation; same-repo secret trust boundary).
+
+## New advisory A-10
+
+`TF_VAR_billing_account` is appended to `$GITHUB_ENV`
+(`.github/workflows/secrets-sync.yml:243`). `billing_account` is declared
+`sensitive = true` (`infra/variables.tf:54`) and `.gitignore` keeps it out of the
+repo, yet `$GITHUB_ENV` values are not automatically masked (unlike registered
+secrets). No current step prints the environment, so there is no leak today, but
+`echo "::add-mask::${BILLING}"` before writing it would match the sensitivity the
+repo already declares. Low.
+
+## Confirmations requested
+
+- `terraform fmt -check -recursive` → exit 0.
+- `terraform validate` → "Success! The configuration is valid."
+- YAML parses; `on:` = `['workflow_dispatch', 'push']`; `push` =
+  `{branches: [main], paths: [.github/workflows/secrets-sync.yml]}`; no other
+  trigger key.
+- No destructive action in the plan: **1 to add, 1 to change (the gate service
+  env, including the MF-3 revert), 0 to destroy**; `fmt`/`validate` clean.
+- The committed workflow sa is `8dfa39c4…`; the round-1 must-fix commit
+  `df728bb` also carries this handoff's round-1 text (321 lines) — hence this
+  append rather than a rewrite.
+
+## Governance level
+
+Unchanged: **L2** (implementation is the highest level touched; ADR-0022 §1/§5
+amendment is L1-flavored; the repo's rule takes the highest). Agree.
+
+## What waits on the owner (unchanged, plus MF-3)
+
+The three GitHub names in `djjay0131/website` — secret `NOTES_EXPORT_APP_KEY`,
+variables `NOTES_EXPORT_APP_ID` and `NOTES_EXPORT_INSTALLATION_ID` — then
+`gh workflow run secrets-sync.yml`; and, if MF-3 is fixed by configuration, a new
+repository variable for the legacy allowed origin. Plus the console actions in
+#113/#114/#115. Nothing unverifiable blocks: MF-3 is reproduced from the
+committed tree and the live state. No fix applied in this round.
+
+## Related docs (Round 2)
+
+- `.github/workflows/secrets-sync.yml` (supply step `:229-243`, plan `:253-259`)
+- `infra/notes-sync.tf:1-19`; `infra/terraform.tfvars` (local, git-ignored);
+  `infra/variables.tf:365`; `infra/README.md:99,455-482`
+- `llm/sprints/2026-09-hub/STATE.md:3893-3898` (A-9)
+- `llm/sprints/2026-09-hub/handoffs/{security-tester,red-team}-d19-secrets-sync.md`
+  (`# Round 2` — hash `95db1a31…`, pre-`df728bb`)
+
+## ADR candidates (Round 2)
+
+- **C-D19-5** (new): a CI apply that targets a *whole* Terraform resource to set
+  one attribute must carry every variable that resource's config reads, or it
+  will revert the attributes owned by values that live only on an operator's
+  machine. The general form of MF-3, and the reason "adds-only" and "-target'd"
+  are not sufficient safety statements on their own.
