@@ -3786,7 +3786,7 @@ and retried. ADR-0022 is **amended** (not replaced) on D18. Seams
 | # | Source | Finding | Disposition |
 |---|---|---|---|
 | RT6NS-01 / D-B1 | Red Team / Dissenter | A delete of the last routed entry was silently dropped (tombstones excluded), leaving the passage published with a false "commit" log | **Fixed.** Tombstones are exported; a tombstone-only item writes a tombstone; test by name |
-| RT6NS-02 | Red Team | `section` is not in `notes/<source>/<slug>.md` | **Recorded, owner-specified layout.** `(source, slug)` is the item key; a member can only affect their own note's file, not another member's content |
+| RT6NS-02 | Red Team | `section` is not in `notes/<source>/<slug>.md` | **Recorded, owner-specified layout.** Seams AN-SYNC-3 and ADR-0022 prescribe the path, and for legitimate items `(source, slug)` is unique (the manifest contract enforces slug uniqueness within a source). A forged `section` can point a job at a different item's repo file (annotation create validates syntax only), but the effect is projection ping-pong on the `notes` branch — Firestore stays the source of truth — not a cross-member content leak. **Chief Reviewer advisory 3: corrected from the earlier "a member can only affect their own file".** |
 | RT6NS-03 | Red Team | `_short_error` did not redact Google `ya29.`/PEM | **Fixed** (patterns + test) |
 | RT6NS-04 / R2-04 | Red Team | Control chars (CR) reached the committed file | **Fixed.** C0-except-TAB/LF stripped; test feeds CR |
 | RT6NS-05 | Red Team | No per-item cap → large commits | **Fixed.** 2000-entry cap with a visible omission note |
@@ -3818,6 +3818,28 @@ governance 4/4).
 5. The ADR-0022 `Proposed → Accepted` status flip is deferred to a **status-line-only
    follow-up PR**, because the `adr-status` check requires a flip to be
    status-line-only (L0); the body amendment is in this wave.
+
+### Chief Reviewer (Wave 6b)
+
+Verdict **Comment — zero must-fix**; the branch merges as reviewed. The reviewer
+verified the AN-SYNC-1..8 seams, ADR-0022 (amended), the two-owner-steps-only
+claim, the dormant and never-`main` guarantees, and every Red Team round-2
+closure claim (`99b2c99`) in the code; `gate` 652 passed; `governance-checks
+--layout` 4/4. Handoff `handoffs/chief-reviewer-wave-6-notes-sync.md`.
+
+Advisory, recorded for follow-up and **not blocking**:
+
+1. AN-SYNC-1's 30–60 s debounce lower bound is not enforced in the production
+   wiring (`config.py` accepts 1–60; `debounce_seconds()` is dead code). The
+   owner-set env var is not client-controlled; default 45 s.
+2. The `enqueue` write path is unwrapped, so a queue-write failure 500s an
+   already-committed annotation — the write-side twin of D6 (fixed to degrade on
+   read).
+3. The RT6NS-02 rationale is corrected in the table above.
+4. `ghr_` redaction and the `action=noop` log have no by-name regression test.
+5. Minor seam/field shape drift (`head_sha`/`installation_token`, `updated_at`)
+   and the Terraform apply-ordering is owner-enforced, not expressed.
+6. The recorded zero-traffic drain and dead-letter re-drive limitations stand.
 
 ### Hard stops awaiting the owner (D18)
 
