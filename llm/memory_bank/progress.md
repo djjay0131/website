@@ -67,9 +67,14 @@ merged reality, not plans.
   change is live on revision `hub-gate-00012-dtz` (dormant, `GATE_NOTES_EXPORT_ENABLED=0`);
   the secret-scoped `secretAccessor` binding failed because the Secret Manager API is
   disabled and the owner-created secret is absent. Anonymous `POST/GET /annotations` live
-  both return 403. **Waiting on the two owner hard stops** (create the App;
-  `gcloud secrets create notes-export-app-key`) plus enabling the Secret Manager API,
-  then a second adds-only apply and the first live commit.
+  both return 403. **D19 (2026-10-08)** replaces the manual `gcloud` credential
+  step with `.github/workflows/secrets-sync.yml`: the owner pastes
+  `NOTES_EXPORT_APP_KEY` (secret) and `NOTES_EXPORT_APP_ID` /
+  `NOTES_EXPORT_INSTALLATION_ID` (variables) into GitHub and dispatches; the
+  workflow syncs the key to Secret Manager and applies the adds-only accessor
+  binding + gate env. Terraform state moved to `gs://cusati-hub-tfstate` so CI
+  can apply. Security 0 FAIL (round 2); Red Team no new bypass; no `gcloud` by
+  hand (pattern `llm/governance/patterns/secrets-management.md`).
 - **Wave 0c (branding) DONE and LIVE** 2026-10-02 (PR #91, merge `beb7301`) — maroon
   band header with "Virginia Tech" text (no mark), three-column footer with 7
   `rel="me"` profiles (GitHub, LinkedIn, Google Scholar, ORCID, X, Bluesky, Mastodon),
@@ -123,7 +128,7 @@ merged reality, not plans.
   live sign-in check and the export-transport live enablement are owner-only.
 - Owner steps outstanding: Wave 3's 14-day share mint (SEAM-S7); the
   `construction-ai` public-page decision; the Firestore member seed; Wave 6's live
-  sign-in check; Wave 6b's two credential hard stops and the second apply.
+  sign-in check; Wave 6b/D19's credential paste + `gh workflow run secrets-sync.yml`.
 
 ## Known issues
 
@@ -141,9 +146,15 @@ Every open issue, once:
 - #61 Hosting answers `/p/` null-byte paths with 500 while `run.app` returns the gate's 404.
 - #63 SHA-pinned `latex-action` wraps a mutable `texlive-full:latest` run as root.
 - #72 Satellites run: Wave 1 (`kgis`) done; Wave 2 (`agentic-kg-research`) next.
-- #107 Annotations — implemented in Wave 6; cross-repository export delivery is
-  blocked on the ADR-0022 credential (owner decision, hard stop), and the narrowed
-  owner-read default awaits confirmation.
+- #107 Annotations — v1 (capture/My notes) live in Wave 6; v2 (the notes export
+  transport) is implemented and dormant, and D19 makes the credential step a
+  GitHub workflow, not a manual `gcloud`. The narrowed owner-read default awaits
+  confirmation.
+- #112 Narrow `gate-deploy`'s project-level `secretmanager.admin` (D19 Security
+  Tester Check 4 follow-up).
+- #113 Tighten the WIF attribute condition to an event allowlist (D19 Red Team A2).
+- #114 Enforce code-owner review on `main` (D19 Red Team A8).
+- #115 Record `gate-deploy`'s actAs-`hub-gate` residual (D19 Red Team round 2).
 
 Closed on this wave's evidence: **#50** (A13 ran; K10 the last proof), **#54** (metric
 forgery fixed — the Red Team disproved the earlier value-only fix, assembled-pair
