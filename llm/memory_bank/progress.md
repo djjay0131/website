@@ -1,7 +1,7 @@
 # Progress
 
 Status: Active
-Last updated: 2026-10-07
+Last updated: 2026-10-08
 Owner: Chief Architect
 
 What belongs here: what works, what is left, and known issues — recorded against
@@ -59,13 +59,17 @@ merged reality, not plans.
   Reviewer Request changes → resolved. **Export delivery is blocked on the ADR-0022
   credential (hard stop).** The owner-read default is narrowed: the owner enumerates and
   deletes any note but does not read a member's content.
-- **Wave 6b (notes sync, D18) implemented** 2026-10-07 (branch `feat/annotations-sync`) —
+- **Wave 6b (notes sync, D18) merged** 2026-10-07 (PR #110, merge `e3be033`) —
   the gate commits annotations to a long-lived `notes` branch (never `main`) through a
   GitHub App: a Firestore export queue (30–60s debounce, coalesced), exponential backoff,
   dead-letter at ≥24h, soft-delete tombstones, credential-free until configured. gate 652
-  passed; Security 0 FAIL; Regression 0. **Waiting on two owner hard stops** (create the
-  App; `gcloud secrets create notes-export-app-key`) before the `terraform apply` and the
-  first live commit.
+  passed; Security 0 FAIL; Regression 0. **Applied 2026-10-08**: the Cloud Run env
+  change is live on revision `hub-gate-00012-dtz` (dormant, `GATE_NOTES_EXPORT_ENABLED=0`);
+  the secret-scoped `secretAccessor` binding failed because the Secret Manager API is
+  disabled and the owner-created secret is absent. Anonymous `POST/GET /annotations` live
+  both return 403. **Waiting on the two owner hard stops** (create the App;
+  `gcloud secrets create notes-export-app-key`) plus enabling the Secret Manager API,
+  then a second adds-only apply and the first live commit.
 - **Wave 0c (branding) DONE and LIVE** 2026-10-02 (PR #91, merge `beb7301`) — maroon
   band header with "Virginia Tech" text (no mark), three-column footer with 7
   `rel="me"` profiles (GitHub, LinkedIn, Google Scholar, ORCID, X, Bluesky, Mastodon),
@@ -115,11 +119,11 @@ merged reality, not plans.
   `dist-public` only, RSS, OG images, leak check extended to the derived outputs,
   and stubs-only Pages retirement (ADR-0020). **Checkpoint 7 is not recorded
   passed**; `redirects:check` is deferred.
-- **Wave 6 (`#107`, annotations)** is implemented and in PR; the live sign-in
-  check and the export-transport decision are owner-only.
+- **Wave 6 (`#107`, annotations)** is merged and live (capture + My notes); the
+  live sign-in check and the export-transport live enablement are owner-only.
 - Owner steps outstanding: Wave 3's 14-day share mint (SEAM-S7); the
-  `construction-ai` public-page decision; the Firestore member seed; Wave 6's
-  export transport and live check.
+  `construction-ai` public-page decision; the Firestore member seed; Wave 6's live
+  sign-in check; Wave 6b's two credential hard stops and the second apply.
 
 ## Known issues
 
