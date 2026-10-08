@@ -117,26 +117,29 @@ what a contributor needs to pick up work today.
   `hub-gate-00012-dtz`, `GATE_NOTES_EXPORT_ENABLED=0`); the secret-scoped
   accessor binding failed because the Secret Manager API is disabled and the
   owner-created secret is absent. Anonymous `POST/GET /annotations` live return
-  403. **The only remaining work is the two owner hard stops** (create the App on
-  the two repos with Contents:write and report the ids; enable Secret Manager and
-  `gcloud secrets create notes-export-app-key` + add the key), then a second
-  `terraform apply` (adds only) with the App id/installation id and
-  `notes_export_enabled=true`.
+  403. **D19 (2026-10-08) removes the manual credential step:** the owner pastes
+  `NOTES_EXPORT_APP_KEY` (secret) and `NOTES_EXPORT_APP_ID` /
+  `NOTES_EXPORT_INSTALLATION_ID` (variables) into GitHub, then runs
+  `gh workflow run secrets-sync.yml`; the workflow syncs the key to Secret
+  Manager and applies the adds-only accessor binding + gate env. No `gcloud` by
+  hand, ever (pattern: `llm/governance/patterns/secrets-management.md`; ADR-0022
+  amended).
 
 ## Stop point
 
-Wave 6 is merged and live. Wave 6b is merged (#110); its Cloud Run config is
-applied and dormant, and its only outstanding work is the two owner hard stops
-above, plus the Wave 6 owner steps (the live sign-in check and confirming the
-narrowed owner-read default). Earlier deferrals stand: Wave 3's share mint, the
-Firestore member seed, and Wave 5's `redirects:check`.
+Wave 6 is merged and live. Wave 6b is merged (#110) and D19 lands the secret
+workflow; its Cloud Run config is applied and dormant, and its only outstanding
+work is the D19 credential paste + dispatch, plus the Wave 6 owner steps (the
+live sign-in check and confirming the narrowed owner-read default). Earlier
+deferrals stand: Wave 3's share mint, the Firestore member seed, and Wave 5's
+`redirects:check`.
 
 ## Next
 
-1. **Wave 6b owner steps:** create the GitHub App on the two repos (Contents:
-   write) and report the App id + installation id; enable `secretmanager.googleapis.com`
-   and `gcloud secrets create notes-export-app-key` + add the key; then a second
-   `terraform apply` (adds only) and the first live commit.
+1. **Wave 6b / D19 owner step:** create the GitHub App on the two repos
+   (Contents: write), paste `NOTES_EXPORT_APP_KEY` (secret) and
+   `NOTES_EXPORT_APP_ID` / `NOTES_EXPORT_INSTALLATION_ID` (variables) into
+   GitHub, then run `gh workflow run secrets-sync.yml`. No `gcloud`.
 2. **Wave 6 steps:** sign in and exercise capture + My notes; confirm or widen
    the narrowed owner-read default.
 2. **Owner steps carried:** Wave 3's 14-day share mint (SEAM-S7); the Firestore member
@@ -160,10 +163,9 @@ Firestore member seed, and Wave 5's `redirects:check`.
   you" page.
 - **The alert-channel verification link** — four policies are enabled and deliver
   nothing until it is clicked.
-- **Wave 6b:** complete the two hard stops — create the GitHub App on the two
-  repos with Contents:write and report the App id + installation id, and run
-  `gcloud secrets create notes-export-app-key` + add the private key — then the
-  gate commits annotations to the `notes` branch. **Wave 6:** sign in as
+- **Wave 6b / D19:** paste the three GitHub names (`NOTES_EXPORT_APP_KEY` as a
+  secret; `NOTES_EXPORT_APP_ID` and `NOTES_EXPORT_INSTALLATION_ID` as variables)
+  and run `gh workflow run secrets-sync.yml` — no `gcloud`. **Wave 6:** sign in as
   `djjay@vt.edu`, select text on a private item, and open
   `https://jason.cusati.us/p/notes/`.
 

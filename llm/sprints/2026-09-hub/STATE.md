@@ -3841,23 +3841,27 @@ Advisory, recorded for follow-up and **not blocking**:
    and the Terraform apply-ordering is owner-enforced, not expressed.
 6. The recorded zero-traffic drain and dead-letter re-drive limitations stand.
 
-### Hard stops awaiting the owner (D18)
+### Owner steps — D19 supersedes the manual `gcloud` hard stop (2026-10-08)
 
-**Two steps, and only two, gate live enablement:**
+**Owner decision D19** replaces D18 hard stop 2 (a manual `gcloud secrets
+create`) with `.github/workflows/secrets-sync.yml`. That command is **removed**:
+no human runs `gcloud` for a secret. The one remaining manual act is the paste
+itself, because GitHub offers no API to create an App or mint its key:
 
 1. **Create the GitHub App** and install it on **exactly**
    `djjay0131/soa-agentic-se` and `djjay0131/agentic-kg-research` with
-   **Contents: Read and write only** (Pull requests not needed). Report the
-   **App id** and **installation id**.
-2. **Create the secret and add the key** (exact):
-   ```
-   gcloud secrets create notes-export-app-key --project=cusati-hub --replication-policy=automatic
-   gcloud secrets versions add notes-export-app-key --project=cusati-hub --data-file=/path/to/app.private-key.pem
-   ```
+   **Contents: Read and write only** (Pull requests: No access).
+2. In `djjay0131/website` `Settings > Secrets and variables > Actions`, set the
+   secret `NOTES_EXPORT_APP_KEY` and the variables `NOTES_EXPORT_APP_ID` and
+   `NOTES_EXPORT_INSTALLATION_ID`.
+3. Run `gh workflow run secrets-sync.yml`.
 
-Then: `terraform apply` (adds only) from `main` with
-`TF_VAR_notes_export_app_id`, `TF_VAR_notes_export_installation_id` and
-`TF_VAR_notes_export_enabled=true`, and the first live drain.
+The workflow enables `secretmanager.googleapis.com` if needed, creates
+`notes-export-app-key` if absent (automatic replication), adds a version from
+the key, disables the prior versions, and runs the adds-only Terraform apply
+(the `hub-gate` `secretAccessor` binding and the gate `GATE_NOTES_*` env) with
+the App id and installation id as `TF_VAR`s. No `gcloud` by hand, ever; the
+generalized rule is `llm/governance/patterns/secrets-management.md`.
 
 ### Five-line status (Wave 6b)
 
@@ -3866,7 +3870,8 @@ Then: `terraform apply` (adds only) from `main` with
   owner step.
 - **What to review:** ADR-0022 (D18); the queue/debounce/retry/dead-letter; the
   `notes` branch discipline; token redaction; the soft-delete tombstone.
-- **What only the owner can do:** the two hard stops above.
+- **What only the owner can do:** paste the three GitHub names and dispatch the
+  `secrets-sync` workflow (D19, above).
 - **Open questions:** zero-traffic drain (scheduler?); dead-letter re-drive;
   `section` in the path; a cross-parser routing test.
 - **Governance:** L2; contracts/handoffs `*-wave-6-notes-sync.md`; checks 4/4 PASS.
@@ -3888,7 +3893,8 @@ change landed** (new revision `hub-gate-00012-dtz`, still dormant —
 `GATE_NOTES_EXPORT_ENABLED=0`, empty App/installation id); the **IAM binding
 failed** with `403 … Secret Manager API has not been used in project cusati-hub …
 SERVICE_DISABLED`, because the owner has not yet enabled the Secret Manager API
-or created the secret (**owner hard stop 2**). A follow-up plan is **1 to add, 0
+or created the secret (the D18 hard stop 2, **since replaced by D19**). A
+follow-up plan is **1 to add, 0
 to change, 0 to destroy**: only the accessor binding remains.
 
 **Live verification after the apply.** `GET /_health` **200** on
@@ -3902,6 +3908,67 @@ unchanged, nothing crashes. The enabled-but-unreadable-secret path (enqueue →
 sanitized retry → dead-letter) is covered by `pytest`; it cannot be exercised
 live until the owner supplies the App id and the secret.
 
-**Then:** the two owner hard stops above, then a second adds-only apply from
-`main` with `TF_VAR_notes_export_app_id`, `TF_VAR_notes_export_installation_id`
-and `TF_VAR_notes_export_enabled=true`, and the first live drain.
+**Then:** the D19 owner steps above (the credential paste and the workflow
+dispatch), then the workflow's adds-only apply and the first live drain.
+
+## D19 — all secrets via the `secrets-sync` workflow (2026-10-08)
+
+Owner decision D19: **all secrets are handled by a GitHub workflow, never by a
+manual `gcloud` step**, generalised to every future secret (the family site
+included) in `llm/governance/patterns/secrets-management.md`. ADR-0022 is
+amended (§1, §5); the manual `gcloud secrets create` hard stop is removed.
+
+### What shipped (branch `feat/secrets-sync`)
+
+- **`.github/workflows/secrets-sync.yml`** — triggered by `workflow_dispatch`
+  and by a push to `main` that changes the workflow file (**no `pull_request`
+  trigger**). It reads the GitHub secret `NOTES_EXPORT_APP_KEY`, authenticates
+  with the existing WIF identity `gate-deploy`, enables
+  `secretmanager.googleapis.com` if disabled, creates `notes-export-app-key` if
+  absent (automatic replication), adds a version, disables the prior versions,
+  and runs the adds-only Terraform apply (`-target`ed to the `hub-gate`
+  accessor binding and the gate's `GATE_NOTES_*` env) with the App id and
+  installation id as `TF_VAR`s. The value is never echoed (`0600` temp file,
+  `umask 077`, `EXIT` trap, no `set -x`). A missing secret **no-ops green**.
+- **`infra/secrets-sync.tf`** — the minimum grants for that identity:
+  project-level `roles/secretmanager.admin` and
+  `roles/serviceusage.serviceUsageAdmin`, the GCS state-bucket object roles, and
+  `roles/browser` (for the project-number data source). Project-level Secret
+  Manager admin is the D19-named fallback (create is project-scoped); **the
+  narrowing follow-up is #112**.
+- **`infra/versions.tf`** — Terraform state moves to the GCS backend
+  `gs://cusati-hub-tfstate` (`infra/` prefix), so a runner can apply. The bucket
+  is a one-time bootstrap (versioning, UBLA, PAP), created and migrated
+  2026-10-08 (state serial 122 → GCS, `terraform init -migrate-state`).
+
+### Apply provenance
+
+- Applied locally (targeted, adds-only): the five identity grants
+  (`secretmanager.admin`, `serviceusage.serviceUsageAdmin`, state `objectAdmin`,
+  state `legacyBucketReader`, `browser`) — 5 adds, 0 destroy/replace.
+- Remaining pending: the `hub-gate` accessor binding (1 add), which the workflow
+  applies after it creates the secret. `terraform plan` → **1 to add, 0 to
+  change, 0 to destroy**.
+
+### Adversarial round (D19) and dispositions
+
+- **Security Tester:** VETO on Check 4 (project-level `secretmanager.admin` can
+  read any secret; the cited follow-up did not exist). **Remediated:** the
+  follow-up is filed as **#112**; the tradeoff is the D19-named fallback, and the
+  identity reads only the one secret it creates today. All other checks PASS
+  (key-leak harness 17/17; no PR/fork trigger; clean no-op).
+- **Red Team:** Comment — no reachable external exfiltration. A6 (#112 absent) →
+  filed #112; A7 (STATE still printed manual `gcloud`) → **fixed**, hard stop 2
+  removed; A8 (code-owner review not enforced) → recorded, #114; A2 (WIF admits
+  a future `workflow_run`/`issue_comment`) → recorded, #113. Round 2: zero new
+  bypass; the `-target` scope confirmed; residual `gate-deploy` actAs-`hub-gate`
+  recorded as **#115**.
+
+Post-review hardening (round-2 probes): the version loop aborts on an empty new
+version name, and the workflow saves a `-target`ed plan file and applies that
+rather than an unscoped `-auto-approve`.
+
+Follow-ups: **#112** (narrow the Secret Manager role), **#113** (WIF event
+allowlist), **#114** (enforce code-owner review), **#115** (gate-deploy
+actAs-hub-gate residual). Handoffs
+`handoffs/{security-tester,red-team}-d19-secrets-sync.md`.

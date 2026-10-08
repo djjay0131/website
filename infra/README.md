@@ -750,23 +750,21 @@ Two things this module cannot roll back, stated so nobody tries:
 
 ## State
 
-Phase 1 uses **local state**, kept out of git by `infra/.gitignore`. State holds
-resource names and the billing account ID but no credentials. Back up
-`terraform.tfstate` after every apply to a private location outside the
-repository.
+**Adopted 2026-10-08 (owner decision D19): a GCS backend.** State lives in
+`gs://cusati-hub-tfstate/infra/default.tfstate` (see `infra/versions.tf`). The
+bucket was created once outside this module (a backend bucket cannot hold its own
+state) with object versioning, uniform bucket-level access, and public access
+prevention enforced; only the gate deploy identity reads or writes it
+(`infra/secrets-sync.tf`). The migration was `terraform init -migrate-state`.
 
-**Proposed backend (ADR candidate C10, still not adopted):** a GCS bucket in the
-hub project, for example `<project_id>-tfstate`, with object versioning, uniform
-bucket-level access, public access prevention, and no principal other than the
-owner. It is created outside this module (it cannot hold its own state), and
-adopted with a `backend "gcs"` block and `terraform init -migrate-state`.
+Why now: D19 moves the last manual step (the notes-sync `secretmanager`
+accessor binding) onto `.github/workflows/secrets-sync.yml`, and a GitHub runner
+has no local state. This is ADR candidate C10, adopted. State holds resource
+names and the billing account ID but **no secret values** — Terraform never
+manages a secret's value.
 
-Phase 2 removes the reason it was deferred: `storage.googleapis.com` is now
-enabled and this module already creates buckets, so the Phase 1 blocker (issue
-#10 K1) is gone, and the owner's Checkpoint 2 decision was "local for now; move
-to a bucket in Phase 2 (C10)". It is **not** done here because the Phase 2 scope
-in the roadmap does not include it. It needs a decision and its own change; see
-the Phase 2 handoff §ADR candidates.
+For a local apply, run `terraform init` first so it uses the backend; do not
+keep a local `terraform.tfstate` (the migration empties it).
 
 ## Checkpoint 3 — verifying the boundary
 

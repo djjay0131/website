@@ -22,8 +22,18 @@ terraform {
     }
   }
 
-  # No backend block: Phase 1 uses local state, which infra/.gitignore keeps out
-  # of the repository. The proposed remote backend is described in README.md
-  # (§State) and recorded as an ADR candidate; adopting it is a later, reviewed
-  # change followed by `terraform init -migrate-state`.
+  # Remote state (D19, 2026-10-08). Owner decision D19 moves the last manual
+  # step — the Secret Manager accessor binding for the notes-sync gate SA — onto
+  # .github/workflows/secrets-sync.yml. A GitHub Actions runner has no local
+  # state, so the state this repository already used must be reachable from CI:
+  # the bootstrap bucket `cusati-hub-tfstate` (created once by the lead because a
+  # backend bucket cannot be created by the state it stores). This is ADR
+  # candidate C10, adopted here; the migration was `terraform init
+  # -migrate-state`. Object versioning is on, uniform bucket-level access on,
+  # public access prevention enforced, and only the gate deploy identity reads or
+  # writes it (infra/gate.tf).
+  backend "gcs" {
+    bucket = "cusati-hub-tfstate"
+    prefix = "infra"
+  }
 }
