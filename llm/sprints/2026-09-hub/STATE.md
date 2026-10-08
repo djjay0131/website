@@ -1,7 +1,7 @@
 # Research Hub — Orchestration State
 
 Status: Active
-Last updated: 2026-10-04
+Last updated: 2026-10-08
 Owner: Chief Architect (Lead Architect)
 
 **Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 for the work streams; **L3 for PR #12** (roadmap requirement changes — delta review 2, Part D)
@@ -3870,3 +3870,38 @@ Then: `terraform apply` (adds only) from `main` with
 - **Open questions:** zero-traffic drain (scheduler?); dead-letter re-drive;
   `section` in the path; a cross-parser routing test.
 - **Governance:** L2; contracts/handoffs `*-wave-6-notes-sync.md`; checks 4/4 PASS.
+
+### Wave 6b — post-merge record (2026-10-08)
+
+PR **#110** merged to `main` at `e3be033` (merge commit; `feat/annotations-sync`
+deleted). Reviewed at `3198e64`; Chief Reviewer verdict **Comment, zero
+must-fix**; PR CI green (`governance-checks`, `budget-guard`, `test`, `build`,
+`contract-tests`, `check`, `leak-check-self-test`, `deploy-tools`; deploy jobs
+skip on a PR).
+
+**Apply provenance.** Plan from merged `main` (which contains the applied
+`a68feea` `kgis` resources): **1 to add, 1 to change, 0 to destroy** — the add is
+the secret-scoped `secretAccessor` binding for `hub-gate` on
+`notes-export-app-key`; the change is the in-place Cloud Run env block
+(stateless, no `# forces replacement`). `terraform apply` ran: the **Cloud Run
+change landed** (new revision `hub-gate-00012-dtz`, still dormant —
+`GATE_NOTES_EXPORT_ENABLED=0`, empty App/installation id); the **IAM binding
+failed** with `403 … Secret Manager API has not been used in project cusati-hub …
+SERVICE_DISABLED`, because the owner has not yet enabled the Secret Manager API
+or created the secret (**owner hard stop 2**). A follow-up plan is **1 to add, 0
+to change, 0 to destroy**: only the accessor binding remains.
+
+**Live verification after the apply.** `GET /_health` **200** on
+`hub-gate-ywkmredngq-ue.a.run.app`; the boot line names both `*.run.app` spellings
+and `https://jason.cusati.us`, with zero `event=misconfigured`, zero
+`event=error` and zero `scope=notes_sync` errors. Anonymous `POST /annotations`
+→ **403** on both `run.app` and `jason.cusati.us`; signed-out `GET /annotations`
+→ **403** (`event=deny scope=annotation action=list reason=no_session_cookie`).
+With the credential absent the subsystem is **dormant**: no network call, routes
+unchanged, nothing crashes. The enabled-but-unreadable-secret path (enqueue →
+sanitized retry → dead-letter) is covered by `pytest`; it cannot be exercised
+live until the owner supplies the App id and the secret.
+
+**Then:** the two owner hard stops above, then a second adds-only apply from
+`main` with `TF_VAR_notes_export_app_id`, `TF_VAR_notes_export_installation_id`
+and `TF_VAR_notes_export_enabled=true`, and the first live drain.

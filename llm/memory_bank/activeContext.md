@@ -104,34 +104,39 @@ what a contributor needs to pick up work today.
   to served `_payload/**` and fixes a pre-existing latent defect (the item iframe
   was `DENY`-blocked).
 
-- **Wave 6b (notes sync, owner decision D18, 2026-10-07) is implemented** (branch
-  `feat/annotations-sync`; ADR-0022 amended). **Option A (a GitHub App) confirmed;
+- **Wave 6b (notes sync, owner decision D18, 2026-10-07) is merged** (PR #110,
+  merge `e3be033`; ADR-0022 amended). **Option A (a GitHub App) confirmed;
   the owner-triggered workflow rejected; the gate commits on save.** A Firestore
   export queue (30–60s debounce, coalesced), exponential backoff, dead-letter at
   ≥24h with a flag on My notes, soft-delete tombstones, a long-lived `notes`
   branch created once from the default and never `main`, Markdown/intent routing,
   and a GitHub App client (short-lived installation token; Secret Manager read).
   **Dormant until configured.** gate 652 passed; Security 0 FAIL; Regression 0;
-  Red Team two rounds (all bypasses closed). **The only remaining work is the two
-  owner hard stops** (create the App on the two repos with Contents:write and
-  report the ids; `gcloud secrets create notes-export-app-key` + add the key),
-  then a `terraform apply` (adds only) with the App id/installation id and
+  Red Team two rounds (all bypasses closed); Chief Reviewer Comment, zero must-fix.
+  **Applied 2026-10-08:** the Cloud Run env change is live (revision
+  `hub-gate-00012-dtz`, `GATE_NOTES_EXPORT_ENABLED=0`); the secret-scoped
+  accessor binding failed because the Secret Manager API is disabled and the
+  owner-created secret is absent. Anonymous `POST/GET /annotations` live return
+  403. **The only remaining work is the two owner hard stops** (create the App on
+  the two repos with Contents:write and report the ids; enable Secret Manager and
+  `gcloud secrets create notes-export-app-key` + add the key), then a second
+  `terraform apply` (adds only) with the App id/installation id and
   `notes_export_enabled=true`.
 
 ## Stop point
 
-Wave 6 is merged. Wave 6b is implemented, reviewed and ready to merge; its only
-outstanding work is the two owner hard stops above, plus the Wave 6 owner steps
-(the live sign-in check and confirming the narrowed owner-read default). Earlier
-deferrals stand: Wave 3's share mint, the Firestore member seed, and Wave 5's
-`redirects:check`.
+Wave 6 is merged and live. Wave 6b is merged (#110); its Cloud Run config is
+applied and dormant, and its only outstanding work is the two owner hard stops
+above, plus the Wave 6 owner steps (the live sign-in check and confirming the
+narrowed owner-read default). Earlier deferrals stand: Wave 3's share mint, the
+Firestore member seed, and Wave 5's `redirects:check`.
 
 ## Next
 
 1. **Wave 6b owner steps:** create the GitHub App on the two repos (Contents:
-   write) and report the App id + installation id; `gcloud secrets create
-   notes-export-app-key` and add the key; then `terraform apply` (adds only) and
-   the first live commit.
+   write) and report the App id + installation id; enable `secretmanager.googleapis.com`
+   and `gcloud secrets create notes-export-app-key` + add the key; then a second
+   `terraform apply` (adds only) and the first live commit.
 2. **Wave 6 steps:** sign in and exercise capture + My notes; confirm or widen
    the narrowed owner-read default.
 2. **Owner steps carried:** Wave 3's 14-day share mint (SEAM-S7); the Firestore member
