@@ -118,6 +118,17 @@ class Settings:
     # for the same-origin Shares page and cannot drift from the deployed host.
     # Set GATE_SHARE_BASE_URL to an absolute origin to return a copyable link.
     share_base_url: str = ""
+    # Notes export (ADR-0022, D18). Off by default: an unconfigured gate behaves
+    # exactly as before, makes no GitHub call and needs no secret.
+    notes_export_enabled: bool = False
+    notes_app_id: str = ""
+    notes_installation_id: str = ""
+    notes_secret_name: str = "notes-export-app-key"  # noqa: S105 - a secret NAME, not a value
+    # The routing JSON (site/notes-routing.json). Empty is invalid when enabled.
+    notes_routing: str = ""
+    notes_debounce_seconds: int = 45
+    # The canonical origin a deep link is built from.
+    notes_canonical_origin: str = "https://jason.cusati.us"
 
     @property
     def session_max_age_seconds(self) -> int:
@@ -164,4 +175,15 @@ def load_settings() -> Settings:
             os.environ.get("GATE_ANNOTATIONS_COLLECTION", "annotations").strip() or "annotations"
         ),
         share_base_url=os.environ.get("GATE_SHARE_BASE_URL", "").strip().rstrip("/"),
+        notes_export_enabled=_flag("GATE_NOTES_EXPORT_ENABLED", default=False),
+        notes_app_id=os.environ.get("GATE_NOTES_APP_ID", "").strip(),
+        notes_installation_id=os.environ.get("GATE_NOTES_INSTALLATION_ID", "").strip(),
+        notes_secret_name=(
+            os.environ.get("GATE_NOTES_SECRET_NAME", "notes-export-app-key").strip() or "notes-export-app-key"
+        ),
+        notes_routing=os.environ.get("GATE_NOTES_ROUTING", "").strip(),
+        notes_debounce_seconds=_positive_int("GATE_NOTES_EXPORT_DEBOUNCE_SECONDS", default=45, maximum=60),
+        notes_canonical_origin=(
+            os.environ.get("GATE_NOTES_CANONICAL_ORIGIN", "https://jason.cusati.us").strip().rstrip("/")
+        ),
     )

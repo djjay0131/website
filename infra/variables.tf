@@ -375,3 +375,26 @@ variable "gate_extra_allowed_origins" {
     error_message = "Each entry must be a serialized https origin -- https://host or https://host:port, with no path, trailing slash, query or fragment. The gate drops malformed entries rather than guessing at them."
   }
 }
+
+# ---------------------------------------------------------------------------
+# Wave 6 notes-sync (ADR-0022, D18): the gate commits annotations to a `notes`
+# branch in each destination repository through a GitHub App.
+# ---------------------------------------------------------------------------
+
+variable "notes_export_enabled" {
+  description = "Turn on the annotation notes-sync (the gate commits to a `notes` branch). FALSE by default: the subsystem is dormant until the owner has created the GitHub App, reported its id and installation id, and created the `notes-export-app-key` secret. Set it true only after those two owner steps; a half-configured gate would fail its sync closed (retry/dead-letter), never silently."
+  type        = bool
+  default     = false
+}
+
+variable "notes_export_app_id" {
+  description = "The GitHub App id (owner-reported, from owner step 1). Not a secret. Empty keeps the sync dormant."
+  type        = string
+  default     = ""
+}
+
+variable "notes_export_installation_id" {
+  description = "The GitHub App installation id on the two destination repositories (owner-reported, from owner step 1). Not a secret. Empty keeps the sync dormant."
+  type        = string
+  default     = ""
+}

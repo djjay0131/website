@@ -100,22 +100,40 @@ what a contributor needs to pick up work today.
   `/p/notes/`, intent routing in `site/notes-routing.json`, and a credential-free export
   renderer. Two adversarial rounds (Red Team 8 bypasses found and closed; Security Tester
   0 FAIL; Regression 0; Dissenter/Skeptic dispositioned); Chief Reviewer Request changes →
-  all must-fixes resolved. **The export delivery credential is a hard stop (ADR-0022,
-  Proposed).** The `X-Frame-Options: SAMEORIGIN` change is confined to served
-  `_payload/**` and fixes a pre-existing latent defect (the item iframe was `DENY`-blocked).
+  all must-fixes resolved. The `X-Frame-Options: SAMEORIGIN` change is confined
+  to served `_payload/**` and fixes a pre-existing latent defect (the item iframe
+  was `DENY`-blocked).
+
+- **Wave 6b (notes sync, owner decision D18, 2026-10-07) is implemented** (branch
+  `feat/annotations-sync`; ADR-0022 amended). **Option A (a GitHub App) confirmed;
+  the owner-triggered workflow rejected; the gate commits on save.** A Firestore
+  export queue (30–60s debounce, coalesced), exponential backoff, dead-letter at
+  ≥24h with a flag on My notes, soft-delete tombstones, a long-lived `notes`
+  branch created once from the default and never `main`, Markdown/intent routing,
+  and a GitHub App client (short-lived installation token; Secret Manager read).
+  **Dormant until configured.** gate 652 passed; Security 0 FAIL; Regression 0;
+  Red Team two rounds (all bypasses closed). **The only remaining work is the two
+  owner hard stops** (create the App on the two repos with Contents:write and
+  report the ids; `gcloud secrets create notes-export-app-key` + add the key),
+  then a `terraform apply` (adds only) with the App id/installation id and
+  `notes_export_enabled=true`.
 
 ## Stop point
 
-Wave 6 is implemented, reviewed and ready to merge; the only outstanding work is
-owner-driven: the export-transport decision (ADR-0022 hard stop), the live sign-in check
-(select text on a private item, open `/p/notes/`), and confirming the narrowed owner-read
-default. Earlier deferrals stand: Wave 3's share mint, the Firestore member seed, and
-Wave 5's `redirects:check`.
+Wave 6 is merged. Wave 6b is implemented, reviewed and ready to merge; its only
+outstanding work is the two owner hard stops above, plus the Wave 6 owner steps
+(the live sign-in check and confirming the narrowed owner-read default). Earlier
+deferrals stand: Wave 3's share mint, the Firestore member seed, and Wave 5's
+`redirects:check`.
 
 ## Next
 
-1. **Wave 6 owner steps:** choose the export transport (ADR-0022); sign in and exercise
-   capture + My notes; confirm or widen the owner-read default.
+1. **Wave 6b owner steps:** create the GitHub App on the two repos (Contents:
+   write) and report the App id + installation id; `gcloud secrets create
+   notes-export-app-key` and add the key; then `terraform apply` (adds only) and
+   the first live commit.
+2. **Wave 6 steps:** sign in and exercise capture + My notes; confirm or widen
+   the narrowed owner-read default.
 2. **Owner steps carried:** Wave 3's 14-day share mint (SEAM-S7); the Firestore member
    seed; decide whether to flip `construction-ai` public.
 3. **Wave 5 follow-up:** regenerate `site/redirects/github-pages.json` from real
@@ -137,10 +155,12 @@ Wave 5's `redirects:check`.
   you" page.
 - **The alert-channel verification link** — four policies are enabled and deliver
   nothing until it is clicked.
-- **Wave 6:** choose the annotation export transport (ADR-0022 — a GitHub App or a
-  fine-grained token; this is a hard stop); then sign in as `djjay@vt.edu`, select
-  text on a private item, and open `https://jason.cusati.us/p/notes/` to close the
-  live check.
+- **Wave 6b:** complete the two hard stops — create the GitHub App on the two
+  repos with Contents:write and report the App id + installation id, and run
+  `gcloud secrets create notes-export-app-key` + add the private key — then the
+  gate commits annotations to the `notes` branch. **Wave 6:** sign in as
+  `djjay@vt.edu`, select text on a private item, and open
+  `https://jason.cusati.us/p/notes/`.
 
 ## Decisions on record
 

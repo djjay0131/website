@@ -150,7 +150,9 @@ locals {
 # - roles/iam.serviceAccountTokenCreator on itself. That is needed to SIGN
 #   blobs -- createCustomToken -- which this gate does not do. Session cookies
 #   are minted by the Identity Toolkit service, not signed locally.
-# - roles/secretmanager.*. There is no secret.
+# - roles/secretmanager.*, with ONE exception: notes-sync.tf grants
+#   `secretmanager.secretAccessor` on the single `notes-export-app-key` secret
+#   (ADR-0022, D18). There is no other secret, and no project-level secret role.
 # ---------------------------------------------------------------------------
 resource "google_service_account" "hub_gate" {
   project      = var.project_id
@@ -306,6 +308,35 @@ resource "google_cloud_run_v2_service" "gate" {
       env {
         name  = "GATE_ALLOWED_ORIGINS"
         value = local.gate_allowed_origins
+      }
+
+      # Notes-sync (ADR-0022, D18). Dormant by default: GATE_NOTES_EXPORT_ENABLED
+      # is "0" until the owner completes the two hard stops. The App id,
+      # installation id and routing are identifiers/config, not secrets; the App
+      # PRIVATE KEY is read from Secret Manager at runtime and never appears here.
+      env {
+        name  = "GATE_NOTES_EXPORT_ENABLED"
+        value = var.notes_export_enabled ? "1" : "0"
+      }
+
+      env {
+        name  = "GATE_NOTES_APP_ID"
+        value = var.notes_export_app_id
+      }
+
+      env {
+        name  = "GATE_NOTES_INSTALLATION_ID"
+        value = var.notes_export_installation_id
+      }
+
+      env {
+        name  = "GATE_NOTES_SECRET_NAME"
+        value = "notes-export-app-key"
+      }
+
+      env {
+        name  = "GATE_NOTES_ROUTING"
+        value = local.notes_routing_json
       }
     }
   }

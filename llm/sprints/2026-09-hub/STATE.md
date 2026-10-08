@@ -3753,3 +3753,120 @@ cross-repository delivery exists. Exact ask is in the PR body and ADR-0022.
 - **Owner sign-in check — PENDING.** Sign in as `djjay@vt.edu`, open a private
   `html` item (e.g. `/p/research/agentic-kg-research/research-store/`), select
   text, Highlight/Comment, and open `/p/notes/`. Recorded pending; not claimed.
+
+## Wave 6b — Notes sync, gate commits on save (D18, 2026-10-07)
+
+Branch `feat/annotations-sync`; issue #107; **owner decision D18**: build the
+notes export now. **Credential Option A (GitHub App) confirmed; the
+owner-triggered workflow is rejected**; the **gate commits on save**, debounced
+and retried. ADR-0022 is **amended** (not replaced) on D18. Seams
+`contracts/wave-6-notes-sync-seams.md`; contracts `gate-/infra-/adversarial-wave-6-notes-sync.md`.
+
+### What shipped (credential-free; the live enablement waits on the owner)
+
+- **gate:** `notes_sync.py` — a Firestore-backed export queue (`notes_export/`),
+  debounce 30–60s coalesced per item, exponential backoff, **dead-letter at ≥24h**
+  (flag surfaced by `GET /annotations`), a deterministic Markdown renderer
+  (chronological entries + **tombstones**), intent routing from
+  `site/notes-routing.json`, a long-lived **`notes` branch created once from the
+  default and never `main`**, and a GitHub App client (RS256 JWT → short-lived
+  installation token; Secret Manager read via ADC). `DELETE` is now a **soft
+  delete**; the renderer caps entries per item; error text redacts GitHub tokens,
+  JWTs, Google `ya29.` tokens and PEM blocks. **Dormant unless configured**, so a
+  gate without the credential behaves exactly as before. A background drain loop
+  and a per-request kick. **652 pytest passed** (26 notes-sync tests).
+- **infra:** `notes-sync.tf` grants `hub-gate` `secretmanager.secretAccessor` on
+  the single `notes-export-app-key` secret (**Terraform does not create the
+  secret**); `gate.tf` sets the notes env. Plan **1 to add, 1 to change, 0 to
+  destroy/replace**; `fmt`/`validate` clean. **Not applied** — apply waits for
+  the two owner hard stops.
+
+### Adversarial round — findings and dispositions
+
+| # | Source | Finding | Disposition |
+|---|---|---|---|
+| RT6NS-01 / D-B1 | Red Team / Dissenter | A delete of the last routed entry was silently dropped (tombstones excluded), leaving the passage published with a false "commit" log | **Fixed.** Tombstones are exported; a tombstone-only item writes a tombstone; test by name |
+| RT6NS-02 | Red Team | `section` is not in `notes/<source>/<slug>.md` | **Recorded, owner-specified layout.** Seams AN-SYNC-3 and ADR-0022 prescribe the path, and for legitimate items `(source, slug)` is unique (the manifest contract enforces slug uniqueness within a source). A forged `section` can point a job at a different item's repo file (annotation create validates syntax only), but the effect is projection ping-pong on the `notes` branch — Firestore stays the source of truth — not a cross-member content leak. **Chief Reviewer advisory 3: corrected from the earlier "a member can only affect their own file".** |
+| RT6NS-03 | Red Team | `_short_error` did not redact Google `ya29.`/PEM | **Fixed** (patterns + test) |
+| RT6NS-04 / R2-04 | Red Team | Control chars (CR) reached the committed file | **Fixed.** C0-except-TAB/LF stripped; test feeds CR |
+| RT6NS-05 | Red Team | No per-item cap → large commits | **Fixed.** 2000-entry cap with a visible omission note |
+| R2-N1 | Red Team r2 | A question-only item logged `action=commit` with no commit | **Fixed.** `action=commit repos=N` only on a commit, else `action=noop` |
+| R2-N2 | Red Team r2 | `ghr_` tokens not redacted | **Fixed** |
+| R2-N4 | Red Team r2 | A queue-read failure could log raw via asyncio | **Fixed.** `drain` catches `due()`; `_kick_drain` sanitizes |
+| D-B2 | Dissenter | Drain liveness under `min=0` | **Fixed for the request path** (per-request kick). **Zero-traffic drain remains a recorded limitation**; a Cloud Scheduler ping is the follow-up |
+| D-D1 | Dissenter | `notes` branch frozen at creation; tombstones accumulate | **Recorded.** D18 specifies the branch and tombstones; history is intended |
+| D-D2 | Dissenter | Path omits `section`/`route.dir` | **Recorded** (owner layout; `dir` is `notes` today) |
+| D-D3 | Dissenter | Broad Contents:write held by an `allUsers` service | **Recorded as the accepted D18 tradeoff**; bounded by the App installation and a 1h token |
+| D-D4 | Dissenter | App id/installation id unvalidated; a mismatch retries 24h | **Note.** A first-run startup mint could fail fast; recorded |
+| D-D5 | Dissenter | Two routing parsers (site mjs / gate py) | **Recorded**; the gate reads the one file as configuration |
+| D-D6 | Dissenter | A queue outage could 500 `GET /annotations` | **Fixed.** The state read degrades to none |
+| D-D7 | Dissenter | Dead-letter has no purge/re-drive; stale comments | **Comments fixed; purge/re-drive recorded** |
+| Skeptic g-1 | Skeptic | The branch-once guard was un-failable | **Fixed** (a test drains twice) |
+| Skeptic g-9 | Skeptic | Token-redaction test did not feed ya29/PEM | **Fixed** (test extended) |
+| ST residual | Security | `_notes_sync_loop` did not sanitize (unreachable credential path) | **Fixed anyway** (`sanitize_error`) |
+
+**Testers.** Security Tester **0 FAIL (no veto)** across 8 checks. Regression
+Tester **no regressions** (gate 626 → 652; site 494/2 unchanged; contract 57/0;
+governance 4/4).
+
+### Decisions taken without the owner
+
+1. Tombstones are exported (a delete must reach the repo).
+2. A soft delete, not a hard delete; My notes hides deleted rows.
+3. Per-item cap 2000 with an omission note; Firestore stays the source of truth.
+4. Error text redacts GitHub and Google tokens and PEM blocks.
+5. The ADR-0022 `Proposed → Accepted` status flip is deferred to a **status-line-only
+   follow-up PR**, because the `adr-status` check requires a flip to be
+   status-line-only (L0); the body amendment is in this wave.
+
+### Chief Reviewer (Wave 6b)
+
+Verdict **Comment — zero must-fix**; the branch merges as reviewed. The reviewer
+verified the AN-SYNC-1..8 seams, ADR-0022 (amended), the two-owner-steps-only
+claim, the dormant and never-`main` guarantees, and every Red Team round-2
+closure claim (`99b2c99`) in the code; `gate` 652 passed; `governance-checks
+--layout` 4/4. Handoff `handoffs/chief-reviewer-wave-6-notes-sync.md`.
+
+Advisory, recorded for follow-up and **not blocking**:
+
+1. AN-SYNC-1's 30–60 s debounce lower bound is not enforced in the production
+   wiring (`config.py` accepts 1–60; `debounce_seconds()` is dead code). The
+   owner-set env var is not client-controlled; default 45 s.
+2. The `enqueue` write path is unwrapped, so a queue-write failure 500s an
+   already-committed annotation — the write-side twin of D6 (fixed to degrade on
+   read).
+3. The RT6NS-02 rationale is corrected in the table above.
+4. `ghr_` redaction and the `action=noop` log have no by-name regression test.
+5. Minor seam/field shape drift (`head_sha`/`installation_token`, `updated_at`)
+   and the Terraform apply-ordering is owner-enforced, not expressed.
+6. The recorded zero-traffic drain and dead-letter re-drive limitations stand.
+
+### Hard stops awaiting the owner (D18)
+
+**Two steps, and only two, gate live enablement:**
+
+1. **Create the GitHub App** and install it on **exactly**
+   `djjay0131/soa-agentic-se` and `djjay0131/agentic-kg-research` with
+   **Contents: Read and write only** (Pull requests not needed). Report the
+   **App id** and **installation id**.
+2. **Create the secret and add the key** (exact):
+   ```
+   gcloud secrets create notes-export-app-key --project=cusati-hub --replication-policy=automatic
+   gcloud secrets versions add notes-export-app-key --project=cusati-hub --data-file=/path/to/app.private-key.pem
+   ```
+
+Then: `terraform apply` (adds only) from `main` with
+`TF_VAR_notes_export_app_id`, `TF_VAR_notes_export_installation_id` and
+`TF_VAR_notes_export_enabled=true`, and the first live drain.
+
+### Five-line status (Wave 6b)
+
+- **State:** the gate commits-on-save subsystem is implemented, tested and
+  reviewed; dormant until the owner's App + secret; the first live commit is the
+  owner step.
+- **What to review:** ADR-0022 (D18); the queue/debounce/retry/dead-letter; the
+  `notes` branch discipline; token redaction; the soft-delete tombstone.
+- **What only the owner can do:** the two hard stops above.
+- **Open questions:** zero-traffic drain (scheduler?); dead-letter re-drive;
+  `section` in the path; a cross-parser routing test.
+- **Governance:** L2; contracts/handoffs `*-wave-6-notes-sync.md`; checks 4/4 PASS.

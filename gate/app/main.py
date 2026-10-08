@@ -24,10 +24,12 @@ without any test going red (ADR-0004):
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 import sys
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -58,6 +60,15 @@ from .annotations import (
 from .auth import FirebaseTokenVerifier, Principal, TokenRejected, TokenVerifier
 from .config import ALLOWED_ORIGINS_VAR, SESSION_COOKIE_NAME, Settings, load_settings, parse_origin
 from .members import FirestoreMemberDirectory, MemberDirectory, normalise_email
+from .notes_sync import (
+    ExportEntry,
+    FirestoreExportQueue,
+    NotesSync,
+    RealGitHubAppClient,
+    SecretManagerRestProvider,
+    parse_routing,
+    sanitize_error,
+)
 from .serve import (
     INDEX_DOCUMENT,
     GcsObjectStore,
@@ -171,6 +182,10 @@ ANNOTATION_ID_CHARS = 12
 # would pass a `^...$` pattern and still reach the log line (Red Team R2-01).
 _ANNOTATION_ID_PATTERN = re.compile(r"\A[A-Za-z0-9_-]{1,64}\Z")
 
+# The notes-export background loop's poll interval (ADR-0022 D18). Small enough
+# that a 30-60s debounce fires promptly while the instance is warm.
+NOTES_SYNC_POLL_SECONDS = 15
+
 # How much of a token a list response may reveal. A prefix is enough to tell two
 # rows apart in owner UI and is not enough to reconstruct the credential; the
 # full token is returned exactly once, from the mint that created it.
@@ -223,11 +238,54 @@ class Dependencies:
     store: ObjectStore
     shares: ShareStore
     annotations: AnnotationStore
+    # The notes export (ADR-0022/D18). None when unconfigured, so a dormant gate
+    # behaves exactly as before and makes no GitHub call.
+    notes_sync: NotesSync | None = None
+
+
+def _export_entries(rows: object) -> list[ExportEntry]:
+    """Map stored annotations (incl. tombstones) to the exporter's view."""
+    return [
+        ExportEntry(
+            intent=annotation.intent,
+            quote=annotation.quote,
+            comment=annotation.comment,
+            member=annotation.member,
+            created=annotation.created,
+            deleted=annotation.deleted,
+            deleted_at=annotation.deleted_at,
+        )
+        for annotation in rows  # type: ignore[union-attr]
+    ]
 
 
 def build_dependencies(settings: Settings | None = None) -> Dependencies:
     """Production wiring: Firebase Admin, Firestore, the private bucket."""
     resolved = settings or load_settings()
+    annotations = FirestoreAnnotationStore(
+        collection=resolved.annotations_collection, project_id=resolved.project_id
+    )
+    notes_sync: NotesSync | None = None
+    if resolved.notes_export_enabled and resolved.notes_app_id and resolved.notes_installation_id:
+        # Configured only after the owner's two hard stops (ADR-0022 D18); a
+        # malformed routing string fails startup loudly rather than silently
+        # exporting to the wrong place.
+        notes_sync = NotesSync(
+            queue=FirestoreExportQueue(project_id=resolved.project_id),
+            github=RealGitHubAppClient(
+                app_id=resolved.notes_app_id,
+                installation_id=resolved.notes_installation_id,
+                secret_provider=SecretManagerRestProvider(resolved.project_id or ""),
+                secret_name=resolved.notes_secret_name,
+            ),
+            routing=parse_routing(resolved.notes_routing),
+            entries_for_item=lambda section, source, slug: _export_entries(
+                annotations.all_for_item(section, source, slug)
+            ),
+            canonical_origin=resolved.notes_canonical_origin,
+            enabled=True,
+            debounce=resolved.notes_debounce_seconds,
+        )
     return Dependencies(
         settings=resolved,
         verifier=FirebaseTokenVerifier(project_id=resolved.project_id),
@@ -236,9 +294,8 @@ def build_dependencies(settings: Settings | None = None) -> Dependencies:
         ),
         store=GcsObjectStore(resolved.private_bucket),
         shares=FirestoreShareStore(collection=resolved.shares_collection, project_id=resolved.project_id),
-        annotations=FirestoreAnnotationStore(
-            collection=resolved.annotations_collection, project_id=resolved.project_id
-        ),
+        annotations=annotations,
+        notes_sync=notes_sync,
     )
 
 
@@ -314,6 +371,18 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             ALLOWED_ORIGINS_VAR,
         )
 
+    # The notes-export background loop (ADR-0022 D18). Started only when the
+    # subsystem is configured, and only under a real ASGI lifespan -- the tests
+    # drive `drain` directly, so nothing races them.
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
+        task = asyncio.create_task(_notes_sync_loop(deps)) if _notes_sync_configured(deps) else None
+        try:
+            yield
+        finally:
+            if task is not None:
+                task.cancel()
+
     # No /docs, /redoc or /openapi.json. The service is reachable by anyone at
     # its *.run.app URL, and a schema document would publish the shape of the
     # private routes to callers who are refused everything else.
@@ -323,6 +392,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
+        lifespan=lifespan,
     )
     app.state.dependencies = deps
 
@@ -777,6 +847,12 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         member = normalise_email(principal.email) or principal.email
         annotation = Annotation(id=new_annotation_id(), member=member, created=now, updated=now, **fields)
         deps.annotations.create(annotation)
+        _enqueue_notes_export(
+            deps,
+            fields["section"],
+            fields["source"],
+            fields["slug"],
+        )
         logger.info(
             "event=allow scope=annotation action=create id=%s by=%s",
             _short_annotation_id(annotation.id),
@@ -830,18 +906,22 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         # This is the safe default; widening it needs the member's consent and
         # is recorded in ADR-0021 decision 8.
         owner_member = normalise_email(principal.email) or principal.email
-        return JSONResponse(
-            {
-                "annotations": [
-                    _annotation_row(
-                        row,
-                        include_content=(scope != "all" or row.member == owner_member),
-                    )
-                    for row in rows
-                ]
-            },
-            status_code=200,
-        )
+        sync = deps.notes_sync
+
+        def _row(annotation: Annotation) -> dict:
+            state = None
+            if sync is not None:
+                try:
+                    state = sync.state_for(annotation.section, annotation.source, annotation.slug)
+                except Exception as exc:  # a queue read must never break the list (Dissenter D6)
+                    logger.warning("event=error scope=notes_sync action=state error=%s", sanitize_error(exc))
+            return _annotation_row(
+                annotation,
+                include_content=(scope != "all" or annotation.member == owner_member),
+                export_state=state,
+            )
+
+        return JSONResponse({"annotations": [_row(row) for row in rows]}, status_code=200)
 
     @app.delete("/annotations/{annotation_id}")
     async def delete_annotation(annotation_id: str, request: Request) -> Response:
@@ -886,7 +966,8 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             )
             return JSONResponse({"status": "forbidden"}, status_code=403)
 
-        deps.annotations.delete(annotation_id)
+        deps.annotations.soft_delete(annotation_id, now=datetime.now(UTC))
+        _enqueue_notes_export(deps, existing.section, existing.source, existing.slug)
         logger.info(
             "event=allow scope=annotation action=delete id=%s by=%s",
             _short_annotation_id(annotation_id),
@@ -1393,14 +1474,17 @@ def _annotation_filters(
     return intent, source, slug
 
 
-def _annotation_row(annotation: Annotation, *, include_content: bool = True) -> dict:
+def _annotation_row(
+    annotation: Annotation, *, include_content: bool = True, export_state: dict | None = None
+) -> dict:
     """One list row.
 
     `include_content=False` is the owner moderating another member's note: the
     row carries the metadata needed to identify and delete it (id, member, item,
     intent, dates) but NOT the note's quote, comment, selector or tags. A
     non-owner's list is always their own rows (`list_for`), so this is only ever
-    the owner's view of a member's row.
+    the owner's view of a member's row. `export_state` is the notes-export state
+    (AN-SYNC-5) when the subsystem is configured.
     """
     metadata = {
         "id": annotation.id,
@@ -1412,6 +1496,8 @@ def _annotation_row(annotation: Annotation, *, include_content: bool = True) -> 
         "created": annotation.created.isoformat(),
         "updated": annotation.updated.isoformat(),
     }
+    if export_state is not None:
+        metadata["export"] = export_state
     if not include_content:
         return {**metadata, "redacted": True}
     position = annotation.position
@@ -1449,3 +1535,62 @@ def _valid_annotation_id(annotation_id: object) -> bool:
     value-free log line before it can be logged or looked up.
     """
     return isinstance(annotation_id, str) and bool(_ANNOTATION_ID_PATTERN.match(annotation_id))
+
+
+def _notes_sync_configured(deps: Dependencies) -> bool:
+    """True only when the notes-export subsystem is wired and enabled."""
+    return deps.notes_sync is not None and deps.notes_sync.enabled
+
+
+def _enqueue_notes_export(deps: Dependencies, section: str, source: str, slug: str) -> None:
+    """After a successful Firestore write, queue a repo update (AN-SYNC-1).
+
+    A no-op when the subsystem is unconfigured, so a dormant gate behaves exactly
+    as it did before D18.
+    """
+    if deps.notes_sync is None:
+        return
+    deps.notes_sync.enqueue(section, source, slug)
+    _kick_drain(deps)
+
+
+def _kick_drain(deps: Dependencies) -> None:
+    """Schedule a drain on the running loop's executor (fire-and-forget).
+
+    A cold instance should not wait for the background loop's next tick after
+    the request that queued the job. Best-effort: the queue is in Firestore, so
+    a failure here only delays the write (Dissenter B2).
+    """
+    sync = deps.notes_sync
+    if sync is None or not sync.enabled:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+
+    def _safe_drain() -> None:
+        try:
+            sync.drain()
+        except Exception as exc:  # never let a background failure log raw
+            logger.warning("event=error scope=notes_sync action=drain error=%s", sanitize_error(exc))
+
+    loop.run_in_executor(None, _safe_drain)
+
+
+async def _notes_sync_loop(deps: Dependencies) -> None:
+    """Drain due export jobs while the instance is warm (ADR-0022 D18).
+
+    The queue lives in Firestore, so a recycled instance loses no work: the next
+    warm instance (or its startup) resumes. Draining under genuinely zero traffic
+    is the recorded limitation; a scheduler ping is the follow-up.
+    """
+    sync = deps.notes_sync
+    if sync is None:
+        return
+    while True:
+        try:
+            await asyncio.to_thread(sync.drain)
+        except Exception as exc:  # any drain failure is retried by the queue itself
+            logger.warning("event=error scope=notes_sync action=drain error=%s", sanitize_error(exc))
+        await asyncio.sleep(NOTES_SYNC_POLL_SECONDS)

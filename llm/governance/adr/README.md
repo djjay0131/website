@@ -33,7 +33,7 @@ from `0000-template.md`.
 | [0019](0019-satellite-roster-and-source-keys.md) | Satellite roster and source keys — kgis #3, agentic-kg-research #4, construction-ai #5 | Accepted |
 | [0020](0020-pages-retirement-with-redirect-stubs.md) | Retire the full-site Pages deployment, keeping redirect stubs | Accepted |
 | [0021](0021-annotations-private-item-notes.md) | Annotations are private, item-anchored notes routed by intent | Accepted |
-| [0022](0022-annotation-export-transport.md) | Annotation export transport (owner decision required) | Proposed |
+| [0022](0022-annotation-export-transport.md) | Annotation export transport — the gate commits to a `notes` branch (D18; acceptance flip is a follow-up) | Proposed |
 
 ## Lifecycle
 

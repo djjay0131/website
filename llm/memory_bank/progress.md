@@ -59,6 +59,13 @@ merged reality, not plans.
   Reviewer Request changes → resolved. **Export delivery is blocked on the ADR-0022
   credential (hard stop).** The owner-read default is narrowed: the owner enumerates and
   deletes any note but does not read a member's content.
+- **Wave 6b (notes sync, D18) implemented** 2026-10-07 (branch `feat/annotations-sync`) —
+  the gate commits annotations to a long-lived `notes` branch (never `main`) through a
+  GitHub App: a Firestore export queue (30–60s debounce, coalesced), exponential backoff,
+  dead-letter at ≥24h, soft-delete tombstones, credential-free until configured. gate 652
+  passed; Security 0 FAIL; Regression 0. **Waiting on two owner hard stops** (create the
+  App; `gcloud secrets create notes-export-app-key`) before the `terraform apply` and the
+  first live commit.
 - **Wave 0c (branding) DONE and LIVE** 2026-10-02 (PR #91, merge `beb7301`) — maroon
   band header with "Virginia Tech" text (no mark), three-column footer with 7
   `rel="me"` profiles (GitHub, LinkedIn, Google Scholar, ORCID, X, Bluesky, Mastodon),
