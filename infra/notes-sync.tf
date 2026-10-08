@@ -1,22 +1,22 @@
-# Wave 6 notes-sync (ADR-0022, D18): the gate commits annotations to a long-lived
-# `notes` branch in each destination repository, through a GitHub App.
+# Wave 6 notes-sync (ADR-0022; D18, amended by D19): the gate commits annotations
+# to a long-lived `notes` branch in each destination repository, through a GitHub
+# App.
 #
-# TWO OWNER HARD STOPS gate this file's apply, and neither credential is created
-# by Terraform:
-#
-#   1. The owner creates the GitHub App, installs it on EXACTLY
-#      djjay0131/soa-agentic-se and djjay0131/agentic-kg-research with Contents:
-#      Read and write only, and reports the App id and installation id (set as
-#      var.notes_export_app_id / var.notes_export_installation_id).
-#   2. The owner creates the secret and adds the private key version:
-#        gcloud secrets create notes-export-app-key \
-#          --project=cusati-hub --replication-policy=automatic
-#        gcloud secrets versions add notes-export-app-key \
-#          --project=cusati-hub --data-file=/path/to/app.private-key.pem
+# CREDENTIAL HANDLING (owner decision D19, 2026-10-08). There is no manual
+# `gcloud` step. The owner pastes the App private key into the repository's
+# GitHub Actions secret `NOTES_EXPORT_APP_KEY` (and the App id / installation id
+# into the repository variables `NOTES_EXPORT_APP_ID` and
+# `NOTES_EXPORT_INSTALLATION_ID`), then runs `gh workflow run secrets-sync.yml`.
+# That workflow (`../.github/workflows/secrets-sync.yml`) enables the Secret
+# Manager API, creates the `notes-export-app-key` secret if absent, adds a
+# version, disables the prior versions, and applies this accessor binding with
+# the ids as TF_VARs. Creating the GitHub App itself stays manual only because
+# GitHub offers no API to create an App or mint its key.
 #
 # Terraform owns ONLY the accessor binding and the gate's configuration. It does
 # not create the secret and holds no key: a Terraform state file is not a place
-# for a private key, and the owner explicitly creates the secret.
+# for a private key. The generalized pattern is
+# `../llm/governance/patterns/secrets-management.md`.
 
 # The gate runtime identity may read the one secret. Scoped to the secret, not
 # the project: no secretmanager.admin, no project-level grant.

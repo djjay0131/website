@@ -3893,7 +3893,8 @@ change landed** (new revision `hub-gate-00012-dtz`, still dormant —
 `GATE_NOTES_EXPORT_ENABLED=0`, empty App/installation id); the **IAM binding
 failed** with `403 … Secret Manager API has not been used in project cusati-hub …
 SERVICE_DISABLED`, because the owner has not yet enabled the Secret Manager API
-or created the secret (**owner hard stop 2**). A follow-up plan is **1 to add, 0
+or created the secret (the D18 hard stop 2, **since replaced by D19**). A
+follow-up plan is **1 to add, 0
 to change, 0 to destroy**: only the accessor binding remains.
 
 **Live verification after the apply.** `GET /_health` **200** on
