@@ -95,3 +95,19 @@ billing_account = "000000-000000-000000"
 #
 # Confirm what the service actually serves before adding one:
 #   terraform output -raw gate_allowed_origins_check_command
+
+# ---------------------------------------------------------------------------
+# NOTES-SYNC (ADR-0022, D19). The gate commits annotations to a `notes` branch
+# through a GitHub App. D18 set these; D19 moved credential handling to
+# .github/workflows/secrets-sync.yml, which supplies them as TF_VARs from the
+# GitHub repository variables (NOTES_EXPORT_APP_ID, NOTES_EXPORT_INSTALLATION_ID)
+# and sets notes_export_enabled=true when both are present. Do NOT put the App
+# private key here; it lives only in Secret Manager (secret
+# `notes-export-app-key`), synced by the workflow.
+#
+#   notes_export_enabled           = true
+#   notes_export_app_id            = "<the GitHub App id>"
+#   notes_export_installation_id   = "<the App installation id>"
+#
+# A local `terraform apply` with the defaults (false / empty) leaves the sync
+# dormant. See llm/governance/patterns/secrets-management.md.

@@ -1,15 +1,24 @@
 # ADR-0022: Annotation export transport — the gate commits to a `notes` branch
 
 Status: Proposed
-Date: 2026-10-07 (amended 2026-10-07 on owner decision D18)
+Date: 2026-10-07 (amended 2026-10-07 on D18; amended 2026-10-08 on D19)
 
 ## Context
 
-> **Status note (2026-10-07).** The `Status:` line stays `Proposed` in this
-> change because the repository's `adr-status` check requires a status flip to be
-> a status-line-only (L0) change, and this change amends the body (a semantic
-> change). D18 has accepted this ADR; the `Proposed → Accepted` flip, with the
-> index row, is a separate mechanical follow-up.
+> **Status note (2026-10-07, extended 2026-10-08).** The `Status:` line stays
+> `Proposed` in these changes because the repository's `adr-status` check requires
+> a status flip to be a status-line-only (L0) change, and these changes amend the
+> body (a semantic change). D18 accepted this ADR and **D19 (2026-10-08) settles
+> credential handling**; the `Proposed → Accepted` flip, with the index row, is a
+> separate mechanical follow-up.
+
+> **D19 (2026-10-08).** All secrets are handled by a GitHub workflow, never by a
+> manual `gcloud` step. The manual `gcloud secrets create notes-export-app-key`
+> hard stop is **replaced** by `.github/workflows/secrets-sync.yml`: the owner's
+> only manual act is pasting the App's private key and the App id / installation
+> id into the repository's GitHub Actions secrets and variables; the workflow
+> syncs them into Secret Manager and runs the remaining adds-only Terraform
+> apply. The generalized rule is `llm/governance/patterns/secrets-management.md`.
 
 Issue #107 and ADR-0021 route notes by intent into two GitHub repositories —
 `djjay0131/soa-agentic-se` (`paper`) and `djjay0131/agentic-kg-research`
@@ -31,10 +40,13 @@ and the transport is **the gate commits on save** — notes reach the repository
 - Repository permission: **Contents: Read and write only.** Pull-requests write
   is **not** needed: the gate commits to a branch, it does not open a PR, and the
   owner merges `notes` into `main` when he likes.
-- The App private key is stored once in **Secret Manager** in `cusati-hub` as the
-  secret **`notes-export-app-key`** (owner creates it; exact command in the
-  handoff). The gate runtime service account `hub-gate` is granted
-  `roles/secretmanager.secretAccessor` on that secret by Terraform.
+- The App private key reaches **Secret Manager** in `cusati-hub` as the secret
+  **`notes-export-app-key`** through `.github/workflows/secrets-sync.yml`, never
+  by a manual `gcloud` step (D19). The owner pastes the key into the repository's
+  GitHub Actions secret `NOTES_EXPORT_APP_KEY`; the workflow writes it to Secret
+  Manager and disables the prior versions. The gate runtime service account
+  `hub-gate` is granted `roles/secretmanager.secretAccessor` on that secret by
+  Terraform.
 - The gate mints a **short-lived (≤1 hour) installation token server-side** from
   the private key. **The browser never sees any GitHub credential, and no GitHub
   Actions secret is used.**
@@ -77,18 +89,42 @@ and the transport is **the gate commits on save** — notes reach the repository
 passed to the gate as JSON; the site file remains the single source, shipped to
 the gate as configuration).
 
-### 5. Owner hard stops (credential creation)
+### 5. Credential handling — the GitHub-secrets workflow (owner decision D19)
 
-Two owner steps, and only two, gate the live enablement:
+Owner decision **D19 (2026-10-08)** removes the manual `gcloud secrets` step
+entirely. The credential path is:
 
-1. Create the GitHub App, install it on exactly the two repositories with
-   **Contents: Read and write**, and report the **App id** and **installation
-   id**.
-2. Run `gcloud secrets create notes-export-app-key` (exact command in the
-   handoff) and add the private key as a secret version.
+1. **The owner pastes once.** In `djjay0131/website`
+   `Settings > Secrets and variables > Actions`, the owner sets the secret
+   `NOTES_EXPORT_APP_KEY` (the App's `.pem` private key) and the variables
+   `NOTES_EXPORT_APP_ID` and `NOTES_EXPORT_INSTALLATION_ID`. Creating the GitHub
+   App remains manual because GitHub offers no API to create an App or mint its
+   key; **the paste is the only manual credential act, and no `gcloud` command is
+   ever run by hand.**
+2. **`.github/workflows/secrets-sync.yml` syncs it.** Triggered by
+   `workflow_dispatch` and by a push to `main` that changes the workflow file (no
+   `pull_request` trigger, so a fork cannot reach the key), the workflow
+   authenticates with the existing WIF deploy identity, enables
+   `secretmanager.googleapis.com` if disabled, creates `notes-export-app-key` if
+   absent (automatic replication), adds a new version from
+   `NOTES_EXPORT_APP_KEY`, disables the prior versions, and never prints the
+   value (a `0600` temp file under `umask 077`, no `echo`, no `set -x`).
+3. **Terraform binds access and sets the config.** The same workflow reads
+   `NOTES_EXPORT_APP_ID` / `NOTES_EXPORT_INSTALLATION_ID` as `TF_VAR`s, sets
+   `TF_VAR_notes_export_enabled=true` only when both are set, and runs the
+   adds-only apply that grants `hub-gate` `roles/secretmanager.secretAccessor` on
+   the one secret and sets the gate's `GATE_NOTES_*` env. The workflow identity's
+   minimum Secret Manager role is declared in `infra/secrets-sync.tf`.
+4. **The runtime reads it.** The gate reads the key from Secret Manager via its
+   own identity (ADC); the value is never an environment variable, never in the
+   image, never in Terraform state.
 
-Terraform for the Secret Manager accessor binding and the gate route config
-follows those steps; the plan must be **adds only**.
+**Remaining owner step (one):** create the GitHub App on exactly
+`djjay0131/soa-agentic-se` and `djjay0131/agentic-kg-research` with
+**Contents: Read and write** (Pull requests: No access), set the three GitHub
+names above, then run `gh workflow run secrets-sync.yml`. The generalized pattern
+every future secret follows is
+`llm/governance/patterns/secrets-management.md`.
 
 ### 6. Security
 
@@ -143,6 +179,9 @@ follows those steps; the plan must be **adds only**.
 ## Related Documents
 
 - `llm/governance/adr/0021-annotations-private-item-notes.md`
+- `llm/governance/patterns/secrets-management.md` (D19)
+- `.github/workflows/secrets-sync.yml` (D19)
+- `infra/secrets-sync.tf` (D19 identity grants)
 - `llm/sprints/2026-09-hub/contracts/wave-6-notes-sync-seams.md`
 - `llm/sprints/2026-09-hub/contracts/gate-wave-6-notes-sync.md`
 - `llm/sprints/2026-09-hub/contracts/infra-wave-6-notes-sync.md`
@@ -151,7 +190,8 @@ follows those steps; the plan must be **adds only**.
 ## Related Issues / PRs
 
 - #107 — annotate the literature
-- Owner decision **D18** (2026-10-07)
+- Owner decision **D18** (2026-10-07) — the GitHub App and the gate-commits-on-save transport
+- Owner decision **D19** (2026-10-08) — secrets are synced by a GitHub workflow, never by a manual `gcloud` step
 
 ## Supersedes
 
