@@ -73,8 +73,10 @@ merged reality, not plans.
   `NOTES_EXPORT_INSTALLATION_ID` (variables) into GitHub and dispatches; the
   workflow syncs the key to Secret Manager and applies the adds-only accessor
   binding + gate env. Terraform state moved to `gs://cusati-hub-tfstate` so CI
-  can apply. Security 0 FAIL (round 2); Red Team no new bypass; no `gcloud` by
-  hand (pattern `llm/governance/patterns/secrets-management.md`).
+  can apply. Security 0 FAIL (round 2); Red Team no new bypass; Chief Reviewer
+  Approve; Skeptic no un-failable guard; no `gcloud` by hand (pattern
+  `llm/governance/patterns/secrets-management.md`). Merged PR #116 (`18c9a00`);
+  the workflow ran **green, no-op** on the merge (secret not set), as required.
 - **Wave 0c (branding) DONE and LIVE** 2026-10-02 (PR #91, merge `beb7301`) — maroon
   band header with "Virginia Tech" text (no mark), three-column footer with 7
   `rel="me"` profiles (GitHub, LinkedIn, Google Scholar, ORCID, X, Bluesky, Mastodon),

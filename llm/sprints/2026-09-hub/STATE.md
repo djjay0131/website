@@ -3972,3 +3972,13 @@ Follow-ups: **#112** (narrow the Secret Manager role), **#113** (WIF event
 allowlist), **#114** (enforce code-owner review), **#115** (gate-deploy
 actAs-hub-gate residual). Handoffs
 `handoffs/{security-tester,red-team}-d19-secrets-sync.md`.
+
+### Post-merge verification (2026-10-08)
+
+PR **#116** merged to `main` at `18c9a00` (Chief Reviewer **Approve**; Security
+Tester 0 FAIL; Skeptic Verifier no un-failable guard; Red Team zero new bypass;
+`governance-checks` 4/4). The merge changed `.github/workflows/secrets-sync.yml`,
+so the workflow ran on that push: **success in 8 s, no-op** — the guard set
+`have_key=false`, emitted the `NOTES_EXPORT_APP_KEY is not set` notice, and the
+`terraform` job was skipped. That is the placeholder-free green run D19 requires;
+the credentialed path waits on the owner's paste and dispatch.
