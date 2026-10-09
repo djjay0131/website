@@ -22,10 +22,11 @@
 // contain markup; every field is escaped and the passage is a blockquote, so a
 // `<script>` in a note stays inert text.
 //
-// The routing and field logic live in ../src-private/lib/annotations.mjs -- the
-// same module the browser island uses -- so the parser the gate is configured
-// from is the parser this renderer applies. That module is browser-safe (no
-// fs), so importing it from Node is a one-way arrow.
+// The routing and field logic live in ../src/lib/annotations.mjs -- the same
+// module the browser island uses (D20 moved it into the shared public tree) --
+// so the parser the gate is configured from is the parser this renderer applies.
+// That module is browser-safe (no fs), so importing it from Node is a one-way
+// arrow.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,7 +38,7 @@ import {
   normalizeIntent,
   parseRouting,
   routeNote,
-} from "../src-private/lib/annotations.mjs";
+} from "../src/lib/annotations.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = path.resolve(HERE, "..");

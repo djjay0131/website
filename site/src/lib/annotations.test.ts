@@ -7,7 +7,7 @@ import {
   DEFAULT_INTENT,
   INTENTS,
   LIMITS,
-  NOTES_PAGE_PATH,
+  INTENT_PREFERENCE_KEY,
   SELECTOR_CONTEXT,
   annotationCreateRequestInit,
   annotationDeleteEndpoint,
@@ -77,12 +77,17 @@ function element(children: any[]) {
 // Endpoints and request shapes
 // ---------------------------------------------------------------------------
 describe("every annotation call is same-origin and shaped the way the gate expects", () => {
-  it("names a bare /annotations path and the My notes page an explicit /p/ path", () => {
+  it("names a bare /annotations path and NO private route, so the island can ship publicly (D20)", () => {
     expect(ANNOTATION_ENDPOINT).toBe("/annotations");
     expect(ANNOTATION_ENDPOINT.startsWith("/")).toBe(true);
     expect(ANNOTATION_ENDPOINT).not.toMatch(/^https?:/);
     expect(ANNOTATION_ENDPOINT).not.toContain("run.app");
-    expect(NOTES_PAGE_PATH).toBe("/p/notes/");
+    // The shared logic must not name the private My notes route (/p/notes/);
+    // that constant lives with the private-only My notes surface. If it were
+    // here, the public island bundle would carry it and the leak check would
+    // (correctly) refuse to publish.
+    expect(INTENT_PREFERENCE_KEY).toBe("hub:annotation-intent");
+    expect(INTENT_PREFERENCE_KEY).not.toContain("hub:annotation:");
   });
 
   it("GET is a same-origin read; the scope switch and filters are query params", () => {
@@ -349,10 +354,11 @@ describe("validateNoteInput mirrors the gate's bounds exactly", () => {
     expect(isSafeItemIdentity({ section: "phd", source: "phd-milestones", slug: "a/../b" })).toBe(false);
   });
 
-  it("normalises an unknown intent to question rather than failing a chip", () => {
+  it("normalises an unknown intent to the default rather than failing a chip (D20: paper)", () => {
     expect(isIntent("paper")).toBe(true);
     expect(isIntent("someday")).toBe(false);
     expect(normalizeIntent("someday")).toBe(DEFAULT_INTENT);
+    expect(DEFAULT_INTENT).toBe("paper");
     expect(INTENTS).toEqual(["paper", "experiment", "brainstorm", "question"]);
   });
 });

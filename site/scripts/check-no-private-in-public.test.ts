@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
 import {
+  ANNOTATION_ALLOWED_IN_PUBLIC,
   ANNOTATION_NEEDLES,
   collectPrivateItems,
   containsAnnotationNeedle,
@@ -401,11 +402,20 @@ describe("needles and their limits are declared, not implied", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AN-LEAK — annotation tooling never reaches dist-public
+// AN-LEAK — the PRIVATE annotation surface never reaches dist-public (D20)
 // ---------------------------------------------------------------------------
-describe("annotation tooling and endpoints never reach the public output", () => {
-  it("declares exactly the four AN-LEAK needles", () => {
-    expect(ANNOTATION_NEEDLES).toEqual(["/annotations", "/p/notes", "hub:annotation:", "data-annotation-"]);
+// Wave 6 forbade all annotation strings. D20 puts the capture ISLAND in the
+// public bundle (members annotate public items too), so `/annotations` and
+// `data-annotation-*` are now allowed public tooling; only the private My notes
+// route and the private-data namespace remain needles.
+describe("the PRIVATE annotation surface never reaches the public output (D20)", () => {
+  it("declares exactly the two private-surface needles, and the allowed island strings", () => {
+    expect(ANNOTATION_NEEDLES).toEqual(["/p/notes", "hub:annotation:"]);
+    expect(ANNOTATION_ALLOWED_IN_PUBLIC).toEqual(["/annotations", "data-annotation-"]);
+    for (const allowed of ANNOTATION_ALLOWED_IN_PUBLIC) {
+      // An allowed string must not itself be a needle.
+      expect(ANNOTATION_NEEDLES.some((needle) => allowed.includes(needle))).toBe(false);
+    }
   });
 
   it("passes a clean public output", () => {
@@ -420,32 +430,16 @@ describe("annotation tooling and endpoints never reach the public output", () =>
     }
   });
 
-  it("flags a planted needle in CONTENTS and in a PATH", () => {
+  it("PASSES a public output that carries the island's allowed tooling (D20)", () => {
+    // This is the whole point of the D20 change: the capture island is bundled
+    // into dist-public, so `/annotations`, `data-annotation-frame`,
+    // `data-annotation-island` and the local intent key MUST NOT fail the build.
     const dist = tree({
-      "index.html": '<script src="/annotations"></script><div data-annotation-island></div>',
-      "annotations/index.html": "<p>My notes</p>",
-      "page.html": "<p>hub:annotation:abc</p>",
-    });
-    try {
-      const leaks = findAnnotationLeaks(dist);
-      const needles = leaks.map((l) => l.needle);
-      expect(needles).toContain("/annotations");
-      expect(needles).toContain("data-annotation-");
-      expect(needles).toContain("hub:annotation:");
-      expect(leaks.some((l) => l.where === "path" && l.file.startsWith("annotations/"))).toBe(true);
-    } finally {
-      fs.rmSync(dist, { recursive: true, force: true });
-    }
-  });
-
-  it("does NOT fire on the public citation key llm-data-annotation-survey (Wave 6 FP)", () => {
-    // A CLEAN public build legitimately contains `data-annotation-` inside the
-    // research citation key `tan-2024-llm-data-annotation-survey`. A plain
-    // substring search failed the clean build; the left-boundary rule keeps the
-    // real DOM attributes and drops the hyphenated citation token.
-    const dist = tree({
-      "research/sources/index.html":
-        '<a href="#tan-2024-llm-data-annotation-survey">[tan-2024-llm-data-annotation-survey]</a>',
+      "index.html":
+        '<iframe data-annotation-frame src="/_payload/kgis/kgis-docs/index.html"></iframe>' +
+        '<div data-annotation-island data-item-section="projects"></div>',
+      "_astro/annotations-island.abc123.js":
+        'const E="/annotations";const K="hub:annotation-intent";document.querySelectorAll("[data-annotation-island]")',
     });
     try {
       expect(findAnnotationLeaks(dist)).toEqual([]);
@@ -454,54 +448,51 @@ describe("annotation tooling and endpoints never reach the public output", () =>
     }
   });
 
-  it("containsAnnotationNeedle still catches a real data-annotation- attribute", () => {
-    expect(containsAnnotationNeedle('<div data-annotation-island>', "data-annotation-")).toBe(true);
-    expect(containsAnnotationNeedle('"iframe[data-annotation-frame]"', "data-annotation-")).toBe(true);
-    expect(containsAnnotationNeedle("llm-data-annotation-survey", "data-annotation-")).toBe(false);
-    // The other three are plain substring needles.
-    expect(containsAnnotationNeedle("see /annotations now", "/annotations")).toBe(true);
-  });
-
-  it("catches case and HTML-entity spellings (RT6-11)", () => {
-    // Attribute names are case-insensitive in HTML, so this is a live capture
-    // frame; an `href` entity is decoded by the browser before it is used.
-    expect(containsAnnotationNeedle("<div DATA-ANNOTATION-FRAME>", "data-annotation-")).toBe(true);
-    expect(containsAnnotationNeedle("href=/Annotations", "/annotations")).toBe(true);
-    expect(containsAnnotationNeedle("HUB:ANNOTATION:x", "hub:annotation:")).toBe(true);
-    expect(containsAnnotationNeedle("&#47;annotations", "/annotations")).toBe(true);
-    expect(containsAnnotationNeedle("&#x2f;annotations", "/annotations")).toBe(true);
-    expect(containsAnnotationNeedle("data&#45;annotation&#45;frame", "data-annotation-")).toBe(true);
-    // A CSS rule or an import path is a real leak too (R2-03).
-    expect(containsAnnotationNeedle(".data-annotation-frame{}", "data-annotation-")).toBe(true);
-    expect(containsAnnotationNeedle('"./data-annotation-frame.js"', "data-annotation-")).toBe(true);
-    // The citation-key false positive still passes under normalisation.
-    expect(containsAnnotationNeedle("tan-2024-llm-data-annotation-survey", "data-annotation-")).toBe(false);
-  });
-
-  it("flags every needle including /p/notes planted in CONTENTS", () => {
+  it("flags the private route and the private-data namespace in CONTENTS and in a PATH", () => {
     const dist = tree({
-      "index.html": "<a href=\"/p/notes/\">My notes</a><p>hub:annotation:abc</p>",
-      "notes.html": "<p>/annotations</p>",
+      "index.html": '<a href="/p/notes/">My notes</a><p>hub:annotation:abc</p>',
+      "p/notes/index.html": "<p>My notes</p>",
     });
     try {
-      const needles = findAnnotationLeaks(dist).map((l) => l.needle);
+      const leaks = findAnnotationLeaks(dist);
+      const needles = leaks.map((l) => l.needle);
       expect(needles).toContain("/p/notes");
-      expect(needles).toContain("/annotations");
       expect(needles).toContain("hub:annotation:");
+      expect(leaks.some((l) => l.where === "path")).toBe(true);
+      // The allowed strings are NOT needles, even in the same file.
+      expect(needles).not.toContain("/annotations");
+      expect(needles).not.toContain("data-annotation-");
     } finally {
       fs.rmSync(dist, { recursive: true, force: true });
     }
   });
 
-  it("scans gzip Pagefind payloads, so a needle inside one is caught", () => {
+  it("containsAnnotationNeedle catches case and HTML-entity spellings (RT6-11)", () => {
+    expect(containsAnnotationNeedle("HUB:ANNOTATION:x", "hub:annotation:")).toBe(true);
+    expect(containsAnnotationNeedle("see /P/NOTES/ now", "/p/notes")).toBe(true);
+    expect(containsAnnotationNeedle("&#47;p&#47;notes&#47;", "/p/notes")).toBe(true);
+    expect(containsAnnotationNeedle("&#x2f;p&#x2f;notes&#x2f;", "/p/notes")).toBe(true);
+    // The allowed island strings are not needles.
+    expect(containsAnnotationNeedle("href=/Annotations", "/p/notes")).toBe(false);
+    expect(containsAnnotationNeedle('"iframe[data-annotation-frame]"', "/p/notes")).toBe(false);
+  });
+
+  it("the local intent key does NOT trip the private-data namespace needle", () => {
+    // `hub:annotation-intent` is one enum word and is safe publicly; only the
+    // namespaced `hub:annotation:` form (which would hold note content) is a leak.
+    expect(containsAnnotationNeedle("hub:annotation-intent", "hub:annotation:")).toBe(false);
+    expect(containsAnnotationNeedle("hub:annotation:quote=secret", "hub:annotation:")).toBe(true);
+  });
+
+  it("scans gzip Pagefind payloads, so a private needle inside one is caught", () => {
     const dist = tree({ "index.html": "<h1>clean</h1>" });
     try {
       fs.mkdirSync(path.join(dist, "pagefind", "fragment"), { recursive: true });
       fs.writeFileSync(
         path.join(dist, "pagefind", "fragment", "en_x.pf_fragment"),
-        zlib.gzipSync(Buffer.from("pagefind_dcd/annotations")),
+        zlib.gzipSync(Buffer.from("pagefind_dcd/notes/ - /p/notes/")),
       );
-      expect(findAnnotationLeaks(dist).some((l) => l.needle === "/annotations")).toBe(true);
+      expect(findAnnotationLeaks(dist).some((l) => l.needle === "/p/notes")).toBe(true);
     } finally {
       fs.rmSync(dist, { recursive: true, force: true });
     }
@@ -537,13 +528,23 @@ describe("the CLI", () => {
     expect(run.stderr).toContain("index.html");
   });
 
-  it("exits 1 when an annotation needle is planted in the public output", () => {
-    fs.writeFileSync(path.join(dist, "index.html"), '<a href="/annotations">notes</a>');
-    const run = spawnSync(process.execPath, [SCRIPT, "--dist", dist, "--sources", FIXTURE_SOURCES], {
+  it("exits 1 when a PRIVATE annotation needle is planted, but 0 on allowed island tooling (D20)", () => {
+    fs.writeFileSync(path.join(dist, "index.html"), '<a href="/p/notes/">My notes</a>');
+    const leaked = spawnSync(process.execPath, [SCRIPT, "--dist", dist, "--sources", FIXTURE_SOURCES], {
       encoding: "utf8",
     });
-    expect(run.status).toBe(1);
-    expect(run.stderr).toContain("/annotations");
+    expect(leaked.status).toBe(1);
+    expect(leaked.stderr).toContain("/p/notes");
+
+    // The island's allowed tooling is NOT a leak (D20).
+    fs.writeFileSync(
+      path.join(dist, "index.html"),
+      '<script src="/annotations"></script><div data-annotation-island></div>',
+    );
+    const allowed = spawnSync(process.execPath, [SCRIPT, "--dist", dist, "--sources", FIXTURE_SOURCES], {
+      encoding: "utf8",
+    });
+    expect(allowed.status, allowed.stderr).toBe(0);
   });
 
   it("exits 2 when there is no build output", () => {

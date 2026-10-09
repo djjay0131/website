@@ -1,0 +1,282 @@
+---
+// THE CAPTURE ISLAND'S MOUNT (D20/Wave 7; ADR-0021).
+//
+// One framework-free component, used by BOTH outputs: the private framed item
+// (src-private/pages/[...itemPath].astro) and every public item page
+// (layouts/ItemPage.astro and the public framed route). It renders an EMPTY,
+// HIDDEN root carrying the item's {section, source, slug}; lib/annotations-island.ts
+// reads those, asks the gate for the caller's notes, and renders the toolbar and
+// panel ONLY when the gate answers with a session (a 403 renders nothing).
+//
+// Because the root starts empty and hidden, the public HTML carries no note,
+// quote, member or count — only the island's own code, which the leak check
+// (AN-LEAK) is now written to allow while still refusing the private /p/ route.
+//
+// The identity triple comes from the ITEM, never from the route or the pane, so a
+// note made on the public route and one made under /p/ for the same item are the
+// same item (ADR-0021 decision 1, amended on D20).
+interface Props {
+  section: string;
+  source: string;
+  slug: string;
+}
+
+const { section, source, slug } = Astro.props;
+---
+
+<div
+  class="annotations-island"
+  data-annotation-island
+  data-item-section={section}
+  data-item-source={source}
+  data-item-slug={slug}
+  hidden></div>
+
+<script>
+  import { mountAnnotationIslands } from "../lib/annotations-island";
+  mountAnnotationIslands();
+</script>
+
+<style is:global>
+  /* The floating toolbar is anchored NEXT TO the selection by JS (position:
+     fixed is set in the module and clamped to the viewport); it is never pinned
+     to the bottom of the window. Touch targets stay >=44px (D20). */
+  .annotation-toolbar {
+    position: fixed;
+    z-index: 60;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    max-width: min(94vw, 46rem);
+    padding: 0.4rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  }
+
+  .annotation-btn,
+  .annotation-intent-chip {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.5rem 0.9rem;
+    font: inherit;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .annotation-btn:disabled,
+  .annotation-intent-chip:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+
+  .annotation-btn.is-primary {
+    background: var(--color-accent, #e6751f);
+    border-color: var(--color-accent, #e6751f);
+    color: #fff;
+  }
+
+  .annotation-intents {
+    display: inline-flex;
+    gap: 0.3rem;
+    align-items: center;
+  }
+
+  .annotation-intent-chip {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.7rem;
+  }
+
+  .annotation-intent-chip.is-active {
+    background: var(--color-accent, #e6751f);
+    border-color: var(--color-accent, #e6751f);
+    color: #fff;
+  }
+
+  .annotation-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    width: min(90vw, 32rem);
+  }
+
+  .annotation-form-label {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+  }
+
+  .annotation-comment-input {
+    width: 100%;
+    min-height: 5rem;
+    font: inherit;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  .annotation-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  /* The notes panel. Narrow screens: a floating toggle opens a bottom sheet, so
+     the list is reachable WITHOUT scrolling past the frame. Wide screens: a
+     fixed side panel, always visible, so it stays in view as the item scrolls
+     (D20). */
+  .annotation-notes {
+    display: none;
+  }
+
+  .annotation-notes.is-open {
+    display: block;
+  }
+
+  .annotation-notes-toggle {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 50;
+    min-height: 44px;
+    padding: 0.5rem 1rem;
+    font: inherit;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+  }
+
+  @media (max-width: 63.99rem) {
+    .annotation-notes.is-open {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 55;
+      max-height: 66vh;
+      overflow-y: auto;
+      padding: 1rem;
+      border-top: 1px solid var(--color-border);
+      background: var(--color-surface);
+      box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.22);
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .annotation-notes {
+      display: block;
+      position: fixed;
+      top: 5rem;
+      right: 1.25rem;
+      width: 22rem;
+      max-height: calc(100vh - 6rem);
+      overflow-y: auto;
+      z-index: 40;
+      padding: 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      background: var(--color-surface);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+    }
+
+    .annotation-notes-toggle {
+      display: none;
+    }
+  }
+
+  .annotation-notes-title {
+    font-size: 1.1rem;
+    margin: 0 0 0.5rem;
+  }
+
+  .annotation-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .annotation-note {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.75rem;
+  }
+
+  .annotation-note-head {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.25rem;
+  }
+
+  .annotation-intent {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
+  }
+
+  .annotation-orphan {
+    display: inline-block;
+    font-size: 0.72rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: var(--color-caution-bg);
+    color: var(--color-text);
+  }
+
+  .annotation-quote {
+    margin: 0.35rem 0;
+    padding-left: 0.75rem;
+    border-left: 3px solid var(--color-border);
+    color: var(--color-muted);
+    white-space: pre-wrap;
+  }
+
+  .annotation-comment {
+    margin: 0.35rem 0;
+    white-space: pre-wrap;
+  }
+
+  .annotation-message {
+    color: var(--color-risk, #b3261e);
+  }
+
+  .annotation-empty {
+    color: var(--color-muted);
+    font-size: 0.9rem;
+  }
+
+  /* The post-save confirmation. Non-blocking: a status toast with Undo, never a
+     modal (D20). */
+  .annotation-toast {
+    position: fixed;
+    right: 1rem;
+    bottom: 5rem;
+    z-index: 65;
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  }
+
+  .annotation-toast-text {
+    font-size: 0.9rem;
+  }
+</style>

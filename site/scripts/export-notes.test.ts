@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { parseRouting } from "../src-private/lib/annotations.mjs";
+import { parseRouting } from "../src/lib/annotations.mjs";
 import {
   deepLink,
   noteOutputPath,

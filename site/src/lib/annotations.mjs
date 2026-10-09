@@ -1,19 +1,27 @@
 // THE ANNOTATION ISLAND'S PURE LOGIC (AN-CAP, AN-STORE, AN-USE, AN-EXPORT;
-// contract site-wave-6, requirements 2 and 7).
+// contract site-wave-6, requirements 2 and 7; D20/Wave 7 moves it into the
+// SHARED public tree so one island can mount on both outputs).
 //
 // Everything with a security, validation, anchoring or routing decision lives
 // here, and nothing here touches the DOM, `node:fs`, `document`, `window` or the
-// network. The capture island (components/AnnotationsIsland.tsx), the My notes
-// island (components/NotesIsland.tsx) and the Node export renderer
+// network. The shared capture island (lib/annotations-island.ts +
+// components/AnnotationsMount.astro), the private My notes island
+// (src-private/components/NotesIsland.tsx) and the Node export renderer
 // (scripts/export-notes.mjs) all import THIS module, so the gate's field bounds,
 // the W3C selector shapes, the intent vocabulary and the owner-editable routing
 // have exactly one definition.
 //
-// WHY IT MUST STAY BROWSER-SAFE. This module is bundled into the private build's
-// client islands. Importing `node:fs` here (to read notes-routing.json) would
-// drag a filesystem module into the browser bundle, so the routing file is read
-// by the Node caller and handed to parseRouting() as data -- the same split
-// shares.mjs makes for its endpoint constants.
+// WHY IT MUST STAY BROWSER-SAFE *AND PUBLIC-SAFE*. This module is bundled into
+// the PUBLIC build's capture island (D20: a signed-in member annotates public
+// items on their public page), so it may contain only facts that are safe on the
+// public internet: the member-gated `/annotations` endpoint, the W3C selector
+// shapes, the intent vocabulary and the field bounds. It may NOT name the
+// private My notes ROUTE or any storage key that names private data -- those live
+// with the private-only My notes surface (src-private/). Importing
+// `node:fs` here (to read notes-routing.json) would drag a filesystem module
+// into the browser bundle, so the routing file is read by the Node caller and
+// handed to parseRouting() as data -- the same split shares.mjs makes for its
+// endpoint constants.
 //
 // THE FIVE PROPERTIES THAT MATTER, AND WHY THEY ARE PINNED HERE:
 //
@@ -28,9 +36,9 @@
 //   3. Anchoring is by quote first (W3C TextQuoteSelector), disambiguated by
 //      prefix/suffix, then by position, and marked ORPHAN -- never dropped --
 //      when none of those resolves (AN-CAP 5-6).
-//   4. A note is rendered as React text nodes and exported as escaped Markdown.
-//      Nothing here ever returns or builds HTML, so a `<script>` in a quote or
-//      comment stays inert text (AN-ADVERSARIAL 2).
+//   4. A note is rendered as a DOM text node (never HTML) and exported as
+//      escaped Markdown. Nothing here ever returns or builds HTML, so a
+//      `<script>` in a quote or comment stays inert text (AN-ADVERSARIAL 2).
 //   5. Routing is owner-editable data, never code: parseRouting() validates
 //      `site/notes-routing.json` so a malformed file fails loudly instead of
 //      silently dropping notes.
@@ -38,14 +46,29 @@
 /** The one annotation endpoint. Hosting rewrites it to the gate (AN-REWRITES). */
 export const ANNOTATION_ENDPOINT = "/annotations";
 
-/** The private My notes page, served by the gate under the private base (AN-USE). */
-export const NOTES_PAGE_PATH = "/p/notes/";
-
 /** The intent vocabulary (AN-STORE). Order is the UI's chip order. */
 export const INTENTS = ["paper", "experiment", "brainstorm", "question"];
 
-/** A highlight with no comment is still a note; it defaults to `question`. */
-export const DEFAULT_INTENT = "question";
+/**
+ * The intent a brand-new note defaults to (D20).
+ *
+ * Was `question`, and that was wrong: `question` is the one intent that never
+ * exports (ADR-0021 decision 5), so a member who highlighted without thinking
+ * about intent produced a note that could never reach the paper/experiment work.
+ * The island now defaults to the member's LAST-used intent (a local preference,
+ * never sent to the server), falling back to `paper` — the intent most notes
+ * want. `normalizeIntent()` still treats an unknown stored value as this default.
+ */
+export const DEFAULT_INTENT = "paper";
+
+/**
+ * The localStorage key the capture island remembers the member's last intent
+ * under (D20). LOCAL ONLY: it holds one enum word, never a quote, comment,
+ * item id or member identity, so it is safe to live in a shared browser profile
+ * and it never reaches the gate or the export. It deliberately is NOT the
+ * `hub:annotation:` namespace, which the leak check reserves for private data.
+ */
+export const INTENT_PREFERENCE_KEY = "hub:annotation-intent";
 
 /** The one scope switch GET /annotations understands, and it is owner-only. */
 export const ALL_SCOPE = "all";
@@ -153,10 +176,19 @@ export function annotationDeleteRequestInit() {
  * objects and has no dependency on the DOM globals (the island passes the
  * iframe's real `body`).
  *
+ * `options.skip` (D20/Wave 7) is an optional predicate on NON-text nodes; when it
+ * returns true the subtree is not walked. The capture island uses it to exclude
+ * its own rendered chrome (the toolbar, the notes panel) from the index when the
+ * target is the page's own `main`/`article` rather than a separate frame — so the
+ * words "Notes on this item" can never shadow the item's real text, and a
+ * selection of the island's own UI never becomes an annotation.
+ *
  * @param {{nodeType: number, nodeValue?: unknown, childNodes?: Iterable<any>}} root
+ * @param {{skip?: (node: any) => boolean}} [options]
  * @returns {{text: string, segments: {node: any, start: number, end: number}[]}}
  */
-export function buildTextIndex(root) {
+export function buildTextIndex(root, options = {}) {
+  const skip = typeof options.skip === "function" ? options.skip : null;
   const segments = [];
   let text = "";
   const visit = (node) => {
@@ -167,6 +199,7 @@ export function buildTextIndex(root) {
       text += value;
       return;
     }
+    if (skip && skip(node)) return;
     const children = node.childNodes ? Array.from(node.childNodes) : [];
     for (const child of children) visit(child);
   };

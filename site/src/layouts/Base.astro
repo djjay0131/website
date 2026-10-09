@@ -17,6 +17,8 @@ import SiteFooter from "../components/SiteFooter.astro";
 import { loadContentPool } from "../lib/cv-data";
 import { CV_CONTENT_DIR } from "../lib/hub-content.mjs";
 import { readFooterData, resolveElsewhere, readBuildInfo } from "../lib/footer.mjs";
+import AnnotationsMount from "../components/AnnotationsMount.astro";
+import { hubItemIdentity } from "../lib/hub-content.mjs";
 import path from "node:path";
 
 interface Props {
@@ -28,6 +30,15 @@ interface Props {
   noindex?: boolean;
   /** Renders the band and footer without navigation (e.g. /signin/, spec §6). */
   hideNav?: boolean;
+  /**
+   * Marks a FIRST-PARTY page that renders item content and may be annotated by a
+   * signed-in member (D20/Wave 7): research digests, papers and CV project
+   * pages. The item identity is derived from the base-relative route
+   * (`hubItemIdentity`), never from the pane. Satellite items mounted on the
+   * framed route pass their manifest identity directly instead. Default false so
+   * the island is never fetched on pages that are not item content.
+   */
+  annotatable?: boolean;
 }
 
 const {
@@ -37,6 +48,7 @@ const {
   jsonLd,
   noindex = false,
   hideNav = false,
+  annotatable = false,
 } = Astro.props;
 
 const base = import.meta.env.BASE_URL;
@@ -135,6 +147,7 @@ const footerNav = [
     />
     <main id="main-content" role="main">
       <slot />
+      {annotatable && <AnnotationsMount {...hubItemIdentity(relativePath)} />}
     </main>
     <SiteFooter
       contact={{ email: meta.contact.email, department: footer.department, university: footer.university }}

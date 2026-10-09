@@ -6,8 +6,9 @@
 // qualified id, because ADR-0021 stores no title.
 //
 // Thin, like the capture island: grouping, filtering and orphan detection live
-// in ../lib/annotations.mjs. Every quote and comment is a React text node, so a
-// stored `<script>` stays inert.
+// in the SHARED ../../src/lib/annotations.mjs (D20 moved it into the public tree
+// so the public capture island can use it too). Every quote and comment is a
+// React text node, so a stored `<script>` stays inert.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DEFAULT_INTENT,
@@ -17,7 +18,7 @@ import {
   isOrphanNote,
   listAnnotations,
   noteItemKey,
-} from "../lib/annotations.mjs";
+} from "../../src/lib/annotations.mjs";
 
 type AnyRecord = Record<string, any>;
 type Item = { section: string; source: string; slug: string; title: string; href: string | null };
