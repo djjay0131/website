@@ -95,6 +95,19 @@ describe("the mount renders no annotation content into the public HTML (D20)", (
     expect(island).toMatch(/keyup/);
   });
 
+  it("shows NO capture chrome without a session (RT-1 must-fix)", () => {
+    const island = fs.readFileSync(path.resolve("src/lib/annotations-island.ts"), "utf8");
+    // The gate decision exists and depends on BOTH the ready state and canWrite.
+    expect(island).toMatch(/canCapture\(\):\s*boolean\s*\{\s*return this\.visible && this\.canWrite;/);
+    // Both toolbar entry points early-return when it is false, and renderNothing
+    // clears canWrite so a 403 removes the toolbar for good.
+    const guards = island.match(/if \(!this\.canCapture\(\)\)/g) ?? [];
+    expect(guards.length, "updateSelection and showToolbar must both guard").toBeGreaterThanOrEqual(2);
+    expect(island).toMatch(/renderNothing\(\): void \{[\s\S]*?this\.canWrite = false;/);
+    // A 403 path calls renderNothing rather than leaving the island ready.
+    expect(island).toMatch(/if \(view\.kind !== "ready"\) \{\s*this\.renderNothing\(\);\s*return;/);
+  });
+
   it("ships NO private route in the shared island module or its pure logic", () => {
     for (const rel of ["src/lib/annotations-island.ts", "src/lib/annotations.mjs"]) {
       const text = fs.readFileSync(path.resolve(rel), "utf8");

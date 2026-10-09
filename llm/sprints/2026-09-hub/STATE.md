@@ -4057,6 +4057,15 @@ island in the public bundle; `demo:leak-check` **PASS** (fail-as-intended);
 `redirects:stubs`, `search:index` all PASS; contract `57/0`; governance
 `--layout` **4 of 4 PASS**.
 
+**Adversarial round (Wave 7):**
+
+| # | Source | Finding | Disposition |
+|---|---|---|---|
+| RT-1 | Red Team | The framework-free rewrite dropped the `canWrite` gate the Wave 6 React island had (`{selection && view.canWrite && …}`): `updateSelection`/`showToolbar` rendered the capture toolbar on a 403, showing a signed-out visitor the Highlight/Comment UI (a refused write, no data breach). | **Fixed (must-fix).** Added `canCapture()` (`visible && canWrite`), guarded in BOTH toolbar entry points, and `renderNothing()` now clears `canWrite` on a 403. `wave-7-structure.test.ts` pins the guard. |
+| RT-2 | Red Team | The island's list call filters only `(source, slug)`; a same-named item under another section could show a member's own note from elsewhere. | **Fixed (defense in depth).** The island also filters rows by `section` to the exact item; `(source, slug)` is unique anyway (ADR-0021 dec. 9). |
+| RT-3 | Red Team | A bare `http(s)://` URL in a comment is autolinked by GFM in the exported Markdown (tracking/phishing only; lands in the owner's private repo). | **Recorded, not fixed.** Pre-existing export behaviour, not a D20 regression; the export escaping owns the property. |
+| RT-4 | Red Team | Cross-member read, HTML injection, public-output leak, identity attribute injection | **No finding.** The gate filters own-only (`scope=all` owner-only, content redacted); the island uses `textContent` only; a byte scan of `dist-public` (incl. gunzipped Pagefind) found no private route, namespace, quote, comment, count or member identity; the identity reaches the DOM only through Astro-escaped attributes. |
+
 **Decisions taken without the owner:** the local intent preference is per
 browser, not per member (the island never holds member identity); the shared
 logic moved into the public `src/` tree so both builds compile it; the AN-LEAK

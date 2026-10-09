@@ -228,13 +228,21 @@ class AnnotationIsland {
   async refresh(): Promise<void> {
     const result = await listAnnotations({ source: this.source, slug: this.slug });
     const view = annotationsView(result);
-    // A 403 means "no session, or no write capability". Render NOTHING: a
-    // signed-out visitor must not even learn the feature is here.
+    // A 403 means "no member session, or no write capability". Render NOTHING:
+    // a signed-out visitor must not even learn the feature is here.
     if (view.kind !== "ready") {
       this.renderNothing();
       return;
     }
-    this.rows = view.rows as AnyRecord[];
+    // Defense in depth: the gate filters by (source, slug), which ADR-0021 says
+    // is unique across the hub; also match `section` so a row from a same-named
+    // item under another section can never be shown here.
+    this.rows = (view.rows as AnyRecord[]).filter(
+      (row) =>
+        (row.section === undefined || row.section === this.section) &&
+        (row.source === undefined || row.source === this.source) &&
+        (row.slug === undefined || row.slug === this.slug),
+    );
     this.canWrite = view.canWrite;
     this.visible = true;
     this.root.hidden = false;
@@ -242,8 +250,20 @@ class AnnotationIsland {
     this.repaint();
   }
 
+  /**
+   * Whether the capture UI may be shown at all. False until the gate has
+   * answered with a session AND write capability, and false again after a 403.
+   * THE 403 RENDERS NOTHING (D20): a signed-out visitor who selects text must not
+   * see a toolbar, and clicking it must never POST. Wave 6's React island gated
+   * its toolbar on `view.canWrite`; the rewrite must keep that gate.
+   */
+  canCapture(): boolean {
+    return this.visible && this.canWrite;
+  }
+
   renderNothing(): void {
     this.visible = false;
+    this.canWrite = false;
     this.rows = [];
     this.selection = null;
     this.hideToolbar();
@@ -262,6 +282,11 @@ class AnnotationIsland {
   // --- Selection and toolbar ----------------------------------------------
 
   updateSelection(): void {
+    // No session (or no write capability): never show the capture chrome.
+    if (!this.canCapture()) {
+      this.hideToolbar();
+      return;
+    }
     const doc = this.targetDoc;
     const win = this.targetWin;
     if (!doc || !win) return;
@@ -326,6 +351,13 @@ class AnnotationIsland {
   }
 
   showToolbar(): void {
+    // The single choke point: no session → the toolbar is never drawn. Entered
+    // only after `updateSelection` passes, and defended again here so a future
+    // caller cannot render capture chrome without a session.
+    if (!this.canCapture()) {
+      this.hideToolbar();
+      return;
+    }
     const toolbar = this.ensureToolbar();
     toolbar.replaceChildren(...this.toolbarChildren());
 
