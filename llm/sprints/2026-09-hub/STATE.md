@@ -4166,3 +4166,17 @@ only; all lockfile resolutions are `registry.npmjs.org`).
 
 **Local evidence:** site `npm test` **506 passed / 2 skipped** (36 files);
 public and private builds clean; `check:no-private-in-public` **PASS**.
+
+**Patch post-merge record (2026-10-09).** PR **#120** merged at **`151b289`**;
+all required checks green (`governance-checks`, `budget-guard`, `build`,
+`build-firebase`, `check`, `contract-tests`, `deploy-tools`,
+`leak-check-self-test`). No `infra/`/`contract/`/`gate/` change, so no apply.
+Post-merge `build-and-deploy` green on every job (`firebase-deploy`,
+`private-sync`, `firebase-smoke-test`, `deploy`, `smoke-test`). Live signed-out
+re-verification: `GET /research/soa-agentic-se/agentic-harnesses/` **200** with
+the hub identity; the new island chunk
+`_astro/AnnotationsMount…YuWcTjZ1.js` (18860 B, was 17357 B) names `/annotations`
+and **0** occurrences of `/p/notes` and carries the `pointerdown` hold fix;
+`GET /annotations` signed-out **403** `private, no-store`. **Owner re-test of the
+member click flow PENDING** (needs the `djjay@vt.edu` session); the jsdom test
+proves the behaviour and is verified failable against the pre-patch island.
