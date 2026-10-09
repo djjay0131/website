@@ -1,7 +1,19 @@
 # ADR-0022: Annotation export transport — the gate commits to a `notes` branch
 
 Status: Proposed
-Date: 2026-10-07 (amended 2026-10-07 on D18; amended 2026-10-08 on D19)
+Date: 2026-10-07 (amended 2026-10-07 on D18; amended 2026-10-08 on D19; noted
+2026-10-09 on D20)
+
+> **D20 note (2026-10-09) — no change to this ADR's decisions.** Owner decision
+> D20 lets a member annotate any item they can read, public items included
+> (ADR-0021 amended). The export consumes the same `annotations/{id}` rows and
+> routes by `intent` regardless of the item's visibility, so the transport,
+> credential, branch, layout (`notes/<source>/<slug>.md`) and routing here are
+> unaffected. A `paper` note on a public item exports exactly as a `paper` note on
+> a private one. The identity in the path is the item's `{source, slug}` from
+> ADR-0021 decision 1; first-party hub pages use `source: "hub"`, which is a safe
+> path segment. This note is a body amendment, so the `Status:` line stays
+> `Proposed`.
 
 ## Context
 
