@@ -127,7 +127,18 @@ class AnnotationIsland {
   confirm: { intent: string; id: string } | null = null;
   confirmTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // The toolbar is built ONCE and its nodes are REUSED (never replaced on a
+  // re-render), so a click that starts on a chip and ends on the same node still
+  // synthesises a `click` (the main-document-mode bug, D20 patch).
   toolbar: HTMLElement | null = null;
+  highlightBtn: HTMLButtonElement | null = null;
+  commentBtn: HTMLButtonElement | null = null;
+  intentsEl: HTMLElement | null = null;
+  chipButtons: Map<string, HTMLButtonElement> = new Map();
+  formEl: HTMLFormElement | null = null;
+  textareaEl: HTMLTextAreaElement | null = null;
+  saveBtn: HTMLButtonElement | null = null;
+  cancelBtn: HTMLButtonElement | null = null;
   toast: HTMLElement | null = null;
 
   constructor(root: HTMLElement, intent: string) {
@@ -198,18 +209,34 @@ class AnnotationIsland {
     }) as TextIndex;
   }
 
+  /** True when an event's target is one of the island's own controls. */
+  isIslandEvent(event: Event): boolean {
+    const target = event.target as Node | null;
+    if (!target) return false;
+    const element = target.nodeType === 1 ? (target as Element) : target.parentElement;
+    return typeof element?.closest === "function" && element.closest("[data-annotation-chrome]") !== null;
+  }
+
   attachSelectionListeners(): void {
     const doc = this.targetDoc;
     if (!doc) return;
-    const update = () => this.updateSelection();
-    doc.addEventListener("mouseup", update);
-    doc.addEventListener("keyup", update);
+    // Ignore events that land on the island's own chrome: a press on a toolbar
+    // control must not be read as "the selection changed" (the main-document
+    // bug). Keyup/mouseup carry the event; selectionchange does not, so it is
+    // additionally guarded by the toolbar holding focus.
+    const update = (event?: Event) => {
+      if (event && this.isIslandEvent(event)) return;
+      this.updateSelection();
+    };
+    doc.addEventListener("mouseup", (event) => update(event));
+    doc.addEventListener("keyup", (event) => update(event));
     // Touch: phones and iPads update the selection without a mouseup (D20).
     // `selectionchange` is debounced so a drag does not fire the handler per word.
     let debounce: ReturnType<typeof setTimeout> | null = null;
     doc.addEventListener("selectionchange", () => {
+      if (this.toolbar && doc.activeElement && this.toolbar.contains(doc.activeElement)) return;
       if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(update, 150);
+      debounce = setTimeout(() => update(), 150);
     });
   }
 
@@ -327,43 +354,141 @@ class AnnotationIsland {
     return { top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
   }
 
+  /**
+   * Build the toolbar ONCE and keep its nodes for the island's lifetime. Every
+   * control gets its OWN click handler, and the whole toolbar swallows
+   * mousedown/mouseup/pointerdown/pointerup with preventDefault + stopPropagation
+   * so the selection is not collapsed and focus does not move. Together these are
+   * the D20 main-document fix: without them, a press on a chip collapses the
+   * selection on mousedown, the island re-renders and REPLACES the button, and
+   * mouseup lands on a different node so the browser synthesises NO click.
+   */
   ensureToolbar(): HTMLElement {
     if (!this.toolbar) {
-      this.toolbar = el("div", {
+      const toolbar = el("div", {
         class: "annotation-toolbar",
         role: "toolbar",
         "aria-label": "Annotation actions",
         "data-annotation-toolbar": "1",
         "data-annotation-chrome": "1",
       });
-      document.body.append(this.toolbar);
+      const hold = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      for (const type of ["mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        toolbar.addEventListener(type, hold);
+      }
+
+      this.highlightBtn = el("button", { type: "button", class: "annotation-btn is-primary" }, "Highlight") as HTMLButtonElement;
+      this.highlightBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        void this.save("");
+      });
+      this.commentBtn = el("button", { type: "button", class: "annotation-btn" }, "Comment") as HTMLButtonElement;
+      this.commentBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        this.composing = true;
+        this.syncToolbar();
+      });
+
+      this.intentsEl = el("div", { class: "annotation-intents", role: "radiogroup", "aria-label": "Intent" });
+      for (const value of INTENTS) {
+        const chip = el(
+          "button",
+          { type: "button", class: "annotation-intent-chip", role: "radio", "aria-checked": "false" },
+          value,
+        ) as HTMLButtonElement;
+        chip.addEventListener("click", (event) => {
+          event.preventDefault();
+          this.intent = normalizeIntent(value);
+          storeIntent(this.intent);
+          this.syncToolbar();
+        });
+        this.chipButtons.set(value, chip);
+        this.intentsEl.append(chip);
+      }
+
+      this.textareaEl = el("textarea", {
+        class: "annotation-comment-input",
+        maxlength: String(LIMITS.commentMax),
+      }) as HTMLTextAreaElement;
+      this.textareaEl.addEventListener("input", () => {
+        this.comment = this.textareaEl?.value ?? "";
+      });
+      this.saveBtn = el("button", { type: "submit", class: "annotation-btn is-primary" }, "Save") as HTMLButtonElement;
+      this.cancelBtn = el("button", { type: "button", class: "annotation-btn" }, "Cancel") as HTMLButtonElement;
+      this.cancelBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        this.composing = false;
+        this.comment = "";
+        this.syncToolbar();
+      });
+      this.formEl = el(
+        "form",
+        { class: "annotation-form" },
+        el("label", { class: "annotation-form-label", text: "Comment" }),
+        this.textareaEl,
+        el("div", { class: "annotation-actions" }, this.saveBtn, this.cancelBtn),
+      ) as HTMLFormElement;
+      this.formEl.addEventListener("submit", (event) => {
+        event.preventDefault();
+        void this.save(this.comment);
+      });
+
+      toolbar.append(this.highlightBtn, this.commentBtn, this.intentsEl, this.formEl);
+      this.toolbar = toolbar;
     }
+    // Re-attach the SAME node if a previous hide detached it (node identity is
+    // what keeps the click alive across a hide/show).
+    if (this.toolbar.parentNode !== document.body) document.body.append(this.toolbar);
     return this.toolbar;
+  }
+
+  /** Update the persistent toolbar's state WITHOUT replacing any node. */
+  syncToolbar(): void {
+    for (const [value, chip] of this.chipButtons) {
+      const active = this.intent === value;
+      chip.classList.toggle("is-active", active);
+      chip.setAttribute("aria-checked", active ? "true" : "false");
+      chip.disabled = this.busy;
+    }
+    if (this.highlightBtn) {
+      this.highlightBtn.disabled = this.busy;
+      this.highlightBtn.style.display = this.composing ? "none" : "";
+    }
+    if (this.commentBtn) {
+      this.commentBtn.disabled = this.busy;
+      this.commentBtn.style.display = this.composing ? "none" : "";
+    }
+    if (this.saveBtn) this.saveBtn.disabled = this.busy;
+    if (this.cancelBtn) this.cancelBtn.disabled = this.busy;
+    if (this.formEl) this.formEl.style.display = this.composing ? "flex" : "none";
+    if (this.textareaEl) this.textareaEl.value = this.comment;
   }
 
   hideToolbar(): void {
     this.selection = null;
     this.composing = false;
-    if (this.toolbar) {
-      this.toolbar.remove();
-      this.toolbar = null;
-    }
+    // Detach but KEEP the node (and its stable children) for the next selection.
+    if (this.toolbar) this.toolbar.remove();
   }
 
   showToolbar(): void {
-    // The single choke point: no session → the toolbar is never drawn. Entered
-    // only after `updateSelection` passes, and defended again here so a future
-    // caller cannot render capture chrome without a session.
+    // The single choke point: no session → the toolbar is never drawn.
     if (!this.canCapture()) {
       this.hideToolbar();
       return;
     }
-    const toolbar = this.ensureToolbar();
-    toolbar.replaceChildren(...this.toolbarChildren());
+    this.ensureToolbar();
+    this.syncToolbar();
+    this.positionToolbar();
+  }
 
-    // Leave the toolbar invisible for the measurement, then clamp it to the
-    // viewport and anchor it above the selection (or below when there is no room
-    // above). NEVER fixed to the bottom of the window (D20).
+  /** Anchor the toolbar above (else below) the selection, clamped to the viewport. */
+  positionToolbar(): void {
+    const toolbar = this.toolbar;
+    if (!toolbar) return;
     toolbar.style.visibility = "hidden";
     toolbar.style.display = "flex";
     const tw = toolbar.offsetWidth;
@@ -379,103 +504,6 @@ class AnnotationIsland {
     toolbar.style.left = `${Math.round(left)}px`;
     toolbar.style.top = `${Math.round(top)}px`;
     toolbar.style.visibility = "visible";
-  }
-
-  intentChips(): HTMLElement {
-    const fieldset = el("div", { class: "annotation-intents", role: "radiogroup", "aria-label": "Intent" });
-    for (const value of INTENTS) {
-      fieldset.append(
-        el(
-          "button",
-          {
-            type: "button",
-            class: `annotation-intent-chip${this.intent === value ? " is-active" : ""}`,
-            role: "radio",
-            "aria-checked": this.intent === value ? "true" : "false",
-            disabled: this.busy,
-            onclick: () => {
-              this.intent = normalizeIntent(value);
-              storeIntent(this.intent);
-              this.showToolbar();
-            },
-          },
-          value,
-        ),
-      );
-    }
-    return fieldset;
-  }
-
-  toolbarChildren(): (Node | string)[] {
-    if (this.composing) {
-      return [
-        this.intentChips(),
-        el(
-          "form",
-          {
-            class: "annotation-form",
-            onsubmit: (event: Event) => {
-              event.preventDefault();
-              void this.save(this.comment);
-            },
-          },
-          el("label", { class: "annotation-form-label", text: "Comment" }),
-          el("textarea", {
-            class: "annotation-comment-input",
-            maxlength: String(LIMITS.commentMax),
-            value: this.comment,
-            oninput: (event: Event) => {
-              this.comment = (event.target as HTMLTextAreaElement).value;
-            },
-          }),
-          el(
-            "div",
-            { class: "annotation-actions" },
-            el("button", { type: "submit", class: "annotation-btn is-primary", disabled: this.busy }, "Save"),
-            el(
-              "button",
-              {
-                type: "button",
-                class: "annotation-btn",
-                disabled: this.busy,
-                onclick: () => {
-                  this.composing = false;
-                  this.comment = "";
-                  this.showToolbar();
-                },
-              },
-              "Cancel",
-            ),
-          ),
-        ),
-      ];
-    }
-    return [
-      el(
-        "button",
-        {
-          type: "button",
-          class: "annotation-btn is-primary",
-          disabled: this.busy,
-          onclick: () => void this.save(""),
-        },
-        "Highlight",
-      ),
-      el(
-        "button",
-        {
-          type: "button",
-          class: "annotation-btn",
-          disabled: this.busy,
-          onclick: () => {
-            this.composing = true;
-            this.showToolbar();
-          },
-        },
-        "Comment",
-      ),
-      this.intentChips(),
-    ];
   }
 
   // --- Save / undo / delete -----------------------------------------------

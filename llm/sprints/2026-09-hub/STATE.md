@@ -4116,3 +4116,53 @@ console, no credentials, no destroy/replace.
   on its public and `/p/` routes showing one note) needs a real `djjay@vt.edu`
   session, which no agent can mint (A1 is owner-only). Signed-out behaviour is
   verified above; the member flow is recorded **pending**, not claimed.
+
+## Wave 7 patch — the main-document click bug (owner live test 2026-10-09)
+
+**Owner live test on `main` at `04bf8a4`, Chrome desktop, signed in.**
+
+- **PASS** — `/p/research/agentic-kg-research/research-store/` (iframe target):
+  drag-select → toolbar anchored above the selection with Highlight / Comment /
+  `paper|experiment|brainstorm|question` (`paper` preselected) → Highlight saves,
+  toast `Saved · paper` + Undo, the highlight paints with the selection collapsed,
+  `Notes (1)` toggle.
+- **FAIL** — public route `/research/soa-agentic-se/agentic-harnesses/`
+  (main-document target; `data-item-source=hub`): the toolbar appeared but a REAL
+  mouse click on any control did nothing. Instrumented capture-phase listeners
+  showed `mousedown`/`mouseup` on the button and **no `click`**, selection length
+  unchanged at 83; `chip.click()` from the console worked. The mousedown/mouseup
+  targets were not the same node: pressing the toolbar collapsed the selection,
+  `mouseup`/`selectionchange` → `updateSelection` → `showToolbar` **replaced** the
+  button mid-click, so the browser synthesised no `click`. The iframe route was
+  immune because the toolbar lives in the parent document there.
+
+**Root cause.** The framework-free rewrite rebuilt the toolbar's children on every
+`showToolbar` (`toolbar.replaceChildren(...)`) and did not stop the toolbar press
+from clearing the selection. Correct in the iframe (separate document), fatal when
+the toolbar and the selection share a document.
+
+**Fix (patch).** In `site/src/lib/annotations-island.ts`:
+
+1. the toolbar and every control are built **once** and their nodes reused, so a
+   re-render never replaces a pressed button — `syncToolbar()` updates classes,
+   `aria-checked`, `disabled` and form visibility in place;
+2. the toolbar `preventDefault()`s and `stopPropagation()`s
+   `mousedown`/`mouseup`/`pointerdown`/`pointerup`, so the selection is not
+   collapsed and the document-level `mouseup` never runs;
+3. selection listeners **ignore events whose target is inside the island**
+   (`[data-annotation-chrome]`), and `selectionchange` is ignored while the
+   toolbar holds focus;
+4. each control binds its own `click` handler (Highlight, Comment, chips, Save,
+   Cancel) rather than relying on document-level ordering.
+
+**Test.** `site/src/lib/annotations-island.dom.test.ts` drives the island with
+REAL `MouseEvent`s in jsdom (main-document mode) and asserts: the toolbar nodes
+are stable across a `selectionchange`; `mousedown` is `defaultPrevented`; a real
+click on a chip changes the active intent; a real click on Highlight saves
+(`Saved` toast + Undo + a `POST` carrying the chosen intent). **Verified
+failable:** against the pre-patch island (`33c812e`) 2 of 4 fail (node stability,
+preventDefault); against the patch all 4 pass. `jsdom` is a devDependency (test
+only; all lockfile resolutions are `registry.npmjs.org`).
+
+**Local evidence:** site `npm test` **506 passed / 2 skipped** (36 files);
+public and private builds clean; `check:no-private-in-public` **PASS**.
