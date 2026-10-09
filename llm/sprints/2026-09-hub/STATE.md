@@ -4082,3 +4082,37 @@ pending, not claimed.
 
 **Hard stops:** none encountered; no Terraform, no schema/contract change, no
 console, no credentials, no destroy/replace.
+
+### Wave 7 — post-merge record (2026-10-09)
+
+- **Merged** as PR **#118**, merge commit **`33c812e`** (branch
+  `feat/annotations-public` deleted). §8 held: `governance-checks` and
+  `budget-guard` required checks green; `build`, `build-firebase`, `check`,
+  `contract-tests`, `deploy-tools` and `leak-check-self-test` green. Red Team
+  RT-1 (must-fix) and RT-2 remediated; Security Tester checks 1–7 PASS and ST-1
+  (the tautological cross-route test) remediated to 0 FAIL; no un-failable guard
+  remains after ST-1; PR body carries the data/security/privacy section.
+- **No apply.** `git diff 20179dd..33c812e` touches no `infra/`, `contract/` or
+  `gate/` path, so there is nothing to plan or apply; the D19-pending
+  `hub-gate` `notes-export-app-key` accessor binding is untouched.
+- **Post-merge workflows green:** `ci` run `37945626154` success;
+  `build-and-deploy` run `37945626175` success on every job — `check`, `build`,
+  `build-firebase`, `deploy` (Pages), `smoke-test`, `private-sync`,
+  `firebase-deploy`, `firebase-smoke-test`, `deploy-tools`, `budget-guard`,
+  `leak-check-self-test`, `private-bucket-live-iam`, `notify-recovery`.
+- **Live signed-out verification (2026-10-09):**
+
+  | Probe | Result |
+  |---|---|
+  | `GET /projects/kgis/kgis-docs/` (public item) | **200**; page carries `data-annotation-island` with `data-item-source="kgis"`; **0** occurrences of the private route |
+  | `GET /research/soa-agentic-se/agentic-memory/` (hub item) | **200**; identity `section=research source=hub slug=research/soa-agentic-se/agentic-memory` |
+  | island chunk `/_astro/AnnotationsMount…js` | **200**, 17357 B; names `/annotations`, **0** occurrences of `/p/notes` |
+  | `GET /annotations` signed-out | **403** `cache-control: private, no-store` |
+  | `GET /p/research/agentic-kg-research/research-store/` signed-out | **404** |
+  | `GET /p/notes/` signed-out | **404** |
+
+- **Owner sign-in check — PENDING.** The member flow (select text → anchored
+  toolbar → Save → immediate highlight → `/p/notes/`; and the same item reached
+  on its public and `/p/` routes showing one note) needs a real `djjay@vt.edu`
+  session, which no agent can mint (A1 is owner-only). Signed-out behaviour is
+  verified above; the member flow is recorded **pending**, not claimed.
