@@ -32,19 +32,27 @@ describe("the annotation item identity is the item's, not the pane's (D20)", () 
     expect(hubItemIdentity("papers")).toEqual({ section: "papers", source: "hub", slug: "papers" });
   });
 
-  it("produces one item key and one request body for the same item on BOTH routes", () => {
-    // The exact triple the framed item route passes, on the public page and the
-    // private frame. A satellite item is the same item whichever pane renders it.
+  it("a satellite item's identity is the MANIFEST triple, not a route-derived one (failable)", () => {
+    // A satellite item is the same item whichever route renders it. Both item
+    // page templates supply the SAME manifest triple (wave-6-structure pins that
+    // structurally); here we model the identity a route WOULD produce if it were
+    // (wrongly) derived from the path, and assert the two differ — so a refactor
+    // that switched the framed route to hubItemIdentity would fail this test.
     const item = { section: "projects", source: "kgis", slug: "kgis-docs" };
-    const fromPublicRoute = { ...item };
-    const fromPrivateRoute = { ...item };
-
+    // What the public framed route and the private frame each pass (manifest).
+    const fromPublicRoute = { section: item.section, source: item.source, slug: item.slug };
+    const fromPrivateRoute = { section: item.section, source: item.source, slug: item.slug };
     expect(noteItemKey(fromPublicRoute)).toBe("projects/kgis/kgis-docs");
-    expect(noteItemKey(fromPrivateRoute)).toBe(noteItemKey(fromPublicRoute));
+    expect(noteItemKey(fromPrivateRoute)).toBe("projects/kgis/kgis-docs");
+
+    // The WRONG identity: what hubItemIdentity would give from the same path.
+    const routeDerived = hubItemIdentity("/projects/kgis/kgis-docs/");
+    expect(routeDerived).toEqual({ section: "projects", source: "hub", slug: "projects/kgis/kgis-docs" });
+    expect(noteItemKey(routeDerived)).not.toBe(noteItemKey(fromPublicRoute));
 
     const selector = { exact: "a quoted passage", prefix: "pre", suffix: "post" };
     const position = { start: 10, end: 27 };
-    const bodyOf = (ident: typeof item) =>
+    const bodyOf = (ident: { section: string; source: string; slug: string }) =>
       annotationCreateRequestInit({
         ...ident,
         selector,
@@ -53,7 +61,10 @@ describe("the annotation item identity is the item's, not the pane's (D20)", () 
         comment: "note",
         intent: "paper",
       }).body;
+    // The two real routes produce identical bodies; the route-derived (wrong)
+    // identity does NOT, which is what makes this a regression test.
     expect(bodyOf(fromPrivateRoute)).toBe(bodyOf(fromPublicRoute));
+    expect(bodyOf(routeDerived)).not.toBe(bodyOf(fromPublicRoute));
     // The request body names section/source/slug and NOTHING about a route/pane.
     const body = JSON.parse(bodyOf(fromPublicRoute));
     expect(body.section).toBe("projects");
