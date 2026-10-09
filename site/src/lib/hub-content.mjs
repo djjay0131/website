@@ -350,6 +350,30 @@ export const ALLOWLIST_VERSION = 1;
 /** The pseudo-source first-party hub pages use in the allowlist. */
 export const HUB_SOURCE = "hub";
 
+/**
+ * The annotation item identity for a FIRST-PARTY hub page (D20/Wave 7).
+ *
+ * A note is anchored to an item — `{section, source, slug}` — never to a route
+ * or a pane (ADR-0021 decision 1, amended on D20). Satellite items take their
+ * triple from the manifest (so a public framed item and the same item under /p/
+ * agree). A first-party page is not in any manifest, so it gets a stable
+ * identity from its own route: `source: "hub"` (the same pseudo-source the
+ * publish allowlist uses for hub pages, ADR-0016) and the path as the slug.
+ *
+ * The `pathname` is the BASE-RELATIVE path (callers strip `base`), so the
+ * Firebase `/research/...` and the GitHub Pages `/website/research/...` spellings
+ * produce the SAME identity for the same page.
+ *
+ * @param {string} pathname base-relative page path, with or without slashes
+ * @returns {{section: string, source: string, slug: string}}
+ */
+export function hubItemIdentity(pathname) {
+  const clean = String(pathname ?? "").replace(/^\/+|\/+$/g, "");
+  const segments = clean.split("/").filter(Boolean);
+  if (segments.length === 0) return { section: "home", source: HUB_SOURCE, slug: "home" };
+  return { section: segments[0], source: HUB_SOURCE, slug: segments.join("/") };
+}
+
 /** The source pattern, mirrored from the manifest schema. */
 const SOURCE_PATTERN = /^[a-z][a-z0-9-]{0,38}$/;
 /** A satellite slug, as the manifest schema defines it. */

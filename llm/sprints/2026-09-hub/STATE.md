@@ -3982,3 +3982,103 @@ so the workflow ran on that push: **success in 8 s, no-op** — the guard set
 `have_key=false`, emitted the `NOTES_EXPORT_APP_KEY is not set` notice, and the
 `terraform` job was skipped. That is the placeholder-free green run D19 requires;
 the credentialed path waits on the owner's paste and dispatch.
+
+## D20 — annotations follow the member, not the page (2026-10-09)
+
+Owner decision D20, recorded verbatim in intent. The owner tested annotations
+live on `/p/research/agentic-kg-research/research-store/` and found the feature
+scoped wrong and its feedback too weak: mechanics worked (toolbar, `POST
+/annotations`, CSS highlight) but nothing about the experience invited a note.
+**Any signed-in member annotates any item they can read — public items
+included.** Five changes:
+
+1. **Scope.** The capture island now mounts on public item pages as well as
+   under `/p/` — the public framed item route (`/<section>/<source>/<slug>/`),
+   `layouts/ItemPage.astro` (CV project pages) and every research/paper page.
+   Gating is unchanged and stays server-side: `GET /annotations` **403 ⇒ the
+   island renders nothing**, and the public build carries the island's CODE but
+   no annotation CONTENT (the mount root is empty and hidden; nothing about the
+   member, their notes or the quotes is inlined into the public HTML or the
+   Pagefind index).
+2. **One island, two targets.** The target is either
+   `iframe[data-annotation-frame]` (framed payload items, as in Wave 6) or the
+   page's own `main`/`article` content root (pages that inline the item). The
+   same W3C selector/text-index code drives both, so a satellite republish still
+   re-anchors.
+3. **Identity is the item's, not the pane.** A satellite item supplies
+   `{section, source, slug}` from its manifest on BOTH routes; a first-party hub
+   page uses `source: "hub"` with its base-relative path as the slug
+   (`hubItemIdentity`, ADR-0016's pseudo-source). A note made on the public route
+   and one made under `/p/` for the same item are the same item.
+4. **Feedback.** Selection-anchored toolbar clamped to the viewport (never
+   bottom-of-window), 44px targets; a brief non-blocking `Saved · <intent>` toast
+   with **Undo**; the selection is collapsed after painting and the highlight
+   opacity raised so the colour is visible; the intent chip is in the one-click
+   toolbar, remembered LOCALLY per browser (`hub:annotation-intent`), defaulting
+   to the last used, else `paper` — never a silent `question`; the notes list is
+   a sticky side panel on wide screens and a toggle on narrow; and
+   `selectionchange` (debounced) joins `mouseup`/`keyup` for touch.
+5. **Guards unchanged.** Members-only server checks, `private, no-store`, no
+   quotes/titles in logs, owner-only delete of others' notes, Security Tester
+   veto. The AN-LEAK needles change shape (below); the notes-sync pipeline
+   (D18/D19) is untouched and consumes the same rows.
+
+**Design:** ADR-0021 amended in place (body change; Status stays `Accepted`);
+ADR-0022 gets a D20 note only — its decisions are unaffected because routing is
+by `intent`, not by item visibility.
+
+**What shipped (branch `feat/annotations-public`, Wave 7):**
+
+- **shared island** — the Wave 6 React island (private-only) is replaced by a
+  framework-free module so the PUBLIC build (which runs no React, SEAM-S6 /
+  ADR-0003) can mount the same island: `site/src/lib/annotations.mjs` (moved
+  from `src-private`, `/p/notes` removed), `site/src/lib/annotations-island.ts`
+  (the DOM driving, `createElement`/`textContent` only, no `innerHTML`),
+  `site/src/components/AnnotationsMount.astro` (one mount, one global style).
+  The private My notes surface stays private (`NotesIsland.tsx`, `/notes/`).
+- **public mounts** — `Base.astro` gains an `annotatable` prop that renders the
+  mount with the item's hub identity; set on the 15 research digest pages and
+  `/papers/`; `ItemPage.astro` forwards `annotatable` for CV project pages; the
+  public framed route passes the manifest identity and marks the frame with
+  `data-annotation-frame`.
+- **leak check (AN-LEAK, D20)** — `/annotations` and `data-annotation-*` are now
+  ALLOWED public tooling (the island ships them); the needles are reduced to the
+  private surface only: `/p/notes` and `hub:annotation:`. The allowed strings are
+  pinned by a test.
+- **tests** — `annotations.test.ts` (moved; default intent `paper`), the AN-LEAK
+  suite rewritten, `wave-6-structure.test.ts` updated for the shared island, and
+  a new `wave-7-structure.test.ts` (identity is the item's; the mount renders no
+  content; the module is `innerHTML`-free and names no private route).
+
+**Local evidence (pre-PR):** site `npm test` **501 passed / 2 skipped**; public
+and private astro builds clean; `check:no-private-in-public` **PASS** with the
+island in the public bundle; `demo:leak-check` **PASS** (fail-as-intended);
+`check:private-links`, `check:publish-allowlist`, `check:smoke-routes`,
+`redirects:stubs`, `search:index` all PASS; contract `57/0`; governance
+`--layout` **4 of 4 PASS**.
+
+**Adversarial round (Wave 7):**
+
+| # | Source | Finding | Disposition |
+|---|---|---|---|
+| RT-1 | Red Team | The framework-free rewrite dropped the `canWrite` gate the Wave 6 React island had (`{selection && view.canWrite && …}`): `updateSelection`/`showToolbar` rendered the capture toolbar on a 403, showing a signed-out visitor the Highlight/Comment UI (a refused write, no data breach). | **Fixed (must-fix).** Added `canCapture()` (`visible && canWrite`), guarded in BOTH toolbar entry points, and `renderNothing()` now clears `canWrite` on a 403. `wave-7-structure.test.ts` pins the guard. |
+| RT-2 | Red Team | The island's list call filters only `(source, slug)`; a same-named item under another section could show a member's own note from elsewhere. | **Fixed (defense in depth).** The island also filters rows by `section` to the exact item; `(source, slug)` is unique anyway (ADR-0021 dec. 9). |
+| RT-3 | Red Team | A bare `http(s)://` URL in a comment is autolinked by GFM in the exported Markdown (tracking/phishing only; lands in the owner's private repo). | **Recorded, not fixed.** Pre-existing export behaviour, not a D20 regression; the export escaping owns the property. |
+| RT-4 | Red Team | Cross-member read, HTML injection, public-output leak, identity attribute injection | **No finding.** The gate filters own-only (`scope=all` owner-only, content redacted); the island uses `textContent` only; a byte scan of `dist-public` (incl. gunzipped Pagefind) found no private route, namespace, quote, comment, count or member identity; the identity reaches the DOM only through Astro-escaped attributes. |
+| ST-1 | Security Tester | The cross-route identity assertion was tautological: `fromPublicRoute` and `fromPrivateRoute` were two copies of one object, so the equality could not fail. | **Fixed.** The test now also derives the WRONG identity from the route (`hubItemIdentity`) and asserts the manifest body DIFFERS from it, so a refactor that used the route would fail. Checks 1–7 PASS; 1 FAIL (ST-1), remediated. |
+
+**Decisions taken without the owner:** the local intent preference is per
+browser, not per member (the island never holds member identity); the shared
+logic moved into the public `src/` tree so both builds compile it; the AN-LEAK
+needle set was reduced to the genuinely private surface, with the newly-allowed
+strings pinned by test.
+
+**Live verification — PENDING (owner sign-in).** The private route and the
+public island route are verified signed-out (the island fetches and renders
+nothing on a 403; the public bundle carries no private route). The member flow
+(select → toolbar → save → highlight → `/p/notes/`) still needs a real
+`djjay@vt.edu` session, which no agent can mint (A1 is owner-only). Recorded
+pending, not claimed.
+
+**Hard stops:** none encountered; no Terraform, no schema/contract change, no
+console, no credentials, no destroy/replace.

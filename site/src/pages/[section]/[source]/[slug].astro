@@ -16,6 +16,7 @@
 // a link rather than linking to a 404.
 import { getCollection } from "astro:content";
 import Base from "../../../layouts/Base.astro";
+import AnnotationsMount from "../../../components/AnnotationsMount.astro";
 import { payloadUrlFor } from "../../../lib/frame-content.mjs";
 
 export async function getStaticPaths() {
@@ -55,7 +56,8 @@ const payload = payloadUrlFor(item, base);
     </p>
     {item.summary && <p class="summary">{item.summary}</p>}
 
-    <iframe class="payload" src={payload} title={item.title} loading="lazy"></iframe>
+    <iframe class="payload" data-annotation-frame src={payload} title={item.title} loading="lazy"></iframe>
+    <AnnotationsMount section={item.section} source={item.source} slug={item.slug} />
     <p class="fallback"><a href={payload}>Open this document on its own</a></p>
   </article>
 </Base>

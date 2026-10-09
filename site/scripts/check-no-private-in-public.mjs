@@ -39,15 +39,16 @@
 //   title          the item's title, raw and HTML-escaped
 //   summary        the item's summary, raw and HTML-escaped
 //
-// ANNOTATION NEEDLES (AN-LEAK; Wave 6). The annotation capture island, the My
-// notes page and the `/annotations` endpoints are PRIVATE build only. If a
-// regression carries any of their tooling or endpoints into dist-public, the
-// public output would name how to reach private, member-scoped notes. Four
-// fixed needles catch that in a path or in a file's contents, independent of any
-// manifest: `/annotations`, `/p/notes`, `hub:annotation:` (a future storage key)
-// and `data-annotation-` (the capture island's DOM attributes). They are
-// checked even when no private item is published, because they guard a tool,
-// not one item.
+// ANNOTATION NEEDLES (AN-LEAK; Wave 6, rewritten for D20/Wave 7). The capture
+// ISLAND is now bundled into dist-public on purpose (a signed-in member
+// annotates public items too), so the `/annotations` endpoint and the
+// `data-annotation-*` DOM hooks are ALLOWED public tooling. What is still
+// forbidden is the PRIVATE surface: `/p/notes` (the member-only My notes route)
+// and `hub:annotation:` (the namespace reserved for private annotation data).
+// Those two are checked in a path or in a file's contents, independent of any
+// manifest, even when no private item is published, because they guard a tool
+// and a data namespace rather than one item. The allowed strings are pinned by a
+// test so they cannot silently become leaks again.
 //
 // A SOURCE NAME IS NOT A BARE NEEDLE (Wave 4 FP-2). The Wave 4 satellite
 // publishes under source key `construction-ai`, which is also the id of the
@@ -283,38 +284,41 @@ export function weakNeedleWarnings(items) {
 }
 
 /**
- * THE ANNOTATION NEEDLES (AN-LEAK; contract site-wave-6 requirement 6).
+ * THE ANNOTATION NEEDLES (AN-LEAK; contract site-wave-6 requirement 6; rewritten
+ * for D20/Wave 7).
  *
- * The annotation tooling and endpoints are private-build only. These four fixed
- * strings are not derived from any manifest: they guard the TOOL. A path or a
- * file under dist-public containing any of them is a regression that would tell
- * a public visitor how to reach private, member-scoped notes.
+ * WAVE 6 kept `/annotations`, `/p/notes`, `hub:annotation:` and `data-annotation-`
+ * out of dist-public because the whole annotation surface was private-build only.
+ * **D20 changes the scope**: any signed-in member annotates any item they can
+ * read, so the capture ISLAND — its `/annotations` endpoint call and its
+ * `data-annotation-*` DOM hooks — is deliberately bundled into dist-public. Those
+ * two strings are therefore ALLOWED public tooling now, and treating them as
+ * needles would fail a correct build (the guard that cries wolf is the guard that
+ * gets deleted).
+ *
+ * What must NEVER reach the public output is the PRIVATE surface:
+ *
+ *   /p/notes   the member-only My notes route (served by the gate under /p/);
+ *   hub:annotation:  the namespace reserved for private annotation DATA. The
+ *              island's own preference key is `hub:annotation-intent`, which does
+ *              NOT contain the trailing colon, so a regression that stored note
+ *              content under the namespace is still caught.
+ *
+ * The member, their notes, their quotes and the note count are never inlined:
+ * the mount root starts EMPTY and HIDDEN and the island fetches at runtime, so
+ * signed out there is nothing to leak, and Pagefind indexes no note content.
+ * `data-annotation-` and `/annotations` are pinned as ALLOWED by a test, so a
+ * future refactor cannot quietly turn the island back into a private-only tool
+ * (which would break public annotation) or into a content inliner.
  */
-export const ANNOTATION_NEEDLES = ["/annotations", "/p/notes", "hub:annotation:", "data-annotation-"];
+export const ANNOTATION_NEEDLES = ["/p/notes", "hub:annotation:"];
 
 /**
- * The left-boundary set for `data-annotation-` (AN-LEAK, Wave 6 FP).
- *
- * A CLEAN public build already contains the substring `data-annotation-`: the
- * research data has the citation key `tan-2024-llm-data-annotation-survey`, and
- * a plain substring search failed the build on it -- the same over-broad-needle
- * class as Wave 2's `index.html` and Wave 4's `construction-ai` (the guard that
- * cries wolf is the guard that gets deleted).
- *
- * The collision is on the LEFT: in `llm-data-annotation-survey` the needle is
- * preceded by a hyphen, part of a longer token; a real DOM attribute or code
- * string is preceded by whitespace, a quote, `<`, an opening bracket, a comma or
- * a backtick. Requiring one of those left neighbours keeps every real occurrence
- * (`data-annotation-frame`, `data-annotation-island`, `"data-annotation-..."`)
- * and drops the hyphenated citation key. The other three needles are
- * distinctive enough to match as plain substrings.
+ * The annotation strings that are ALLOWED in the public bundle (D20). Exported so
+ * the companion test can assert the island's own code is present rather than
+ * flagged; they are not leaks.
  */
-const ANNOTATION_LEFT_BOUNDARY = new Set([
-  " ", "\t", "\n", "\r", "<", '"', "'", "(", "[", "{", ",", "`", "=",
-  // R2-03: a CSS rule `.data-annotation-frame{}` or an import
-  // `"./data-annotation-frame.js"` is a real leak too.
-  ".", "/", "#", "?", ";", ":", "&", "|",
-]);
+export const ANNOTATION_ALLOWED_IN_PUBLIC = ["/annotations", "data-annotation-"];
 
 /**
  * HTML entities a browser decodes before an attribute value or URL is used.
@@ -348,20 +352,12 @@ export function normalizeAnnotationHaystack(text) {
 
 /**
  * True when `text` carries `needle`, case-insensitively and after decoding the
- * common HTML entities. `data-annotation-` must still start a token (see
- * ANNOTATION_LEFT_BOUNDARY); the others match as substrings.
+ * common HTML entities. Every ANNOTATION needle is distinctive enough to match
+ * as a plain substring (the `data-annotation-` left-boundary special-case died
+ * with that needle on D20, since the attribute is now legitimate public tooling).
  */
 export function containsAnnotationNeedle(text, needle) {
-  const haystack = normalizeAnnotationHaystack(text);
-  const lowered = String(needle).toLowerCase();
-  let at = haystack.indexOf(lowered);
-  while (at !== -1) {
-    if (needle !== "data-annotation-") return true;
-    const before = at === 0 ? "" : haystack[at - 1];
-    if (before === "" || ANNOTATION_LEFT_BOUNDARY.has(before)) return true;
-    at = haystack.indexOf(lowered, at + 1);
-  }
-  return false;
+  return normalizeAnnotationHaystack(text).includes(String(needle).toLowerCase());
 }
 
 /**

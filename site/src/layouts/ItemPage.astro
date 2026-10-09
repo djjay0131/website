@@ -20,6 +20,12 @@ interface Props {
   backHref: string;
   backLabel: string;
   noindex?: boolean;
+  /**
+   * Enables the shared annotation capture island (D20/Wave 7). This layout is
+   * the item-content layout for CV project pages; the identity comes from the
+   * page route (`hub/projects/<id>`), computed in Base via `hubItemIdentity`.
+   */
+  annotatable?: boolean;
 }
 
 const {
@@ -31,10 +37,11 @@ const {
   backHref,
   backLabel,
   noindex = false,
+  annotatable = false,
 } = Astro.props;
 ---
 
-<Base title={pageTitle} description={description} noindex={noindex}>
+<Base title={pageTitle} description={description} noindex={noindex} annotatable={annotatable}>
   <article class="item-page">
     <p class="crumbs"><a href={backHref}>← {backLabel}</a></p>
     <header class="item-head">
