@@ -5,6 +5,8 @@ import { loadContentPool } from "../lib/cv-data";
 import { mdToHtml } from "../lib/md";
 import { CV_CONTENT_DIR } from "../lib/hub-content.mjs";
 import { readFooterData } from "../lib/footer.mjs";
+import { getPublishedPosts } from "../lib/rabbit-holes-collection";
+import { RABBIT_HOLES_TITLE } from "../lib/rabbit-holes.mjs";
 import path from "node:path";
 import portfolio from "../data/research-portfolio.json";
 
@@ -40,11 +42,17 @@ function hrefFor(item: (typeof recent)[number]): string | undefined {
   return undefined;
 }
 
+// The latest Rabbit Holes post (D21): a card on the home page, hidden entirely
+// when there are no published posts. Reads the published set, so a draft never
+// reaches this card.
+const rabbitHoles = await getPublishedPosts();
+const latestRabbitHole = rabbitHoles[0];
+
 // The "Ways in" copy is a draft the owner edits (plan §3).
 const waysIn = [
   { label: "Research", href: `${base}research/`, description: "Working digests grouped by project." },
   { label: "Projects", href: `${base}projects/`, description: "Selected projects and research." },
-  { label: "Writing", href: `${base}writing/`, description: "Notes, papers and shorter pieces." },
+  { label: RABBIT_HOLES_TITLE, href: `${base}rabbit-holes/`, description: "Whatever I'm reading, building or arguing about." },
   { label: "CV", href: `${base}cv/`, description: "The CV in each of its variants." },
 ];
 ---
@@ -131,6 +139,16 @@ const waysIn = [
       ))}
     </div>
   </section>
+
+  {latestRabbitHole && (
+    <section class="block" aria-labelledby="latest-rabbit-hole">
+      <h2 id="latest-rabbit-hole">Latest rabbit hole</h2>
+      <a class="way latest" href={`${base}rabbit-holes/${latestRabbitHole.slug}/`}>
+        <span class="way-label">{latestRabbitHole.title}</span>
+        <span class="way-description">{latestRabbitHole.summary}</span>
+      </a>
+    </section>
+  )}
 </Base>
 
 <style>

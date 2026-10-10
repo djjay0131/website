@@ -1,0 +1,194 @@
+---
+// RABBIT HOLES — one post (D21, Wave 8). Markdown rendered by Astro's pipeline
+// (Shiki code blocks, GFM footnotes), typography matched to the research pages,
+// per-post OG image, prev/next, a Subscribe block and share links. The
+// annotation capture island mounts here like every other public item, with
+// source=hub and slug=rabbit-holes/<slug> (D20) — Base derives that identity from
+// the route.
+import { render } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import RabbitHolesShare from "../../components/RabbitHolesShare.astro";
+import RabbitHolesSubscribe from "../../components/RabbitHolesSubscribe.astro";
+import { getPublishedPosts } from "../../lib/rabbit-holes-collection";
+import { CANONICAL_ORIGIN } from "../../lib/canonical-url.mjs";
+import { RABBIT_HOLES_TITLE, postUrl, readingLabel, tagSlug } from "../../lib/rabbit-holes.mjs";
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  return posts.map((post) => ({ params: { slug: post.slug } }));
+}
+
+const base = import.meta.env.BASE_URL;
+const { slug } = Astro.params;
+const posts = await getPublishedPosts();
+const index = posts.findIndex((post) => post.slug === slug);
+const post = posts[index];
+if (!post) throw new Error(`no published rabbit hole for slug "${slug}"`);
+const newer = index > 0 ? posts[index - 1] : null;
+const older = index < posts.length - 1 ? posts[index + 1] : null;
+// Render through Astro's own pipeline so the page matches the feed's
+// `rendered.html` byte for byte.
+const { Content } = await render(post.entry);
+const url = postUrl(post, CANONICAL_ORIGIN);
+---
+
+<Base
+  title={`${post.title} — ${RABBIT_HOLES_TITLE} — Jason Cusati`}
+  description={post.summary}
+  ogImage={`rabbit-holes/og/${post.slug}.png`}
+  canonical={post.canonical}
+  annotatable
+>
+  <article class="rh-post" data-rabbit-hole={post.slug}>
+    <p class="crumbs">
+      <a href={`${base}rabbit-holes/`}>← {RABBIT_HOLES_TITLE}</a>
+    </p>
+    <header>
+      <h1>{post.title}</h1>
+      <p class="meta-mono">
+        <time datetime={post.dateText}>{post.dateText}</time>
+        <span aria-hidden="true"> · </span>
+        <span>{post.body ? readingLabel(post.body) : "1 min read"}</span>
+      </p>
+      {post.tags.length > 0 && (
+        <ul class="rh-tags" aria-label="Tags">
+          {post.tags.map((tag) => (
+            <li>
+              <a href={`${base}rabbit-holes/tags/${tagSlug(tag)}/`}>#{tag}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </header>
+
+    {post.hero && (
+      <img class="rh-hero" src={post.hero.startsWith("/") ? `${base}${post.hero.replace(/^\//, "")}` : post.hero} alt="" />
+    )}
+
+    <div class="prose">
+      <Content />
+    </div>
+
+    {post.sources && post.sources.length > 0 && (
+      <section class="rh-sources" aria-labelledby="rh-sources-heading">
+        <h2 id="rh-sources-heading">Sources</h2>
+        <ul>
+          {post.sources.map((source) => (
+            <li>
+              <a href={source.url} rel="noopener">{source.title}</a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    <nav class="rh-postnav" aria-label="More Rabbit Holes">
+      {older ? <a href={`${base}rabbit-holes/${older.slug}/`}>← {older.title}</a> : <span />}
+      {newer ? <a href={`${base}rabbit-holes/${newer.slug}/`}>{newer.title} →</a> : <span />}
+    </nav>
+
+    <RabbitHolesShare title={post.title} url={url} />
+    <RabbitHolesSubscribe />
+  </article>
+</Base>
+
+<style>
+  .crumbs {
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  header h1 {
+    margin-bottom: 0.35rem;
+  }
+
+  .rh-tags {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .rh-tags a {
+    font-family: var(--font-mono);
+  }
+
+  .rh-hero {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+    margin: 1rem 0 1.5rem;
+  }
+
+  /* Typography matched to the research pages: a comfortable measure, Spectral
+     headings, readable body. */
+  .prose {
+    max-width: 46rem;
+    font-size: 1.05rem;
+  }
+
+  .prose :global(p),
+  .prose :global(ul),
+  .prose :global(ol),
+  .prose :global(blockquote),
+  .prose :global(pre) {
+    margin-bottom: 1rem;
+  }
+
+  .prose :global(ul),
+  .prose :global(ol) {
+    padding-left: 1.4rem;
+  }
+
+  .prose :global(blockquote) {
+    border-left: 3px solid var(--color-accent);
+    padding-left: 1rem;
+    color: var(--color-muted);
+  }
+
+  .prose :global(pre) {
+    padding: 1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-size: 0.9rem;
+  }
+
+  .prose :global(code) {
+    font-size: 0.9em;
+  }
+
+  .prose :global(a) {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .prose :global(img) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .rh-sources {
+    margin-top: 2rem;
+    max-width: 46rem;
+  }
+
+  .rh-sources ul {
+    padding-left: 1.2rem;
+  }
+
+  .rh-postnav {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 2.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+    font-weight: 500;
+  }
+</style>

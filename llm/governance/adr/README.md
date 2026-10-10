@@ -34,6 +34,7 @@ from `0000-template.md`.
 | [0020](0020-pages-retirement-with-redirect-stubs.md) | Retire the full-site Pages deployment, keeping redirect stubs | Accepted |
 | [0021](0021-annotations-private-item-notes.md) | Annotations are member-private, item-anchored notes routed by intent (amended on D20) | Accepted |
 | [0022](0022-annotation-export-transport.md) | Annotation export transport — the gate commits to a `notes` branch (D18; acceptance flip is a follow-up) | Proposed |
+| [0023](0023-rabbit-holes-blog-content-and-feeds.md) | Rabbit Holes — the blog content model, feeds and subscription (D21) | Accepted |
 
 ## Lifecycle
 

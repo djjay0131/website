@@ -1,7 +1,7 @@
 # Progress
 
 Status: Active
-Last updated: 2026-10-08
+Last updated: 2026-10-10
 Owner: Chief Architect
 
 What belongs here: what works, what is left, and known issues — recorded against
@@ -51,6 +51,18 @@ merged reality, not plans.
 
 ## Done, most recent first
 
+- **Wave 8 — "Rabbit Holes" blog (D21) implemented** 2026-10-10 (branch
+  `feat/rabbit-holes`; ADR-0023). A public blog at `/rabbit-holes/`, authored as
+  Markdown in this repo via an Astro content collection (`draft` default true,
+  strict Zod schema, free-form tags). Public with no gate; RSS 2.0 + Atom + JSON
+  Feed with full content plus the site-wide `/rss.xml`; per-post OG images; the
+  site-wide `/rabbit-holes/index.json` for the operator's weekly topic suggester;
+  email via Buttondown RSS-to-email behind `PUBLIC_BUTTONDOWN_USERNAME` (static
+  form, no SDK/pixel; RSS fallback when unset). The leak check gained each draft's
+  needles (`collectDraftRabbitHoles`), so it is non-vacuous on a normal build. The
+  "Writing" nav slot is now "Rabbit Holes" (`/writing/` redirects); the home page
+  shows a "Latest rabbit hole" card. One seed post is committed as a **draft**.
+  Owner step: create the Buttondown account and set the variable.
 - **Wave 6 (`#107`, annotations) implemented** 2026-10-07 (branch `feat/annotations`,
   D17) — private reading-time notes: a capture island on `html`/`bundle` private item
   frames, gate routes `POST/GET/DELETE /annotations` (owner-only `?scope=all`), My notes
@@ -117,6 +129,12 @@ merged reality, not plans.
 
 ## What is left
 
+- **Wave 8 (`D21`, Rabbit Holes) implemented 2026-10-10** (branch
+  `feat/rabbit-holes`, ADR-0023): blog pages, three feeds + JSON index, per-post
+  OG, draft leak needles, one seed **draft** post. Owner step: create the
+  Buttondown newsletter, point RSS-to-email at `/rabbit-holes/rss.xml`, and set
+  `PUBLIC_BUTTONDOWN_USERNAME` as a repository variable; then edit and flip the
+  seed post. Live verification and Lighthouse a11y are the post-merge checks.
 - **Wave 4 (`hub-005`, Phase 5) is DONE 2026-10-03** (PRs #95, #97; satellite
   PR #11): `construction-ai` satellite provisioned, boundary-proven, and
   publishing two private items; index from manifests; a sync-content traversal

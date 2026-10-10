@@ -148,6 +148,34 @@
     "to": "/projects/vvuq-beam-solver/"
   },
   {
+    "from": "/website/rabbit-holes/",
+    "to": "/rabbit-holes/"
+  },
+  {
+    "from": "/website/rabbit-holes/archive/",
+    "to": "/rabbit-holes/archive/"
+  },
+  {
+    "from": "/website/rabbit-holes/atom.xml",
+    "to": "/rabbit-holes/atom.xml"
+  },
+  {
+    "from": "/website/rabbit-holes/feed.json",
+    "to": "/rabbit-holes/feed.json"
+  },
+  {
+    "from": "/website/rabbit-holes/index.json",
+    "to": "/rabbit-holes/index.json"
+  },
+  {
+    "from": "/website/rabbit-holes/rss.xml",
+    "to": "/rabbit-holes/rss.xml"
+  },
+  {
+    "from": "/website/rabbit-holes/tags/",
+    "to": "/rabbit-holes/tags/"
+  },
+  {
     "from": "/website/research/",
     "to": "/research/"
   },

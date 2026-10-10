@@ -4180,3 +4180,128 @@ and **0** occurrences of `/p/notes` and carries the `pointerdown` hold fix;
 `GET /annotations` signed-out **403** `private, no-store`. **Owner re-test of the
 member click flow PENDING** (needs the `djjay@vt.edu` session); the jsdom test
 proves the behaviour and is verified failable against the pre-patch island.
+
+## D21 — "Rabbit Holes", a public blog on the hub (2026-10-10)
+
+Owner decision **D21**, recorded in full in the decisions below and durably as
+**ADR-0023**. A public blog, **Rabbit Holes**, at `/rabbit-holes/`; the tagline
+(the agent proposes one line, in the "here's where I went this week" voice) is
+*"Notes from wherever this week's reading, building or argument went."* Topics
+wander by design, so there is no category taxonomy and tags are free-form.
+
+### The decisions (owner, final)
+
+1. **Authoring — Markdown in this repo.** An Astro content collection at
+   `site/src/content/rabbit-holes/<yyyy-mm-dd>-<slug>.md` with a strict Zod
+   schema (`title`, `date`, `summary` ≤ 280, free-form `tags`, `draft` **default
+   true**, optional `hero`, `canonical`, `sources`). Drafts never reach
+   `dist-public`, any feed, the sitemap, search or OG; the leak check gains each
+   draft's route/slug/title/summary as a needle. Publishing = merge a PR that
+   flips `draft: false`.
+2. **Public.** Everything with `draft: false` is public; no gate involvement. No
+   private item may be referenced by path (the leak check and
+   `check-publish-allowlist` apply).
+3. **Subscriptions — RSS + Buttondown.** RSS 2.0, Atom and JSON Feed, full
+   content, `<link rel="alternate">` discovery; the site-wide `/rss.xml` also
+   carries the posts. Email is Buttondown RSS-to-email via a **static HTML form**
+   (no JS SDK, no tracking pixel) gated on `PUBLIC_BUTTONDOWN_USERNAME`; unset
+   renders a "Subscribe by RSS" block so the build is green first.
+4. **Weekly topic suggestion is NOT a site feature.** The site contributes only
+   a public, stable JSON index `/rabbit-holes/index.json`
+   (`{slug,title,date,tags,summary,url}`) for the operator tool.
+
+## Wave 8 — Rabbit Holes, implemented (2026-10-10)
+
+Branch `feat/rabbit-holes`. Design: **ADR-0023**. There is **no roadmap
+checkbox** — this is a post-Phase-6 backlog feature like Waves 6–7; D21 is the
+unit of record.
+
+### What shipped
+
+- **content model** — `rabbitHolesSchema` + the `rabbit-holes` glob collection in
+  `site/src/content.config.ts`; `site/src/lib/rabbit-holes.mjs` is the one
+  declaration of the slug/date rules, helpers, feed builders and JSON index;
+  `site/src/lib/rabbit-holes-collection.ts` computes the published set once.
+- **pages** — `/rabbit-holes/` index (paginated at 20 under
+  `/rabbit-holes/page/<n>/`), `[slug]` post page (Astro markdown, prev/next,
+  share, subscribe, annotation mount), `/rabbit-holes/tags/<tag>/`, a tag list,
+  `/rabbit-holes/archive/` by month.
+- **feeds** — `rss.xml`, `atom.xml`, `feed.json`, `index.json` (public build
+  only); the site-wide `/rss.xml` merges the posts with full content.
+- **discovery/presentation** — `Base.astro` emits the three feed alternates and
+  `<meta name="fediverse:creator" content="@djjay0131@mastodon.social">`; the
+  "Writing" nav slot becomes "Rabbit Holes" (`/writing/` redirects); the footer
+  gains the Rabbit Holes RSS icon; the home page gains a "Latest rabbit hole"
+  card (hidden when there are none).
+- **OG** — `renderRabbitHoleOgSvg` + the `rabbitHolesOg()` integration write one
+  per-post PNG into the OUTPUT only (never a committed tree).
+- **leak check** — `collectDraftRabbitHoles` adds each draft's needles, making
+  the check non-vacuous on a normal build.
+- **seed content** — `2026-10-10-why-a-blog-called-rabbit-holes.md`, written by
+  the agent as a **draft** (`draft: true`, ~420 words, first person). The owner
+  edits it and flips the flag.
+
+### D21 — recorded (owner, 2026-10-10) — summary for the decisions table
+
+| # | Decision |
+|---|---|
+| **D21** | **"Rabbit Holes", a public blog at `/rabbit-holes/`** — authored as Markdown in this repo (Astro content collection, `draft` default true); public with no gate; RSS 2.0 + Atom + JSON Feed with full content and the site-wide `/rss.xml`; email via Buttondown RSS-to-email behind `PUBLIC_BUTTONDOWN_USERNAME` (static form, no SDK/pixel); a public `/rabbit-holes/index.json` for the operator's weekly topic suggester; no comments for now. Design: **ADR-0023** |
+
+### Local verification (pre-PR, 2026-10-10, fixture content)
+
+```
+npm test                                 533 passed | 2 skipped (37 files)
+npm run build:public                      35 pages; /rabbit-holes/** emitted; OG image and tag pages built
+npm run build:private                     7 pages; no rabbit-holes route, no OG (private build unaffected)
+node scripts/check-no-private-in-public   PASS — 4 private items + 1 draft post, 180 files scanned
+governance-checks.mjs --layout            4 of 4 PASS
+lighthouse@12 (accessibility)             /rabbit-holes/ 1.0; a post page 1.0
+```
+
+End-to-end with the seed post temporarily published (then reverted to draft):
+post page rendered with `data-item-section="rabbit-holes" data-item-source="hub"
+data-item-slug="rabbit-holes/why-a-blog-called-rabbit-holes"` (D20 identity), a
+per-post OG PNG written, the post in `sitemap-0.xml` and in both the blog and the
+site-wide RSS **with `<content:encoded>` full content**, and the public JSON index
+populated. With the post reverted to `draft: true`, `grep` finds no trace of it in
+`dist-public`, and every feed/sitemap is empty.
+
+### Tests added
+
+`src/lib/rabbit-holes.test.ts` (26 tests): schema (bad date / >280 summary /
+missing fields / strict unknown field / defaults), filename and date rules, tag
+slugging, reading time, pagination, month grouping, **RSS 2.0 / Atom / JSON Feed
+parsed with a real XML/JSON parser and asserted to carry full content (including a
+`]]>` CDATA hazard)**, the JSON index shape, and the committed seed being a draft.
+`check-no-private-in-public.test.ts` gains a draft-needle CLI test (a draft slug
+planted into a feed exits 1) and the "non-vacuous with a draft" assertion.
+
+### Owner step (one line, recorded)
+
+Create the Buttondown newsletter, point its RSS-to-email at
+`https://jason.cusati.us/rabbit-holes/rss.xml`, and set
+`PUBLIC_BUTTONDOWN_USERNAME` as a repository **variable** (D19 pattern: variables
+via GitHub, never by hand). Until then the subscribe block renders the RSS
+fallback and the build is green.
+
+### Open questions
+
+- **Comments:** none for now. Mastodon-thread comments vs. none is recorded as an
+  open question, not built.
+- `hero` is a path string (public asset pipeline); Astro `image()` optimisation
+  is not wired.
+
+### Five-line status (Wave 8)
+
+- **State:** Rabbit Holes implemented — content collection + schema, pages, three
+  feeds + JSON index, per-post OG, nav/footer/home, draft leak needles, seed
+  draft post; ADR-0023 written.
+- **What to review:** ADR-0023; the draft-default and leak-needle model; the
+  three full-content feed formats; the Buttondown static form as the only
+  external endpoint.
+- **What only the owner can do:** the Buttondown step above; edit and flip the
+  seed post's `draft` flag; run Lighthouse a11y on `/rabbit-holes/` and a post.
+- **Open questions:** comments (Mastodon thread vs none); pull-to-publish via a
+  `rabbit-holes` branch once D19's App is live.
+- **Governance:** L2; design authority D21 + ADR-0023; checks 4/4 PASS; no
+  Terraform, no schema/contract change.
