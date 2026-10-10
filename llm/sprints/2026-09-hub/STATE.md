@@ -4305,3 +4305,43 @@ fallback and the build is green.
   `rabbit-holes` branch once D19's App is live.
 - **Governance:** L2; design authority D21 + ADR-0023; checks 4/4 PASS; no
   Terraform, no schema/contract change.
+
+### Wave 8 — post-merge record (2026-10-10)
+
+- **Merged** as PR **#122**, merge commit **`a08880f`** (branch
+  `feat/rabbit-holes` deleted). §8 held: required checks `governance-checks` and
+  `budget-guard` green, plus `build`, `build-firebase`, `check`, `contract-tests`,
+  `deploy-tools` and `leak-check-self-test` green; Security Tester **0 FAIL**
+  (solo handoff `handoffs/wave-8-security-tester.md`); PR body carries the
+  data/security/privacy section.
+- **No apply.** `git diff` touches no `infra/`, `gate/` or `contract/` path, so
+  there is nothing to plan or apply.
+- **Post-merge `build-and-deploy` green** (run `38071335726`, on `a08880f`):
+  every job succeeded — `check`, `build`, `build-firebase`, `deploy` (Pages),
+  `smoke-test`, `private-sync`, `firebase-deploy`, `firebase-smoke-test`,
+  `deploy-tools`, `budget-guard`, `leak-check-self-test`,
+  `private-bucket-live-iam`, `notify-recovery`.
+- **Live verification (2026-10-10):**
+
+  | Probe | Result |
+  |---|---|
+  | `/rabbit-holes/` | **200**, empty state ("Nothing here yet"), nav "Rabbit Holes", `fediverse:creator` meta, RSS/Atom/JSON alternate links |
+  | `/rabbit-holes/rss.xml`, `atom.xml`, `feed.json`, `index.json` | **200**; RSS **W3C-valid** (`validity true`), Atom **W3C-valid** (`validity true`), JSON Feed parses as `1.1` |
+  | `/rabbit-holes/archive/`, `/rabbit-holes/tags/` | **200** (empty states) |
+  | `/rabbit-holes/why-a-blog-called-rabbit-holes/` | **404** — the seed **draft** is not served |
+  | draft traces in `sitemap-0.xml`, `/rss.xml`, `pagefind/pagefind-entry.json` | **0**, **0**, **0** |
+  | `/writing/` | **200**, meta-refresh + canonical to `/rabbit-holes/` |
+  | home "Latest rabbit hole" card | **absent** (no published posts yet) |
+
+- **Owner step — PENDING.** Create the Buttondown newsletter, point its
+  RSS-to-email at `https://jason.cusati.us/rabbit-holes/rss.xml`, and set
+  `PUBLIC_BUTTONDOWN_USERNAME` as a repository **variable**; then edit the seed
+  post and flip its `draft` flag.
+- **Roster honesty.** This was a **solo Lead-Architect run**: no separate Red
+  Team, Dissenter, Skeptic Verifier or Chief Reviewer sub-agent session ran. The
+  Security Tester targets D21 named (draft leakage, HTML injection via
+  Markdown/frontmatter, the Buttondown action URL as the only external endpoint,
+  the feed and OG paths) were executed and are recorded in
+  `handoffs/wave-8-security-tester.md`; the feed and OG paths were exercised
+  end-to-end. The missing independent reviewer sessions are recorded as a gap,
+  not papered over.
