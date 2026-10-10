@@ -38,7 +38,7 @@ import { LEGACY_REDIRECTS, isExcludedFromSitemap } from './scripts/site-routes.m
 import { resolveHubOutput } from './scripts/site-output.mjs';
 import { privateBuild } from './scripts/private-build.mjs';
 import { publicBuild } from './scripts/public-build.mjs';
-import { ogCard } from './scripts/og-card.mjs';
+import { ogCard, rabbitHolesOg } from './scripts/og-card.mjs';
 
 const { site, base } = resolveSiteEnv(process.env);
 const { outDir, isPrivate } = resolveHubOutput(process.env);
@@ -66,10 +66,14 @@ export default defineConfig({
   // Astro process .tsx or hydrate an island.
   integrations: isPrivate
     ? [react(), privateBuild()]
-    : [sitemap({ filter: (page) => !isExcludedFromSitemap(page, base) }), ogCard(), publicBuild()],
+    : [sitemap({ filter: (page) => !isExcludedFromSitemap(page, base) }), ogCard(), rabbitHolesOg(), publicBuild()],
   // The legacy GitHub Pages redirects are public routes and have no meaning in
-  // the private output.
+  // the private output. D21 retires the "Writing" slot: /writing/ redirects to
+  // the Rabbit Holes blog (the old route is kept as a redirect, as D21 asks).
   redirects: isPrivate
     ? {}
-    : Object.fromEntries(LEGACY_REDIRECTS.map(({ from, to }) => [`/${from}`, withBase(base, to)])),
+    : {
+        ...Object.fromEntries(LEGACY_REDIRECTS.map(({ from, to }) => [`/${from}`, withBase(base, to)])),
+        "/writing": withBase(base, "rabbit-holes/"),
+      },
 });

@@ -1,0 +1,126 @@
+---
+// THE SUBSCRIBE BLOCK (D21 decision 3).
+//
+// Email subscription is Buttondown's RSS-to-email. The site ships a STATIC HTML
+// form that POSTs straight to Buttondown — no JavaScript SDK, no tracking pixel,
+// no third-party script, and the form's action URL is the ONLY external endpoint
+// anywhere in the block. It is rendered from a single build-time config value,
+// `PUBLIC_BUTTONDOWN_USERNAME`.
+//
+// WHEN IT IS UNSET the block renders a plain "Subscribe by RSS" line instead, so
+// the build is green before the owner creates the newsletter account. Setting the
+// repository variable flips the form on with no code change (D21 owner step).
+import { RABBIT_HOLES_SECTION } from "../lib/rabbit-holes.mjs";
+
+interface Props {
+  /** Override the feed URL the RSS fallback points at. */
+  rssHref?: string;
+}
+
+const base = import.meta.env.BASE_URL;
+const { rssHref = `${base}${RABBIT_HOLES_SECTION}/rss.xml` } = Astro.props;
+// Astro inlines PUBLIC_* at build time. The owner sets it as a repository
+// variable (never a hand-edited file); unset means the fallback renders.
+const username = import.meta.env.PUBLIC_BUTTONDOWN_USERNAME;
+const action = username
+  ? `https://buttondown.email/api/emails/embed-subscribe/${username}`
+  : undefined;
+---
+
+<section class="subscribe" aria-labelledby="subscribe-heading">
+  <h2 id="subscribe-heading" class="subscribe-heading">Subscribe</h2>
+  {action ? (
+    <form class="subscribe-form" action={action} method="post">
+      <label class="subscribe-label" for="buttondown-email">Get new posts by email</label>
+      <div class="subscribe-row">
+        <input
+          class="subscribe-input"
+          id="buttondown-email"
+          type="email"
+          name="email"
+          autocomplete="email"
+          placeholder="you@example.com"
+          required
+        />
+        <button class="subscribe-button" type="submit">Subscribe</button>
+      </div>
+      <p class="subscribe-note">
+        Delivered by <a href="https://buttondown.email" rel="noopener">Buttondown</a>.
+        Or subscribe by <a href={rssHref}>RSS</a>.
+      </p>
+    </form>
+  ) : (
+    <p class="subscribe-rss">
+      Subscribe by <a href={rssHref}>RSS</a> — new posts arrive in your reader.
+    </p>
+  )}
+</section>
+
+<style>
+  .subscribe {
+    margin-top: 2.5rem;
+    padding: 1.25rem 1.4rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-accent);
+    border-radius: var(--radius);
+  }
+
+  .subscribe-heading {
+    font-size: 1.1rem;
+    margin: 0 0 0.75rem;
+    border: none;
+    padding: 0;
+  }
+
+  .subscribe-label {
+    display: block;
+    font-size: 0.95rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .subscribe-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .subscribe-input {
+    flex: 1;
+    min-width: 12rem;
+    padding: 0.55rem 0.7rem;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: var(--color-text);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+  }
+
+  .subscribe-button {
+    padding: 0.55rem 1.1rem;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-on-accent);
+    background: var(--color-accent);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+
+  .subscribe-note,
+  .subscribe-rss {
+    margin-top: 0.6rem;
+    font-size: 0.85rem;
+    color: var(--color-muted);
+  }
+
+  /* In-text links are distinguishable by more than colour (Lighthouse
+     link-in-text-block). The global style only underlines on hover. */
+  .subscribe-note a,
+  .subscribe-rss a {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+</style>

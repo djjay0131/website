@@ -132,6 +132,7 @@ import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { SOURCES_DIR, effectiveVisibility, readPublishAllowlist } from "../src/lib/hub-content.mjs";
 import { CANONICAL_ORIGIN } from "../src/lib/canonical-url.mjs";
+import { readRabbitHoles } from "../src/lib/rabbit-holes.mjs";
 import { OUTPUT_DIRS } from "./site-output.mjs";
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -223,6 +224,35 @@ export function collectPrivateItems(sourcesDir, allowlist = readPublishAllowlist
     }
   }
   return items;
+}
+
+/**
+ * The DRAFT RABBIT HOLES needles (D21, Wave 8).
+ *
+ * A `draft: true` post must never reach dist-public OR any feed, sitemap, search
+ * index or OG image (D21). Every page and feed filters drafts out, so this is the
+ * guard that proves it rather than trusting the filter: each draft's route, slug,
+ * title and summary become needles, exactly as a private item's do. They are
+ * carried by the same `findLeaks`, so a draft slug rendered into the public index
+ * is caught by the same contents scan that catches a private item's.
+ *
+ * The needles run even when no satellite private item is published (the usual
+ * state here), so this check is not vacuous on a normal build.
+ *
+ * @param {string} [siteRoot] the site/ directory
+ * @returns {{source: string, slug: string, title: string, summary: string, section: string, path: string}[]}
+ */
+export function collectDraftRabbitHoles(siteRoot = SITE_ROOT) {
+  return readRabbitHoles(siteRoot)
+    .filter((post) => post.draft === true)
+    .map((post) => ({
+      source: "rabbit-holes",
+      slug: post.slug,
+      title: post.title,
+      summary: post.summary,
+      section: "rabbit-holes",
+      path: post.filename,
+    }));
 }
 
 /**
@@ -802,17 +832,21 @@ if (isMain) {
   }
 
   const items = collectPrivateItems(sourcesDir);
-  const leaks = findLeaks(distDir, items);
+  // DRAFT RABBIT HOLES (D21): drafts are needles too, so this check is
+  // non-vacuous on a normal build even when no satellite private item exists.
+  const drafts = collectDraftRabbitHoles(SITE_ROOT);
+  const needles = [...items, ...drafts];
+  const leaks = findLeaks(distDir, needles);
   const warnings = weakNeedleWarnings(items);
   const derived = listDerivedOutputs(distDir);
   const scopeProblems = checkSearchIndexScope(distDir);
-  const stubLeaks = stubsDir ? findRedirectStubLeaks(stubsDir, items) : [];
+  const stubLeaks = stubsDir ? findRedirectStubLeaks(stubsDir, needles) : [];
   const annotationLeaks = findAnnotationLeaks(distDir);
 
   if (args.json) {
     console.log(
       JSON.stringify(
-        { dist: distDir, stubs: stubsDir, privateItems: items, leaks, stubLeaks, annotationLeaks, scopeProblems, derived, warnings },
+        { dist: distDir, stubs: stubsDir, privateItems: items, draftPosts: drafts, leaks, stubLeaks, annotationLeaks, scopeProblems, derived, warnings },
         null,
         2,
       ),
@@ -904,34 +938,44 @@ if (isMain) {
 
   if (leakCount > 0 || scopeProblems.length > 0) process.exit(1);
 
-  // An empty private set is a real and expected state today -- phd-milestones
-  // cannot publish until Checkpoint 4 -- but it means this run proved nothing.
+  // An empty needle set means this run proved nothing. With D21's draft needles
+  // (above) this only happens on a tree with no private item AND no draft post.
   // Say so loudly rather than printing a reassuring "passed".
-  if (items.length === 0) {
+  if (needles.length === 0) {
     console.log(
-      `check:no-private-in-public: NO PRIVATE ITEMS are published, so this run proves nothing ` +
-        `about ${shownDist} with the item needles. The annotation needles ` +
-        `(${ANNOTATION_NEEDLES.join(", ")}) WERE checked and none was found. This is expected ` +
-        `until phd-milestones first publishes (Checkpoint 4). Run npm run demo:leak-check to see ` +
-        `the check actually fail.`,
+      `check:no-private-in-public: NO PRIVATE ITEMS OR DRAFT POSTS exist, so this run proves ` +
+        `nothing about ${shownDist} with the item needles. The annotation needles ` +
+        `(${ANNOTATION_NEEDLES.join(", ")}) WERE checked and none was found. Run ` +
+        `npm run demo:leak-check to see the check actually fail.`,
     );
     process.exit(0);
   }
 
-  console.log(
-    `check:no-private-in-public: ${items.length} private item(s) to look for in ${shownDist}:`,
-  );
-  for (const item of items) {
-    const kinds = needlesFor(item).map((n) => n.kind).join(", ");
-    console.log(`  ${item.source}/${item.slug} — needles: ${kinds}`);
+  if (items.length > 0) {
+    console.log(
+      `check:no-private-in-public: ${items.length} private item(s) to look for in ${shownDist}:`,
+    );
+    for (const item of items) {
+      const kinds = needlesFor(item).map((n) => n.kind).join(", ");
+      console.log(`  ${item.source}/${item.slug} — needles: ${kinds}`);
+    }
+  }
+  if (drafts.length > 0) {
+    console.log(
+      `check:no-private-in-public: ${drafts.length} draft Rabbit Holes post(s) to look for ` +
+        `(D21) — each must reach no page, feed, sitemap, index or OG image:`,
+    );
+    for (const post of drafts) {
+      console.log(`  rabbit-holes/${post.slug} — needles: ${needlesFor(post).map((n) => n.kind).join(", ")}`);
+    }
   }
   console.log(
     `check:no-private-in-public: annotation needles scanned: ${ANNOTATION_NEEDLES.join(", ")}`,
   );
 
   console.log(
-    `\ncheck:no-private-in-public: PASS — no private slug, route, payload path, title or summary ` +
-      `appears in any path or any file's contents under ${shownDist}` +
+    `\ncheck:no-private-in-public: PASS — no private item's or draft post's slug, route, payload ` +
+      `path, title or summary appears in any path or any file's contents under ${shownDist}` +
       `${shownStubs ? ` and no private title or summary appears in any stub under ${shownStubs}` : ""}` +
       `, and none of the annotation needles (${ANNOTATION_NEEDLES.join(", ")}) appears` +
       ` (${walkFiles(distDir).length} file(s) scanned in ${shownDist}` +

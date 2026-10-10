@@ -1,0 +1,60 @@
+---
+// RABBIT HOLES — paginated index pages (D21). Page 1 is /rabbit-holes/; this file
+// serves /rabbit-holes/page/2/, /page/3/ … The named `/page/` path keeps
+// pagination from colliding with post slugs at /rabbit-holes/<slug>/.
+import Base from "../../../layouts/Base.astro";
+import RabbitHolesPostList from "../../../components/RabbitHolesPostList.astro";
+import RabbitHolesSubscribe from "../../../components/RabbitHolesSubscribe.astro";
+import { getPublishedPosts } from "../../../lib/rabbit-holes-collection";
+import { PAGE_SIZE, RABBIT_HOLES_TITLE, pageCount, pageSlice } from "../../../lib/rabbit-holes.mjs";
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  const total = pageCount(posts.length, PAGE_SIZE);
+  const paths = [];
+  for (let page = 2; page <= total; page += 1) {
+    paths.push({ params: { page: String(page) } });
+  }
+  return paths;
+}
+
+const base = import.meta.env.BASE_URL;
+const page = Number(Astro.params.page);
+const posts = await getPublishedPosts();
+const total = pageCount(posts.length, PAGE_SIZE);
+const shown = pageSlice(posts, page, PAGE_SIZE);
+const prevHref = page === 2 ? `${base}rabbit-holes/` : `${base}rabbit-holes/page/${page - 1}/`;
+const nextHref = `${base}rabbit-holes/page/${page + 1}/`;
+---
+
+<Base
+  title={`${RABBIT_HOLES_TITLE} — page ${page} — Jason Cusati`}
+  description={`Rabbit Holes, page ${page} of ${total}.`}
+>
+  <header class="rh-head">
+    <h1>{RABBIT_HOLES_TITLE}</h1>
+    <p class="meta-mono">Page {page} of {total}</p>
+  </header>
+
+  <RabbitHolesPostList posts={shown} />
+
+  <nav class="rh-pager" aria-label="Pagination">
+    <a href={prevHref}>← Newer</a>
+    {page < total ? <a href={nextHref}>Older →</a> : <span />}
+  </nav>
+
+  <RabbitHolesSubscribe />
+</Base>
+
+<style>
+  .rh-head {
+    margin-bottom: 1.75rem;
+  }
+
+  .rh-pager {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.75rem;
+    font-weight: 500;
+  }
+</style>

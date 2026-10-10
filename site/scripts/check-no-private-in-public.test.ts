@@ -7,6 +7,7 @@ import zlib from "node:zlib";
 import {
   ANNOTATION_ALLOWED_IN_PUBLIC,
   ANNOTATION_NEEDLES,
+  collectDraftRabbitHoles,
   collectPrivateItems,
   containsAnnotationNeedle,
   containsBounded,
@@ -556,16 +557,38 @@ describe("the CLI", () => {
     expect(run.status).toBe(2);
   });
 
-  it("says loudly that it proved NOTHING when no private item is published", () => {
+  // D21 (Wave 8): the draft Rabbit Holes needles make the check non-vacuous even
+  // with no satellite private item. It no longer claims "proves nothing" while a
+  // draft exists; it names the draft needles instead.
+  it("reports the draft Rabbit Holes needles when no private item is published (D21)", () => {
     const emptySources = fs.mkdtempSync(path.join(os.tmpdir(), "no-private-"));
     try {
       const run = spawnSync(process.execPath, [SCRIPT, "--dist", dist, "--sources", emptySources], {
         encoding: "utf8",
       });
       expect(run.status).toBe(0);
-      expect(run.stdout).toContain("proves nothing");
+      expect(run.stdout).toContain("draft Rabbit Holes post");
+      expect(run.stdout).toContain("why-a-blog-called-rabbit-holes");
+      expect(run.stdout).not.toContain("proves nothing");
     } finally {
       fs.rmSync(emptySources, { recursive: true, force: true });
     }
+  });
+
+  it("exits 1 when a DRAFT post's slug reaches a feed (D21 leak check)", () => {
+    // A draft that leaked into a feed is exactly what the guard must catch: the
+    // slug is planted into rss.xml, a derived output the byte walk covers.
+    const drafts = collectDraftRabbitHoles(path.resolve("."));
+    expect(drafts.length).toBeGreaterThan(0);
+    const victim = drafts[0];
+    fs.writeFileSync(
+      path.join(dist, "rss.xml"),
+      `<item><title>${victim.title}</title><link>/rabbit-holes/${victim.slug}/</link></item>`,
+    );
+    const run = spawnSync(process.execPath, [SCRIPT, "--dist", dist, "--sources", FIXTURE_SOURCES], {
+      encoding: "utf8",
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain(`rabbit-holes/${victim.slug}`);
   });
 });

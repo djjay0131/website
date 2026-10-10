@@ -29,9 +29,16 @@
  * no private handling at all.
  */
 import { defineCollection } from "astro/content/config";
+import { glob } from "astro/loaders";
 import { z } from "astro/zod";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  RABBIT_HOLES_CONTENT_DIR,
+  RABBIT_HOLES_SECTION,
+  SUMMARY_MAX_LENGTH,
+  slugFromFilename,
+} from "./lib/rabbit-holes.mjs";
 import {
   CLAIMED_DATA_ITEMS,
   KNOWN_MANIFEST_VERSIONS,
@@ -441,4 +448,53 @@ const sources = defineCollection({
   schema: entrySchema,
 });
 
-export const collections = { sources };
+// --- Rabbit Holes — the authored blog (D21, Wave 8) --------------------------
+//
+// The ONE content collection that is not a satellite manifest. It reads committed
+// Markdown from `site/src/content/rabbit-holes/<yyyy-mm-dd>-<slug>.md` through the
+// glob loader, so Astro renders the Markdown (Shiki, footnotes) and the entry's
+// `rendered.html` is available to the full-content feeds.
+//
+// `draft` DEFAULTS TO TRUE (D21). A post is public only when it says
+// `draft: false`, which is the deliberate friction the owner asked for: a new file
+// is invisible until the flag is flipped in a reviewed pull request. Every page,
+// feed, the sitemap, Pagefind and the OG generator filter on this field, and the
+// leak check is given each draft's route/slug/title/summary as a needle.
+//
+// TAGS ARE FREE-FORM (D21). There is no tag pattern and no category field: the
+// blog's topics are random by design. `tags` is a plain string array; only the
+// URL form is derived (see tagSlug in lib/rabbit-holes.mjs).
+export const rabbitHolesSchema = z.strictObject({
+  title: z.string().min(LIMITS.titleMinLength).max(LIMITS.titleMaxLength),
+  // Coerced so a YAML date, a `YYYY-MM-DD` string, or a full timestamp all work;
+  // an unparseable value produces an Invalid Date and zod rejects it, which fails
+  // the build (D21: "a draft with a bad date fails the build").
+  date: z.coerce.date(),
+  summary: z.string().min(1).max(SUMMARY_MAX_LENGTH),
+  tags: z.array(z.string().min(1).max(64)).max(50).default([]),
+  draft: z.boolean().default(true),
+  hero: z.string().min(1).optional(),
+  canonical: z.string().url().optional(),
+  sources: z
+    .array(z.strictObject({ title: z.string().min(1), url: z.string().url() }))
+    .optional(),
+});
+
+const rabbitHoles = defineCollection({
+  // `base` is resolved against the project root, so the same committed tree is
+  // read by both the public and the private build (the private build re-exports
+  // this file). The private build routes no Rabbit Holes page, so it is inert
+  // there; loading it is harmless.
+  loader: glob({
+    pattern: "**/*.md",
+    base: `./${RABBIT_HOLES_CONTENT_DIR}`,
+    // The URL slug is the filename with its `YYYY-MM-DD-` prefix removed, so
+    // `2026-10-10-why-a-blog-called-rabbit-holes.md` lives at
+    // /rabbit-holes/why-a-blog-called-rabbit-holes/. One rule, shared with the
+    // build-time reader and the tests (lib/rabbit-holes.mjs).
+    generateId: ({ entry }) => slugFromFilename(entry),
+  }),
+  schema: rabbitHolesSchema,
+});
+
+export const collections = { sources, [RABBIT_HOLES_SECTION]: rabbitHoles };

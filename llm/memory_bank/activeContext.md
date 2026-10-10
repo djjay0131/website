@@ -125,6 +125,15 @@ what a contributor needs to pick up work today.
   hand, ever (pattern: `llm/governance/patterns/secrets-management.md`; ADR-0022
   amended).
 
+- **Wave 8 (D21, Rabbit Holes) implemented 2026-10-10** — branch `feat/rabbit-holes`,
+  ADR-0023: a public blog at `/rabbit-holes/` authored as Markdown in this repo (`draft`
+  default true, free-form tags), RSS 2.0 + Atom + JSON Feed with full content, a public
+  `/rabbit-holes/index.json` for the operator's topic suggester, per-post OG images, and
+  Buttondown email behind `PUBLIC_BUTTONDOWN_USERNAME` (static form; RSS fallback when
+  unset). The leak check gains each draft's needles, so it is non-vacuous on a normal
+  build. One seed post is committed as a **draft**. Owner step: create the Buttondown
+  account and set the variable.
+
 ## Stop point
 
 Wave 6 is merged and live. Wave 6b is merged (#110) and D19 lands the secret
@@ -168,6 +177,10 @@ deferrals stand: Wave 3's share mint, the Firestore member seed, and Wave 5's
   and run `gh workflow run secrets-sync.yml` — no `gcloud`. **Wave 6:** sign in as
   `djjay@vt.edu`, select text on a private item, and open
   `https://jason.cusati.us/p/notes/`.
+- **Wave 8 / D21 (Rabbit Holes):** create the Buttondown newsletter, point its
+  RSS-to-email at `https://jason.cusati.us/rabbit-holes/rss.xml`, and set
+  `PUBLIC_BUTTONDOWN_USERNAME` as a repository variable; then edit the seed post
+  and flip its `draft` flag. Run Lighthouse a11y on `/rabbit-holes/` and a post.
 
 ## Decisions on record
 

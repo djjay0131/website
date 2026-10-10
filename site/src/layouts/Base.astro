@@ -19,6 +19,7 @@ import { CV_CONTENT_DIR } from "../lib/hub-content.mjs";
 import { readFooterData, resolveElsewhere, readBuildInfo } from "../lib/footer.mjs";
 import AnnotationsMount from "../components/AnnotationsMount.astro";
 import { hubItemIdentity } from "../lib/hub-content.mjs";
+import { feedAlternates } from "../lib/rabbit-holes.mjs";
 import path from "node:path";
 
 interface Props {
@@ -39,6 +40,8 @@ interface Props {
    * the island is never fetched on pages that are not item content.
    */
   annotatable?: boolean;
+  /** Overrides `<link rel="canonical">` (a post's optional `canonical` field). */
+  canonical?: string;
 }
 
 const {
@@ -49,11 +52,12 @@ const {
   noindex = false,
   hideNav = false,
   annotatable = false,
+  canonical,
 } = Astro.props;
 
 const base = import.meta.env.BASE_URL;
 const siteUrl = Astro.site?.toString().replace(/\/$/, "") ?? "";
-const canonicalUrl = `${siteUrl}${Astro.url.pathname}`;
+const canonicalUrl = canonical ?? `${siteUrl}${Astro.url.pathname}`;
 // The default link-preview image is the research emblem, the site mark
 // (D13/D16). Wave 0c briefly used a generated card here; D16 restores the
 // emblem, as #71 had it. The portrait is never served on the public site.
@@ -63,14 +67,20 @@ const ogImageUrl = ogImage ? `${siteUrl}${base}${ogImage}` : `${siteUrl}${base}e
 // cv-data's meta.contact, never hard-coded here.
 const footer = readFooterData();
 const meta = loadContentPool(path.resolve(CV_CONTENT_DIR)).meta;
-const elsewhere = resolveElsewhere(footer, meta.contact);
+const elsewhere = [
+  ...resolveElsewhere(footer, meta.contact),
+  // The Rabbit Holes feed icon in the footer (D21). Kept last so the owner's
+  // elsewheres keep their order.
+  { id: "rabbit-holes-rss", label: "Rabbit Holes RSS", icon: "rss", href: `${base}rabbit-holes/rss.xml` },
+];
 const buildInfo = readBuildInfo(path.resolve("."), footer.repository);
 
-// Public navigation. The phd section is never linked (brief §4).
+// Public navigation. The old "Writing" slot is now "Rabbit Holes" (D21); the
+// /writing/ route is kept as a redirect. The phd section is never linked (brief §4).
 const primaryNav = [
   { label: "Research", section: "research" },
   { label: "Projects", section: "projects" },
-  { label: "Writing", section: "writing" },
+  { label: "Rabbit Holes", section: "rabbit-holes" },
   { label: "CV", section: "cv" },
 ];
 const secondaryNav = [
@@ -114,6 +124,17 @@ const footerNav = [
     <!-- Feed autodiscovery (SEAM-P3). Public layout only; the private layout
          emits no feed and links none. -->
     <link rel="alternate" type="application/rss+xml" title="Jason Cusati — Research hub" href={`${base}rss.xml`} />
+    <!-- Rabbit Holes feed discovery (D21): RSS, Atom and JSON Feed. -->
+    {feedAlternates(siteUrl).map((alt) => (
+      <link
+        rel="alternate"
+        type={alt.type}
+        title={alt.href.endsWith("atom.xml") ? "Rabbit Holes (Atom)" : alt.href.endsWith("feed.json") ? "Rabbit Holes (JSON Feed)" : "Rabbit Holes (RSS)"}
+        href={alt.href}
+      />
+    ))}
+    <!-- Mastodon creator attribution (D21). -->
+    <meta name="fediverse:creator" content="@djjay0131@mastodon.social" />
 
     <!-- OpenGraph -->
     <meta property="og:title" content={title} />
