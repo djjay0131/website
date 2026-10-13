@@ -51,6 +51,18 @@ billing_account = "000000-000000-000000"
 #     repository_owner_id = "5666389"
 #     default_branch      = "main"
 #   }
+#   construction-ai = {
+#     repository          = "djjay0131/construction-ai-proposal"
+#     repository_id       = "1134376420"
+#     repository_owner_id = "5666389"
+#     default_branch      = "master"
+#   }
+#   saner2027 = {
+#     repository          = "djjay0131/saner2027-governed-agents"
+#     repository_id       = "1409006235"
+#     repository_owner_id = "5666389"
+#     default_branch      = "master"
+#   }
 # }
 #
 # SETTING THIS AT ALL REPLACES THE WHOLE MAP. A tfvars value does not merge with

@@ -40,6 +40,24 @@ GCP service-account id is at most 30 characters. `construction-ai-proposal` is
    the secrecy of content already public in the satellite's own repository;
    D8/ADR-0016 must not be read as concealing a PDF that is public on GitHub.
 
+## Amendment (2026-10-13): satellite #6, `saner2027`
+
+Owner request, 2026-10-13: publish the SANER 2027 study's preliminary work
+(design, task pool, plan and timeline) to the hub for the study team.
+
+- **Roster:** `saner2027-governed-agents` (source `saner2027`) is satellite #6.
+  Repository id `1409006235`, owner id `5666389`, default branch `master`,
+  `private: true` — all read from the GitHub REST API on 2026-10-13.
+- **Key:** decision 2 applies unchanged. `publish-saner2027-governed-agents`
+  would be 33 characters, so the key is `saner2027` (SA `publish-saner2027`,
+  provider `github-saner2027`).
+- **Visibility:** private repository, private items only, as in decision 3.
+  The paper is under double-anonymous review until notification (2026-12-08),
+  so a public page naming the owner beside the study risks a desk reject. Its
+  items are **never** added to `site/publish-allowlist.json` while review is
+  open, and the satellite's own build fails if any item is not private
+  (docs/satellites.md, "Enforce your own visibility").
+
 ## Rationale
 
 The design doc is the design authority; leaving the roster stale is the same
