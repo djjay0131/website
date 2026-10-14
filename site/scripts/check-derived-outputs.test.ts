@@ -8,6 +8,7 @@ import {
   checkSearchIndexScope,
   collectPrivateItems,
   findLeaks,
+  findRedirectRuleLeaks,
   findRedirectStubLeaks,
   listDerivedOutputs,
 } from "./check-no-private-in-public.mjs";
@@ -162,6 +163,44 @@ describe("findRedirectStubLeaks scans stubs for titles/summaries (SEAM-P6)", () 
     const leaks = findRedirectStubLeaks(out, ITEMS);
     expect(leaks.length).toBeGreaterThan(0);
     expect(leaks.some((l) => l.kind.startsWith("title"))).toBe(true);
+  });
+});
+
+describe("findRedirectRuleLeaks — no redirect may name a private slug (D22)", () => {
+  it("passes on the committed firebase.json", () => {
+    const config = path.resolve("..", "firebase.json");
+    expect(findRedirectRuleLeaks(config, ITEMS)).toEqual([]);
+  });
+
+  it("flags a redirect whose source names the private Fellow slug", () => {
+    const dir = scratch();
+    const config = path.join(dir, "firebase.json");
+    fs.writeFileSync(
+      config,
+      JSON.stringify({
+        hosting: {
+          redirects: [
+            { source: "/cv/anthropic-fellow", destination: "/signin/", type: 302 },
+          ],
+        },
+      }),
+    );
+    const leaks = findRedirectRuleLeaks(config, ITEMS);
+    expect(leaks).toHaveLength(1);
+    expect(leaks[0].item).toBe("cv/anthropic-fellow");
+    expect(leaks[0].where).toContain("source");
+  });
+
+  it("flags a redirect whose destination names the private Fellow slug", () => {
+    const dir = scratch();
+    const config = path.join(dir, "firebase.json");
+    fs.writeFileSync(
+      config,
+      JSON.stringify({
+        hosting: { redirects: [{ source: "/x", destination: "/cv/anthropic-fellow", type: 301 }] },
+      }),
+    );
+    expect(findRedirectRuleLeaks(config, ITEMS)).toHaveLength(1);
   });
 });
 

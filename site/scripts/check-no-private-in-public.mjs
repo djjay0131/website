@@ -785,6 +785,46 @@ export function findRedirectStubLeaks(stubsDir, items) {
   return leaks;
 }
 
+/**
+ * No `firebase.json` redirect rule may name a private slug (owner live check,
+ * 2026-10-14). A redirect for a private item makes the signed-out response for
+ * its public path differ from an unknown path (a 302 where everything else is a
+ * 404) — an existence oracle that also leaks the slug (ADR-0016; C29's uniform
+ * 404). The private item is served ONLY under /p/; its public paths must 404
+ * exactly like a missing one, so no rule may name it in either field.
+ */
+export function findRedirectRuleLeaks(configPath, items) {
+  const leaks = [];
+  if (items.length === 0 || !fs.existsSync(configPath)) return leaks;
+  let config;
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  } catch {
+    return leaks;
+  }
+  const rules = Array.isArray(config?.hosting?.redirects) ? config.hosting.redirects : [];
+  const shown = path.relative(SITE_ROOT, configPath) || configPath;
+  for (const item of items) {
+    const slug = needlesFor(item).find((n) => n.kind === "slug");
+    if (!slug) continue;
+    rules.forEach((rule, index) => {
+      for (const field of ["source", "destination"]) {
+        const value = typeof rule[field] === "string" ? rule[field] : "";
+        if (!containsBounded(value, slug.value)) continue;
+        leaks.push({
+          file: shown,
+          where: `hosting.redirects[${index}].${field}`,
+          kind: "slug",
+          needle: slug.value,
+          item: `${item.source}/${item.slug}`,
+          context: `${field} = ${JSON.stringify(value)}`,
+        });
+      }
+    });
+  }
+  return leaks;
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
@@ -842,11 +882,12 @@ if (isMain) {
   const scopeProblems = checkSearchIndexScope(distDir);
   const stubLeaks = stubsDir ? findRedirectStubLeaks(stubsDir, needles) : [];
   const annotationLeaks = findAnnotationLeaks(distDir);
+  const redirectLeaks = findRedirectRuleLeaks(path.join(SITE_ROOT, "..", "firebase.json"), items);
 
   if (args.json) {
     console.log(
       JSON.stringify(
-        { dist: distDir, stubs: stubsDir, privateItems: items, draftPosts: drafts, leaks, stubLeaks, annotationLeaks, scopeProblems, derived, warnings },
+        { dist: distDir, stubs: stubsDir, privateItems: items, draftPosts: drafts, leaks, stubLeaks, annotationLeaks, redirectLeaks, scopeProblems, derived, warnings },
         null,
         2,
       ),
@@ -879,7 +920,8 @@ if (isMain) {
   // single run proves the whole guard. The structural search-index assertion
   // (SEAM-P6) is reported alongside the byte leaks. The annotation needles
   // (AN-LEAK) guard a tool, so they are counted here too.
-  const leakCount = leaks.length + stubLeaks.length + annotationLeaks.length;
+  const leakCount =
+    leaks.length + stubLeaks.length + annotationLeaks.length + redirectLeaks.length;
 
   if (leakCount > 0) {
     console.error(
@@ -916,6 +958,17 @@ if (isMain) {
         console.log(
           `::error file=${leak.file}::annotation needle ${JSON.stringify(leak.needle)} appears in ` +
             `the ${leak.where} of ${leak.file} under the PUBLIC output`,
+        );
+      }
+    }
+    for (const leak of redirectLeaks) {
+      console.error(`  ${leak.file}  (${leak.where})`);
+      console.error(`    ${leak.kind} of ${leak.item} — ${JSON.stringify(leak.needle)}`);
+      console.error(`    …${leak.context}…`);
+      if (process.env.GITHUB_ACTIONS === "true") {
+        console.log(
+          `::error file=${leak.file}::private slug ${JSON.stringify(leak.needle)} (${leak.item}) ` +
+            `appears in ${leak.where}; a redirect for a private item is an existence oracle`,
         );
       }
     }
@@ -977,7 +1030,8 @@ if (isMain) {
     `\ncheck:no-private-in-public: PASS — no private item's or draft post's slug, route, payload ` +
       `path, title or summary appears in any path or any file's contents under ${shownDist}` +
       `${shownStubs ? ` and no private title or summary appears in any stub under ${shownStubs}` : ""}` +
-      `, and none of the annotation needles (${ANNOTATION_NEEDLES.join(", ")}) appears` +
+      `; no redirect rule names a private slug; and none of the annotation needles ` +
+      `(${ANNOTATION_NEEDLES.join(", ")}) appears` +
       ` (${walkFiles(distDir).length} file(s) scanned in ${shownDist}` +
       `${shownStubs ? `, ${walkFiles(stubsDir).length} in ${shownStubs}` : ""}).`,
   );
