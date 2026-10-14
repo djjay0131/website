@@ -74,19 +74,34 @@
     ],
     "redirects": [
       {
-        "source": "/pdfs/anthropic-fellow.pdf",
-        "destination": "/signin/",
-        "type": 302
+        "source": "/resumes/academic",
+        "destination": "/cv/research-full",
+        "type": 301
       },
       {
-        "source": "/cv/anthropic-fellow",
-        "destination": "/signin/",
-        "type": 302
+        "source": "/resumes/academic/**",
+        "destination": "/cv/research-full",
+        "type": 301
       },
       {
-        "source": "/cv/anthropic-fellow/**",
-        "destination": "/signin/",
-        "type": 302
+        "source": "/resumes/research-professional",
+        "destination": "/cv/research-2p",
+        "type": 301
+      },
+      {
+        "source": "/resumes/research-professional/**",
+        "destination": "/cv/research-2p",
+        "type": 301
+      },
+      {
+        "source": "/resumes/sde-long",
+        "destination": "/cv/professional-full",
+        "type": 301
+      },
+      {
+        "source": "/resumes/sde-long/**",
+        "destination": "/cv/professional-full",
+        "type": 301
       },
       {
         "source": "/resumes",

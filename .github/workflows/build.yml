@@ -1615,6 +1615,42 @@ jobs:
             echo "OK: ${ROUTE} body is ${BODY_SIZE} bytes"
           done
 
+      # Owner live check (2026-10-14). A private item must be indistinguishable
+      # from a missing one when signed out: the Fellow CV has no public route and
+      # NO redirect, so its public paths must 404 exactly like a random missing
+      # path -- same status, no Location header, same body class. A redirect
+      # (302 to /signin/) would be an existence oracle and leak the slug (C29).
+      - name: Private item is indistinguishable from a missing path (signed out)
+        run: |
+          set -u
+          FAILED=0
+          MISSING="/cv/zzz-nonexistent-$(date +%s)/"
+          ref_status=$(curl -s -o /dev/null -w "%{http_code}" "${SITE}${MISSING}")
+          ref_loc=$(curl -s -D - -o /dev/null "${SITE}${MISSING}" | awk 'tolower($1)=="location:"{print $2}' | tr -d '\r')
+          ref_len=$(curl -s "${SITE}${MISSING}" | wc -c)
+          echo "missing path ${MISSING}: status=${ref_status} location=${ref_loc:-none} bytes=${ref_len}"
+          for ROUTE in "/cv/anthropic-fellow/" "/pdfs/anthropic-fellow.pdf"; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "${SITE}${ROUTE}")
+            loc=$(curl -s -D - -o /dev/null "${SITE}${ROUTE}" | awk 'tolower($1)=="location:"{print $2}' | tr -d '\r')
+            len=$(curl -s "${SITE}${ROUTE}" | wc -c)
+            echo "${ROUTE}: status=${status} location=${loc:-none} bytes=${len}"
+            if [ "$status" != "$ref_status" ]; then
+              echo "::error::${ROUTE} status ${status} differs from a missing path (${ref_status}) — existence oracle"
+              FAILED=1
+            fi
+            if [ "${loc:-}" != "${ref_loc:-}" ]; then
+              echo "::error::${ROUTE} Location header differs from a missing path — existence oracle"
+              FAILED=1
+            fi
+            diff=$(( len > ref_len ? len - ref_len : ref_len - len ))
+            if [ "$diff" -gt 2048 ]; then
+              echo "::error::${ROUTE} body ${len} bytes is a different class from a missing path (${ref_len})"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then exit 1; fi
+          echo "OK: the private paths return ${ref_status} with no redirect, like a missing path."
+
   # Single place that reports failures anywhere in the pipeline. The webhook is
   # optional; the tracking issue is not, so a broken build is visible (and
   # emailed by GitHub) even with no secrets configured at all. Without this,

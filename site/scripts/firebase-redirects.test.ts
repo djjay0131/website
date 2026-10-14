@@ -31,19 +31,24 @@ describe("firebase.json redirects (D22/ADR-0024)", () => {
     }
   });
 
-  it("keeps the Fellowship CV behind sign-in (302, never 301)", () => {
-    for (const source of [
-      "/pdfs/anthropic-fellow.pdf",
-      "/cv/anthropic-fellow",
-      "/cv/anthropic-fellow/**",
+  it("deep-links /resumes/<old-variant>/ to its successor, not the index", () => {
+    for (const [from, to] of [
+      ["/resumes/academic", "/cv/research-full"],
+      ["/resumes/research-professional", "/cv/research-2p"],
+      ["/resumes/sde-long", "/cv/professional-full"],
     ]) {
-      expect(rule(source), source).toMatchObject({ destination: "/signin/", type: 302 });
+      expect(rule(from), from).toMatchObject({ destination: to, type: 301 });
     }
   });
 
-  it("never redirects anything TO the private Fellow slug", () => {
+  // Owner live check (2026-10-14): a redirect for the private Fellow CV made a
+  // signed-out visitor's response differ from an unknown path (302 vs 404) -- an
+  // existence oracle and a slug leak. The Fellow is served ONLY under /p/; a
+  // public request for it must 404 exactly like a missing path.
+  it("does NOT redirect any private Fellow path (no existence oracle)", () => {
     for (const r of redirects) {
-      expect(r.destination).not.toContain("anthropic-fellow");
+      expect(r.source, r.source).not.toContain("anthropic-fellow");
+      expect(r.destination, r.source).not.toContain("anthropic-fellow");
     }
   });
 });
