@@ -20,20 +20,24 @@
     "to": "/cv/"
   },
   {
-    "from": "/website/cv/academic/",
-    "to": "/cv/academic/"
+    "from": "/website/cv/one-page/",
+    "to": "/cv/one-page/"
   },
   {
-    "from": "/website/cv/anthropic-fellow/",
-    "to": "/cv/anthropic-fellow/"
+    "from": "/website/cv/professional-2p/",
+    "to": "/cv/professional-2p/"
   },
   {
-    "from": "/website/cv/research-professional/",
-    "to": "/cv/research-professional/"
+    "from": "/website/cv/professional-full/",
+    "to": "/cv/professional-full/"
   },
   {
-    "from": "/website/cv/sde-long/",
-    "to": "/cv/sde-long/"
+    "from": "/website/cv/research-2p/",
+    "to": "/cv/research-2p/"
+  },
+  {
+    "from": "/website/cv/research-full/",
+    "to": "/cv/research-full/"
   },
   {
     "from": "/website/email/",
@@ -68,28 +72,28 @@
     "to": "/papers/"
   },
   {
-    "from": "/website/pdfs/academic.pdf",
-    "to": "/pdfs/academic.pdf"
+    "from": "/website/pdfs/one-page.pdf",
+    "to": "/pdfs/one-page.pdf"
   },
   {
-    "from": "/website/pdfs/anthropic-fellow.pdf",
-    "to": "/pdfs/anthropic-fellow.pdf"
+    "from": "/website/pdfs/professional-2p.pdf",
+    "to": "/pdfs/professional-2p.pdf"
   },
   {
-    "from": "/website/pdfs/research-professional.pdf",
-    "to": "/pdfs/research-professional.pdf"
+    "from": "/website/pdfs/professional-full.pdf",
+    "to": "/pdfs/professional-full.pdf"
   },
   {
-    "from": "/website/pdfs/sde-long.pdf",
-    "to": "/pdfs/sde-long.pdf"
+    "from": "/website/pdfs/research-2p.pdf",
+    "to": "/pdfs/research-2p.pdf"
+  },
+  {
+    "from": "/website/pdfs/research-full.pdf",
+    "to": "/pdfs/research-full.pdf"
   },
   {
     "from": "/website/phd/",
     "to": "/phd/"
-  },
-  {
-    "from": "/website/photo_jason_1.jpeg",
-    "to": "/photo_jason_1.jpeg"
   },
   {
     "from": "/website/privacy/",
@@ -254,10 +258,6 @@
   {
     "from": "/website/research/soa-agentic-se/agentic-memory/synthesis/",
     "to": "/research/soa-agentic-se/agentic-memory/synthesis/"
-  },
-  {
-    "from": "/website/resumes/",
-    "to": "/resumes/"
   },
   {
     "from": "/website/robots.txt",

@@ -1,7 +1,10 @@
 # FIXTURE. Invented.
-variant: academic
-label: Academic CV
-description: Fixture academic variant. Not real content.
+variant: research-full
+label: Full research CV
+description: Fixture research-full variant. Not real content.
+track: research
+length: full
+visibility: public
 sections:
   - type: summary
     content_id: academic

@@ -12,8 +12,8 @@ describe("feedPathFor", () => {
     expect(feedPathFor({ section: "projects", source: "kgis", slug: "kgis-docs", format: "html" })).toBe(
       "/projects/kgis/kgis-docs/",
     );
-    expect(feedPathFor({ section: "cv", source: "cv", slug: "academic", format: "pdf" })).toBe(
-      "/cv/academic/",
+    expect(feedPathFor({ section: "cv", source: "cv", slug: "one-page", format: "pdf" })).toBe(
+      "/cv/one-page/",
     );
     // A group folder item has no page of its own, so it is not feedable.
     expect(feedPathFor({ section: "cv", source: "cv", slug: "cv-data", format: "data" })).toBeNull();
@@ -26,9 +26,9 @@ describe("collectFeedItems is public-only by construction (SEAM-P1, SEAM-P3)", (
 
   it("includes only effectively-public items that have a real page", () => {
     expect(links).toContain(`${CANONICAL_ORIGIN}/projects/kgis/kgis-docs/`);
-    expect(links).toContain(`${CANONICAL_ORIGIN}/cv/academic/`);
-    expect(links).toContain(`${CANONICAL_ORIGIN}/cv/research-professional/`);
-    expect(links).toContain(`${CANONICAL_ORIGIN}/cv/sde-long/`);
+    expect(links).toContain(`${CANONICAL_ORIGIN}/cv/one-page/`);
+    expect(links).toContain(`${CANONICAL_ORIGIN}/cv/research-2p/`);
+    expect(links).toContain(`${CANONICAL_ORIGIN}/cv/professional-full/`);
     // cv-data is effectively public but has no page, so it is skipped.
     expect(links.some((l) => l.includes("cv-data"))).toBe(false);
   });
@@ -67,11 +67,11 @@ describe("an item with no date is skipped, not invented (SEAM-P3)", () => {
           source: "cv",
           items: [
             {
-              slug: "academic",
+              slug: "one-page",
               title: "Undated CV",
               section: "cv",
               format: "pdf",
-              path: "academic.pdf",
+              path: "one-page.pdf",
               visibility: "public",
             },
           ],

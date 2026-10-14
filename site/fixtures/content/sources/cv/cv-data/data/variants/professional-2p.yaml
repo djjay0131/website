@@ -1,7 +1,10 @@
 # FIXTURE. Invented.
-variant: sde-long
-label: Software Engineering
-description: Fixture software-engineering variant. Not real content.
+variant: professional-2p
+label: Professional résumé (2 pages)
+description: Fixture professional-2p variant. Not real content.
+track: professional
+length: two-page
+visibility: public
 sections:
   - type: summary
     content_id: industry
@@ -16,4 +19,3 @@ sections:
     include:
       - languages
       - tools
-  - type: misc

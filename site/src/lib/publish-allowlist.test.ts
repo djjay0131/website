@@ -120,9 +120,11 @@ describe("the committed allowlist", () => {
     const parsed = readPublishAllowlist();
     expect(parsed.entries.map((e) => `${e.source}/${e.slug}`)).toEqual(
       expect.arrayContaining([
-        "cv/academic",
-        "cv/research-professional",
-        "cv/sde-long",
+        "cv/one-page",
+        "cv/research-2p",
+        "cv/professional-2p",
+        "cv/research-full",
+        "cv/professional-full",
         "cv/cv-data",
         "kgis/kgis-docs",
       ]),

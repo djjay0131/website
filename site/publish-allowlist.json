@@ -1,9 +1,11 @@
 {
   "version": 1,
   "items": [
-    { "source": "cv", "slug": "academic" },
-    { "source": "cv", "slug": "research-professional" },
-    { "source": "cv", "slug": "sde-long" },
+    { "source": "cv", "slug": "one-page" },
+    { "source": "cv", "slug": "research-2p" },
+    { "source": "cv", "slug": "professional-2p" },
+    { "source": "cv", "slug": "research-full" },
+    { "source": "cv", "slug": "professional-full" },
     { "source": "cv", "slug": "cv-data" },
     { "source": "kgis", "slug": "kgis-docs" },
     { "source": "hub", "slug": "research/soa-agentic-se" },

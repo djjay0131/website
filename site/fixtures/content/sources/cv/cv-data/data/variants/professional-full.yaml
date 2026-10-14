@@ -1,0 +1,22 @@
+# FIXTURE. Invented.
+variant: professional-full
+label: Full professional résumé
+description: Fixture professional-full variant. Not real content.
+track: professional
+length: full
+visibility: public
+sections:
+  - type: summary
+    content_id: industry
+  - type: employment
+    include:
+      - current-role
+      - previous-role
+  - type: education
+    include:
+      - bachelors
+  - type: skills
+    include:
+      - languages
+      - tools
+  - type: misc

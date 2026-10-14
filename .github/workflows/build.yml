@@ -49,7 +49,7 @@ concurrency:
 #          refs/pull/<n>/merge and the deploy binding admits only
 #          refs/heads/main (infra/wif.tf), so it CANNOT authenticate to read the
 #          bucket. Without this fallback every PR would build a CV-less site and
-#          fail check:smoke-routes on /cv/academic.
+#          fail check:smoke-routes on /cv/one-page.
 #   any trigger while vars.GCP_CONTENT_BUCKET is unset
 #       -> scripts/fetch-data.sh : covers the window between merging Phase 2 and
 #          the owner applying Terraform and setting the variable at Checkpoint 3.
@@ -1100,6 +1100,13 @@ jobs:
       - name: Check smoke-test routes exist (GitHub Pages variant)
         run: npm run check:smoke-routes
 
+      # SEAM-6 / Checkpoint 7 gap, closed (owner D22, ADR-0024): the committed
+      # redirect map must cover every public route. It was unwired, so a route
+      # could ship with no /website redirect. Runs against the build just made,
+      # before the stubs (which consume the map) are generated.
+      - name: Check the redirect map is complete (GitHub Pages variant)
+        run: node scripts/generate-redirect-map.mjs --check --dist dist-public
+
       # SEAM-P5 / ADR-0020: generate the stubs-only Pages artifact. This must run
       # BEFORE the leak check so the check's --stubs scan (npm run
       # check:no-private-in-public passes --stubs dist-redirects) covers the
@@ -1354,8 +1361,8 @@ jobs:
       - name: Verify a redirect stub forwards to the canonical host
         run: |
           SITE="https://djjay0131.github.io/website"
-          ROUTE="/cv/academic/"
-          TARGET="https://jason.cusati.us/cv/academic/"
+          ROUTE="/cv/research-full/"
+          TARGET="https://jason.cusati.us/cv/research-full/"
           BODY="$(curl -sL "${SITE}${ROUTE}")"
           if printf '%s' "${BODY}" | grep -Fq "url=${TARGET}"; then
             echo "OK: ${SITE}${ROUTE} forwards to ${TARGET}"
@@ -1583,7 +1590,7 @@ jobs:
       - name: Smoke test live routes
         run: |
           FAILED=0
-          for ROUTE in "/" "/resumes/" "/cv/academic" "/cv/research-professional" "/papers/" "/pdfs/academic.pdf" "/projects/"; do
+          for ROUTE in "/" "/cv/" "/cv/one-page" "/cv/research-2p" "/papers/" "/pdfs/one-page.pdf" "/projects/"; do
             STATUS=$(curl -sL -o /dev/null -w "%{http_code}" "${SITE}${ROUTE}")
             if [ "$STATUS" = "200" ]; then
               echo "OK: ${ROUTE} → ${STATUS}"
@@ -1599,7 +1606,7 @@ jobs:
 
       - name: Verify non-empty body on key routes
         run: |
-          for ROUTE in "/cv/academic" "/papers/"; do
+          for ROUTE in "/cv/research-full" "/papers/"; do
             BODY_SIZE=$(curl -sL "${SITE}${ROUTE}" | wc -c)
             if [ "$BODY_SIZE" -lt 500 ]; then
               echo "::error::${ROUTE} returned suspiciously small body (${BODY_SIZE} bytes)"

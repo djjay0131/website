@@ -4345,3 +4345,112 @@ fallback and the build is green.
   `handoffs/wave-8-security-tester.md`; the feed and OG paths were exercised
   end-to-end. The missing independent reviewer sessions are recorded as a gap,
   not papered over.
+
+## D22 — one CV section, five documents, per-variant visibility (2026-10-14)
+
+Owner decision **D22**, recorded durably as **ADR-0024**
+(`llm/governance/adr/0024-cv-consolidation-per-variant-visibility.md`). This
+wave spans **two repositories**: `~/code/cv` (the satellite) and
+`~/code/website` (the hub). Branch `feat/d22-cv-consolidation` in both.
+
+### The contract STOP, and its resolution
+
+D22's satellite instructions name a hard gate: if the two new manifest fields
+(`track`, `length`) need a schema change, that is a contract change
+(`v1`→`v2`, shared with the family site), and the instruction is to **STOP and
+report before changing the contract** unless v1 already has an extension field.
+
+Checked, not assumed: `contract/manifest.schema.json` is
+`additionalProperties: false` at the envelope (line 7) **and** item (line 41)
+levels, and `site/src/content.config.ts` mirrors it with `z.strictObject` — there
+is **no extension field**. The gate therefore fired. It was reported to the
+owner, who chose the non-contract path:
+
+> **Option B** — carry `track`/`length` (and `visibility`) in the **`cv-data`
+> payload** (the variant selectors), versioned by that payload's own
+> `schema_version` `"1"` → `"2"` (ADR-0009). The publish contract and the
+> manifest schema are untouched; `contract/publish@v1` is unchanged.
+
+`tools/manifest.py` no longer hard-codes `VISIBILITY = "public"`; each PDF item
+reads its variant's `visibility:` (default `private`, ADR-0016). The shared
+`cv-data` item stays `public`.
+
+### The six documents
+
+| slug | label | `length` | `track` | `visibility` |
+|---|---|---|---|---|
+| `one-page` | One-page résumé | one-page | both | public |
+| `research-2p` | Research résumé (2 pages) | two-page | research | public |
+| `professional-2p` | Professional résumé (2 pages) | two-page | professional | public |
+| `research-full` | Full research CV | full | research | public |
+| `professional-full` | Full professional résumé | full | professional | public |
+| `anthropic-fellow` | Anthropic Fellow CV | full | both | **private** |
+
+`research-professional` is retired; its content became `research-2p`.
+`academic`→`research-full` and `sde-long`→`professional-full` are renames with
+unchanged content. Trimming invented no experience, number or publication; every
+judgment call is listed in the satellite PR body for the owner.
+
+### What shipped
+
+**Satellite (`cv`)** — six variants; `track`/`length`/`visibility` on every
+selector with defaults matching the schema; `cv-data` `schema_version` `"2"`;
+`tools/page_budget.py` counts the built PDF (`pypdf`, `pdfinfo` fallback) and
+fails when one-page ≠ 1 or a `*-2p` > 2, wired as a `page-budget` job that
+`publish` now depends on; the bibliography is gated on `\cvpublications` so a
+short variant can omit it; 207 tests pass, `ruff` clean.
+
+**Hub (`website`)** — one `/cv/` section (`site/src/pages/cv/index.astro`): the
+one-page résumé featured with a prominent Download PDF, then Research
+(`research-2p`, `research-full`) and Professional (`professional-2p`,
+`professional-full`) groups, each with HTML view + PDF download, last-updated
+date and page count (`site/src/lib/pdf-pages.mjs`, dependency-free). `/resumes/`
+removed and 301-redirected; old variant URLs and PDFs 301 in `firebase.json`;
+`redirects:check` wired into CI (closes ADR-0020 decision 4's DEFERRED gap);
+nav/footer carry one "CV" link; `publish-allowlist.json` lists the five public
+slugs; the leak check's private set contains the Fellow CV and its slug, title,
+route and payload path appear nowhere in `dist-public`, sitemap, RSS or OG;
+annotations mount on the CV HTML views (D20). 543 tests pass; governance checks
+4/4 PASS.
+
+### Verification (local, pre-merge)
+
+- Satellite: local xelatex-equivalent build of all six — one-page **1**, the
+  two `-2p` **2**, `research-full` 4, `professional-full` 3, fellow 2; the
+  budget checker passes them and fails an injected 4-page one-page.
+- Hub: `build:public` builds clean (36 fixture pages, 45 with real CV data); `/cv/` lists exactly the five public documents
+  in the right groups; no `/resumes/`; `check-publish-allowlist` PASS; smoke
+  routes 7/7; `redirects:check` "every inventoried route is covered";
+  `check-no-private-in-public` PASS (Fellow needles absent); `build:private`
+  lists the Fellow CV under `/p/` and links the five public ones out.
+
+### Roster
+
+Full roster this time (the Wave 8 solo-run gap is not repeated): Red Team
+(`handoffs/wave-9-red-team.md`), Security Tester, veto
+(`handoffs/wave-9-security-tester.md`), Skeptic Verifier
+(`handoffs/wave-9-skeptic-verifier.md`), Chief Reviewer
+(`handoffs/wave-9-chief-reviewer.md`). No Terraform.
+
+**Findings, all fixed before merge:** (a) the committed redirect map had been
+regenerated from fixture content, dropping the 12 real `/projects/*` routes, and
+the `redirects:check` step ran after `search:index` so it over-fired — fixed by
+excluding `_payload/`, `pagefind/` and `404.html` in `route-inventory.mjs` and
+regenerating the map from a real-content build; (b) `PrivateBase.astro` still
+linked "Resumes" — removed; (c) the page-budget checker trusted the variant's
+self-declared `length` — now bound to the slug (`expected_length_for_slug`), so a
+`*-2p` cannot relabel itself `full`; (d) `pypdf` pinned `>=4,<7`. The Security
+Tester's verdict after remediation is **PASS, 0 FAIL**. Merge rules as before
+(§8).
+
+### Merge / live verification
+
+PENDING. **The satellite merges first.** The hub's CI builds the CV from the
+`cv` GitHub release (a PR cannot read the bucket) and its allowlist names the
+five new slugs; until the satellite publishes them the hub PR's
+`check:publish-allowlist` fails on stale entries. So the satellite merges,
+publishes `schema_version "2"` and the new variants, the hub PR then builds
+against them and goes green, and the hub merges immediately after. Between the
+two merges the deployed hub may build red (its old claim table does not know
+`"2"`); a failed build does not undeploy. The hub claim table accepts **both**
+`"1"` and `"2"`.
