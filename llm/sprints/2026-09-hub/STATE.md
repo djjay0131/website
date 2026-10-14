@@ -4445,12 +4445,49 @@ Tester's verdict after remediation is **PASS, 0 FAIL**. Merge rules as before
 
 ### Merge / live verification
 
-PENDING. **The satellite merges first.** The hub's CI builds the CV from the
-`cv` GitHub release (a PR cannot read the bucket) and its allowlist names the
-five new slugs; until the satellite publishes them the hub PR's
-`check:publish-allowlist` fails on stale entries. So the satellite merges,
-publishes `schema_version "2"` and the new variants, the hub PR then builds
-against them and goes green, and the hub merges immediately after. Between the
-two merges the deployed hub may build red (its old claim table does not know
-`"2"`); a failed build does not undeploy. The hub claim table accepts **both**
-`"1"` and `"2"`.
+**DONE (2026-10-14).** Ordering held as designed: the satellite merged first.
+
+- **Satellite `cv` PR #16** — merged `1e24e76` (branch deleted). Master run
+  `38521813906` success: all six compiled, **Page budgets** passed, `publish`
+  wrote 7 items to `gs://cusati-hub-content/sources/cv/` (`one-page`,
+  `research-2p`, `professional-2p`, `research-full`, `professional-full`,
+  `anthropic-fellow`, `cv-data` `schema_version "2"`) and updated the `latest`
+  release. The hub PR's `build` failed on the old release data (allowlist stale)
+  until the satellite published — exactly the predicted gate.
+- **Hub PR #126** — merged `7e81cd9` (branch deleted). First post-merge
+  `build-and-deploy` **failed** on `redirects:check`: the map was missing
+  `/website/projects/kgis/kgis-docs/` (my regeneration tree lacked `kgis`). No
+  deploy ran.
+- **Hub PR #128** — `fix(d22): regenerate the redirect map with the kgis item
+  present`: merged; the map is 73 entries; deploy success.
+- **Owner live check (2026-10-14) found two follow-ups, both fixed in hub PR
+  #129** (merged, deploy success):
+  1. **Existence oracle.** Signed-out `/cv/anthropic-fellow/` and
+     `/pdfs/anthropic-fellow.pdf` returned 302 → `/signin/` while an unknown path
+     returned 404 — an anonymous visitor learned the private CV exists and its
+     slug. The three Fellow redirects are removed; the item is served only under
+     `/p/`, so both paths now 404 like any missing path. The leak check gained
+     `findRedirectRuleLeaks` (no redirect may name a private slug) and
+     `firebase-smoke-test` gained a live comparison of the Fellow paths against a
+     random missing path.
+  2. **Deep links.** `/resumes/sde-long/` and `/resumes/research-professional/`
+     now 301 to `/cv/professional-full/` and `/cv/research-2p/` (and
+     `/resumes/academic/` to `/cv/research-full/`); `/resumes/` still 301s to
+     `/cv/`.
+
+### Live verification (2026-10-14, `jason.cusati.us`)
+
+| Probe | Result |
+|---|---|
+| `/cv/` | 200; one-page featured + Research (2) + Professional (2) |
+| `/pdfs/{one-page,research-2p,professional-2p,research-full,professional-full}.pdf` pages | **1, 2, 2, 4, 3** — the budgets |
+| `/cv/anthropic-fellow/`, `/pdfs/anthropic-fellow.pdf` | **404** |
+| `/cv/zzz-nonexistent/` (random) | **404** — indistinguishable |
+| `/resumes/sde-long/` → 301 `/cv/professional-full`; `/resumes/research-professional/` → 301 `/cv/research-2p`; `/resumes/academic/` → 301 `/cv/research-full`; `/resumes/` → 301 `/cv/` | correct |
+| `/cv/academic/`, `/pdfs/sde-long.pdf` | 301 to successors |
+| Fellow slug in `sitemap-0.xml`, `rss.xml`, home | **0, 0, 0** |
+| "Resumes" link anywhere | absent; one "CV" nav entry |
+| `/p/` signed out | 404 (uniform) |
+
+`main` is green; `build-and-deploy` `38524725900` success, `firebase-smoke-test`
+(incl. the new private-404 assertion) green.
