@@ -87,6 +87,66 @@
         "source": "/cv/anthropic-fellow/**",
         "destination": "/signin/",
         "type": 302
+      },
+      {
+        "source": "/resumes",
+        "destination": "/cv/",
+        "type": 301
+      },
+      {
+        "source": "/resumes/",
+        "destination": "/cv/",
+        "type": 301
+      },
+      {
+        "source": "/resumes/**",
+        "destination": "/cv/",
+        "type": 301
+      },
+      {
+        "source": "/cv/academic",
+        "destination": "/cv/research-full",
+        "type": 301
+      },
+      {
+        "source": "/cv/academic/**",
+        "destination": "/cv/research-full",
+        "type": 301
+      },
+      {
+        "source": "/cv/research-professional",
+        "destination": "/cv/research-2p",
+        "type": 301
+      },
+      {
+        "source": "/cv/research-professional/**",
+        "destination": "/cv/research-2p",
+        "type": 301
+      },
+      {
+        "source": "/cv/sde-long",
+        "destination": "/cv/professional-full",
+        "type": 301
+      },
+      {
+        "source": "/cv/sde-long/**",
+        "destination": "/cv/professional-full",
+        "type": 301
+      },
+      {
+        "source": "/pdfs/academic.pdf",
+        "destination": "/pdfs/research-full.pdf",
+        "type": 301
+      },
+      {
+        "source": "/pdfs/research-professional.pdf",
+        "destination": "/pdfs/research-2p.pdf",
+        "type": 301
+      },
+      {
+        "source": "/pdfs/sde-long.pdf",
+        "destination": "/pdfs/professional-full.pdf",
+        "type": 301
       }
     ],
     "headers": [

@@ -134,7 +134,15 @@ describe("findRedirectStubLeaks scans stubs for titles/summaries (SEAM-P6)", () 
 
   it("accepts the ADR-0020 legacy path, which names the private slug", () => {
     const out = scratch();
-    generateRedirectStubs({ map, outDir: out });
+    // The committed map is regenerated from the build, so a private item has no
+    // route and no entry. Give the generator the legacy path the ADR-0020 stubs
+    // artifact is allowed to carry: a path may name the slug; only the item's
+    // title/summary would be a leak.
+    const privateMap = [
+      ...map,
+      { from: "/website/cv/anthropic-fellow/", to: "/cv/anthropic-fellow/" },
+    ];
+    generateRedirectStubs({ map: privateMap, outDir: out });
     // The fellowship path IS present in the artifact...
     const fellowship = ITEMS.find((i) => i.slug === "anthropic-fellow");
     expect(fellowship).toBeTruthy();

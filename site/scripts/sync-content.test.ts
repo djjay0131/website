@@ -36,10 +36,10 @@ describe("sync-content.sh --from (the bucket-shaped local tree)", () => {
     expect(r.status, r.stderr).toBe(0);
     for (const rel of [
       "cv/manifest.json",
-      "cv/academic.pdf",
-      "cv/research-professional.pdf",
+      "cv/one-page.pdf",
+      "cv/research-2p.pdf",
       "cv/cv-data/data/content/meta.yaml",
-      "cv/cv-data/data/variants/academic.yaml",
+      "cv/cv-data/data/variants/one-page.yaml",
       "cv/cv-data/own-bib.bib",
     ]) {
       expect(fs.existsSync(path.join(dest, rel)), rel).toBe(true);
@@ -160,7 +160,7 @@ describe("the fingerprint covers the whole object set, deletions included", () =
 
   it("CHANGES WHEN AN OBJECT IS DELETED — a withdrawn item must never look unchanged", () => {
     const before = fingerprint(tree);
-    fs.rmSync(path.join(tree, "sources/cv/sde-long.pdf"));
+    fs.rmSync(path.join(tree, "sources/cv/professional-full.pdf"));
     expect(fingerprint(tree)).not.toBe(before);
   });
 
@@ -198,12 +198,12 @@ describe("stage-public-assets — Phase 1's URLs keep resolving", () => {
 
   it("puts each published cv pdf at public/pdfs/<slug>.pdf and NO portrait", () => {
     const { staged } = stagePublicAssets(sources, siteRoot);
-    expect(staged).toContain(`${PUBLIC_PDF_DIR}/academic.pdf`);
-    expect(staged).toContain(`${PUBLIC_PDF_DIR}/research-professional.pdf`);
+    expect(staged).toContain(`${PUBLIC_PDF_DIR}/one-page.pdf`);
+    expect(staged).toContain(`${PUBLIC_PDF_DIR}/research-2p.pdf`);
     // Amendment 4 / ADR-0015 decision 1: the public site serves no portrait.
     expect(staged).not.toContain(PUBLIC_PHOTO_PATH);
     expect(fs.existsSync(path.join(siteRoot, PUBLIC_PHOTO_PATH))).toBe(false);
-    expect(fs.existsSync(path.join(siteRoot, PUBLIC_PDF_DIR, "sde-long.pdf"))).toBe(true);
+    expect(fs.existsSync(path.join(siteRoot, PUBLIC_PDF_DIR, "professional-full.pdf"))).toBe(true);
   });
 
   it("removes a stale portrait an older build left in public/", () => {
@@ -221,15 +221,15 @@ describe("stage-public-assets — Phase 1's URLs keep resolving", () => {
     stagePublicAssets(sources, siteRoot);
     const manifestPath = path.join(sources, "cv", "manifest.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-    manifest.items = manifest.items.filter((i: { slug: string }) => i.slug !== "sde-long");
+    manifest.items = manifest.items.filter((i: { slug: string }) => i.slug !== "professional-full");
     fs.writeFileSync(manifestPath, JSON.stringify(manifest));
 
     const { staged } = stagePublicAssets(sources, siteRoot);
-    expect(staged).not.toContain(`${PUBLIC_PDF_DIR}/sde-long.pdf`);
+    expect(staged).not.toContain(`${PUBLIC_PDF_DIR}/professional-full.pdf`);
     // The manifest is the authority on what exists, even though the bytes
     // remain under the prefix (a satellite cannot list, so it cannot prune).
-    expect(fs.existsSync(path.join(sources, "cv", "sde-long.pdf"))).toBe(true);
-    expect(fs.existsSync(path.join(siteRoot, PUBLIC_PDF_DIR, "sde-long.pdf"))).toBe(false);
+    expect(fs.existsSync(path.join(sources, "cv", "professional-full.pdf"))).toBe(true);
+    expect(fs.existsSync(path.join(siteRoot, PUBLIC_PDF_DIR, "professional-full.pdf"))).toBe(false);
   });
 
   it("stages nothing, and fails nothing, when no content has been synced", () => {

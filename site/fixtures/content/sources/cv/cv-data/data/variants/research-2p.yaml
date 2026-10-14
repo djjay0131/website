@@ -1,7 +1,10 @@
 # FIXTURE. Invented.
-variant: research-professional
-label: Research Professional
-description: Fixture research-professional variant. Not real content.
+variant: research-2p
+label: Research résumé (2 pages)
+description: Fixture research-2p variant. Not real content.
+track: research
+length: two-page
+visibility: public
 sections:
   - type: summary
     content_id: industry
@@ -11,6 +14,7 @@ sections:
   - type: education
     include:
       - doctorate
+  - type: publications
   - type: skills
     include:
       - id: languages

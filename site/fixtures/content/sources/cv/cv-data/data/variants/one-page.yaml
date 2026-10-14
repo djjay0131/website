@@ -1,0 +1,23 @@
+# FIXTURE. Invented.
+variant: one-page
+label: One-page résumé
+description: Fixture one-page variant. Not real content.
+track: both
+length: one-page
+visibility: public
+sections:
+  - type: summary
+    content_id: academic
+  - type: employment
+    include:
+      - id: current-role
+        bullets:
+          - current-a
+  - type: education
+    include:
+      - doctorate
+  - type: skills
+    include:
+      - id: languages
+        items:
+          - Fixture Lang
