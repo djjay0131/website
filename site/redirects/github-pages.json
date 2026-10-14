@@ -116,6 +116,10 @@
     "to": "/projects/insurance-schema-framework/"
   },
   {
+    "from": "/website/projects/kgis/kgis-docs/",
+    "to": "/projects/kgis/kgis-docs/"
+  },
+  {
     "from": "/website/projects/llm-coding-assistant/",
     "to": "/projects/llm-coding-assistant/"
   },
