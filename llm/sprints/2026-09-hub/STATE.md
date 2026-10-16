@@ -1,7 +1,7 @@
 # Research Hub — Orchestration State
 
 Status: Active
-Last updated: 2026-10-08
+Last updated: 2026-10-16
 Owner: Chief Architect (Lead Architect)
 
 **Sprint:** 2026-09-hub · **Mode:** 3 (Ultracode) · **Level:** L2 for the work streams; **L3 for PR #12** (roadmap requirement changes — delta review 2, Part D)
@@ -4491,3 +4491,74 @@ Tester's verdict after remediation is **PASS, 0 FAIL**. Merge rules as before
 
 `main` is green; `build-and-deploy` `38524725900` success, `firebase-smoke-test`
 (incl. the new private-404 assertion) green.
+
+## D23 — satellite 6 `saner2027`, PRIVATE ONLY (owner task, 2026-10-15)
+
+A sixth satellite, publishing only `visibility: private` items, behind the gate.
+The study is under **double-anonymous review until 2026-12-08**; every item is
+private, and no item is ever added to `site/publish-allowlist.json` while review
+is open. The satellite's own build fails on any non-private item; the hub's leak
+check is the backstop.
+
+### Owner decisions taken during the wave
+
+| # | Decision | Rationale (one line) |
+|---|---|---|
+| **D23** | Add satellite 6 `saner2027` (`djjay0131/saner2027-governed-agents`, branch `master`), private items only. | The owner asked for the study's preliminary work on the hub for the team; it must stay private. |
+| **D23-A** | **Superseded by D23-B.** Opaque key `study6`, ids-only WIF, secret-sourced needles. | The owner's first answer to the needle question. |
+| **D23-B** | **Use the real name.** Key stays `saner2027`; PR #124 and branch `satellite/saner2027` stay. Commit `saner2027` and `saner2027-governed-agents` as leak-check needles; do **not** commit the study's paper/page title — manifest-derived title needles cover titles. | D23-A was based on a misread of the question; the owner accepts the key/repo name on the public repo (they are already in the committed roster). |
+
+Both D23-A and D23-B are recorded because D23-A is what was executed for part of
+a session before D23-B reversed it; nothing from D23-A survived into a commit
+(the `satellite/study6` branch was local and was deleted; #124 was never closed
+and `satellite/saner2027` was never deleted).
+
+### Review of the two open PRs, against `docs/satellites.md`
+
+- **#124 (`satellite/saner2027`)** — infra is **correct and needs no resource
+  block.** The `saner2027` entry in `var.satellites` is consumed by the existing
+  `for_each` in `infra/satellites.tf`, so it generates, with no edit to any
+  resource:
+  - SA `publish-saner2027` (no key);
+  - WIF provider `github-saner2027`, `attribute_condition`
+    `assertion.repository_id == '1409006235' && assertion.repository_owner_id == '5666389' && assertion.repository == 'djjay0131/saner2027-governed-agents' && assertion.event_name != 'pull_request_target'`
+    (rendered with `terraform console`; the numeric ids read live from the GitHub
+    API and match `private: true`, `default_branch: master`);
+  - impersonation binding pinned to
+    `attribute.repository_id_ref/1409006235/refs/heads/master`;
+  - content-bucket binding of the three-permission custom role (no `list`),
+    conditioned `resource.name.startsWith('…/objects/sources/saner2027/')`.
+  Not in `publish-allowlist.json`. Roster records present (design doc §2,
+  governance-delta, ADR-0019 amendment). `terraform fmt -check -recursive` and
+  `validate` clean; `#124` touches no `*.tf` resource block (`satellites.tf`,
+  `wif.tf`, `satellite-role.tf` untouched).
+- **The one gap fixed on the branch:** a source NAME is deliberately not an item
+  needle (Wave 4 FP-2), so the satellite's identity had no needle. Added a
+  committed `SOURCE_IDENTITY_NEEDLES = ["saner2027", "saner2027-governed-agents"]`
+  class to `site/scripts/check-no-private-in-public.mjs`, wired into the check on
+  every build (paths and contents, gzip Pagefind included, case-insensitive and
+  entity-decoded), plus tests and a `demo:leak-check` injection. Titles are **not**
+  committed; the manifest-derived item-title needles cover them (D23-B). The
+  branch was also merged up to `main` (it predated D22).
+- **#125 (`members/add-yovi`)** — email already lowercased, no `role` field
+  (correct for a non-owner). Fixed: the seed note named the study
+  (`…(Yovi Solomon), SANER 2027 study.`) in a public script; changed to a neutral
+  `Research assistant. Added 2026-10-13.`
+
+### Adversarial round (D23)
+
+| Role | Verdict | Notes |
+|---|---|---|
+| **Security Tester (veto)** | **PASS, 0 FAIL** | No public leak: `saner2027`/repo name absent from a public build (check PASS, raw grep empty) and from `publish-allowlist.json`; study title absent from the repo. WIF binds only the numeric id/owner + `refs/heads/master` (a fork, another branch or a `pull_request` event is refused). Publisher scoped to `sources/saner2027/`. Guard is new, wired, and load-bearing. |
+| **Red Team** | 1 accepted, rest refused | **RT1 (linkability):** a public reader *can* link `saner2027` → SANER 2027 → the owner from the **public repo** (`variables.tf`, ADR-0019, design doc §2, governance-delta). **Accepted by D23-B** — the owner chose the real name; it is not a site leak. **RT2** (another repo/branch/fork/PR event) refused by the id+ref binding. **RT3** (write outside prefix) refused (`sources/saner2027-other/` does not `startsWith` `sources/saner2027/`). **RT4** (title needle gap): page/paper titles are not committed needles; covered by manifest-derived title needles once the satellite publishes. Accepted (D23-B). |
+| **Skeptic Verifier** | No un-failable guard | Break-test: with the committed needle list, a tree carrying `saner2027-governed-agents` reddens (2 leaks); with the list emptied it passes (0) — the list is load-bearing. A generic synthetic-needle test proves the class is not hard-wired to the real strings. |
+| **Chief Reviewer** | **Comment** | Scope clean; the only open item is the D23-B-accepted public naming. `#124`/`#125` CI green (governance-checks, budget-guard, contract-tests, build, build-firebase, check, leak-check-self-test, deploy-tools). |
+
+### Merge / live verification (owner-run; not done)
+
+**STOPPED at "ready to merge".** Neither PR is merged; no `terraform apply` has
+run. `#124` and `#125` are ready for the owner. After the owner merges `#124`:
+`cd infra && terraform init && terraform plan -out=sat6.tfplan` (expect adds-only,
+every address satellite-6), then apply; then set the four `GCP_*` variables on the
+study repo and run the member seed. The study repo's own literature PR and PR #8
+then publish through `publish.yml` and the items appear under `/p/`.
