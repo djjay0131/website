@@ -223,6 +223,30 @@ variable "satellites" {
       repository_owner_id = "5666389"
       default_branch      = "master"
     }
+    # Satellite 6 (owner request, 2026-10-13). PRIVATE repository, PRIVATE
+    # items: generated views of the SANER 2027 study's design, task pool, plan
+    # and timeline. The paper is under DOUBLE-ANONYMOUS review until
+    # notification (2026-12-08), so a public page tying the owner's name to the
+    # study risks a desk reject: every item is visibility: private, the
+    # satellite's own build fails on any non-private item, and nothing is added
+    # to site/publish-allowlist.json. As with satellites 4 and 5, the grant is
+    # the same custom role with the same startsWith condition; the
+    # private/public distinction lives in the manifest's visibility and the
+    # allowlist, not in the satellite's IAM.
+    #
+    # The key is saner2027, NOT the repository name: publish-<key> must fit the
+    # 30-character service-account ID limit, and
+    # publish-saner2027-governed-agents would be 33 (ADR-0019 decision 2).
+    # default_branch is master, not main.
+    #
+    # Both ids read from the GitHub REST API on 2026-10-13, not copied from a
+    # brief; the same read returned default_branch master and private: true.
+    saner2027 = {
+      repository          = "djjay0131/saner2027-governed-agents"
+      repository_id       = "1409006235"
+      repository_owner_id = "5666389"
+      default_branch      = "master"
+    }
   }
 
   validation {

@@ -40,6 +40,34 @@ GCP service-account id is at most 30 characters. `construction-ai-proposal` is
    the secrecy of content already public in the satellite's own repository;
    D8/ADR-0016 must not be read as concealing a PDF that is public on GitHub.
 
+## Amendment (2026-10-13): satellite #6, `saner2027`
+
+Owner request, 2026-10-13: publish the SANER 2027 study's preliminary work
+(design, task pool, plan and timeline) to the hub for the study team.
+
+- **Roster:** `saner2027-governed-agents` (source `saner2027`) is satellite #6.
+  Repository id `1409006235`, owner id `5666389`, default branch `master`,
+  `private: true` — all read from the GitHub REST API on 2026-10-13.
+- **Key:** decision 2 applies unchanged. `publish-saner2027-governed-agents`
+  would be 33 characters, so the key is `saner2027` (SA `publish-saner2027`,
+  provider `github-saner2027`).
+- **Visibility:** private repository, private items only, as in decision 3.
+  The paper is under double-anonymous review until notification (2026-12-08),
+  so a public page naming the owner beside the study risks a desk reject. Its
+  items are **never** added to `site/publish-allowlist.json` while review is
+  open, and the satellite's own build fails if any item is not private
+  (docs/satellites.md, "Enforce your own visibility").
+- **Leak-check needles (D23, 2026-10-16).** The item needles are derived from
+  the private manifest at build time and cover each item's slug, route, payload
+  path, title and summary. A source NAME is deliberately not an item needle
+  (Wave 4 FP-2), so the hub commits `SOURCE_IDENTITY_NEEDLES`
+  (`site/scripts/check-no-private-in-public.mjs`) naming this satellite's source
+  key and repository name. **The paper and page titles are deliberately not
+  committed as needles**: the manifest-derived title needles already cover every
+  title the satellite publishes, and a title literal in this public repository
+  would itself be a disclosure. Committing the key and repository name is
+  accepted because they already appear in this repository's committed roster.
+
 ## Rationale
 
 The design doc is the design authority; leaving the roster stale is the same

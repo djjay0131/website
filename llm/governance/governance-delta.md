@@ -276,5 +276,6 @@ repository (principle 3), and nothing here depends on how a satellite builds.
 | `agentic-kgis` | Satellite #3 (source `kgis`), public items: MkDocs project page. **Substituted for `agentic-kg`** by D4/D10 (ADR-0019). | 5 |
 | `agentic-kg-research` | Satellite #4, private items: a Quarto research store. | 5 |
 | `construction-ai-proposal` | Satellite #5 (source `construction-ai`), `visibility: private` items until allowlisted. | 5 |
+| `saner2027-governed-agents` | Satellite #6 (source `saner2027`), private repository, `visibility: private` items only; never allowlisted while under double-anonymous review (ADR-0019 amendment, 2026-10-13). | 5 |
 | `agentic-kg` | Later/optional, project page (public) from its `docs/`. | 5 |
 | `agentic-research` | Not a satellite. Academic-writing tooling; not used in Phases 0–3. | — |

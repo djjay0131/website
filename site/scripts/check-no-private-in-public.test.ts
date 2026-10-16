@@ -7,12 +7,15 @@ import zlib from "node:zlib";
 import {
   ANNOTATION_ALLOWED_IN_PUBLIC,
   ANNOTATION_NEEDLES,
+  SOURCE_IDENTITY_NEEDLES,
   collectDraftRabbitHoles,
   collectPrivateItems,
   containsAnnotationNeedle,
   containsBounded,
+  containsNormalizedNeedle,
   findAnnotationLeaks,
   findLeaks,
+  findSourceIdentityLeaks,
   htmlEscape,
   needlesFor,
   weakNeedleWarnings,
@@ -496,6 +499,91 @@ describe("the PRIVATE annotation surface never reaches the public output (D20)",
       expect(findAnnotationLeaks(dist).some((l) => l.needle === "/p/notes")).toBe(true);
     } finally {
       fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D23 — the private satellite's SOURCE IDENTITY never reaches dist-public
+// ---------------------------------------------------------------------------
+// The item needles are derived from the private manifests and cover an item's
+// slug/route/path/title/summary. A source NAME is deliberately not one of them
+// (Wave 4 FP-2), so the satellite's own key and repository name need their own
+// committed needles. The paper/page TITLES are deliberately NOT committed; those
+// stay covered by the manifest-derived title needles.
+describe("the private satellite's source identity never reaches the public output (D23)", () => {
+  it("declares exactly the committed source-identity needles", () => {
+    expect(SOURCE_IDENTITY_NEEDLES).toEqual(["saner2027", "saner2027-governed-agents"]);
+  });
+
+  it("passes a clean public output", () => {
+    const dist = tree({
+      "index.html": "<h1>Jason Cusati</h1>",
+      "research/soa-agentic-se/index.html": "<h1>Research</h1>",
+    });
+    try {
+      expect(findSourceIdentityLeaks(dist)).toEqual([]);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("flags the source key in a PATH and the repo name in CONTENTS, case-insensitively", () => {
+    const dist = tree({
+      "research/SANER2027/index.html": "<p>clean</p>",
+      "index.html": "<p>see Saner2027-Governed-Agents</p>",
+    });
+    try {
+      const leaks = findSourceIdentityLeaks(dist);
+      expect(leaks.some((l) => l.needle === "saner2027" && l.where === "path")).toBe(true);
+      expect(
+        leaks.some((l) => l.needle === "saner2027-governed-agents" && l.where === "contents"),
+      ).toBe(true);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("decodes HTML entities before matching", () => {
+    expect(containsNormalizedNeedle("&#115;aner2027", "saner2027")).toBe(true);
+  });
+
+  it("scans gzip Pagefind payloads, so an identity needle inside one is caught", () => {
+    const dist = tree({ "index.html": "<h1>clean</h1>" });
+    try {
+      fs.mkdirSync(path.join(dist, "pagefind", "fragment"), { recursive: true });
+      fs.writeFileSync(
+        path.join(dist, "pagefind", "fragment", "en_x.pf_fragment"),
+        zlib.gzipSync(Buffer.from("pagefind_dcdsaner2027-governed-agents")),
+      );
+      expect(findSourceIdentityLeaks(dist).length).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("is generic over an injected synthetic needle (the self-test's needle)", () => {
+    const dist = tree({ "index.html": "<p>ZZ-SYNTHETIC-NEEDLE-99</p>" });
+    try {
+      expect(findSourceIdentityLeaks(dist, ["zz-synthetic-needle-99"]).length).toBeGreaterThan(0);
+      expect(findSourceIdentityLeaks(dist, ["nothing-matches-this"])).toEqual([]);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("the CLI goes red when a source-identity needle reaches dist-public", () => {
+    const dist = tree({ "index.html": "<p>saner2027</p>" });
+    const emptySources = fs.mkdtempSync(path.join(os.tmpdir(), "no-private-"));
+    try {
+      const run = spawnSync(process.execPath, [SCRIPT, "--dist", dist, "--sources", emptySources], {
+        encoding: "utf8",
+      });
+      expect(run.status).toBe(1);
+      expect(run.stderr).toContain("saner2027");
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+      fs.rmSync(emptySources, { recursive: true, force: true });
     }
   });
 });
