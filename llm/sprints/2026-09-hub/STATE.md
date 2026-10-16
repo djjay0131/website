@@ -4562,3 +4562,40 @@ run. `#124` and `#125` are ready for the owner. After the owner merges `#124`:
 every address satellite-6), then apply; then set the four `GCP_*` variables on the
 study repo and run the member seed. The study repo's own literature PR and PR #8
 then publish through `publish.yml` and the items appear under `/p/`.
+
+### D23 step 2 — Terraform plan, plan-only (2026-10-16)
+
+`#124`, `#125` and `#131` merged by the owner; `main` at `d77950a`. `terraform
+init` against the GCS backend, then a plan-only run (never applied).
+
+**The untargeted plan was not clean and was rejected.** It read
+`Plan: 5 to add, 0 to change, 0 to destroy` — adds-only, but 4 addresses are
+satellite 6 and the 5th is **`google_secret_manager_secret_iam_member.hub_gate_notes_export_key`**,
+which belongs to the notes-sync subsystem (D19), not satellite 6. The owner
+chose a `-target`-scoped plan for exactly the four satellite-6 resources.
+
+**Targeted plan (saved to `infra/sat6.tfplan`):**
+
+```
+Plan: 4 to add, 0 to change, 0 to destroy.
+  # google_iam_workload_identity_pool_provider.satellite["saner2027"] will be created
+  # google_service_account.satellite_publish["saner2027"] will be created
+  # google_service_account_iam_member.satellite_publish_wif["saner2027"] will be created
+  # google_storage_bucket_iam_member.satellite_publish_prefix["saner2027"] will be created
+```
+
+Every address is satellite 6; no change, destroy or replace. Apply command (for
+the owner, from `infra/`): `terraform apply "sat6.tfplan"`. **Not applied by an
+agent.**
+
+**FOLLOW-UP (owner) — D19 notes-export IAM drift.** `notes-sync.tf:23`'s
+`google_secret_manager_secret_iam_member.hub_gate_notes_export_key` is declared
+but absent from state, so every untargeted plan now wants to add it. It was
+designed to be applied by `.github/workflows/secrets-sync.yml` (D19, which an
+earlier apply failed to complete because the Secret Manager API was disabled and
+the secret absent). Not satellite 6, so it was deliberately left out of
+`sat6.tfplan`. It needs its own decision: either the owner re-runs
+`secrets-sync.yml` (which applies the binding) or the gate's accessor binding is
+allowed to land in a normal `terraform apply` — until then it is expected drift
+in every plan. Tracked here so the next planner does not read it as a new
+finding.
