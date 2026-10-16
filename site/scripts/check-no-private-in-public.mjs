@@ -351,6 +351,32 @@ export const ANNOTATION_NEEDLES = ["/p/notes", "hub:annotation:"];
 export const ANNOTATION_ALLOWED_IN_PUBLIC = ["/annotations", "data-annotation-"];
 
 /**
+ * THE SOURCE-IDENTITY NEEDLES (D23; owner decision, 2026-10-16).
+ *
+ * The private satellite's SOURCE key and repository name must never appear on
+ * the public site, in a path or in any file's contents — not in a page, the
+ * sitemap, a feed, the Pagefind index or an OG card. This is a narrower and
+ * different guard from the item needles: those bind a specific ITEM's slug,
+ * route, payload path, title and summary, and they are derived from the private
+ * manifests at build time. A source NAME is deliberately not an item needle
+ * (Wave 4 FP-2: a source name can equal public first-party content), so the
+ * satellite's own identity has no needle at all unless it is declared here.
+ *
+ * These two strings are committed on purpose (D23-B, 2026-10-16): the source key
+ * `saner2027` and the repository name `saner2027-governed-agents` already appear
+ * in this public repository's `infra/` and `llm/` roster records, so committing
+ * them as needles adds no exposure the roster entry does not. The satellite's
+ * paper/page TITLES are deliberately NOT committed here: the manifest-derived
+ * item-title needles already cover every title the satellite publishes, and a
+ * title literal in this public repository would be a new disclosure (D23-B).
+ *
+ * Matched case-insensitively and after decoding the common HTML entities, in a
+ * path or in a file's contents (the gzip Pagefind payloads included), exactly as
+ * the annotation needles are.
+ */
+export const SOURCE_IDENTITY_NEEDLES = ["saner2027", "saner2027-governed-agents"];
+
+/**
  * HTML entities a browser decodes before an attribute value or URL is used.
  *
  * The needles are compared against a NORMALISED haystack so the check does not
@@ -387,6 +413,15 @@ export function normalizeAnnotationHaystack(text) {
  * with that needle on D20, since the attribute is now legitimate public tooling).
  */
 export function containsAnnotationNeedle(text, needle) {
+  return containsNormalizedNeedle(text, needle);
+}
+
+/**
+ * True when `text` carries `needle`, case-insensitively and after decoding the
+ * common HTML entities. The general form of the annotation needles' rule,
+ * reused by the source-identity needles (D23).
+ */
+export function containsNormalizedNeedle(text, needle) {
   return normalizeAnnotationHaystack(text).includes(String(needle).toLowerCase());
 }
 
@@ -432,6 +467,61 @@ export function findAnnotationLeaks(distDir) {
           where: "contents",
           item: "annotation tooling",
           kind: "annotation",
+          needle,
+          context: snippet(text, needle),
+        });
+      }
+    }
+  }
+  return leaks;
+}
+
+/**
+ * Every trace of a source-identity needle under a built output, in a path or in
+ * a file's contents (D23). Independent of the private-item and annotation
+ * needles: it runs on every build, because it guards the private satellite's own
+ * identity rather than one item. The gzip Pagefind payloads are decompressed and
+ * scanned exactly as the other needle classes are.
+ *
+ * @param {string} distDir
+ * @param {readonly string[]} [needles]
+ * @returns {{file: string, where: "path"|"contents", item: string, kind: string, needle: string, context: string}[]}
+ */
+export function findSourceIdentityLeaks(distDir, needles = SOURCE_IDENTITY_NEEDLES) {
+  const leaks = [];
+  if (!Array.isArray(needles) || needles.length === 0) return leaks;
+  for (const relFile of walkFiles(distDir)) {
+    const absFile = path.join(distDir, relFile);
+    const relPath = `/${relFile}`.toLowerCase();
+    for (const needle of needles) {
+      if (relPath.includes(String(needle).toLowerCase())) {
+        leaks.push({
+          file: relFile,
+          where: "path",
+          item: "source identity",
+          kind: "source-identity",
+          needle,
+          context: relFile,
+        });
+      }
+    }
+
+    let text = decompressPagefind(relFile, absFile);
+    if (text === null) {
+      if (!isTextFile(relFile, absFile)) continue;
+      try {
+        text = fs.readFileSync(absFile, "utf8");
+      } catch {
+        continue;
+      }
+    }
+    for (const needle of needles) {
+      if (containsNormalizedNeedle(text, needle)) {
+        leaks.push({
+          file: relFile,
+          where: "contents",
+          item: "source identity",
+          kind: "source-identity",
           needle,
           context: snippet(text, needle),
         });
@@ -882,12 +972,18 @@ if (isMain) {
   const scopeProblems = checkSearchIndexScope(distDir);
   const stubLeaks = stubsDir ? findRedirectStubLeaks(stubsDir, needles) : [];
   const annotationLeaks = findAnnotationLeaks(distDir);
+  // D23: the private satellite's source key and repository name, checked on
+  // every build in the public output and in the redirect stubs.
+  const sourceIdentityLeaks = [
+    ...findSourceIdentityLeaks(distDir),
+    ...(stubsDir ? findSourceIdentityLeaks(stubsDir) : []),
+  ];
   const redirectLeaks = findRedirectRuleLeaks(path.join(SITE_ROOT, "..", "firebase.json"), items);
 
   if (args.json) {
     console.log(
       JSON.stringify(
-        { dist: distDir, stubs: stubsDir, privateItems: items, draftPosts: drafts, leaks, stubLeaks, annotationLeaks, redirectLeaks, scopeProblems, derived, warnings },
+        { dist: distDir, stubs: stubsDir, privateItems: items, draftPosts: drafts, leaks, stubLeaks, annotationLeaks, sourceIdentityLeaks, redirectLeaks, scopeProblems, derived, warnings },
         null,
         2,
       ),
@@ -921,7 +1017,11 @@ if (isMain) {
   // (SEAM-P6) is reported alongside the byte leaks. The annotation needles
   // (AN-LEAK) guard a tool, so they are counted here too.
   const leakCount =
-    leaks.length + stubLeaks.length + annotationLeaks.length + redirectLeaks.length;
+    leaks.length +
+    stubLeaks.length +
+    annotationLeaks.length +
+    sourceIdentityLeaks.length +
+    redirectLeaks.length;
 
   if (leakCount > 0) {
     console.error(
@@ -958,6 +1058,17 @@ if (isMain) {
         console.log(
           `::error file=${leak.file}::annotation needle ${JSON.stringify(leak.needle)} appears in ` +
             `the ${leak.where} of ${leak.file} under the PUBLIC output`,
+        );
+      }
+    }
+    for (const leak of sourceIdentityLeaks) {
+      console.error(`  ${leak.file}  (source identity)`);
+      console.error(`    ${leak.where}: ${JSON.stringify(leak.needle)} (D23)`);
+      if (leak.where === "contents") console.error(`    …${leak.context}…`);
+      if (process.env.GITHUB_ACTIONS === "true") {
+        console.log(
+          `::error file=${leak.file}::source-identity needle ${JSON.stringify(leak.needle)} appears ` +
+            `in the ${leak.where} of ${leak.file} under the PUBLIC output`,
         );
       }
     }
@@ -998,7 +1109,8 @@ if (isMain) {
     console.log(
       `check:no-private-in-public: NO PRIVATE ITEMS OR DRAFT POSTS exist, so this run proves ` +
         `nothing about ${shownDist} with the item needles. The annotation needles ` +
-        `(${ANNOTATION_NEEDLES.join(", ")}) WERE checked and none was found. Run ` +
+        `(${ANNOTATION_NEEDLES.join(", ")}) and the source-identity needles ` +
+        `(${SOURCE_IDENTITY_NEEDLES.join(", ")}) WERE checked and none was found. Run ` +
         `npm run demo:leak-check to see the check actually fail.`,
     );
     process.exit(0);
@@ -1025,13 +1137,18 @@ if (isMain) {
   console.log(
     `check:no-private-in-public: annotation needles scanned: ${ANNOTATION_NEEDLES.join(", ")}`,
   );
+  console.log(
+    `check:no-private-in-public: source-identity needles scanned (D23): ` +
+      `${SOURCE_IDENTITY_NEEDLES.join(", ")}`,
+  );
 
   console.log(
     `\ncheck:no-private-in-public: PASS — no private item's or draft post's slug, route, payload ` +
       `path, title or summary appears in any path or any file's contents under ${shownDist}` +
       `${shownStubs ? ` and no private title or summary appears in any stub under ${shownStubs}` : ""}` +
       `; no redirect rule names a private slug; and none of the annotation needles ` +
-      `(${ANNOTATION_NEEDLES.join(", ")}) appears` +
+      `(${ANNOTATION_NEEDLES.join(", ")}) or source-identity needles ` +
+      `(${SOURCE_IDENTITY_NEEDLES.join(", ")}) appears` +
       ` (${walkFiles(distDir).length} file(s) scanned in ${shownDist}` +
       `${shownStubs ? `, ${walkFiles(stubsDir).length} in ${shownStubs}` : ""}).`,
   );

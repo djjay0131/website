@@ -45,7 +45,7 @@ import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { SOURCES_DIR } from "../src/lib/hub-content.mjs";
 import { OUTPUT_DIRS } from "./site-output.mjs";
-import { collectPrivateItems } from "./check-no-private-in-public.mjs";
+import { SOURCE_IDENTITY_NEEDLES, collectPrivateItems } from "./check-no-private-in-public.mjs";
 import { MAP_PATH, generateRedirectStubs } from "./generate-redirect-stubs.mjs";
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -168,6 +168,17 @@ try {
   const stubFile = path.join(stubsDir, stubRel);
   writeAppend(stubFile, `<p>${needle}</p>`);
   planted.push(stubRel);
+
+  // 8. a SOURCE-IDENTITY needle (D23): the private satellite's committed key,
+  // planted into the public output. The needles are committed on purpose
+  // (D23-B), so this self-test needs no secret to exercise the class; a red run
+  // here proves `findSourceIdentityLeaks` actually fires.
+  const identityNeedle = SOURCE_IDENTITY_NEEDLES[0];
+  const identityRel = "assets/identity-leak.json";
+  const identityFile = path.join(injected, identityRel);
+  fs.mkdirSync(path.dirname(identityFile), { recursive: true });
+  fs.writeFileSync(identityFile, JSON.stringify({ planted: identityNeedle }));
+  planted.push(identityRel);
 
   console.log("demo:leak-check: injected deliberate leaks into a COPY of the public build");
   console.log(`  copy:        ${injected}`);
