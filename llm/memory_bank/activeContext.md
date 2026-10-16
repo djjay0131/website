@@ -1,7 +1,7 @@
 # Active Context
 
 Status: Active
-Last updated: 2026-10-07
+Last updated: 2026-10-16
 Owner: Chief Architect
 
 What belongs here: the current focus, the current stop point, and next steps —
@@ -134,13 +134,23 @@ what a contributor needs to pick up work today.
   build. One seed post is committed as a **draft**. Owner step: create the Buttondown
   account and set the variable.
 
+- **D22 (2026-10-14) is merged and live** — one `/cv/` section, five public CV
+  documents plus the private Fellow CV (`record/wave-9`). **D23 (owner task,
+  2026-10-15): satellite 6 `saner2027`, PRIVATE ONLY** (double-anonymous review
+  until 2026-12-08; never allowlisted). **Owner decision D23-B (2026-10-16): use
+  the real name** — key `saner2027`, repo `djjay0131/saner2027-governed-agents`;
+  commit `saner2027` + the repo name as leak-check needles, **not** the study
+  title (manifest-derived title needles cover titles). **PR #124** (infra + the
+  new `SOURCE_IDENTITY_NEEDLES` site guard + roster records) and **PR #125**
+  (`members/add-yovi`, neutral seed note) are **ready to merge — owner-run**.
+
 ## Stop point
 
-Wave 6 is merged and live. Wave 6b is merged (#110) and D19 lands the secret
-workflow; its Cloud Run config is applied and dormant, and its only outstanding
-work is the D19 credential paste + dispatch, plus the Wave 6 owner steps (the
-live sign-in check and confirming the narrowed owner-read default). Earlier
-deferrals stand: Wave 3's share mint, the Firestore member seed, and Wave 5's
+**D23 is stopped at "ready to merge": PR #124 and PR #125 are green and
+awaiting the owner.** Neither is merged and no `terraform apply` has run. After
+the owner merges #124: plan-only Terraform (adds-only, satellite-6 addresses),
+then apply, then set the four `GCP_*` variables on the study repo and run the
+member seed. Earlier deferrals stand: Wave 3's share mint, Wave 5's
 `redirects:check`.
 
 ## Next
@@ -181,6 +191,12 @@ deferrals stand: Wave 3's share mint, the Firestore member seed, and Wave 5's
   RSS-to-email at `https://jason.cusati.us/rabbit-holes/rss.xml`, and set
   `PUBLIC_BUTTONDOWN_USERNAME` as a repository variable; then edit the seed post
   and flip its `draft` flag. Run Lighthouse a11y on `/rabbit-holes/` and a post.
+- **D23 (owner-only):** (1) merge **#124** and **#125**; (2) after #124, run the
+  plan-only `terraform` apply for satellite 6; (3) then the four study-repo
+  `GCP_*` variables are set for you and the Firestore member seed is printed for
+  you to run; (4) merge the study repo's literature PR and PR #8, which triggers
+  `publish.yml`. Nothing of D23 is public: every `saner2027` item is private and
+  never allowlisted while the study is under double-anonymous review.
 
 ## Decisions on record
 
