@@ -28,7 +28,7 @@ BY="${ADDED_BY:-djjay@vt.edu}"
 MEMBERS=(
   "djjay@vt.edu|owner|Owner. Seeded at Checkpoint 4."
   "cbrown@vt.edu||Committee member. Seeded at Checkpoint 4."
-  "yovi26@vt.edu||Undergraduate research assistant (Yovi Solomon), SANER 2027 study. Added 2026-10-13."
+  "yovi26@vt.edu||Research assistant. Added 2026-10-13."
 )
 
 for entry in "${MEMBERS[@]}"; do
