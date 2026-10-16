@@ -3,20 +3,47 @@
   "published": "2026-09-16T00:00:00Z",
   "items": [
     {
-      "slug": "academic",
-      "title": "Academic CV (fixture)",
+      "slug": "one-page",
+      "title": "One-page résumé (fixture)",
       "section": "cv",
       "format": "pdf",
-      "path": "academic.pdf",
+      "path": "one-page.pdf",
       "visibility": "public",
       "date": "2026-09-16"
     },
     {
-      "slug": "research-professional",
-      "title": "Research Professional CV (fixture)",
+      "slug": "research-2p",
+      "title": "Research résumé (fixture)",
       "section": "cv",
       "format": "pdf",
-      "path": "research-professional.pdf",
+      "path": "research-2p.pdf",
+      "visibility": "public",
+      "date": "2026-09-16"
+    },
+    {
+      "slug": "professional-2p",
+      "title": "Professional résumé (fixture)",
+      "section": "cv",
+      "format": "pdf",
+      "path": "professional-2p.pdf",
+      "visibility": "public",
+      "date": "2026-09-16"
+    },
+    {
+      "slug": "research-full",
+      "title": "Full research CV (fixture)",
+      "section": "cv",
+      "format": "pdf",
+      "path": "research-full.pdf",
+      "visibility": "public",
+      "date": "2026-09-16"
+    },
+    {
+      "slug": "professional-full",
+      "title": "Full professional résumé (fixture)",
+      "section": "cv",
+      "format": "pdf",
+      "path": "professional-full.pdf",
       "visibility": "public",
       "date": "2026-09-16"
     },
@@ -30,15 +57,6 @@
       "date": "2026-09-16"
     },
     {
-      "slug": "sde-long",
-      "title": "Software Engineering CV (fixture)",
-      "section": "cv",
-      "format": "pdf",
-      "path": "sde-long.pdf",
-      "visibility": "public",
-      "date": "2026-09-16"
-    },
-    {
       "slug": "cv-data",
       "title": "CV source data (fixture)",
       "section": "cv",
@@ -46,7 +64,7 @@
       "path": "cv-data/",
       "visibility": "public",
       "date": "2026-09-16",
-      "schema_version": "1"
+      "schema_version": "2"
     }
   ]
 }

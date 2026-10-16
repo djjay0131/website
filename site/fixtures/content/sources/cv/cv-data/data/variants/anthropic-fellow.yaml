@@ -1,7 +1,12 @@
-# FIXTURE. Invented.
+# FIXTURE. Invented. Kept `visibility: public` so the leak check and the
+# allowlist guard are exercised by the D8 path (a public manifest item the hub
+# does not allowlist must render private).
 variant: anthropic-fellow
 label: Fellowship
 description: Fixture fellowship variant. Not real content.
+track: both
+length: full
+visibility: public
 sections:
   - type: summary
     content_id: academic

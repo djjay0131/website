@@ -55,7 +55,12 @@ const personJsonLd = {
 };
 ---
 
-<Base title={`${cv.meta.name} — CV (${variant})`} description={cv.summary?.text} jsonLd={personJsonLd}>
+<Base
+  title={`${cv.meta.name} — CV (${variant})`}
+  description={cv.summary?.text}
+  jsonLd={personJsonLd}
+  annotatable
+>
   <div class="print-banner">
     For the formal PDF version, <a href={`${base}pdfs/${variant}.pdf`}>download it here</a>.
   </div>

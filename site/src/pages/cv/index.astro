@@ -1,39 +1,194 @@
 ---
-import SectionIndex from "../../layouts/SectionIndex.astro";
+import Base from "../../layouts/Base.astro";
 import { loadVariantSummaries } from "../../lib/cv-data";
-import { CV_VARIANTS_DIR, SOURCES_DIR } from "../../lib/hub-content.mjs";
+import { CV_VARIANTS_DIR, PUBLIC_PDF_DIR, SOURCES_DIR } from "../../lib/hub-content.mjs";
 import { collectPublicItems } from "../../lib/frame-content.mjs";
+import { countPdfPagesFile } from "../../lib/pdf-pages.mjs";
 import path from "node:path";
 
-// Synced from the content bucket (SEAM-5); the resolver is unchanged.
+// ONE CV section (owner D22, ADR-0024). The one-page résumé leads; the 2-page
+// and full documents are grouped by track. The Fellow CV is never listed: it is
+// private, so it is absent from the allowlist and therefore from `visible`.
 //
-// The variant LIST is filtered by effective visibility (D8; SEAM-B3). `cv-data`
-// carries every variant definition, including the private fellowship CV, so
-// reading the variants directory directly would list it no matter what the
-// manifest or the allowlist said. The allowlisted `cv` PDF items are the
-// authority on which variants are public.
-const visible = new Set(
-  collectPublicItems(path.resolve(SOURCES_DIR), { section: "cv" }).map((i) => i.slug),
-);
-const variants = loadVariantSummaries(path.resolve(CV_VARIANTS_DIR)).filter((v) =>
-  visible.has(v.slug),
-);
+// `cv-data` carries every variant definition, including the private fellowship
+// variant, so the variant list is filtered by effective visibility (ADR-0016
+// decision 7; SEAM-B3): the allowlisted `cv` PDF manifest items are the
+// authority on which variants may be listed.
+const manifestItems = collectPublicItems(path.resolve(SOURCES_DIR), { section: "cv" });
+const bySlug = new Map(manifestItems.map((i) => [i.slug, i]));
+
+function pagesFor(slug: string): number | undefined {
+  try {
+    return countPdfPagesFile(path.resolve(PUBLIC_PDF_DIR, `${slug}.pdf`));
+  } catch {
+    return undefined;
+  }
+}
+
 const base = import.meta.env.BASE_URL;
-const items = variants.map((v) => ({
-  title: v.label,
-  href: `${base}cv/${v.slug}`,
-  summary: v.description || undefined,
-  links: [
-    { href: `${base}cv/${v.slug}`, label: "View on web" },
-    { href: `${base}pdfs/${v.slug}.pdf`, label: "Download PDF" },
-  ],
-}));
+const variants = loadVariantSummaries(path.resolve(CV_VARIANTS_DIR))
+  .filter((v) => bySlug.has(v.slug))
+  .map((v) => ({
+    ...v,
+    date: bySlug.get(v.slug)?.date,
+    pages: pagesFor(v.slug),
+    href: `${base}cv/${v.slug}`,
+    pdfHref: `${base}pdfs/${v.slug}.pdf`,
+  }));
+
+const onePage = variants.find((v) => v.length === "one-page");
+const lengthOrder = ["two-page", "full"];
+const groups = [
+  { title: "Research", track: "research", items: variants.filter((v) => v.track === "research") },
+  {
+    title: "Professional",
+    track: "professional",
+    items: variants.filter((v) => v.track === "professional"),
+  },
+]
+  .map((g) => ({
+    ...g,
+    items: [...g.items].sort((a, b) => lengthOrder.indexOf(a.length) - lengthOrder.indexOf(b.length)),
+  }))
+  .filter((g) => g.items.length > 0);
+
+const pagesLabel = (n: number | undefined) => (n === undefined ? null : n === 1 ? "1 page" : `${n} pages`);
 ---
 
-<SectionIndex
-  title="CV"
-  description="Jason Cusati's CV in each of its variants, on the web and as PDF."
-  lede="The CV in each of its variants, built from the same source. Read one on the web or download its PDF."
-  items={items}
-  emptyMessage="No CV variants are available in this build."
-/>
+<Base
+  title="CV — Jason Cusati"
+  description="Jason Cusati's CV: a one-page résumé, two-page research and professional résumés, and the full CV and résumé."
+>
+  <h1>CV</h1>
+  <p class="lead">
+    The same CV at four lengths: a one-page résumé, two-page versions for research
+    and for industry, and the full record. Read any of them on the web or download
+    the PDF.
+  </p>
+
+  {onePage && (
+    <section class="featured" aria-labelledby="one-page-heading">
+      <h2 id="one-page-heading">{onePage.label}</h2>
+      {onePage.description && <p class="description">{onePage.description}</p>}
+      <div class="actions">
+        <a class="button" href={onePage.pdfHref}>Download PDF</a>
+        <a class="secondary" href={onePage.href}>Read on the web</a>
+      </div>
+      <p class="meta">{[pagesLabel(onePage.pages), onePage.date && `updated ${onePage.date}`]
+        .filter(Boolean)
+        .join(" · ")}</p>
+    </section>
+  )}
+
+  {groups.map((group) => (
+    <section class="group" aria-labelledby={`group-${group.track}`}>
+      <h2 id={`group-${group.track}`}>{group.title}</h2>
+      <ul class="doc-list">
+        {group.items.map((v) => (
+          <li class="doc">
+            <h3>{v.label}</h3>
+            {v.description && <p class="description">{v.description}</p>}
+            <div class="links">
+              <a href={v.href}>View on web</a>
+              <a href={v.pdfHref}>Download PDF</a>
+            </div>
+            <p class="meta">{[pagesLabel(v.pages), v.date && `updated ${v.date}`]
+              .filter(Boolean)
+              .join(" · ")}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+
+  {variants.length === 0 && <p class="empty">No CV documents are available in this build.</p>}
+</Base>
+
+<style>
+  .lead {
+    color: var(--color-muted);
+    margin-bottom: 2rem;
+  }
+
+  .featured {
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-accent);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 2.5rem;
+    background: var(--color-surface, transparent);
+  }
+
+  .featured h2 {
+    margin-top: 0;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    margin: 1rem 0 0.75rem;
+  }
+
+  .button {
+    display: inline-block;
+    padding: 0.6rem 1.1rem;
+    border-radius: 6px;
+    background: var(--color-accent);
+    color: var(--color-on-accent, #fff);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .secondary {
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+  }
+
+  .group {
+    margin-bottom: 2.25rem;
+  }
+
+  .doc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .doc {
+    padding: 1.1rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .doc:last-child {
+    border-bottom: none;
+  }
+
+  .doc h3 {
+    margin: 0 0 0.4rem;
+  }
+
+  .description {
+    color: var(--color-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .links {
+    display: flex;
+    gap: 1.25rem;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+  }
+
+  .meta {
+    color: var(--color-muted);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    margin: 0.4rem 0 0;
+  }
+
+  .empty {
+    color: var(--color-muted);
+  }
+</style>

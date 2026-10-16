@@ -9,9 +9,17 @@ import path from "node:path";
 import { CI_PUBLIC_FILES, LEGACY_REDIRECTS, SMOKE_ROUTES } from "./site-routes.mjs";
 import { PAGES_SITE_BASE, normalizeBase } from "./site-env.mjs";
 
-// Content-hashed build assets (CSS, fonts). Only pages reference them, their
-// names change on every dependency bump, and no inbound link targets them.
-export const EXCLUDED_BUILD_PREFIXES = ["_astro/"];
+// Paths that are build outputs rather than navigable content routes.
+//   _astro/     content-hashed assets (CSS, fonts): only pages reference them,
+//               their names change on every dependency bump, no inbound link.
+//   pagefind/   the Pagefind search index, written after the build; the map is
+//               generated from a pagefind-free build, so including it makes the
+//               check pass or fail on CI step ordering.
+//   _payload/   staged framed-item payloads (ADR-0020 decision 4 planned to
+//               keep these out of the redirect map).
+// `404.html` is excluded separately in routesFromBuild: it is the not-found
+// document, not a route.
+export const EXCLUDED_BUILD_PREFIXES = ["_astro/", "pagefind/", "_payload/"];
 
 /** Leading slash, no repeated slashes, and a trailing slash on anything without a file extension. */
 export function normalizeRoute(route) {
@@ -41,6 +49,7 @@ function fileToRoute(relFile) {
 /** Every route a built output directory serves. */
 export function routesFromBuild(distDir, { excludePrefixes = EXCLUDED_BUILD_PREFIXES } = {}) {
   return walkFiles(distDir)
+    .filter((f) => f !== "404.html")
     .filter((f) => !excludePrefixes.some((p) => f.startsWith(p)))
     .map(fileToRoute)
     .map(normalizeRoute);

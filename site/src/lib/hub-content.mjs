@@ -35,7 +35,10 @@ export const CLAIMED_DATA_ITEMS = [
     slug: "cv-data",
     // schema_version values this hub's renderer understands. A value outside
     // this list fails the build rather than rendering a subtly wrong CV.
-    schemaVersions: ["1"],
+    // "2" (owner D22, ADR-0024) adds `track`/`length`/`visibility` to each
+    // variant selector. Both are listed so the hub builds during the rollout
+    // window: the satellite may publish "2" before or after this hub change.
+    schemaVersions: ["1", "2"],
     renderer: "src/lib/cv-data.ts",
   },
 ];
@@ -52,7 +55,7 @@ export function claimFor(source, slug) {
 
 // --- The cv satellite's payload (SEAM-5) -----------------------------------
 //
-// cv publishes four `pdf` items (<variant>.pdf) and one `data` item, slug
+// cv publishes six `pdf` items (<variant>.pdf) and one `data` item, slug
 // cv-data, at path cv-data/, whose contents are exactly today's cv-data.zip
 // unzipped: data/content/*.yaml, data/variants/*.yaml, own-bib.bib and
 // photo_jason_1.jpeg. The paths below are where those files land after the

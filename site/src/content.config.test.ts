@@ -415,11 +415,17 @@ describe("the hub renders only the data items it claims", () => {
 
   it("claims exactly ('cv', 'cv-data') in Phase 2", () => {
     expect(CLAIMED_DATA_ITEMS.map((c) => [c.source, c.slug])).toEqual([["cv", "cv-data"]]);
-    expect(CLAIMED_DATA_ITEMS[0].schemaVersions).toEqual(["1"]);
+    // "1" and "2": D22/ADR-0024 adds the variant grouping fields, and the hub
+    // accepts both across the rollout window.
+    expect(CLAIMED_DATA_ITEMS[0].schemaVersions).toEqual(["1", "2"]);
   });
 
   it("accepts the claimed item", () => {
     expect(() => check(dataManifest({}))).not.toThrow();
+  });
+
+  it("accepts schema_version 2 (D22 variant grouping fields)", () => {
+    expect(() => check(dataManifest({ schema_version: "2" }))).not.toThrow();
   });
 
   it("FAILS on a data item it does not claim", () => {
@@ -434,8 +440,8 @@ describe("the hub renders only the data items it claims", () => {
   });
 
   it("FAILS on an unrecognised schema_version", () => {
-    expect(() => check(dataManifest({ schema_version: "2" }))).toThrow(
-      /schema_version "2" is not one this hub understands/,
+    expect(() => check(dataManifest({ schema_version: "99" }))).toThrow(
+      /schema_version "99" is not one this hub understands/,
     );
   });
 

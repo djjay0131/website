@@ -110,10 +110,18 @@ export interface VariantSection {
   content_id?: string;
 }
 
+export type VariantTrack = "research" | "professional" | "both";
+export type VariantLength = "one-page" | "two-page" | "full";
+
 export interface VariantConfig {
   variant: string;
   label?: string;
   description?: string;
+  // Grouping metadata (owner D22, ADR-0024). Present in `cv-data`
+  // schema_version "2"; absent in "1", where the defaults below apply.
+  track?: VariantTrack;
+  length?: VariantLength;
+  visibility?: "public" | "private";
   sections: VariantSection[];
 }
 
@@ -121,6 +129,8 @@ export interface VariantSummary {
   slug: string;
   label: string;
   description: string;
+  track: VariantTrack;
+  length: VariantLength;
 }
 
 export interface ContentPool {
@@ -327,6 +337,9 @@ export function loadVariantSummaries(variantsDir: string): VariantSummary[] {
       slug,
       label: cfg.label ?? titleizeSlug(slug),
       description: cfg.description ?? "",
+      // Defaults match cv/tools/schema.py; a "1" payload declares neither.
+      track: cfg.track ?? "both",
+      length: cfg.length ?? "full",
     };
   });
 }
