@@ -57,6 +57,16 @@ Owner request, 2026-10-13: publish the SANER 2027 study's preliminary work
   items are **never** added to `site/publish-allowlist.json` while review is
   open, and the satellite's own build fails if any item is not private
   (docs/satellites.md, "Enforce your own visibility").
+- **Leak-check needles (D23, 2026-10-16).** The item needles are derived from
+  the private manifest at build time and cover each item's slug, route, payload
+  path, title and summary. A source NAME is deliberately not an item needle
+  (Wave 4 FP-2), so the hub commits `SOURCE_IDENTITY_NEEDLES`
+  (`site/scripts/check-no-private-in-public.mjs`) naming this satellite's source
+  key and repository name. **The paper and page titles are deliberately not
+  committed as needles**: the manifest-derived title needles already cover every
+  title the satellite publishes, and a title literal in this public repository
+  would itself be a disclosure. Committing the key and repository name is
+  accepted because they already appear in this repository's committed roster.
 
 ## Rationale
 
