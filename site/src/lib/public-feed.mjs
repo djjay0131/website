@@ -12,7 +12,7 @@
 //   - `html` / `bundle` -> the thin frame at /<section>/<source>/<slug>/
 //     (src/pages/[section]/[source]/[slug].astro).
 //   - a `cv` PDF -> /cv/<slug>/ (the first-party variant page), NOT the frame
-//     route, because `cv` is rendered by /cv/ and /resumes/ and has no frame.
+//     route, because `cv` is rendered by the one /cv/ section and has no frame.
 //   - anything else (`data`, e.g. the cv-data payload) -> no page, so it is
 //     SKIPPED. A feed entry that 404s is worse than an absent one.
 //

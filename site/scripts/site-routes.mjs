@@ -26,11 +26,11 @@ export const NOINDEX_SECTIONS = ["phd", "signin"];
 // URL paths with a leading slash. Keep in step with that workflow.
 export const SMOKE_ROUTES = [
   "/",
-  "/resumes/",
-  "/cv/academic",
-  "/cv/research-professional",
+  "/cv/",
+  "/cv/one-page",
+  "/cv/research-2p",
   "/papers/",
-  "/pdfs/academic.pdf",
+  "/pdfs/one-page.pdf",
   "/projects/",
 ];
 

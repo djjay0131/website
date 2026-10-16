@@ -21,13 +21,13 @@ function runCheck(dir: string) {
 describe("smokeRouteFile", () => {
   it("maps page routes, with or without a trailing slash, to index.html", () => {
     expect(smokeRouteFile("/")).toBe("index.html");
-    expect(smokeRouteFile("/cv/academic")).toBe("cv/academic/index.html");
-    expect(smokeRouteFile("/cv/academic/")).toBe("cv/academic/index.html");
+    expect(smokeRouteFile("/cv/one-page")).toBe("cv/one-page/index.html");
+    expect(smokeRouteFile("/cv/one-page/")).toBe("cv/one-page/index.html");
     expect(smokeRouteFile("/papers/")).toBe("papers/index.html");
   });
 
   it("maps file routes to the file itself", () => {
-    expect(smokeRouteFile("/pdfs/academic.pdf")).toBe("pdfs/academic.pdf");
+    expect(smokeRouteFile("/pdfs/one-page.pdf")).toBe("pdfs/one-page.pdf");
   });
 });
 
@@ -40,8 +40,8 @@ describe("smoke-route presence check (SEAM-7)", () => {
   afterEach(() => fs.rmSync(dist, { recursive: true, force: true }));
 
   it("checks a page route and a file route from site-routes.mjs", () => {
-    expect(SMOKE_ROUTES).toContain("/cv/research-professional");
-    expect(SMOKE_ROUTES).toContain("/pdfs/academic.pdf");
+    expect(SMOKE_ROUTES).toContain("/cv/research-2p");
+    expect(SMOKE_ROUTES).toContain("/pdfs/one-page.pdf");
   });
 
   it("passes when every smoke route is present", () => {
@@ -52,20 +52,20 @@ describe("smoke-route presence check (SEAM-7)", () => {
   });
 
   it("fails and names a missing page route and a missing file route", () => {
-    fs.rmSync(path.join(dist, "cv/research-professional"), { recursive: true });
-    fs.rmSync(path.join(dist, "pdfs/academic.pdf"));
+    fs.rmSync(path.join(dist, "cv/research-2p"), { recursive: true });
+    fs.rmSync(path.join(dist, "pdfs/one-page.pdf"));
 
     expect(findMissingSmokeRoutes(dist)).toEqual([
-      { route: "/cv/research-professional", file: "cv/research-professional/index.html" },
-      { route: "/pdfs/academic.pdf", file: "pdfs/academic.pdf" },
+      { route: "/cv/research-2p", file: "cv/research-2p/index.html" },
+      { route: "/pdfs/one-page.pdf", file: "pdfs/one-page.pdf" },
     ]);
 
     const run = runCheck(dist);
     expect(run.status).toBe(1);
-    expect(run.stdout).toContain("MISSING /cv/research-professional → cv/research-professional/index.html");
-    expect(run.stdout).toContain("MISSING /pdfs/academic.pdf → pdfs/academic.pdf");
+    expect(run.stdout).toContain("MISSING /cv/research-2p → cv/research-2p/index.html");
+    expect(run.stdout).toContain("MISSING /pdfs/one-page.pdf → pdfs/one-page.pdf");
     expect(run.stderr).toContain("2 of 7 smoke routes missing");
-    expect(run.stderr).toContain("/cv/research-professional, /pdfs/academic.pdf");
+    expect(run.stderr).toContain("/cv/research-2p, /pdfs/one-page.pdf");
   });
 
   it("does not accept a directory in place of a page's index.html", () => {
