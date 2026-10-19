@@ -24,10 +24,10 @@ TOKEN="$(gcloud auth print-access-token)"
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 BY="${ADDED_BY:-djjay@vt.edu}"
 
-# email|role|note   -- role is omitted entirely when empty (SEAM-3: cbrown has no role field)
+# email|role|note   -- role is omitted entirely when empty (SEAM-3: committee members have no role field)
 MEMBERS=(
   "djjay@vt.edu|owner|Owner. Seeded at Checkpoint 4."
-  "cbrown@vt.edu||Committee member. Seeded at Checkpoint 4."
+  "dcbrown@vt.edu||Committee member. Corrected from cbrown@vt.edu 2026-10-19."
   "yovi26@vt.edu||Research assistant. Added 2026-10-13."
 )
 
