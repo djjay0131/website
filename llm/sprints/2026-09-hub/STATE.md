@@ -4700,3 +4700,54 @@ script's method).** Both lowercase document IDs return HTTP 200:
 `/rabbit-holes/`, `sitemap-0.xml`, `rss.xml`, the Rabbit Holes RSS/Atom/JSON
 feeds and `index.json`, the Pagefind entry and `robots.txt` — **0 `saner2027`
 hits in total**.
+
+### D23 finish — Phase E verification, PASSED (2026-10-19)
+
+**Study PR #20 merged (owner); publish succeeded.** Push run `39199673649` on
+`master` green, "Publish to the research hub" **success**. Bucket manifest:
+source `saner2027`, **4 items, all `visibility: private`**, distinctive slugs
+`study-overview`, `study-design-and-pool`, `study-plan-and-timeline`,
+`study-literature`.
+
+**Hub build-and-deploy re-run `39199760806`: SUCCESS.** `build` and
+`build-firebase` passed the leak check (no false positive with the distinctive
+slugs), and `firebase-deploy`, `private-sync` and `firebase-smoke-test` all
+succeeded and deployed. Live `build-info.json` → `built_from_sha d77950a`,
+`run_id 39199760806`.
+
+**Signed-out parity — no existence oracle.** 22 probes returned **404, no
+redirect, `text/html`**, identical headers to a random missing private path
+(`cache-control: private, no-store`, `x-frame-options: DENY`,
+`vary: Cookie, …`):
+
+- 4 `/p/research/saner2027/<slug>/` item routes;
+- 5 `/p/_payload/saner2027/{index,research,plan,literature}.html` + `style.css`;
+- 4 public `/research/saner2027/<slug>/` routes;
+- 5 public `/_payload/saner2027/…` paths;
+- controls `/p/research/zzz-nonexistent-6f3a/`, `/p/_payload/zzz-nonexistent/x.html`,
+  `/research/zzz-nonexistent-6f3a/`, `/_payload/zzz-nonexistent/x.html`.
+- `/p/` signed out → 404.
+
+**Public absence — 0 hits** (checked the key, the repository name, the page-title
+prefix and the paper-title prefix) on `/`, `/research/`, `/cv/`, `/rabbit-holes/`,
+`sitemap-0.xml`, `rss.xml`, the Rabbit Holes RSS/Atom/JSON feeds and `index.json`,
+`/pagefind/pagefind-entry.json`, `robots.txt`.
+
+**Private bucket populated** (`gs://cusati-hub-private/`): all four item routes
+(each with its `_doc/` share copy) and `_payload/saner2027/`. Both the private
+frame page and the study payload carry a `robots` META noindex.
+
+**`X-Robots-Tag` gap and fix.** Live private responses still lack the
+`X-Robots-Tag` header (`cache-control: private, no-store` is present). **PR #134**
+(`fix/private-x-robots-tag`, off `main`) adds `X-Robots-Tag: noindex, nofollow`
+to every gate response in the `security_headers` middleware, with tests for every
+`/p/**` response class and a non-`/p` route; `test_headers.py` 32 passed, `ruff`
+clean. **Not merged.**
+
+**Members (Phase C):** `members/djjay@vt.edu` → `role: owner`;
+`members/yovi26@vt.edu` → exists, **no role field**. Both read-only via the
+Firestore REST API with an ADC token (the seed script's method).
+
+**Signed-in URLs for the owner's browser check:**
+`https://jason.cusati.us/p/research/saner2027/study-overview/`,
+`…/study-design-and-pool/`, `…/study-plan-and-timeline/`, `…/study-literature/`.
