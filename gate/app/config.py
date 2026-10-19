@@ -129,6 +129,10 @@ class Settings:
     notes_debounce_seconds: int = 45
     # The canonical origin a deep link is built from.
     notes_canonical_origin: str = "https://jason.cusati.us"
+    # The public site origin the gate's static error pages link to. Not a
+    # security decision: the pages are identical for every path, and these are
+    # outbound navigation links only.
+    site_origin: str = "https://jason.cusati.us"
 
     @property
     def session_max_age_seconds(self) -> int:
@@ -186,4 +190,5 @@ def load_settings() -> Settings:
         notes_canonical_origin=(
             os.environ.get("GATE_NOTES_CANONICAL_ORIGIN", "https://jason.cusati.us").strip().rstrip("/")
         ),
+        site_origin=(os.environ.get("GATE_SITE_ORIGIN", "https://jason.cusati.us").strip().rstrip("/")),
     )

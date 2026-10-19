@@ -212,7 +212,7 @@ def test_an_unknown_token_is_a_404(client, transport):
     response = client.get("/s/not-a-real-token/index.html", headers=request_headers(transport))
 
     assert response.status_code == 404
-    assert "Not found" in response.text
+    assert "Page not found" in response.text
 
 
 def test_an_expired_share_is_a_404(client, shares, transport):
@@ -541,7 +541,7 @@ def test_a_corrupt_stored_section_is_refused(client, store, shares, transport):
     response = client.get("/s/corrupt-section/", headers=request_headers(transport))
 
     assert response.status_code == 404
-    assert "Not found" in response.text
+    assert "Page not found" in response.text
     assert b"Escaped sentinel" not in response.content
     assert escaped not in store.fetches
     assert store.fetches == []

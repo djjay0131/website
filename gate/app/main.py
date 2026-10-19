@@ -431,7 +431,8 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
     async def http_exception(request: Request, exc: StarletteHTTPException) -> Response:
         # Unknown routes and wrong methods land here. They are told the same
         # thing a member is told about a missing object.
-        return _html(pages.NOT_FOUND, exc.status_code if exc.status_code >= 400 else 404)
+        status = exc.status_code if exc.status_code >= 400 else 404
+        return _html(pages.not_found(deps.settings.site_origin), status)
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception(request: Request, exc: RequestValidationError) -> Response:
@@ -444,7 +445,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
     async def unhandled_exception(request: Request, exc: Exception) -> Response:
         # Logged server-side with its traceback; the caller gets none of it.
         logger.exception("event=error reason=unhandled")
-        return _html(pages.SERVER_ERROR, 500)
+        return _html(pages.server_error(deps.settings.site_origin), 500)
 
     # ---------------------------------------------------------------------
     # Responsibility 1: sessions.
@@ -580,15 +581,15 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         principal, reason = _authenticate(request, deps)
         if principal is None:
             logger.info("event=deny scope=private stage=session reason=%s", reason)
-            return _html(pages.SIGN_IN_REQUIRED, 404)
+            return _html(pages.not_found(deps.settings.site_origin), 404)
 
         if not principal.email_verified:
             logger.info("event=deny scope=private stage=verify reason=email_not_verified")
-            return _html(pages.NOT_SHARED_WITH_YOU, 404)
+            return _html(pages.no_access(deps.settings.site_origin), 404)
 
         if not deps.members.is_member(principal.email):
             logger.info("event=deny scope=private stage=allowlist member=%s", principal.email)
-            return _html(pages.NOT_SHARED_WITH_YOU, 404)
+            return _html(pages.no_access(deps.settings.site_origin), 404)
 
         try:
             name = safe_object_path(path, deps.settings.private_prefix)
@@ -596,7 +597,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             logger.warning(
                 "event=deny scope=private stage=path reason=%s member=%s", exc.reason, principal.email
             )
-            return _html(pages.NOT_FOUND, 404)
+            return _html(pages.not_found(deps.settings.site_origin), 404)
 
         obj = deps.store.fetch(name)
         if obj is None:
@@ -605,7 +606,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
                 principal.email,
                 _log_path(name, deps.settings),
             )
-            return _html(pages.NOT_FOUND, 404)
+            return _html(pages.not_found(deps.settings.site_origin), 404)
 
         logger.info("event=allow scope=private member=%s%s", principal.email, _log_path(name, deps.settings))
         # Record the SERVED object name so the header middleware can decide the
@@ -760,13 +761,13 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
                 "event=deny scope=share stage=token reason=%s",
                 "unknown" if share is None else "inactive",
             )
-            return _html(pages.NOT_FOUND, 404)
+            return _html(pages.not_found(deps.settings.site_origin), 404)
 
         prefix = _share_item_prefix(share.section, share.source, share.slug)
         if prefix is None:
             # A corrupt stored row is refused, never served.
             logger.warning("event=deny scope=share stage=item reason=invalid_item")
-            return _html(pages.NOT_FOUND, 404)
+            return _html(pages.not_found(deps.settings.site_origin), 404)
         if deps.settings.private_prefix:
             prefix = f"{deps.settings.private_prefix}/{prefix}"
 
@@ -783,12 +784,12 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             name = safe_object_path(path, prefix)
         except UnsafePath as exc:
             logger.warning("event=deny scope=share stage=path reason=%s", exc.reason)
-            return _html(pages.NOT_FOUND, 404)
+            return _html(pages.not_found(deps.settings.site_origin), 404)
 
         obj = deps.store.fetch(name)
         if obj is None:
             logger.info("event=miss scope=share%s", _log_path(name, deps.settings))
-            return _html(pages.NOT_FOUND, 404)
+            return _html(pages.not_found(deps.settings.site_origin), 404)
 
         logger.info("event=allow scope=share%s", _log_path(name, deps.settings))
         headers = {} if obj.size is None else {"content-length": str(obj.size)}
