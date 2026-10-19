@@ -1,7 +1,7 @@
 ---
 // Chrome for the private area. A deliberate sibling of src/layouts/Base.astro
 // rather than a reuse of it, for one structural reason: Base.astro carries the
-// PUBLIC navigation (Research, Projects, Writing, CV), and every one of those
+// PUBLIC navigation (Research, Projects, Rabbit Holes, CV, Papers), and every one of those
 // links 404s inside the private output, which is served by the gate from a
 // separate bucket and contains none of those pages.
 //
@@ -28,25 +28,28 @@ import path from "node:path";
 
 interface Props {
   title: string;
-  /** Items in the private navigation: every private item this build rendered. */
-  nav?: { href: string; label: string }[];
 }
 
-const { title, nav = [] } = Astro.props;
+const { title } = Astro.props;
 
 const base = import.meta.env.BASE_URL; // "/p/"
 const site = Astro.site?.toString().replace(/\/$/, "") ?? "";
-const here = Astro.url.pathname;
-// The Shares entry is added HERE, not by each page, so it appears on every
-// /p/** page without touching any page or shared component (contract
-// requirement 5). It is a private route under the base, so no public nav leaks.
-// My notes (Wave 6) sits beside it for the same reason.
 const sharesHref = `${base}shares/`;
 const notesHref = `${base}notes/`;
+
+// Public pages are reached by their CANONICAL public URL, not a /p/-relative
+// link: the gate serves dist-private under /p/, and a bare /research/ would
+// escape the base (check:private-links).
+const canon = (rel: string) => (site ? `${site}/${rel}` : `/${rel}`);
+// D24: the members' header is the NORMAL site navigation, not a list of every
+// private item. The item catalogue is fetched by the landing page from the gate
+// and contains only what the viewer may open.
 const bandNav = [
-  ...nav.map((entry) => ({ ...entry, current: here === entry.href })),
-  { href: sharesHref, label: "Shares", current: here === sharesHref },
-  { href: notesHref, label: "My notes", current: here === notesHref },
+  { href: canon("research/"), label: "Research" },
+  { href: canon("projects/"), label: "Projects" },
+  { href: canon("rabbit-holes/"), label: "Rabbit Holes" },
+  { href: canon("cv/"), label: "CV" },
+  { href: canon("papers/"), label: "Papers" },
 ];
 
 const footer = readFooterData();
@@ -54,15 +57,13 @@ const meta = loadContentPool(path.resolve(CV_CONTENT_DIR)).meta;
 const elsewhere = resolveElsewhere(footer, meta.contact);
 const buildInfo = readBuildInfo(path.resolve("."), footer.repository);
 
-// Public pages are reached by their CANONICAL public URL, not a /p/-relative
-// link: the gate serves dist-private under /p/, and a bare /research/ would
-// escape the base (check:private-links). An absolute outbound anchor is allowed
-// by that check by design.
-const canon = (rel: string) => (site ? `${site}/${rel}` : `/${rel}`);
 const footerNav = [
+  { label: "Shared with you", href: base },
+  { label: "My notes", href: notesHref },
+  { label: "Shares", href: sharesHref },
   { label: "Research", href: canon("research/") },
   { label: "Projects", href: canon("projects/") },
-  { label: "Writing", href: canon("writing/") },
+  { label: "Rabbit Holes", href: canon("rabbit-holes/") },
   { label: "CV", href: canon("cv/") },
   { label: "Papers", href: canon("papers/") },
   { label: "RSS", href: null },

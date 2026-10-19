@@ -1,22 +1,20 @@
 ---
 // One private item, at /<section>/<source>/<slug>/.
 //
-// `format: html` is "a self-contained page or folder, served verbatim in a thin
-// frame with a back link" (docs/satellites.md). The frame is this page; the
-// payload itself is staged byte-for-byte under /_payload/<source>/... by
-// scripts/private-build.mjs, together with the sibling assets it loads, so its
-// own relative links and stylesheet resolve exactly as they do in the satellite.
+// D24 / ADR-0025: NO IFRAME. The old page put the satellite document in an
+// embedded window below a private menu. This page is now a normal site page:
+// the same header, navigation and stylesheet as the public site, with the item's
+// metadata and a link that opens the document itself top-level.
+//
+// The document bytes are still staged under /_payload/<source>/... by
+// scripts/private-build.mjs and are served by the gate under the same access
+// rule as this page. A satellite document keeps its own design; the hub does not
+// wrap it in a second chrome.
 import { getCollection } from "astro:content";
 import PrivateBase from "../layouts/PrivateBase.astro";
-import { memberHref, payloadUrlFor } from "../lib/private-content.mjs";
-// The SHARED capture island (D20/Wave 7). It lives in the public srcDir so the
-// public build can mount it too; the private build imports it across the
-// one-way arrow (private -> public) that scripts/private-structure.test.ts pins.
-import AnnotationsMount from "../../src/components/AnnotationsMount.astro";
+import { payloadUrlFor } from "../lib/private-content.mjs";
 
 export async function getStaticPaths() {
-  // Only effectively-private items get a frame under /p/. The nav is built from
-  // EVERY item (SEAM-B4: the member sees everything; public items link out).
   const all = (await getCollection("sources", ({ data }) => data.format !== "data")).map(
     (entry) => entry.data,
   );
@@ -24,43 +22,31 @@ export async function getStaticPaths() {
 
   return privateItems.map((item) => ({
     params: { itemPath: `${item.section}/${item.source}/${item.slug}` },
-    props: { item, all },
+    props: { item },
   }));
 }
 
-const { item, all } = Astro.props;
+const { item } = Astro.props;
 const base = import.meta.env.BASE_URL;
-const site = Astro.site?.toString() ?? "";
-const nav = all
-  .slice()
-  .sort((a, b) => (a.title < b.title ? -1 : 1))
-  .map((i) => ({ href: memberHref(i, { base, site }), label: i.title }))
-  .filter((n: { href: string | null; label: string }) => n.href !== null);
 const payload = payloadUrlFor(item, base);
+const label = item.format === "pdf" ? "Open the PDF" : "Open the document";
 ---
 
-<PrivateBase title={item.title} nav={nav}>
-  <p class="crumbs"><a href={base}>← Members' area</a></p>
+<PrivateBase title={item.title}>
+  <p class="crumbs"><a href={base}>← Shared with you</a></p>
   <h1>{item.title}</h1>
   <p class="meta">
     <time datetime={item.date}>{item.date}</time> · {item.source} · {item.format}
   </p>
   {item.summary && <p class="summary">{item.summary}</p>}
 
-  {item.format === "html" || item.format === "bundle" ? (
-    <>
-      <iframe
-        class="payload"
-        data-annotation-frame
-        src={payload}
-        title={item.title}
-        loading="lazy"></iframe>
-      <AnnotationsMount section={item.section} source={item.source} slug={item.slug} />
-      <p class="fallback"><a href={payload}>Open this document on its own</a></p>
-    </>
-  ) : (
-    <p><a href={payload}>Open this document</a></p>
-  )}
+  <p class="open-document">
+    <a class="document-link" href={payload} target="_top" rel="noopener">{label}</a>
+  </p>
+  <p class="hint">
+    The document opens on its own so it keeps the satellite's own layout and
+    stylesheet. Use your browser's back button to return here.
+  </p>
 </PrivateBase>
 
 <style>
@@ -72,17 +58,13 @@ const payload = payloadUrlFor(item, base);
     margin-bottom: 0.5rem;
   }
   .summary { color: var(--color-muted); margin-bottom: 1.5rem; }
-  .payload {
-    width: 100%;
-    min-height: 70vh;
-    border: 1px solid var(--color-border);
+  .open-document { margin: 2rem 0 0.75rem; }
+  .document-link {
+    display: inline-block;
+    padding: 0.55rem 1.1rem;
+    border: 1px solid var(--color-link);
     border-radius: var(--radius);
-    background: var(--color-bg);
+    font-weight: 500;
   }
-  .fallback { margin-top: 0.75rem; font-size: 0.9rem; }
-
-  /* The capture island's own styles now ship with the SHARED component
-     (src/components/AnnotationsMount.astro), so the private frame and the
-     public item pages cannot drift. D20 moved the toolbar from a fixed bar at
-     the bottom of the window to a selection-anchored popover. */
+  .hint { color: var(--color-muted); font-size: 0.9rem; max-width: 60ch; }
 </style>
