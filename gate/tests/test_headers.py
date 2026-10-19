@@ -78,9 +78,7 @@ def test_private_responses_vary_on_cookie(client, member_session, non_member_ses
         assert "cookie" in response.headers["vary"].lower(), label
 
 
-def test_every_private_response_is_noindex(
-    client, member_session, non_member_session, verifier, transport
-):
+def test_every_private_response_is_noindex(client, member_session, non_member_session, verifier, transport):
     """D23: X-Robots-Tag on every /p/** response class, refusals included.
 
     A crawler that fetches a non-HTML private response (a PDF, a served payload
