@@ -4683,3 +4683,20 @@ completed.
 private pages carry `<meta name="robots" content="noindex, nofollow, noarchive">`,
 but there is **no `X-Robots-Tag: noindex` HTTP header** in the gate or
 `firebase.json`. Recorded for the owner; not changed in this task.
+
+### D23 finish — Phase C and live-build confirmation (2026-10-19)
+
+**Members (re-confirmed read-only, Firestore REST with an ADC token, the seed
+script's method).** Both lowercase document IDs return HTTP 200:
+`members/djjay@vt.edu` → `role: owner`, `added_by: djjay@vt.edu`;
+`members/yovi26@vt.edu` → **no role field** (member, not owner),
+`added_by: djjay@vt.edu`. The yovi note is still the pre-#125 wording.
+
+**The failed build did not deploy; the live site is unchanged.** The live
+`build-info.json` still reports `built_from_sha 77bda6f` / `run_id 38907763828`
+(the successful push run of 2026-10-16), not the failed run `39197937193`, whose
+`firebase-deploy`, `private-sync`, `deploy` and both smoke-test jobs are
+**skipped**. Re-probed live public surfaces — `/`, `/research/`, `/cv/`,
+`/rabbit-holes/`, `sitemap-0.xml`, `rss.xml`, the Rabbit Holes RSS/Atom/JSON
+feeds and `index.json`, the Pagefind entry and `robots.txt` — **0 `saner2027`
+hits in total**.
