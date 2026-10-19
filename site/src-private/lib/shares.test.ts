@@ -392,17 +392,14 @@ describe("the Shares page binds the island in the private srcDir", () => {
     expect(page).toMatch(/PrivateBase/);
   });
 
-  it("supplies the island the effectively-private items, each with its entry basename", () => {
-    // The page, not the user, names the item: the mint form selects from this
-    // list and the mint body carries the item document's `entry` (the basename
-    // the private build stages under `_doc/`). See the addendum, requirement 8b.
-    expect(page).toMatch(/effective_visibility === "private"/);
-    expect(page).toMatch(/path\.posix\.basename\(item\.path\)/);
-    expect(page).toMatch(/items=\{shareableItems\}/);
-    expect(page).toMatch(/section: item\.section/);
-    expect(page).toMatch(/source: item\.source/);
-    expect(page).toMatch(/slug: item\.slug/);
-    expect(page).toMatch(/entry:/);
+  it("embeds no item titles; the island asks the gate for what the owner may share", () => {
+    // D24 / ADR-0025: the catalogue is not static HTML. The gate returns only
+    // accessible items, and the island names an item by choosing from that list.
+    expect(page).not.toMatch(/getCollection|effective_visibility|basename/);
+    const island = fs.readFileSync(path.resolve("src-private/components/SharesIsland.tsx"), "utf8");
+    expect(island).toMatch(/loadPrivateItems/);
+    expect(island).toMatch(/shareableItems/);
+    expect(island).toMatch(/entry/);
   });
 
   it("is NOT reachable from the public srcDir", () => {

@@ -1,12 +1,17 @@
 # Firestore in Native mode (design doc §6 responsibility 2, §8; ADR-0004
 # decision 3; SEAM-3).
 #
-# One database, holding one collection that matters: members/{email}, whose
-# document id is the member's LOWERCASED email and whose fields are
-# {added_by, added_at, note, role}. The gate reads it on every request to decide
-# whether a verified sign-in is a member (SEAM-3). Seeding it is the owner's
-# step at Checkpoint 4, not Terraform's: this module creates the database, never
-# its contents, so no real email address is written into this repository.
+# One database holding the member allowlist and the owner's access policy:
+#
+#   members/{email}          role and groups for one member (SEAM-3, ADR-0025)
+#   access_policy/current    the item/source/section/default access rules
+#   access_audit/{id}        one record per policy or member-group write
+#
+# The gate reads members/{email} and access_policy/current on every request.
+# `infra/scripts/access.py` is the only writer of the policy and the audit log.
+# Seeding contents is the owner's step, not Terraform's: this module creates the
+# database, never its contents, so no real email address, item key or group name
+# is written into this repository. The repository is PUBLIC.
 #
 # THE LOCATION IS PERMANENT. "Be aware that once you provision a database
 # instance, you cannot change its location setting" (Firestore, "Firestore
@@ -79,13 +84,16 @@ resource "google_firestore_database" "hub" {
 # Who else is there? The sign-in page (site stream, D6) loads the Firebase Web
 # SDK on a PUBLIC page, and that SDK can talk to Firestore directly from a
 # browser using the project's public API key. What stops a signed-in
-# non-member -- or any signed-in stranger -- from reading members/{email}
-# straight out of the browser console is the ruleset, and nothing else.
+# non-member -- or any signed-in stranger -- from reading members/{email},
+# access_policy/current or access_audit straight out of the browser console is
+# the ruleset, and nothing else.
 #
-# members/{email} is a list of real people's email addresses (STATE §10 Q4). A
-# default-permissive or absent ruleset would make the allowlist itself readable
-# by anyone who can sign in, which is a personal-data leak that no part of the
-# gate's code would notice.
+# members/{email} is a list of real people's email addresses (STATE §10 Q4), and
+# access_policy/current says what private content exists and who it is for. A
+# default-permissive or absent ruleset would make both readable by anyone who
+# can sign in, which is a personal-data leak that no part of the gate's code
+# would notice. The deny-all match below covers access_policy/current and every
+# access_audit record too; no client may read or write either collection.
 #
 # So: one ruleset that denies every client read and write, released to
 # cloud.firestore. The gate is unaffected. The site's sign-in page never needs

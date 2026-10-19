@@ -19,11 +19,13 @@ import {
   listAnnotations,
   noteItemKey,
 } from "../../src/lib/annotations.mjs";
+import { loadPrivateItems } from "../lib/private-items.mjs";
 
 type AnyRecord = Record<string, any>;
 type Item = { section: string; source: string; slug: string; title: string; href: string | null };
 
-export default function NotesIsland({ items = [] }: { items?: Item[] }) {
+export default function NotesIsland() {
+  const [items, setItems] = useState<Item[]>([]);
   const [view, setView] = useState<{ kind: string; rows: AnyRecord[]; canWrite: boolean }>({
     kind: "loading",
     rows: [],
@@ -34,8 +36,9 @@ export default function NotesIsland({ items = [] }: { items?: Item[] }) {
   const [to, setTo] = useState("");
 
   const refresh = useCallback(async () => {
-    const result = await listAnnotations();
+    const [result, itemResult] = await Promise.all([listAnnotations(), loadPrivateItems()]);
     setView(annotationsView(result));
+    setItems(itemResult.items as Item[]);
   }, []);
 
   useEffect(() => {

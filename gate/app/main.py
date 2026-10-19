@@ -40,6 +40,7 @@ from starlette.datastructures import QueryParams
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import pages
+from .access import AccessMap, BucketCatalogStore, FirestoreAccessPolicyStore, RuntimeAccessMap
 from .annotations import (
     ANNOTATION_INTENTS,
     DEFAULT_INTENT,
@@ -238,6 +239,10 @@ class Dependencies:
     store: ObjectStore
     shares: ShareStore
     annotations: AnnotationStore
+    # The per-item access policy (ADR-0025, D24-B). The rule comes from
+    # Firestore at request time; the object -> item map comes from the private
+    # bucket. Injected as a static double by the tests.
+    access: AccessMap
     # The notes export (ADR-0022/D18). None when unconfigured, so a dormant gate
     # behaves exactly as before and makes no GitHub call.
     notes_sync: NotesSync | None = None
@@ -286,15 +291,29 @@ def build_dependencies(settings: Settings | None = None) -> Dependencies:
             enabled=True,
             debounce=resolved.notes_debounce_seconds,
         )
+    store = GcsObjectStore(resolved.private_bucket)
     return Dependencies(
         settings=resolved,
         verifier=FirebaseTokenVerifier(project_id=resolved.project_id),
         members=FirestoreMemberDirectory(
             collection=resolved.members_collection, project_id=resolved.project_id
         ),
-        store=GcsObjectStore(resolved.private_bucket),
+        store=store,
         shares=FirestoreShareStore(collection=resolved.shares_collection, project_id=resolved.project_id),
         annotations=annotations,
+        access=RuntimeAccessMap(
+            policy_source=FirestoreAccessPolicyStore(
+                collection=resolved.access_policy_collection,
+                document=resolved.access_policy_document,
+                project_id=resolved.project_id,
+                cache_seconds=resolved.access_policy_cache_seconds,
+            ),
+            catalog_source=BucketCatalogStore(
+                store,
+                resolved.catalog_object,
+                cache_seconds=resolved.catalog_cache_seconds,
+            ),
+        ),
         notes_sync=notes_sync,
     )
 
@@ -587,7 +606,8 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             logger.info("event=deny scope=private stage=verify reason=email_not_verified")
             return _html(pages.no_access(deps.settings.site_origin), 404)
 
-        if not deps.members.is_member(principal.email):
+        profile = deps.members.profile(principal.email)
+        if profile is None:
             logger.info("event=deny scope=private stage=allowlist member=%s", principal.email)
             return _html(pages.no_access(deps.settings.site_origin), 404)
 
@@ -598,6 +618,14 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
                 "event=deny scope=private stage=path reason=%s member=%s", exc.reason, principal.email
             )
             return _html(pages.not_found(deps.settings.site_origin), 404)
+
+        # D24 / ADR-0025. The object -> item map is read from the private
+        # bucket and joined with the Firestore policy before the bucket. A
+        # member who may not read this object gets the same body as one asking
+        # for an object that does not exist; no path or item name is logged.
+        if not deps.access.allows_object(profile, name, deps.settings.private_prefix):
+            logger.info("event=deny scope=private stage=access member=%s", principal.email)
+            return _html(pages.no_access(deps.settings.site_origin), 404)
 
         obj = deps.store.fetch(name)
         if obj is None:
@@ -620,6 +648,32 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             media_type=obj.content_type,
             headers=headers,
         )
+
+    @app.get("/private/items")
+    async def list_private_items(request: Request) -> Response:
+        """The landing page's only item source (D24).
+
+        It returns exactly what the caller may open. The owner sees every item;
+        a member sees public items plus the private items their role/groups
+        allow. The landing page and the members' navigation no longer embed the
+        full private catalogue in static HTML.
+        """
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not principal.email_verified:
+            logger.info("event=deny scope=items reason=%s", reason or "email_not_verified")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+        profile = deps.members.profile(principal.email)
+        if profile is None:
+            logger.info("event=deny scope=items reason=not_a_member member=%s", principal.email)
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        items = deps.access.listings(profile)
+        logger.info(
+            "event=allow scope=items count=%d member=%s",
+            len(items),
+            principal.email,
+        )
+        return JSONResponse({"items": [item.as_listing() for item in items]}, status_code=200)
 
     # ---------------------------------------------------------------------
     # Responsibility 4: share links (SEAM-S1..S3). Owner-only management, and a
@@ -833,14 +887,25 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             return bad_request
 
         principal, reason = _authenticate(request, deps)
-        if principal is None or not _is_member(principal, deps):
-            logger.info("event=deny scope=annotation action=create reason=%s", reason or "not_member")
+        if principal is None or not principal.email_verified:
+            logger.info("event=deny scope=annotation action=create reason=%s", reason or "email_not_verified")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+        profile = deps.members.profile(principal.email)
+        if profile is None:
+            logger.info("event=deny scope=annotation action=create reason=not_member")
             return JSONResponse({"status": "forbidden"}, status_code=403)
 
         fields = _annotation_fields(payload)
         if fields is None:
             logger.info("event=reject scope=annotation reason=invalid_annotation")
             return JSONResponse({"status": "invalid_request"}, status_code=400)
+
+        # D24: a note is item-scoped, so writing one is a read of that item's
+        # identity and must obey the same access rule as /p/**. The refusal is
+        # a fixed 403 and names no item.
+        if not deps.access.allows_item(profile, fields["section"], fields["source"], fields["slug"]):
+            logger.info("event=deny scope=annotation action=create reason=no_access")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
 
         now = datetime.now(UTC)
         # `member` comes from the verified session ONLY, never from the body
@@ -864,8 +929,12 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
     @app.get("/annotations")
     async def list_annotations(request: Request) -> Response:
         principal, reason = _authenticate(request, deps)
-        if principal is None or not _is_member(principal, deps):
-            logger.info("event=deny scope=annotation action=list reason=%s", reason or "not_member")
+        if principal is None or not principal.email_verified:
+            logger.info("event=deny scope=annotation action=list reason=%s", reason or "email_not_verified")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+        profile = deps.members.profile(principal.email)
+        if profile is None:
+            logger.info("event=deny scope=annotation action=list reason=not_member")
             return JSONResponse({"status": "forbidden"}, status_code=403)
 
         scope = request.query_params.get("scope") or "own"
@@ -892,6 +961,14 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             rows = [row for row in rows if row.source == source]
         if slug is not None:
             rows = [row for row in rows if row.slug == slug]
+
+        # D24: a member's own list must not become a side channel for an item
+        # their access was narrowed away from. The owner's scope=all is the
+        # moderation view and is not filtered; the owner is allowed everything.
+        if scope != "all":
+            rows = [
+                row for row in rows if deps.access.allows_item(profile, row.section, row.source, row.slug)
+            ]
 
         logger.info(
             "event=allow scope=annotation action=list scope=%s count=%d by=%s",

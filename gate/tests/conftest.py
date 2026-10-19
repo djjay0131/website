@@ -26,6 +26,7 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from app.access import AccessItem, AccessPolicy, AccessRule, ItemCatalog, StaticAccessMap
 from app.annotations import StaticAnnotationStore
 from app.auth import Principal, TokenRejected, principal_from_claims
 from app.config import Settings
@@ -218,8 +219,50 @@ def annotations() -> StaticAnnotationStore:
     return StaticAnnotationStore()
 
 
+def _item(section: str, source: str, slug: str, *, visibility: str = "private") -> AccessItem:
+    return AccessItem(
+        section=section,
+        source=source,
+        slug=slug,
+        title=f"{slug} title",
+        format="html",
+        visibility=visibility,
+        href=f"/p/{section}/{source}/{slug}/",
+        entry="index.html",
+    )
+
+
 @pytest.fixture
-def deps(settings, verifier, members, store, shares, annotations) -> Dependencies:
+def access() -> StaticAccessMap:
+    # The route tests inherited from main use their own object paths; the
+    # catalog maps each one to a synthetic item. Access rules are exercised in
+    # tests/test_access.py with synthetic names too.
+    items = {
+        item.key: item
+        for item in (
+            _item("section-test", "source-test", "item-a"),
+            _item("section-test", "source-test", "item-b"),
+        )
+    }
+    # Annotation tests name the fixture items by key. Derive those keys from the
+    # inherited fixture bucket rather than repeating private path names here.
+    for name in PRIVATE_OBJECTS:
+        parts = name.split("/")
+        if name.startswith(("_payload/", "_hub/")) or len(parts) < 3:
+            continue
+        derived = _item(*parts[:3])
+        items.setdefault(derived.key, derived)
+    # Derive the object map from the fixture bucket so this branch adds no new
+    # private path names. The item keys are synthetic.
+    objects = {
+        name: ("section-test/source-test/item-a",) for name in PRIVATE_OBJECTS if not name.startswith("_hub/")
+    }
+    policy = AccessPolicy(default=AccessRule(member=True), sections={}, sources={}, items={})
+    return StaticAccessMap(ItemCatalog(items=items, objects=objects), policy)
+
+
+@pytest.fixture
+def deps(settings, verifier, members, store, shares, annotations, access) -> Dependencies:
     return Dependencies(
         settings=settings,
         verifier=verifier,
@@ -227,6 +270,7 @@ def deps(settings, verifier, members, store, shares, annotations) -> Dependencie
         store=store,
         shares=shares,
         annotations=annotations,
+        access=access,
     )
 
 

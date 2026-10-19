@@ -133,6 +133,17 @@ class Settings:
     # security decision: the pages are identical for every path, and these are
     # outbound navigation links only.
     site_origin: str = "https://jason.cusati.us"
+    # The Firestore document holding the owner's access policy (ADR-0025,
+    # D24-B). It is read at request time and cached for at most 30 seconds, so
+    # a policy or group change needs no PR, rebuild or redeploy.
+    access_policy_collection: str = "access_policy"
+    access_policy_document: str = "current"
+    access_policy_cache_seconds: int = 30
+    # The private-bucket object carrying item metadata and the object -> item
+    # map (ADR-0025, D24-B). It carries no groups or roles. `_hub/**` is never
+    # served through /p/**.
+    catalog_object: str = "_hub/catalog.json"
+    catalog_cache_seconds: int = 30
 
     @property
     def session_max_age_seconds(self) -> int:
@@ -191,4 +202,15 @@ def load_settings() -> Settings:
             os.environ.get("GATE_NOTES_CANONICAL_ORIGIN", "https://jason.cusati.us").strip().rstrip("/")
         ),
         site_origin=(os.environ.get("GATE_SITE_ORIGIN", "https://jason.cusati.us").strip().rstrip("/")),
+        access_policy_collection=(
+            os.environ.get("GATE_ACCESS_POLICY_COLLECTION", "access_policy").strip() or "access_policy"
+        ),
+        access_policy_document=(
+            os.environ.get("GATE_ACCESS_POLICY_DOCUMENT", "current").strip() or "current"
+        ),
+        access_policy_cache_seconds=_positive_int("GATE_ACCESS_POLICY_CACHE_SECONDS", default=30, maximum=30),
+        catalog_object=(
+            os.environ.get("GATE_CATALOG_OBJECT", "_hub/catalog.json").strip() or "_hub/catalog.json"
+        ),
+        catalog_cache_seconds=_positive_int("GATE_CATALOG_CACHE_SECONDS", default=30, maximum=30),
     )

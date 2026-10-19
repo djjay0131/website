@@ -167,6 +167,14 @@ a transient failure into silent deletion.
 `visibility: private` items never reach the public site. They go bucket → build →
 private bucket, and are served only behind the hub's sign-in gate.
 
+**Private access is decided by the hub, not by your manifest (ADR-0025).**
+`visibility: private` means the item is not public. Which members may read it is
+set by the hub owner in Firestore, by item, source, section or default, using
+member groups and roles. A satellite cannot widen access by asserting a field;
+the manifest has no `access` field. If you need a group to see your material,
+tell the hub owner the `(source, slug)` and the group name. The hub's repository
+is public and carries no access data.
+
 **`visibility` is a request; the hub's allowlist is the decision.** Since Wave 0b, an
 item is public only if **both** its manifest says `visibility: public` **and** the hub's
 committed `site/publish-allowlist.json` names its `(source, slug)`. Everything else —
