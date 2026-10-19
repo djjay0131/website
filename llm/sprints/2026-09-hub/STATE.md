@@ -4638,3 +4638,48 @@ The live yovi note still carries the pre-#125 wording that names the study; the
 seed script's neutral note takes effect only when the owner re-runs
 `PROJECT=cusati-hub bash infra/scripts/seed-members.sh`. Recorded, not changed
 here.
+
+### D23 finish — execution (2026-10-19)
+
+**Apply done (owner).** `terraform apply sat6.tfplan`: 4 added, 0 changed, 0
+destroyed. State carries the four `saner2027` resources. Note: the **targeted**
+apply left the `satellite_github_actions_variables` *output* stale (it still
+listed five sources), so the four values were read authoritatively from state
+and set on the study repository:
+`GCP_PROJECT_ID=cusati-hub`,
+`GCP_WIF_PROVIDER=projects/410552878319/locations/global/workloadIdentityPools/satellites/providers/github-saner2027`,
+`GCP_PUBLISH_SA=publish-saner2027@cusati-hub.iam.gserviceaccount.com`,
+`GCP_CONTENT_BUCKET=cusati-hub-content` (identifiers, not secrets).
+
+**Publish succeeded.** `workflow_dispatch` of the private publish workflow on
+`master` (run `39197780448`) is green, and its **"Publish to the research hub"
+step succeeded** (not skipped). The content bucket now holds
+`gs://cusati-hub-content/sources/saner2027/` with a manifest of **4 items, all
+`visibility: private`** (overview, research, plan-and-timeline, literature).
+
+**Blocker found — leak-check FALSE POSITIVE, not a leak.** The follow-up hub
+`build-and-deploy` (run `39197937193`) failed in
+`check:no-private-in-public`. The item needles are derived from the private
+manifest; the **bare-slug** needle collided with legitimate public content:
+`research` is the hub section path and a common word (41 contents + 20 path
+hits), `overview` appears in public documentation URLs
+(`/docs/en/overview`, …; 2 contents hits), and `literature` is a common word
+(1 contents hit). Every distinctive needle (qualified-id,
+route, payload path, title, summary) was clean. This is the Wave 4 FP-2 class
+(a bare token is only as safe as the most generic public word it can equal), and
+the guard must not be weakened to accommodate it.
+
+**Fix — study-repo PR #20 (`hub/distinctive-slugs`).** The private-page **slugs**
+are now distinctive: `study-overview`, `study-design-and-pool`,
+`study-plan-and-timeline`, `study-literature`. Files, paths, titles, summaries,
+`section`, `format` and `visibility: private` are unchanged; the publish contract
+is unchanged. PR #20 is `MERGEABLE`/`CLEAN` with the publish workflow's PR job,
+`ci` and `harness-tests` all green. **Owner merge pending**; on merge the push to
+`master` re-runs the publish, then the hub build can be re-run and Phase E
+completed.
+
+**Phase E finding — no `X-Robots-Tag` header.** The gate applies
+`Cache-Control: private, no-store` to every response (`gate/app/main.py`) and the
+private pages carry `<meta name="robots" content="noindex, nofollow, noarchive">`,
+but there is **no `X-Robots-Tag: noindex` HTTP header** in the gate or
+`firebase.json`. Recorded for the owner; not changed in this task.
