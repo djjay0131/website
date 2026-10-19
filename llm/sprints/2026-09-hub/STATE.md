@@ -4599,3 +4599,42 @@ the secret absent). Not satellite 6, so it was deliberately left out of
 allowed to land in a normal `terraform apply` — until then it is expected drift
 in every plan. Tracked here so the next planner does not read it as a new
 finding.
+
+### D23 finish — anonymity inventory and owner decision (2026-10-18)
+
+**Inventory (read-only, `main` @ `d77950a`, PUBLIC repo).** A tracked-file scan
+for the satellite key, the venue/year, the repository name and the immutable
+repository id found **66 matching lines across 15 files**: the satellite entry
+and its docs (`infra/variables.tf`, `infra/terraform.tfvars.example`,
+`infra/README.md`), the roster records (`ADR-0019`, the design doc §2, the
+governance delta), the memory bank, the D23 STATE/handoffs, and the committed
+leak-check needles/tests. The public **site build** has **zero** hits: the live
+`build-info.json` names the #124 merge, every public surface (`/`, `/research/`,
+`/cv/`, `/rabbit-holes/`, sitemap, all feeds, `/pagefind/`, `robots.txt`) returns
+0, and `check:no-private-in-public` **PASSES** with the identity needles scanned.
+The only unrelated match is `SANER 2026` in the pre-existing first-party
+research data (IEEE AI-author policy), not the study.
+
+**Owner decision (2026-10-18): proceed as is (D23-B).** Keep the real key
+`saner2027` and the repository name in the public repository; do not rename or
+scrub. Printed PR/branch trail: #124 and #131 merged; #132 open (this record);
+remote branch `satellite/saner2027` retained.
+
+**RT1 is recorded as an ACCEPTED RISK, not a defect.** A public reader can link
+`saner2027` to the venue and to the owner from the public **repository** (the
+roster entry, ADR/design records and this STATE file). This is the owner's
+explicit choice over an opaque key and over deleting the trail; the **site**
+boundary remains intact (no allowlist entry, no public byte, leak check green).
+No further action is required unless the owner revisits D23-B.
+
+**Terraform state at this decision:** the targeted plan was re-verified on
+`d77950a` — `Plan: 4 to add, 0 to change, 0 to destroy`, all four addresses
+`satellite["saner2027"]`; the D19 `notes_export` binding is excluded. **The
+owner applies `infra/sat6.tfplan`.** Not applied by an agent.
+
+**Members (Phase C read-back, read-only).** Both documents exist:
+`members/djjay@vt.edu` (`role: owner`) and `members/yovi26@vt.edu` (member).
+The live yovi note still carries the pre-#125 wording that names the study; the
+seed script's neutral note takes effect only when the owner re-runs
+`PROJECT=cusati-hub bash infra/scripts/seed-members.sh`. Recorded, not changed
+here.
