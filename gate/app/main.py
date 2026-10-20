@@ -427,6 +427,14 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         response.headers["Vary"] = "Cookie"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
+        # D23 (owner, 2026-10-19): the private pages already carry a `robots`
+        # META noindex, but a crawler that fetches a non-HTML private response
+        # (a PDF, a served payload document, a share asset) never sees a meta
+        # tag. Send the header on EVERY gate response, like Cache-Control:
+        # refused, missing, served and gate-control responses alike are never
+        # indexable. `nofollow` also stops a crawler following links it somehow
+        # obtains from a private document.
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
         # The ONE deliberate exception to DENY (AN-CAP 3 / AN-GUARD-8). The
         # capture island reads the selection from the item payload iframe at
         # `/p/_payload/<source>/<path>`, same origin as the frame, so a served

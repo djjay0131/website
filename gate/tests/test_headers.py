@@ -78,6 +78,26 @@ def test_private_responses_vary_on_cookie(client, member_session, non_member_ses
         assert "cookie" in response.headers["vary"].lower(), label
 
 
+def test_every_private_response_is_noindex(client, member_session, non_member_session, verifier, transport):
+    """D23: X-Robots-Tag on every /p/** response class, refusals included.
+
+    A crawler that fetches a non-HTML private response (a PDF, a served payload
+    document, a share asset) never sees the pages' `robots` META tag, so the
+    header is the only noindex signal for those response types.
+    """
+    responses = _all_private_responses(client, member_session, non_member_session, verifier, transport)
+
+    for label, response in responses.items():
+        assert response.headers["x-robots-tag"] == "noindex, nofollow", label
+
+
+def test_gate_control_responses_are_noindex(client, transport):
+    """The header is applied at the middleware, so a non-/p gate route carries it too."""
+    response = client.get("/_health", headers=request_headers(transport))
+
+    assert response.headers["x-robots-tag"] == "noindex, nofollow"
+
+
 @pytest.mark.parametrize(
     "header,value",
     [
