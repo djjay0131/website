@@ -5015,3 +5015,146 @@ Other live checks:
   initial set.
 - No live private content was exposed; no traffic rollback was needed.
 - This record is on `record/d24-live` and its PR is **not merged**.
+
+## D25 — access fixes and private projects as site sections (2026-10-20)
+
+Owner task D25. Two parts: urgent access grants plus the shared-asset bug, then
+the members' area rebuilt as Projects inside the main site. No Terraform apply,
+destroy, publish-allowlist change or satellite contract change was made. No
+private email, source name, group name or item key was added to the repository.
+
+### D25-A — access grants (live, owner-approved)
+
+Applied with `infra/scripts/access.py` against live Firestore, before any code
+deploy. Values are deliberately not repeated here.
+
+- The committee member who was denied at `stage=access` was added to the
+  project's team group; the committee group was kept.
+- The second account did not exist in `members/{email}` and was created with
+  `add-member` (role `member`, the same team group).
+- Both writes are single Firestore transactions with an **`access_audit`**
+  record. `access.py show` and the audit collection confirmed:
+  `add_group` at 17:39:59Z, `add_member` at 17:40:03Z, actor the owner's
+  signed-in gcloud identity.
+
+The tool gained a generic `add-member --member --role --groups [--note]`
+command; it contains no value of its own and reuses the same audit path.
+
+### D25-B — the shared-asset and item-page bugs
+
+The live denial exposed two gate defects:
+
+1. **Shared chrome was unmapped.** `/p/emblem/research-emblem.svg` is shared by
+   every private page but is not an item, so the object map failed closed. The
+   gate now allows a fixed set of private-site chrome to any **signed-in
+   member**: `_astro/**`, `emblem/**`, `badges/**`, `favicon.ico` and
+   `favicon.svg`. This is not a wildcard: `_payload/**`, `_doc/**` and item
+   pages still resolve through the catalog, and signed-out callers never reach
+   the rule.
+2. **Item pages were not in the object map.** `_hub/catalog.json` mapped payload
+   and `_doc` objects only. A member with the right group could read an item's
+   payload but still got 404 for the page that embeds it. The private build now
+   maps the old and project-section page objects to the item key. The same
+   change maps each project section page to every item key in that project, so a
+   section is readable only by a member who may read at least one of its pages.
+
+Gate logs since the D24 deploy were scanned: the emblem was the only shared
+asset denied. Other `/p/**` 404s were signed-out probes, deliberate no-access
+checks, or real item/payload requests made before the grant.
+
+### D25-C — Projects (ADR-0026)
+
+The members' landing is now **Projects**, reached from the private header/footer
+(or the canonical `/p/projects/`). Each project is a section of the main site:
+
+- `/p/projects/` — one card per project the viewer can open: derived title,
+  short description, page count, last updated. The static HTML carries no
+  project or item metadata; cards come from `GET /private/items`.
+- `/p/projects/<source>/` — project hub; breadcrumb and the viewer's own pages.
+- `/p/projects/<source>/<slug>/` — inline document inside the normal band,
+  footer and stylesheet, with breadcrumb `Projects › project › page`, a
+  project sub-nav, previous/next links, and the shared annotation box restored.
+- `/p/<section>/<source>/<slug>/` — **kept working** and renders the same inline
+  project section. No redirect was needed; both page objects are catalog-mapped
+  to the item. ADR-0026 records this.
+- No iframe and no link-out as the primary presentation. Satellite bodies are
+  sanitised at build time (scripts/frames/forms/handlers/`javascript:` removed,
+  ids prefixed). Satellite CSS is wrapped in `@scope ([data-project-document])`;
+  `position:fixed`, `z-index` and `@import` are neutralised. Unsupported
+  browsers drop the scoped block rather than applying satellite CSS globally.
+- Satellites are unchanged: no manifest field was added. Order is manifest order
+  (carried in the catalog with `date`), and labels come from existing titles.
+- The emblem/badges/favicon/_astro shared-asset rule is unchanged from D25-B.
+
+### PRs and deploy
+
+| PR | Branch | What | Merge |
+|---|---|---|---|
+| **#145** | `fix/d25-access-shared-assets` | shared assets, item-page catalog mappings, `add-member` | `ef89f2a` |
+| **#146** | `feat/d25-projects-sections` | Projects landing/sections, inline sanitiser, sub-nav, notes, ADR-0026, visual workflow | `79c3546` |
+
+Deploy run: <https://github.com/djjay0131/website/actions/runs/39474252701> on
+`79c3546` — every job succeeded (`build`, `build-firebase`, `private-sync`,
+`firebase-deploy`, `deploy`, both smoke tests). Cloud Run `hub-gate` revision
+**`hub-gate-00017-7th`** carries 100% of traffic. No Terraform apply was needed.
+
+### Live verification
+
+Signed-out HTTP against `https://jason.cusati.us`:
+
+| Path | Status | Body |
+|---|---|---|
+| `/p/`, `/p/projects/`, a project hub, an old item route, the emblem, an imaginary private path | **404** each | all six bodies byte-identical (`sha256 31d7e027…`), `cache-control: private, no-store` |
+
+Decision code against **live Firestore** policy/member documents and the **live
+`_hub/catalog.json`** (16 items, 195 object mappings):
+
+| Principal | `/private/items` | Study items | Old + new page | Project hub | Emblem | Study payload |
+|---|---|---|---|---|---|---|
+| Owner | 16 | 4/4 | allowed | allowed | allowed | allowed |
+| Committee + team (granted) | 16 | 4/4 | allowed | allowed | allowed | allowed |
+| Team only (new member) | 16 | 4/4 | allowed | allowed | allowed | allowed |
+| Committee-only | 12 | 0/4 | denied | denied | allowed | denied |
+| Signed-in non-member | 403 | denied | denied | denied | denied | denied |
+
+No real member cookie could be minted here; these are decisions computed by the
+gate's own code, as in D24. Signed-out HTTP is a real request.
+
+Other checks:
+
+| Check | Result |
+|---|---|
+| Live catalog | version 2, 16 items, 195 mappings; old page, project page and project hub objects all present; `summary`, `date`, `order` present |
+| Public build + `redirects:stubs` + `check:no-private-in-public` | PASS; 185 public files and 53 stubs scanned; no private needle |
+| Leak-check self-test | PASS |
+| `check:publish-allowlist` | PASS (23 entries, 0 conflicts, 0 stale) |
+| `check:private-links` | PASS (220 anchors across 17 private pages) |
+| Contract suite | PASS (old manifests unchanged) |
+| Gate | ruff clean, **694+ passed**; site vitest **574 passed, 2 skipped** |
+| Visual workflow `d25-visual` on #146 | PASS; artifact `d25-screenshots` — <https://github.com/djjay0131/website/actions/runs/39473927505/artifacts> |
+| Local Playwright against the live private content and policy | **55/55** assertions (Projects landing, project section, sub-page, owner / committee-only / team / signed-out; no iframe, site header, breadcrumb, sub-nav, correct projects, styled signed-out 404) |
+
+### Adversarial round
+
+| Target | Result |
+|---|---|
+| Oracle via cards/nav | Committee-only gets exactly the non-restricted project sources; the restricted project is absent from cards and sub-nav. Static HTML carries no project title. PASS |
+| Access bypass via sub-nav links | Sub-nav comes from the filtered `/private/items`; project section pages are mapped to the project's item keys; an unreadable sub-page is a 404. PASS |
+| Sanitizer / script injection | Injected `<script>`, `<iframe>`, `onerror`, `javascript:` and form actions are absent from rendered pages; unit tests cover each. PASS |
+| CSS isolation | Satellite CSS is inside `@scope ([data-project-document])`; fixed positioning, `z-index`, `@import` and `javascript:` URLs are neutralised. PASS |
+| Asset rule | Shared chrome is member-only; unmapped `_payload`/`_doc` stays closed; signed-out stays a styled 404. PASS |
+| Public leak | Public build, live public surface and self-test all clean. PASS |
+| No contract break | Satellites 1–6 need no change; the contract suite passes on their existing manifests. PASS |
+
+### Residuals
+
+- Inline rendering removes satellite JavaScript, so an interactive satellite
+  widget (for example a form) is inert inline. A small "Open the original
+  document" fallback remains, gated by the same item rule.
+- A project's display title is derived from its item titles, with a humanised
+  source key as fallback. A precise project name would need an optional,
+  versioned manifest hint (deferred by ADR-0026).
+- Screenshots with live private content were used for local verification only;
+  the committed CI artifact uses synthetic projects so no private content is
+  published. The check exercises the same templates and access join.
+- No live private content was exposed; no gate rollback was needed.
