@@ -63,19 +63,22 @@ describe("the shared capture island lives in the public tree (D20)", () => {
     expect(fs.existsSync(path.resolve("src-private/lib/annotations.mjs"))).toBe(false);
   });
 
-  it("both item page templates pass the item identity to the SAME shared mount", () => {
+  it("the PUBLIC frame still mounts the shared capture island", () => {
     const publicFrame = fs.readFileSync(path.resolve("src/pages/[section]/[source]/[slug].astro"), "utf8");
-    const privateFrame = fs.readFileSync(path.resolve("src-private/pages/[...itemPath].astro"), "utf8");
-    for (const [label, text] of [
-      ["public frame", publicFrame],
-      ["private frame", privateFrame],
-    ] as const) {
-      expect(text, `${label} imports AnnotationsMount`).toMatch(/AnnotationsMount/);
-      expect(text, `${label} passes section`).toMatch(/section=\{item\.section\}/);
-      expect(text, `${label} passes source`).toMatch(/source=\{item\.source\}/);
-      expect(text, `${label} passes slug`).toMatch(/slug=\{item\.slug\}/);
-      expect(text, `${label} marks the payload frame`).toMatch(/data-annotation-frame/);
-    }
+    expect(publicFrame).toMatch(/AnnotationsMount/);
+    expect(publicFrame).toMatch(/section=\{item\.section\}/);
+    expect(publicFrame).toMatch(/source=\{item\.source\}/);
+    expect(publicFrame).toMatch(/slug=\{item\.slug\}/);
+    expect(publicFrame).toMatch(/data-annotation-frame/);
+  });
+
+  it("the PRIVATE item page is de-framed (D24): no iframe, no island, a top-level link", () => {
+    const privatePage = fs.readFileSync(path.resolve("src-private/pages/[...itemPath].astro"), "utf8");
+    expect(privatePage).not.toMatch(/<iframe/);
+    expect(privatePage).not.toMatch(/AnnotationsMount/);
+    expect(privatePage).not.toMatch(/data-annotation-frame/);
+    expect(privatePage).toMatch(/payloadUrlFor/);
+    expect(privatePage).toMatch(/target="_top"/);
   });
 
   it("no file under src-private/other than the island imports is required for the public build", () => {
@@ -137,22 +140,24 @@ describe.runIf(fs.existsSync(path.join(PRIVATE_DIST, "index.html")))(
       expect(fs.existsSync(path.join(PRIVATE_DIST, "notes", "index.html"))).toBe(true);
     });
 
-    it("emits the shared island chunk", () => {
+    it("emits no capture-island code for private item frames (D24)", () => {
       const astro = path.join(PRIVATE_DIST, "_astro");
       const files = fs.existsSync(astro) ? fs.readdirSync(astro) : [];
-      const carriesTooling = files.some(
-        (name) =>
-          /\.js$/.test(name) && fs.readFileSync(path.join(astro, name), "utf8").includes("/annotations"),
-      );
-      expect(carriesTooling).toBe(true);
+      for (const name of files.filter((file) => /\.js$/.test(file))) {
+        const text = fs.readFileSync(path.join(astro, name), "utf8");
+        expect(text).not.toContain("data-annotation-frame");
+        expect(text).not.toContain("annotations-island");
+      }
     });
 
-    it("mounts the capture island on a framed item page", () => {
-      const frame = path.join(PRIVATE_DIST, "phd", "phd-milestones", "milestones", "index.html");
-      expect(fs.existsSync(frame), "fixture frame page").toBe(true);
-      const html = fs.readFileSync(frame, "utf8");
-      expect(html).toContain("data-annotation-frame");
-      expect(html).toContain("data-annotation-island");
+    it("emits a normal-chrome item page with no embedded payload (D24)", () => {
+      const page = path.join(PRIVATE_DIST, "phd", "phd-milestones", "milestones", "index.html");
+      expect(fs.existsSync(page), "fixture item page").toBe(true);
+      const html = fs.readFileSync(page, "utf8");
+      expect(html).not.toContain("data-annotation-frame");
+      expect(html).not.toContain("<iframe");
+      expect(html).toContain('class="site-band"');
+      expect(html).toContain("_payload/phd-milestones/site/index.html");
     });
   },
 );
