@@ -4563,6 +4563,194 @@ every address satellite-6), then apply; then set the four `GCP_*` variables on t
 study repo and run the member seed. The study repo's own literature PR and PR #8
 then publish through `publish.yml` and the items appear under `/p/`.
 
+### D23 step 2 — Terraform plan, plan-only (2026-10-16)
+
+`#124`, `#125` and `#131` merged by the owner; `main` at `d77950a`. `terraform
+init` against the GCS backend, then a plan-only run (never applied).
+
+**The untargeted plan was not clean and was rejected.** It read
+`Plan: 5 to add, 0 to change, 0 to destroy` — adds-only, but 4 addresses are
+satellite 6 and the 5th is **`google_secret_manager_secret_iam_member.hub_gate_notes_export_key`**,
+which belongs to the notes-sync subsystem (D19), not satellite 6. The owner
+chose a `-target`-scoped plan for exactly the four satellite-6 resources.
+
+**Targeted plan (saved to `infra/sat6.tfplan`):**
+
+```
+Plan: 4 to add, 0 to change, 0 to destroy.
+  # google_iam_workload_identity_pool_provider.satellite["saner2027"] will be created
+  # google_service_account.satellite_publish["saner2027"] will be created
+  # google_service_account_iam_member.satellite_publish_wif["saner2027"] will be created
+  # google_storage_bucket_iam_member.satellite_publish_prefix["saner2027"] will be created
+```
+
+Every address is satellite 6; no change, destroy or replace. Apply command (for
+the owner, from `infra/`): `terraform apply "sat6.tfplan"`. **Not applied by an
+agent.**
+
+**FOLLOW-UP (owner) — D19 notes-export IAM drift.** `notes-sync.tf:23`'s
+`google_secret_manager_secret_iam_member.hub_gate_notes_export_key` is declared
+but absent from state, so every untargeted plan now wants to add it. It was
+designed to be applied by `.github/workflows/secrets-sync.yml` (D19, which an
+earlier apply failed to complete because the Secret Manager API was disabled and
+the secret absent). Not satellite 6, so it was deliberately left out of
+`sat6.tfplan`. It needs its own decision: either the owner re-runs
+`secrets-sync.yml` (which applies the binding) or the gate's accessor binding is
+allowed to land in a normal `terraform apply` — until then it is expected drift
+in every plan. Tracked here so the next planner does not read it as a new
+finding.
+
+### D23 finish — anonymity inventory and owner decision (2026-10-18)
+
+**Inventory (read-only, `main` @ `d77950a`, PUBLIC repo).** A tracked-file scan
+for the satellite key, the venue/year, the repository name and the immutable
+repository id found **66 matching lines across 15 files**: the satellite entry
+and its docs (`infra/variables.tf`, `infra/terraform.tfvars.example`,
+`infra/README.md`), the roster records (`ADR-0019`, the design doc §2, the
+governance delta), the memory bank, the D23 STATE/handoffs, and the committed
+leak-check needles/tests. The public **site build** has **zero** hits: the live
+`build-info.json` names the #124 merge, every public surface (`/`, `/research/`,
+`/cv/`, `/rabbit-holes/`, sitemap, all feeds, `/pagefind/`, `robots.txt`) returns
+0, and `check:no-private-in-public` **PASSES** with the identity needles scanned.
+The only unrelated match is `SANER 2026` in the pre-existing first-party
+research data (IEEE AI-author policy), not the study.
+
+**Owner decision (2026-10-18): proceed as is (D23-B).** Keep the real key
+`saner2027` and the repository name in the public repository; do not rename or
+scrub. Printed PR/branch trail: #124 and #131 merged; #132 open (this record);
+remote branch `satellite/saner2027` retained.
+
+**RT1 is recorded as an ACCEPTED RISK, not a defect.** A public reader can link
+`saner2027` to the venue and to the owner from the public **repository** (the
+roster entry, ADR/design records and this STATE file). This is the owner's
+explicit choice over an opaque key and over deleting the trail; the **site**
+boundary remains intact (no allowlist entry, no public byte, leak check green).
+No further action is required unless the owner revisits D23-B.
+
+**Terraform state at this decision:** the targeted plan was re-verified on
+`d77950a` — `Plan: 4 to add, 0 to change, 0 to destroy`, all four addresses
+`satellite["saner2027"]`; the D19 `notes_export` binding is excluded. **The
+owner applies `infra/sat6.tfplan`.** Not applied by an agent.
+
+**Members (Phase C read-back, read-only).** Both documents exist:
+`members/djjay@vt.edu` (`role: owner`) and `members/yovi26@vt.edu` (member).
+The live yovi note still carries the pre-#125 wording that names the study; the
+seed script's neutral note takes effect only when the owner re-runs
+`PROJECT=cusati-hub bash infra/scripts/seed-members.sh`. Recorded, not changed
+here.
+
+### D23 finish — execution (2026-10-19)
+
+**Apply done (owner).** `terraform apply sat6.tfplan`: 4 added, 0 changed, 0
+destroyed. State carries the four `saner2027` resources. Note: the **targeted**
+apply left the `satellite_github_actions_variables` *output* stale (it still
+listed five sources), so the four values were read authoritatively from state
+and set on the study repository:
+`GCP_PROJECT_ID=cusati-hub`,
+`GCP_WIF_PROVIDER=projects/410552878319/locations/global/workloadIdentityPools/satellites/providers/github-saner2027`,
+`GCP_PUBLISH_SA=publish-saner2027@cusati-hub.iam.gserviceaccount.com`,
+`GCP_CONTENT_BUCKET=cusati-hub-content` (identifiers, not secrets).
+
+**Publish succeeded.** `workflow_dispatch` of the private publish workflow on
+`master` (run `39197780448`) is green, and its **"Publish to the research hub"
+step succeeded** (not skipped). The content bucket now holds
+`gs://cusati-hub-content/sources/saner2027/` with a manifest of **4 items, all
+`visibility: private`** (overview, research, plan-and-timeline, literature).
+
+**Blocker found — leak-check FALSE POSITIVE, not a leak.** The follow-up hub
+`build-and-deploy` (run `39197937193`) failed in
+`check:no-private-in-public`. The item needles are derived from the private
+manifest; the **bare-slug** needle collided with legitimate public content:
+`research` is the hub section path and a common word (41 contents + 20 path
+hits), `overview` appears in public documentation URLs
+(`/docs/en/overview`, …; 2 contents hits), and `literature` is a common word
+(1 contents hit). Every distinctive needle (qualified-id,
+route, payload path, title, summary) was clean. This is the Wave 4 FP-2 class
+(a bare token is only as safe as the most generic public word it can equal), and
+the guard must not be weakened to accommodate it.
+
+**Fix — study-repo PR #20 (`hub/distinctive-slugs`).** The private-page **slugs**
+are now distinctive: `study-overview`, `study-design-and-pool`,
+`study-plan-and-timeline`, `study-literature`. Files, paths, titles, summaries,
+`section`, `format` and `visibility: private` are unchanged; the publish contract
+is unchanged. PR #20 is `MERGEABLE`/`CLEAN` with the publish workflow's PR job,
+`ci` and `harness-tests` all green. **Owner merge pending**; on merge the push to
+`master` re-runs the publish, then the hub build can be re-run and Phase E
+completed.
+
+**Phase E finding — no `X-Robots-Tag` header.** The gate applies
+`Cache-Control: private, no-store` to every response (`gate/app/main.py`) and the
+private pages carry `<meta name="robots" content="noindex, nofollow, noarchive">`,
+but there is **no `X-Robots-Tag: noindex` HTTP header** in the gate or
+`firebase.json`. Recorded for the owner; not changed in this task.
+
+### D23 finish — Phase C and live-build confirmation (2026-10-19)
+
+**Members (re-confirmed read-only, Firestore REST with an ADC token, the seed
+script's method).** Both lowercase document IDs return HTTP 200:
+`members/djjay@vt.edu` → `role: owner`, `added_by: djjay@vt.edu`;
+`members/yovi26@vt.edu` → **no role field** (member, not owner),
+`added_by: djjay@vt.edu`. The yovi note is still the pre-#125 wording.
+
+**The failed build did not deploy; the live site is unchanged.** The live
+`build-info.json` still reports `built_from_sha 77bda6f` / `run_id 38907763828`
+(the successful push run of 2026-10-16), not the failed run `39197937193`, whose
+`firebase-deploy`, `private-sync`, `deploy` and both smoke-test jobs are
+**skipped**. Re-probed live public surfaces — `/`, `/research/`, `/cv/`,
+`/rabbit-holes/`, `sitemap-0.xml`, `rss.xml`, the Rabbit Holes RSS/Atom/JSON
+feeds and `index.json`, the Pagefind entry and `robots.txt` — **0 `saner2027`
+hits in total**.
+
+### D23 finish — Phase E verification, PASSED (2026-10-19)
+
+**Study PR #20 merged (owner); publish succeeded.** Push run `39199673649` on
+`master` green, "Publish to the research hub" **success**. Bucket manifest:
+source `saner2027`, **4 items, all `visibility: private`**, distinctive slugs
+`study-overview`, `study-design-and-pool`, `study-plan-and-timeline`,
+`study-literature`.
+
+**Hub build-and-deploy re-run `39199760806`: SUCCESS.** `build` and
+`build-firebase` passed the leak check (no false positive with the distinctive
+slugs), and `firebase-deploy`, `private-sync` and `firebase-smoke-test` all
+succeeded and deployed. Live `build-info.json` → `built_from_sha d77950a`,
+`run_id 39199760806`.
+
+**Signed-out parity — no existence oracle.** 22 probes returned **404, no
+redirect, `text/html`**, identical headers to a random missing private path
+(`cache-control: private, no-store`, `x-frame-options: DENY`,
+`vary: Cookie, …`):
+
+- 4 `/p/research/saner2027/<slug>/` item routes;
+- 5 `/p/_payload/saner2027/{index,research,plan,literature}.html` + `style.css`;
+- 4 public `/research/saner2027/<slug>/` routes;
+- 5 public `/_payload/saner2027/…` paths;
+- controls `/p/research/zzz-nonexistent-6f3a/`, `/p/_payload/zzz-nonexistent/x.html`,
+  `/research/zzz-nonexistent-6f3a/`, `/_payload/zzz-nonexistent/x.html`.
+- `/p/` signed out → 404.
+
+**Public absence — 0 hits** (checked the key, the repository name, the page-title
+prefix and the paper-title prefix) on `/`, `/research/`, `/cv/`, `/rabbit-holes/`,
+`sitemap-0.xml`, `rss.xml`, the Rabbit Holes RSS/Atom/JSON feeds and `index.json`,
+`/pagefind/pagefind-entry.json`, `robots.txt`.
+
+**Private bucket populated** (`gs://cusati-hub-private/`): all four item routes
+(each with its `_doc/` share copy) and `_payload/saner2027/`. Both the private
+frame page and the study payload carry a `robots` META noindex.
+
+**`X-Robots-Tag` gap and fix.** Live private responses still lack the
+`X-Robots-Tag` header (`cache-control: private, no-store` is present). **PR #134**
+(`fix/private-x-robots-tag`, off `main`) adds `X-Robots-Tag: noindex, nofollow`
+to every gate response in the `security_headers` middleware, with tests for every
+`/p/**` response class and a non-`/p` route; `test_headers.py` 32 passed, `ruff`
+clean. **Not merged.**
+
+**Members (Phase C):** `members/djjay@vt.edu` → `role: owner`;
+`members/yovi26@vt.edu` → exists, **no role field**. Both read-only via the
+Firestore REST API with an ADC token (the seed script's method).
+
+**Signed-in URLs for the owner's browser check:**
+`https://jason.cusati.us/p/research/saner2027/study-overview/`,
+`…/study-design-and-pool/`, `…/study-plan-and-timeline/`, `…/study-literature/`.
 
 ## D24 — access-control redesign and private UX (owner task, 2026-10-19)
 
