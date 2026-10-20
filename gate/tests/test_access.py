@@ -224,6 +224,76 @@ def test_a_payload_object_uses_the_mapped_item_rule(restricted_client, verifier,
     assert allowed.content == b"<h1>payload-a</h1>"
 
 
+def test_shared_chrome_assets_are_readable_by_any_signed_in_member(
+    restricted_client, verifier, store, transport
+):
+    """The emblem is private-site chrome, not an item (D25).
+
+    It is shared by every private page, so it cannot be item-mapped. It is
+    still member-only: the signed-out path never reaches this rule.
+    """
+    for name in ("emblem/research-emblem.svg", "emblem/research-emblem.png", "badges/badge.png"):
+        store.objects[name] = b"asset"
+        response = restricted_client.get(
+            f"/p/{name}",
+            headers=request_headers(transport, {"__session": _session(verifier, name, MEMBER_A)}),
+        )
+        assert response.status_code == 200, name
+        assert response.content == b"asset"
+
+
+def test_a_shared_asset_prefix_cannot_read_an_item_payload(restricted_client, verifier, store, transport):
+    """The shared allowlist is a fixed set of chrome prefixes, not a wildcard."""
+    session = _session(verifier, "shared-no-payload", MEMBER_A)
+    store.objects[f"_payload/{SOURCE}/site/not-shared.css"] = b"x"
+    store.fetches.clear()
+
+    response = restricted_client.get(
+        f"/p/_payload/{SOURCE}/site/not-shared.css",
+        headers=request_headers(transport, {"__session": session}),
+    )
+
+    assert response.status_code == 404
+    assert store.fetches == []
+
+
+def test_a_project_hub_page_is_a_member_page_but_its_sub_pages_are_not(
+    restricted_client, verifier, store, transport
+):
+    session = _session(verifier, "project-hub", MEMBER_B)
+    headers = request_headers(transport, {"__session": session})
+    store.objects["projects/index.html"] = b"landing"
+    store.objects["projects/source-a/index.html"] = b"project"
+    store.objects[f"projects/{SOURCE}/{SLUG_A}/index.html"] = b"item"
+
+    landing = restricted_client.get("/p/projects/", headers=headers)
+    project = restricted_client.get(f"/p/projects/{SOURCE}/", headers=headers)
+    inaccessible_item = restricted_client.get(f"/p/projects/{SOURCE}/{SLUG_A}/", headers=headers)
+
+    assert landing.status_code == 200
+    assert project.status_code == 200
+    # Member B is allowed ITEM_B only; a project landing prefix must not make
+    # ITEM_A's sub-page readable.
+    assert inaccessible_item.status_code == 404
+
+
+def test_catalog_item_metadata_carries_date_and_manifest_order():
+    catalog = parse_catalog_document(
+        {
+            "version": 2,
+            "items": {
+                ITEM_A: {**_item(SLUG_A).as_listing(), "date": "2026-10-17", "order": 0},
+            },
+            "objects": {OBJECT_A: [ITEM_A]},
+        }
+    )
+    item = catalog.items[ITEM_A]
+    assert item.date == "2026-10-17"
+    assert item.order == 0
+    assert item.as_listing()["date"] == "2026-10-17"
+    assert item.as_listing()["order"] == 0
+
+
 def test_an_unmapped_object_fails_closed(restricted_client, verifier, store, transport):
     store.objects[f"_payload/{SOURCE}/site/orphan.html"] = b"<h1>orphan</h1>"
     session = _session(verifier, "orphan", MEMBER_A)

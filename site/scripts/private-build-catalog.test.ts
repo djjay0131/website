@@ -63,8 +63,16 @@ describe("the private build's _hub catalog", () => {
     const document = catalog();
     expect(document.version).toBe(2);
     expect(document.items[ITEM].visibility).toBe("private");
+    expect(document.items[ITEM].date).toBe("2026-10-19");
+    expect(document.items[ITEM].order).toBe(0);
     expect(document.objects[`_payload/${SOURCE}/site/private.html`]).toEqual([ITEM]);
     expect(document.objects[`${ITEM}/_doc/private.html`]).toEqual([ITEM]);
+  });
+
+  it("maps both the item page and its project-section route to the item", () => {
+    const document = catalog();
+    expect(document.objects[`${ITEM}/index.html`]).toEqual([ITEM]);
+    expect(document.objects[`projects/${SOURCE}/slug-private/index.html`]).toEqual([ITEM]);
   });
 
   it("carries no groups or roles and does not write the old access object", () => {

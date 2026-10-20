@@ -64,6 +64,15 @@ def test_a_member_snapshot_has_a_role_and_sorted_groups():
     }
 
 
+def test_a_new_member_document_carries_its_role_and_sorted_groups():
+    fields = access_tool._new_member_fields("actor@example.invalid", "member", ["group-b", "group-a"], None)
+    assert fields["role"] == "member"
+    assert fields["groups"] == ["group-a", "group-b"]
+    assert fields["added_by"] == "actor@example.invalid"
+    assert "note" not in fields
+    assert "added_at" in fields
+
+
 def test_firestore_values_round_trip():
     value = {"a": [1, True, None, "x"], "b": {"c": 1.5}}
     assert access_tool._from_value(access_tool._to_value(value)) == value

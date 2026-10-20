@@ -20,6 +20,7 @@ Examples (all values are placeholders):
     ./access.py set-rule --scope source --name SOURCE_NAME --groups GROUP_A
     ./access.py set-rule --scope item --name SECTION/SOURCE/SLUG --groups GROUP_A
     ./access.py clear-rule --scope source --name SOURCE_NAME
+    ./access.py add-member --member MEMBER_EMAIL --role member --groups GROUP_A
     ./access.py add-group --member MEMBER_EMAIL --group GROUP_A
     ./access.py remove-group --member MEMBER_EMAIL --group GROUP_A
     ./access.py set-role --member MEMBER_EMAIL --role owner
@@ -370,6 +371,19 @@ def _member_snapshot(fields: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _new_member_fields(by: str, role: str, groups: list[str], note: str | None) -> dict[str, Any]:
+    """The complete document a new member gets, with no hidden defaults."""
+    fields: dict[str, Any] = {
+        "added_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "added_by": by,
+        "groups": sorted(set(groups)),
+        "role": role,
+    }
+    if note:
+        fields["note"] = note
+    return fields
+
+
 def _transaction(
     args: argparse.Namespace,
     mutate,
@@ -517,6 +531,26 @@ def _member_mutation(args: argparse.Namespace, action: str, change) -> None:
     _transaction(args, mutate)
 
 
+def command_add_member(args: argparse.Namespace) -> None:
+    email = _validate_email(args.member)
+    if args.role not in ("owner", "member"):
+        raise AccessToolError("--role must be owner or member")
+    groups = _split_names(args.groups or "", "group")
+
+    def mutate(base, token, transaction, by):
+        path = _member_path(email)
+        if _get_document(base, path, token, transaction) is not None:
+            raise AccessToolError(
+                f"member {email!r} already exists; use add-group or set-role to change it"
+            )
+        fields = _new_member_fields(by, args.role, groups, args.note)
+        write = _write_create(_document_name(args.project, args.database, path), fields)
+        after = {"role": fields["role"], "groups": fields["groups"]}
+        return ([write], "add_member", f"member:{email}", None, after)
+
+    _transaction(args, mutate)
+
+
 def command_add_group(args: argparse.Namespace) -> None:
     group = _normalise_names([args.group], "group")[0]
 
@@ -599,6 +633,13 @@ def _parser() -> argparse.ArgumentParser:
     replace = sub.add_parser("replace-policy", help="replace the whole policy from a JSON file")
     replace.add_argument("--file", required=True)
     replace.set_defaults(func=command_replace_policy)
+
+    add_member = sub.add_parser("add-member", help="create a member document")
+    add_member.add_argument("--member", required=True)
+    add_member.add_argument("--role", default="member", choices=["owner", "member"])
+    add_member.add_argument("--groups", default="", help="comma-separated group names")
+    add_member.add_argument("--note", default=None)
+    add_member.set_defaults(func=command_add_member)
 
     add = sub.add_parser("add-group", help="add a member to a group")
     add.add_argument("--member", required=True)

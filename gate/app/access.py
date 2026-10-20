@@ -59,9 +59,25 @@ logger = logging.getLogger("gate")
 # Hub-owned private pages that carry no item catalogue and are readable by any
 # signed-in member. The item routes are resolved through `objects`; `_astro/**`
 # is the build's shared asset tree and is handled by prefix.
-MEMBER_PAGES = frozenset({"index.html", "shares/index.html", "notes/index.html"})
+MEMBER_PAGES = frozenset({"index.html", "projects/index.html", "shares/index.html", "notes/index.html"})
 ASTRO_PREFIX = "_astro/"
 RESERVED_PREFIX = "_hub/"
+
+# Shared, non-item chrome the private build emits. These are the site's own
+# emblem/badges/compiled assets, identical for every member and containing no
+# private item metadata. They are served to any signed-in member -- never before
+# the session check -- but they are NOT a general object allowlist: anything
+# else still has to resolve through `_hub/catalog.json`'s object map. In
+# particular `_payload/**`, `_doc/**` and every item page remain item-scoped.
+SHARED_ASSET_PREFIXES = (ASTRO_PREFIX, "emblem/", "badges/")
+SHARED_ASSET_FILES = frozenset({"favicon.ico", "favicon.svg"})
+
+# A project section's landing page is a member page, not an item. It contains no
+# static item metadata: its cards and sub-navigation are fetched from
+# `/private/items`, which the gate filters. The per-item sub-pages below it
+# still resolve through the catalog object map, so this prefix cannot widen
+# access to any item.
+_PROJECT_HUB_PAGE = re.compile(r"^projects/[a-z0-9][a-z0-9-]{0,63}/index\.html$")
 
 # The maximum the brief allows. A stale policy can only be stale for this long.
 DEFAULT_CACHE_SECONDS = 30
@@ -131,6 +147,8 @@ class AccessItem:
     visibility: str
     href: str | None
     entry: str | None
+    date: str | None = None
+    order: int | None = None
 
     @property
     def key(self) -> str:
@@ -146,6 +164,8 @@ class AccessItem:
             "visibility": self.visibility,
             "href": self.href,
             "entry": self.entry,
+            **({"date": self.date} if self.date is not None else {}),
+            **({"order": self.order} if self.order is not None else {}),
         }
 
 
@@ -269,6 +289,8 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
     visibility = raw.get("visibility")
     href = raw.get("href")
     entry = raw.get("entry")
+    date = raw.get("date")
+    order = raw.get("order")
     if not all(isinstance(v, str) and v for v in (section, source, slug, title, fmt, visibility)):
         return None
     if f"{section}/{source}/{slug}" != key:
@@ -278,6 +300,10 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
     if href is not None and not isinstance(href, str):
         return None
     if entry is not None and not isinstance(entry, str):
+        return None
+    if date is not None and (not isinstance(date, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date)):
+        return None
+    if order is not None and (isinstance(order, bool) or not isinstance(order, int) or order < 0):
         return None
     # The catalog must never carry an access decision (D24-B).
     if "access" in raw or "groups" in raw or "roles" in raw:
@@ -291,6 +317,8 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
         visibility=visibility,
         href=href,
         entry=entry,
+        date=date,
+        order=order,
     )
 
 
@@ -431,7 +459,12 @@ def _allows_object(
     # including the hub's own member pages.
     if policy is None or catalog is None:
         return False
-    if relative in MEMBER_PAGES or relative.startswith(ASTRO_PREFIX):
+    if (
+        relative in MEMBER_PAGES
+        or relative in SHARED_ASSET_FILES
+        or relative.startswith(SHARED_ASSET_PREFIXES)
+        or _PROJECT_HUB_PAGE.fullmatch(relative)
+    ):
         return True
     items = catalog.items_for_object(relative)
     if not items:

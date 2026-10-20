@@ -27,6 +27,7 @@ import {
 import {
   CATALOG_OBJECT,
   buildItemCatalog,
+  isProjectItem,
   itemKey,
 } from "../src-private/lib/catalog.mjs";
 import { RECEIPT_NAME } from "./sync-private.mjs";
@@ -121,6 +122,21 @@ export function privateBuild(options = {}) {
               `the private build stages ${key}, but the catalog did not list it. ` +
                 `Refusing to emit an object the gate cannot resolve to an item.`,
             );
+          }
+          // THE ITEM PAGES THEMSELVES. The gate resolves every /p/** object
+          // through this map, not only payload files; without these entries a
+          // member with the right group could read the payload but still get a
+          // 404 for the page that embeds it (D25). Both the pre-D25 route and
+          // the project-section route are mapped to the same item, so old URLs
+          // keep working while the new navigation uses the section shape.
+          const pageObjects = [`${key}/index.html`];
+          if (isProjectItem(item)) {
+            pageObjects.push(`projects/${item.source}/${item.slug}/index.html`);
+          }
+          for (const to of pageObjects) {
+            const keys = catalog.objects[to] ?? [];
+            if (!keys.includes(key)) keys.push(key);
+            catalog.objects[to] = keys;
           }
           for (const entry of [
             ...stagingPlanFor(sourcesDir, [item]),
