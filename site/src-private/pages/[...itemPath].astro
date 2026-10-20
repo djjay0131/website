@@ -1,18 +1,16 @@
 ---
-// One private item, at /<section>/<source>/<slug>/.
+// THE PRE-D25 ITEM ROUTE, KEPT WORKING (D25 / ADR-0026).
 //
-// D24 / ADR-0025: NO IFRAME. The old page put the satellite document in an
-// embedded window below a private menu. This page is now a normal site page:
-// the same header, navigation and stylesheet as the public site, with the item's
-// metadata and a link that opens the document itself top-level.
-//
-// The document bytes are still staged under /_payload/<source>/... by
-// scripts/private-build.mjs and are served by the gate under the same access
-// rule as this page. A satellite document keeps its own design; the hub does not
-// wrap it in a second chrome.
+// /p/<section>/<source>/<slug>/ still resolves for every private item. Project
+// items render the same inline project section as the new
+// /p/projects/<source>/<slug>/ route; a non-project item (the private CV PDF)
+// keeps its simple document page. No redirect is required, and the catalog maps
+// both page objects to the item, so the access rule is identical.
 import { getCollection } from "astro:content";
 import PrivateBase from "../layouts/PrivateBase.astro";
-import { payloadUrlFor } from "../lib/private-content.mjs";
+import InlineItem from "../components/InlineItem.astro";
+import ProjectSection from "../components/ProjectSection.astro";
+import { isProjectItem } from "../lib/projects.mjs";
 
 export async function getStaticPaths() {
   const all = (await getCollection("sources", ({ data }) => data.format !== "data")).map(
@@ -22,49 +20,36 @@ export async function getStaticPaths() {
 
   return privateItems.map((item) => ({
     params: { itemPath: `${item.section}/${item.source}/${item.slug}` },
-    props: { item },
+    props: {
+      item,
+      siblings: privateItems.filter((other) => other.source === item.source),
+    },
   }));
 }
 
-const { item } = Astro.props;
+const { item, siblings } = Astro.props;
 const base = import.meta.env.BASE_URL;
-const payload = payloadUrlFor(item, base);
-const label = item.format === "pdf" ? "Open the PDF" : "Open the document";
 ---
 
-<PrivateBase title={item.title}>
-  <p class="crumbs"><a href={base}>← Shared with you</a></p>
-  <h1>{item.title}</h1>
-  <p class="meta">
-    <time datetime={item.date}>{item.date}</time> · {item.source} · {item.format}
-  </p>
-  {item.summary && <p class="summary">{item.summary}</p>}
-
-  <p class="open-document">
-    <a class="document-link" href={payload} target="_top" rel="noopener">{label}</a>
-  </p>
-  <p class="hint">
-    The document opens on its own so it keeps the satellite's own layout and
-    stylesheet. Use your browser's back button to return here.
-  </p>
-</PrivateBase>
+{isProjectItem(item) ? (
+  <PrivateBase title={item.title}>
+    <ProjectSection item={item} siblings={siblings} base={base} />
+  </PrivateBase>
+) : (
+  <PrivateBase title={item.title}>
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href={base}>Projects</a></li>
+        <li aria-current="page">{item.title}</li>
+      </ol>
+    </nav>
+    <InlineItem item={item} base={base} />
+  </PrivateBase>
+)}
 
 <style>
-  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
-  .meta {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--color-muted);
-    margin-bottom: 0.5rem;
-  }
-  .summary { color: var(--color-muted); margin-bottom: 1.5rem; }
-  .open-document { margin: 2rem 0 0.75rem; }
-  .document-link {
-    display: inline-block;
-    padding: 0.55rem 1.1rem;
-    border: 1px solid var(--color-link);
-    border-radius: var(--radius);
-    font-weight: 500;
-  }
-  .hint { color: var(--color-muted); font-size: 0.9rem; max-width: 60ch; }
+  .breadcrumbs { font-size: 0.9rem; margin-bottom: 1.25rem; }
+  .breadcrumbs ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .breadcrumbs li + li::before { content: "›"; margin-right: 0.3rem; color: var(--color-muted); }
+  .breadcrumbs [aria-current="page"] { color: var(--color-muted); }
 </style>

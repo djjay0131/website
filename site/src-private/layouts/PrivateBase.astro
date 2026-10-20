@@ -46,7 +46,10 @@ const canon = (rel: string) => (site ? `${site}/${rel}` : `/${rel}`);
 // and contains only what the viewer may open.
 const bandNav = [
   { href: canon("research/"), label: "Research" },
-  { href: canon("projects/"), label: "Projects" },
+  // D25: inside the members' area, "Projects" is the private project index.
+  // The PUBLIC projects index remains reachable from the footer and from the
+  // normal site when signed out.
+  { href: `${base}projects/`, label: "Projects" },
   { href: canon("rabbit-holes/"), label: "Rabbit Holes" },
   { href: canon("cv/"), label: "CV" },
   { href: canon("papers/"), label: "Papers" },
@@ -58,11 +61,11 @@ const elsewhere = resolveElsewhere(footer, meta.contact);
 const buildInfo = readBuildInfo(path.resolve("."), footer.repository);
 
 const footerNav = [
-  { label: "Shared with you", href: base },
+  { label: "Projects", href: `${base}projects/` },
   { label: "My notes", href: notesHref },
   { label: "Shares", href: sharesHref },
   { label: "Research", href: canon("research/") },
-  { label: "Projects", href: canon("projects/") },
+  { label: "Public projects", href: canon("projects/") },
   { label: "Rabbit Holes", href: canon("rabbit-holes/") },
   { label: "CV", href: canon("cv/") },
   { label: "Papers", href: canon("papers/") },

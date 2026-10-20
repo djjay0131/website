@@ -124,8 +124,11 @@ export function buildItemCatalog(options = {}) {
         entry: path.posix.basename(String(item.path ?? "")),
         href:
           visibility === "private"
-            ? routeFor({ ...item, source }, base)
+            ? isProjectItem({ ...item, source })
+              ? projectRouteFor({ ...item, source }, base)
+              : routeFor({ ...item, source }, base)
             : publicHrefFor({ ...item, source }, siteOrigin),
+        summary: item.summary,
         date: item.date,
         order,
       };

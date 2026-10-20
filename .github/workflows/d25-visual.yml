@@ -1,0 +1,62 @@
+name: d25-visual
+
+# D25 visual verification. Synthetic content only: pull-request runs cannot
+# authenticate to the private content bucket (the WIF binding admits main), and
+# real private pages must never be committed or attached from a public repo.
+# The check exercises the same rendered templates and the same access join.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: site
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Publish fixture content
+        run: npm run content:fixture
+
+      - name: Build the public 404 shell
+        run: npm run build
+
+      - name: Create synthetic D25 projects and principals
+        run: node scripts/d25-visual-fixtures.mjs /tmp/d25-visual
+
+      - name: Build the private output with the synthetic projects
+        run: npm run build:private
+
+      - name: Render and assert each principal
+        env:
+          D25_PRINCIPALS: /tmp/d25-visual/principals.json
+          D25_POLICY: /tmp/d25-visual/policy.json
+          D25_SCREENSHOTS: /tmp/d25-screenshots
+          PLAYWRIGHT_CHROMIUM: /usr/bin/google-chrome
+        run: node scripts/d25-visual-check.mjs
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: d25-screenshots
+          path: /tmp/d25-screenshots
+          if-no-files-found: warn
+

@@ -115,8 +115,13 @@ export function privateBuild(options = {}) {
           base: process.env.SITE_BASE || "/p/",
         });
 
+        const projectKeys = new Map();
         for (const item of items) {
           const key = itemKey(item.section, item.source, item.slug);
+          if (isProjectItem(item)) {
+            if (!projectKeys.has(item.source)) projectKeys.set(item.source, []);
+            projectKeys.get(item.source).push(key);
+          }
           if (!catalog.items[key]) {
             throw new Error(
               `the private build stages ${key}, but the catalog did not list it. ` +
@@ -146,6 +151,16 @@ export function privateBuild(options = {}) {
             if (!keys.includes(key)) keys.push(key);
             catalog.objects[entry.to] = keys;
           }
+        }
+
+        // The project section's landing page is readable by anyone who may
+        // read at least one page in that project. Mapping it to the project's
+        // item keys keeps the gate's normal object rule: a source name cannot
+        // be enumerated, and removing a member's last page removes the section.
+        for (const [source, keys] of projectKeys) {
+          const to = `projects/${source}/index.html`;
+          const existing = catalog.objects[to] ?? [];
+          catalog.objects[to] = [...new Set([...existing, ...keys])];
         }
 
         // `_payload/<source>/…` and `<section>/<source>/<slug>/_doc/…` are

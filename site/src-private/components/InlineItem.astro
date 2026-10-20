@@ -1,0 +1,157 @@
+---
+// ONE PRIVATE ITEM, INLINE IN THE SITE LAYOUT (D25).
+//
+// The satellite's body is read at build time and sanitised by
+// lib/inline-content.mjs. Its CSS is wrapped in an `@scope` block rooted at
+// `[data-project-document]`, so it cannot restyle the band, footer or the
+// project sub-navigation. There is no iframe and no link-out as the primary
+// presentation.
+import path from "node:path";
+import { mdToHtml } from "../../src/lib/md";
+import { SOURCES_DIR } from "../../src/lib/hub-content.mjs";
+import { payloadUrlFor } from "../lib/private-content.mjs";
+import { prepareInlineDocument, readSourceFile } from "../lib/inline-content.mjs";
+import AnnotationsMount from "../../src/components/AnnotationsMount.astro";
+
+interface Props {
+  item: {
+    section: string;
+    source: string;
+    slug: string;
+    title: string;
+    format: string;
+    path: string;
+    date?: string;
+    summary?: string;
+  };
+  base: string;
+}
+
+const { item, base } = Astro.props;
+const payload = payloadUrlFor(item, base);
+const payloadBase = payload.replace(/[^/]*$/, "");
+
+let documentHtml: string | null = null;
+let documentCss = "";
+let embedError = "";
+
+if (item.format === "html" || item.format === "bundle" || item.format === "md") {
+  const sourceDir = path.join(path.resolve(SOURCES_DIR), item.source);
+  const raw = readSourceFile(sourceDir, item.path);
+  if (raw === null) {
+    embedError = "The document could not be embedded.";
+  } else {
+    let html = raw;
+    if (item.format === "md") {
+      html = raw
+        .split(/\n\s*\n/)
+        .map((block) => `<p>${mdToHtml(block).replace(/\n/g, "<br>")}</p>`)
+        .join("\n");
+    }
+    try {
+      const prepared = prepareInlineDocument({
+        html,
+        itemPath: item.path,
+        sourceDir,
+        payloadBase,
+      });
+      documentHtml = prepared.html;
+      documentCss = prepared.css;
+    } catch {
+      embedError = "The document could not be embedded.";
+    }
+  }
+}
+---
+
+<article class="project-item" data-annotation-document>
+  <header class="project-item-head">
+    <h1>{item.title}</h1>
+    <p class="project-item-meta">
+      {item.date && <time datetime={item.date}>{item.date}</time>}
+      {item.date && " · "}
+      <span>{item.source}</span>
+    </p>
+    {item.summary && <p class="project-item-summary">{item.summary}</p>}
+  </header>
+
+  {documentHtml !== null ? (
+    <>
+      <style is:global set:html={documentCss}></style>
+      <div class="project-document" data-project-document set:html={documentHtml}></div>
+    </>
+  ) : item.format === "pdf" ? (
+    <p class="project-item-fallback">
+      <a class="document-link" href={payload} target="_top" rel="noopener">Open the PDF</a>
+    </p>
+  ) : (
+    <p class="project-item-fallback" role="alert">
+      {embedError || "This document cannot be displayed inline."}
+      <a href={payload} target="_top" rel="noopener">Open the original document</a>.
+    </p>
+  )}
+
+  <p class="project-item-original">
+    <a href={payload} target="_top" rel="noopener">Open the original document</a>
+  </p>
+</article>
+
+<AnnotationsMount section={item.section} source={item.source} slug={item.slug} />
+
+<style>
+  .project-item { min-width: 0; }
+  .project-item-head { margin-bottom: 1.5rem; }
+  .project-item-meta {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    margin-bottom: 0.35rem;
+  }
+  .project-item-summary { color: var(--color-muted); max-width: 70ch; }
+  .project-item-fallback,
+  .project-item-original {
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: var(--color-muted);
+  }
+  .project-item-original { display: none; }
+  .document-link {
+    display: inline-block;
+    padding: 0.55rem 1.1rem;
+    border: 1px solid var(--color-link);
+    border-radius: var(--radius);
+    font-weight: 500;
+  }
+
+  /* A calm reading column and typography for untrusted satellite HTML. The
+     satellite's own CSS is scoped separately; these rules only supply a safe
+     baseline where its stylesheet is absent. */
+  .project-document {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .project-document :global(img),
+  .project-document :global(svg),
+  .project-document :global(video) { max-width: 100%; height: auto; }
+  .project-document :global(table) { max-width: 100%; }
+  .project-document :global(pre) { overflow-x: auto; }
+  .project-document :global(h1) { font-size: 1.65rem; margin: 1.2rem 0 0.6rem; }
+  .project-document :global(h2) { font-size: 1.3rem; margin: 1.2rem 0 0.5rem; }
+  .project-document :global(h3) { font-size: 1.1rem; margin: 1rem 0 0.4rem; }
+  .project-document :global(p),
+  .project-document :global(ul),
+  .project-document :global(ol) { margin-bottom: 0.8rem; }
+  .project-document :global(a) { color: var(--color-link); }
+  .project-document :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--color-surface);
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+  }
+  .project-document :global(blockquote) {
+    border-left: 3px solid var(--color-border);
+    padding-left: 0.9rem;
+    color: var(--color-muted);
+  }
+</style>

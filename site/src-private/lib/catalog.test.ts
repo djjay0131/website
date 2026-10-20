@@ -93,7 +93,7 @@ describe("the private build's catalog", () => {
     const privateItem = catalog.items[itemKey("section-a", SOURCE, "slug-private")];
     const publicItem = catalog.items[itemKey("section-a", SOURCE, "slug-public")];
     expect(privateItem.visibility).toBe("private");
-    expect(privateItem.href).toBe("/p/section-a/source-a/slug-private/");
+    expect(privateItem.href).toBe("/p/projects/source-a/slug-private/");
     expect(privateItem.entry).toBe("private.html");
     expect(publicItem.visibility).toBe("public");
     expect(publicItem.href).toBe("https://jason.cusati.us/section-a/source-a/slug-public/");
