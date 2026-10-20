@@ -23,7 +23,7 @@ const c = (id: string) => `<a class="ref" href="#ref-${id}">[${n(id)}]</a>`;
   title="Jason Cusati — Chapter Proposal: From Papers to Progress, with Agents"
   description="Draft one-page chapter proposal for the Springer volume Using AI in Empirical Software Engineering Research: governing AI-assisted empirical software engineering research. Jason Cusati and Chris Brown, Virginia Tech."
 >
-  <p class="crumbs"><a href={project}>← Governed Agentic Empirical Research</a></p>
+  <p class="crumbs"><a href={project}>← From Papers to Progress, with Agents</a></p>
   <p class="kicker">Chapter proposal <span class="badge">draft v1 · 20 October 2026</span></p>
   <h1>From Papers to Progress, with Agents: Governing AI-Assisted Empirical Software Engineering Research</h1>
   <p class="lede">
@@ -58,7 +58,7 @@ const c = (id: string) => `<a class="ref" href="#ref-${id}">[${n(id)}]</a>`;
     critiques, with decisions delegated to it along the way <Fragment set:html={c("gomes2026")} />.
     Current guidance asks authors to disclose models and prompts, keep session
     traces and validate AI output by hand <Fragment set:html={c("baltes2025")} />,
-    and stage-specific frameworks now govern literature screening <Fragment set:html={c("kitchenham2026")} />
+    and stage-specific frameworks now govern literature screening <Fragment set:html={c("kitchenham2026")} />{" "}
     and repository mining <Fragment set:html={c("demartino2025")} />. What no
     standard yet specifies is the research <em>process</em> as a governed
     object: which decisions were delegated to AI and under what authority,
@@ -71,12 +71,12 @@ const c = (id: string) => `<a class="ref" href="#ref-${id}">[${n(id)}]</a>`;
   </p>
   <p>
     The chapter operationalizes four published principles for research
-    artifacts (structured, inspectable, long-lived, governed) <Fragment set:html={c("cusati2026")} />
+    artifacts (structured, inspectable, long-lived, governed) <Fragment set:html={c("cusati2026")} />{" "}
     for AI-assisted empirical research: agents work under bounded authority,
     claims are recorded as typed entities, decisions leave durable provenance,
     and reproducibility is built in as executable checks. It is written for PhD
     students and early-career researchers who already use agents and need to
-    know what to record and where human judgement must stay; for reviewers who
+    know what to record and where human judgment must stay; for reviewers who
     need criteria for assessing agent-assisted studies; and for educators, who
     get a framework and worked examples to assign alongside existing methods
     guidance. It is grounded in working tooling and two cases from our own
@@ -90,18 +90,18 @@ const c = (id: string) => `<a class="ref" href="#ref-${id}">[${n(id)}]</a>`;
     <li><strong>Failure modes of ungoverned AI-assisted research.</strong> Hidden delegated decisions, prompt and model drift, circular validation, non-durable context, schema choices that distort measured results, unrecorded human interventions — each tied to its validity threat.</li>
     <li><strong>A governance framework for agentic empirical research.</strong> The four principles as design patterns: bounded agent authority with explicit roles; typed claims (existence proof, method claim, general claim) and the baseline each requires; durable provenance of decisions; human semantic gates with stated criteria and placement.</li>
     <li><strong>Engineering reproducibility.</strong> Versioned agent definitions and prompts, a control plane separate from research artifacts, executable checks in CI, FAIR packaging.</li>
-    <li><strong>Two worked cases.</strong> A literature study of agentic software engineering (268 schema-constrained records, separate adversarial verification) and a time-boxed empirical study in which a claims register, pre-registered thresholds and a human re-derivation ledger gated every agent-drafted result — including the lesson that recorded provenance does not govern by itself: a new agent session used the record reliably only when the protocol for loading it was itself governed.</li>
+    <li><strong>Two worked cases.</strong> A literature study of agentic software engineering (a separate 268-record, schema-constrained store with adversarial verification) and a time-boxed empirical study in which a claims register, pre-registered thresholds and a human re-derivation ledger gated every agent-drafted result — including the lesson that recorded provenance does not govern by itself: a new agent session used the record reliably only when the protocol for loading it was itself governed.</li>
     <li><strong>Adoption guide and research agenda.</strong> A minimum governed workflow, a reporting checklist for agent-assisted studies, and open questions: how much process provenance is enough, measuring generator–evaluator independence, model drift in longitudinal studies.</li>
   </ol>
   <p>Readers leave with a vocabulary for what agents may decide, a checklist for what to record, and installable templates.</p>
 
   <h2>5. Intended supplementary material</h2>
   <p>
-    A FAIR-archived package (Zenodo, MIT/CC-BY): our open-source plugins
-    <code>agentic-governance</code> and <code>agentic-research</code> (agent
+    A FAIR-archived package (Zenodo, MIT/CC-BY): our open-source plugins{" "}
+    <code>agentic-governance</code> and <code>agentic-research</code>{" "}(agent
     role contracts, decision-record, claims-register and verification-ledger
     templates, conformance-check scripts); the prompts and agent definitions
-    used in both cases; the 219-record, independently verified
+    used in both cases; the 219-record, independently verified{" "}
     <a href={track}>source dataset behind this proposal</a>; and a worked example
     repository showing the full lifecycle.
   </p>
