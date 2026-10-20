@@ -38,6 +38,9 @@ jobs:
       - name: Build the public 404 shell
         run: npm run build
 
+      - name: Generate the styled 404 shell
+        run: npm run redirects:stubs
+
       - name: Create synthetic D25 projects and principals
         run: node scripts/d25-visual-fixtures.mjs /tmp/d25-visual
 
