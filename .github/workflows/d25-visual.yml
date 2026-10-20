@@ -47,7 +47,7 @@ jobs:
       - name: Build the private output with the synthetic projects
         run: npm run build:private
 
-      - name: Render and assert each principal
+      - name: Render and assert each D25 principal
         env:
           D25_PRINCIPALS: /tmp/d25-visual/principals.json
           D25_POLICY: /tmp/d25-visual/policy.json
@@ -55,11 +55,21 @@ jobs:
           PLAYWRIGHT_CHROMIUM: /usr/bin/google-chrome
         run: node scripts/d25-visual-check.mjs
 
+      - name: Render and assert each D26 principal (calendar)
+        env:
+          D25_PRINCIPALS: /tmp/d25-visual/principals.json
+          D25_POLICY: /tmp/d25-visual/policy.json
+          D26_SCREENSHOTS: /tmp/d26-screenshots
+          PLAYWRIGHT_CHROMIUM: /usr/bin/google-chrome
+        run: node scripts/d26-visual-check.mjs
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: d25-screenshots
-          path: /tmp/d25-screenshots
+          name: d25-d26-screenshots
+          path: |
+            /tmp/d25-screenshots
+            /tmp/d26-screenshots
           if-no-files-found: warn
 

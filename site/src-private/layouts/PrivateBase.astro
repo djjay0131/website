@@ -48,8 +48,9 @@ const bandNav = [
   { href: canon("research/"), label: "Research" },
   // D25: inside the members' area, "Projects" is the private project index.
   // The PUBLIC projects index remains reachable from the footer and from the
-  // normal site when signed out.
+  // normal site when signed out. D26 adds Calendar beside it.
   { href: `${base}projects/`, label: "Projects" },
+  { href: `${base}calendar/`, label: "Calendar" },
   { href: canon("rabbit-holes/"), label: "Rabbit Holes" },
   { href: canon("cv/"), label: "CV" },
   { href: canon("papers/"), label: "Papers" },
@@ -62,6 +63,7 @@ const buildInfo = readBuildInfo(path.resolve("."), footer.repository);
 
 const footerNav = [
   { label: "Projects", href: `${base}projects/` },
+  { label: "Calendar", href: `${base}calendar/` },
   { label: "My notes", href: notesHref },
   { label: "Shares", href: sharesHref },
   { label: "Research", href: canon("research/") },

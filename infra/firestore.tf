@@ -6,9 +6,14 @@
 #   members/{email}          role and groups for one member (SEAM-3, ADR-0025)
 #   access_policy/current    the item/source/section/default access rules
 #   access_audit/{id}        one record per policy or member-group write
+#   calendar_events/{id}     owner-managed private calendar events (ADR-0027)
+#   calendar_audit/{id}      one record per calendar-event write
 #
-# The gate reads members/{email} and access_policy/current on every request.
-# `infra/scripts/access.py` is the only writer of the policy and the audit log.
+# The gate reads members/{email} and access_policy/current on every request,
+# and calendar_events for GET /private/calendar.
+# `infra/scripts/access.py` is the only writer of the policy and the access
+# audit log. `infra/scripts/calendar_events.py` is the only writer of calendar
+# events and their audit log.
 # Seeding contents is the owner's step, not Terraform's: this module creates the
 # database, never its contents, so no real email address, item key or group name
 # is written into this repository. The repository is PUBLIC.
@@ -92,8 +97,9 @@ resource "google_firestore_database" "hub" {
 # access_policy/current says what private content exists and who it is for. A
 # default-permissive or absent ruleset would make both readable by anyone who
 # can sign in, which is a personal-data leak that no part of the gate's code
-# would notice. The deny-all match below covers access_policy/current and every
-# access_audit record too; no client may read or write either collection.
+# would notice. The deny-all match below covers access_policy/current, every
+# access_audit record, calendar_events and calendar_audit too; no client may
+# read or write any of them.
 #
 # So: one ruleset that denies every client read and write, released to
 # cloud.firestore. The gate is unaffected. The site's sign-in page never needs

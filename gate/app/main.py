@@ -59,6 +59,13 @@ from .annotations import (
     new_annotation_id,
 )
 from .auth import FirebaseTokenVerifier, Principal, TokenRejected, TokenVerifier
+from .calendar import (
+    BucketCalendarStore,
+    CalendarEvent,
+    CalendarSource,
+    FirestoreCalendarEventStore,
+    OwnerCalendarStore,
+)
 from .config import ALLOWED_ORIGINS_VAR, SESSION_COOKIE_NAME, Settings, load_settings, parse_origin
 from .members import FirestoreMemberDirectory, MemberDirectory, normalise_email
 from .notes_sync import (
@@ -243,6 +250,11 @@ class Dependencies:
     # Firestore at request time; the object -> item map comes from the private
     # bucket. Injected as a static double by the tests.
     access: AccessMap
+    # D26 / ADR-0027: satellite deadlines (private bucket) merged with
+    # owner-managed Firestore events. None means that source contributes
+    # nothing; no route treats None as "allow everything".
+    calendar: CalendarSource | None = None
+    calendar_events: OwnerCalendarStore | None = None
     # The notes export (ADR-0022/D18). None when unconfigured, so a dormant gate
     # behaves exactly as before and makes no GitHub call.
     notes_sync: NotesSync | None = None
@@ -313,6 +325,16 @@ def build_dependencies(settings: Settings | None = None) -> Dependencies:
                 resolved.catalog_object,
                 cache_seconds=resolved.catalog_cache_seconds,
             ),
+        ),
+        calendar=BucketCalendarStore(
+            store,
+            resolved.calendar_object,
+            cache_seconds=resolved.calendar_cache_seconds,
+        ),
+        calendar_events=FirestoreCalendarEventStore(
+            collection=resolved.calendar_events_collection,
+            project_id=resolved.project_id,
+            cache_seconds=resolved.calendar_cache_seconds,
         ),
         notes_sync=notes_sync,
     )
@@ -682,6 +704,35 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             principal.email,
         )
         return JSONResponse({"items": [item.as_listing() for item in items]}, status_code=200)
+
+    @app.get("/private/calendar")
+    async def list_private_calendar(request: Request) -> Response:
+        """Events for the projects this caller may open (D26 / ADR-0027).
+
+        The two sources are merged before filtering. A member sees an event only
+        when its project has at least one item they may read; non-project events
+        are owner-only. Denied events are never returned and no count of them is
+        exposed, so this is not an existence oracle. A missing/malformed source
+        contributes nothing rather than widening access.
+        """
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not principal.email_verified:
+            logger.info("event=deny scope=calendar reason=%s", reason or "email_not_verified")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+        profile = deps.members.profile(principal.email)
+        if profile is None:
+            logger.info("event=deny scope=calendar reason=not_a_member member=%s", principal.email)
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        merged: list[CalendarEvent] = []
+        satellite = deps.calendar.events() if deps.calendar is not None else None
+        owned = deps.calendar_events.events() if deps.calendar_events is not None else None
+        for event in (satellite or []) + (owned or []):
+            if profile.is_owner or (event.project and deps.access.allows_project(profile, event.project)):
+                merged.append(event)
+        merged.sort(key=lambda event: (event.start, event.title.lower(), event.id))
+        logger.info("event=allow scope=calendar count=%d member=%s", len(merged), principal.email)
+        return JSONResponse({"events": [event.as_listing() for event in merged]}, status_code=200)
 
     # ---------------------------------------------------------------------
     # Responsibility 4: share links (SEAM-S1..S3). Owner-only management, and a

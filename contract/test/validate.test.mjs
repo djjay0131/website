@@ -157,6 +157,12 @@ test('the reason each fixture is rejected is the reason its name claims', async 
     'schema-version-on-non-data-item.json': /must not carry the field\(s\) "schema_version"/,
     'unknown-top-level-field.json': /unknown field "dispatch_token"/,
     'unknown-item-field.json': /unknown field "redirect_to"/,
+    'deadline-unknown-field.json': /unknown field "project"/,
+    'deadline-without-version-2.json': /missing required field "manifest_version"/,
+    'deadline-with-version-1.json': /must be "2" \(got "1"\)/,
+    'deadline-duplicate-id.json': /duplicate deadline id "paper"/,
+    'deadline-impossible-date.json': /"2026-02-31" is not a real date or time/,
+    'deadline-end-before-start.json': /end "2026-11-01" is before start "2026-11-05"/,
   };
 
   for (const [name, pattern] of Object.entries(expectations)) {
@@ -189,6 +195,28 @@ test('ajv and the dependency-free interpreter agree on every fixture', async (t)
       );
     });
   }
+});
+
+test('a version 2 manifest with a valid deadline is accepted', () => {
+  const manifest = {
+    source: 'example-notes',
+    manifest_version: '2',
+    published: '2026-10-20T00:00:00Z',
+    items: [],
+    deadlines: [
+      {
+        id: 'paper',
+        title: 'Paper submission',
+        kind: 'submission',
+        start: '2026-10-23',
+        all_day: true,
+        timezone: 'AoE',
+        conference: 'ExampleConf',
+      },
+    ],
+  };
+  assert.deepEqual(validateManifestShape(manifest, { schema }), []);
+  assert.deepEqual(ajvErrorsFor(manifest), []);
 });
 
 test('duplicate slug is a contract rule, not a JSON Schema rule', () => {

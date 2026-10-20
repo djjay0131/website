@@ -144,6 +144,13 @@ class Settings:
     # served through /p/**.
     catalog_object: str = "_hub/catalog.json"
     catalog_cache_seconds: int = 30
+    # D26 / ADR-0027: the satellite deadlines file and the owner-managed event
+    # collection. The gate reads Firestore; the owner tool writes it. Dependency
+    # on `datastore.user` is the same grant already used for shares and
+    # annotations, so no new IAM is needed.
+    calendar_object: str = "_hub/calendar.json"
+    calendar_events_collection: str = "calendar_events"
+    calendar_cache_seconds: int = 30
 
     @property
     def session_max_age_seconds(self) -> int:

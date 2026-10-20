@@ -10,7 +10,7 @@
  * schema — so a change on the contract side fails this build rather than
  * drifting silently. A mismatch is a seam defect: report it, do not paper over it.
  *
- * TWO CONTRACT RULES ARE NOT IN THE SCHEMA, because JSON Schema draft 2020-12
+ * SOME CONTRACT RULES ARE NOT IN THE SCHEMA, because JSON Schema draft 2020-12
  * cannot express them. SEAM-1 splits their enforcement and requires each end to
  * implement its half deliberately:
  *
@@ -19,7 +19,10 @@
  *      conformant validator — including the Zod mirror below, which ACCEPTS a
  *      duplicate slug exactly as ajv does. `findDuplicateSlugs()` is that half,
  *      written as named code beside the schema and asserted by its own test.
- *   2. `path` resolves inside `dist/` on disk, symlinks included. Only the
+ *   2. `deadline.id` is unique within a manifest, `start` and `end` name real
+ *      calendar instants, and `end` is not before `start` (ADR-0027). The
+ *      schema pins their shape; `deadlineInstant()` pins the calendar.
+ *   3. `path` resolves inside `dist/` on disk, symlinks included. Only the
  *      publish action can check that, because only it has the satellite's
  *      filesystem. The hub enforces the textual half through the `path` pattern.
  *
@@ -73,6 +76,9 @@ export const PATTERNS = {
   slug: "^[a-z0-9]+(?:-[a-z0-9]+)*$",
   path: "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\u0000-\\u001f]+$",
   date: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+  deadline_date: "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2})?(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2}))?$",
+  timezone: "^[A-Za-z][A-Za-z0-9_+/-]{0,63}$",
+  url: "^https://[^\\s]+$",
   tag: "^[a-z0-9]+(?:-[a-z0-9]+)*$",
   schema_version: "^[0-9]+(?:\\.[0-9]+){0,2}$",
   // ADR-0009. Note it is NOT the same pattern as schema_version: integers only,
@@ -152,11 +158,26 @@ export const itemSchema = z
  * whether the VALUE is one this hub understands is a separate question answered
  * in validateManifest() — the schema's job is the shape, not the vocabulary.
  */
+export const deadlineSchema = z.strictObject({
+  id: z.string().regex(re(PATTERNS.slug)).max(64),
+  title: z.string().min(1).max(200),
+  kind: z.enum(["submission", "abstract", "notification", "camera-ready", "conference", "milestone", "work"]),
+  start: z.string().regex(re(PATTERNS.deadline_date)),
+  end: z.string().regex(re(PATTERNS.deadline_date)).optional(),
+  all_day: z.boolean().optional(),
+  timezone: z.string().regex(re(PATTERNS.timezone)).optional(),
+  conference: z.string().min(1).max(120).optional(),
+  url: z.string().regex(re(PATTERNS.url)).max(500).optional(),
+  notes: z.string().max(2000).optional(),
+  status: z.enum(["active", "done", "cancelled"]).optional(),
+});
+
 export const manifestSchema = z.strictObject({
   source: z.string().regex(re(PATTERNS.source)),
   manifest_version: z.string().regex(re(PATTERNS.manifest_version)).optional(),
   published: z.string().regex(re(PATTERNS.published)),
   items: z.array(itemSchema),
+  deadlines: z.array(deadlineSchema).max(200).optional(),
 });
 
 export type ManifestItem = z.infer<typeof itemSchema>;
@@ -191,6 +212,23 @@ export function findDuplicateSlugs(items: readonly { slug?: unknown }[]): Map<st
     else seen.set(item.slug, [index]);
   });
   return new Map([...seen].filter(([, indexes]) => indexes.length > 1));
+}
+
+/**
+ * Milliseconds for an ISO date or offset datetime, or null when the value is
+ * not a real calendar instant. JSON Schema pins the shape; this pins the
+ * calendar, so 2026-02-31 fails the build instead of silently vanishing from
+ * the calendar. Date-only values compare as the start of that UTC day.
+ */
+export function deadlineInstant(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  const day = new Date(`${text.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== text.slice(0, 10)) {
+    return null;
+  }
+  const parsed = Date.parse(text.includes("T") ? text : `${text}T00:00:00Z`);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 // --- Contract rule 2: the hub renders only the data items it claims ---------
@@ -272,6 +310,43 @@ export function validateManifest(raw: unknown, expectedSource: string): Manifest
         `satellite (ADR-0009). An absent manifest_version means "1". Teach the hub this version ` +
         `before a satellite publishes it.`,
     );
+  }
+
+  if (manifest.deadlines !== undefined && envelope !== "2") {
+    problems.push(
+      `  deadlines: this field was added in manifest envelope version 2 (ADR-0027). ` +
+        `A manifest carrying deadlines must declare manifest_version: "2" (absent means "1").`,
+    );
+  }
+
+  if (manifest.deadlines) {
+    const seen = new Set<string>();
+    manifest.deadlines.forEach((deadline, index) => {
+      if (seen.has(deadline.id)) {
+        problems.push(
+          `  deadlines[${index}].id: duplicate deadline id ${JSON.stringify(deadline.id)} — an id must be unique within a manifest.`,
+        );
+      }
+      seen.add(deadline.id);
+
+      const start = deadlineInstant(deadline.start);
+      if (start === null) {
+        problems.push(
+          `  deadlines[${index}].start: ${JSON.stringify(deadline.start)} is not a real date or time.`,
+        );
+      }
+      if (deadline.end === undefined) return;
+      const end = deadlineInstant(deadline.end);
+      if (end === null) {
+        problems.push(
+          `  deadlines[${index}].end: ${JSON.stringify(deadline.end)} is not a real date or time.`,
+        );
+      } else if (start !== null && end < start) {
+        problems.push(
+          `  deadlines[${index}].end: ${JSON.stringify(deadline.end)} is before start ${JSON.stringify(deadline.start)}.`,
+        );
+      }
+    });
   }
 
   if (manifest.source !== expectedSource) {

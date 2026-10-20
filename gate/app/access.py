@@ -59,7 +59,9 @@ logger = logging.getLogger("gate")
 # Hub-owned private pages that carry no item catalogue and are readable by any
 # signed-in member. The item routes are resolved through `objects`; `_astro/**`
 # is the build's shared asset tree and is handled by prefix.
-MEMBER_PAGES = frozenset({"index.html", "projects/index.html", "shares/index.html", "notes/index.html"})
+MEMBER_PAGES = frozenset(
+    {"index.html", "projects/index.html", "calendar/index.html", "shares/index.html", "notes/index.html"}
+)
 ASTRO_PREFIX = "_astro/"
 RESERVED_PREFIX = "_hub/"
 
@@ -200,6 +202,8 @@ class AccessMap(Protocol):
     def allows_object(self, profile: MemberProfile, name: str, private_prefix: str = "") -> bool: ...
 
     def allows_item(self, profile: MemberProfile, section: str, source: str, slug: str) -> bool: ...
+
+    def allows_project(self, profile: MemberProfile, source: str) -> bool: ...
 
     def listings(self, profile: MemberProfile, *, include_all: bool = False) -> list[AccessItem]: ...
 
@@ -377,6 +381,9 @@ class StaticAccessMap:
     def allows_item(self, profile: MemberProfile, section: str, source: str, slug: str) -> bool:
         return _allows_item(self._catalog, self._policy, profile, section, source, slug)
 
+    def allows_project(self, profile: MemberProfile, source: str) -> bool:
+        return _allows_project(self._catalog, self._policy, profile, source)
+
     def listings(self, profile: MemberProfile, *, include_all: bool = False) -> list[AccessItem]:
         return _listings(self._catalog, self._policy, profile, include_all=include_all)
 
@@ -405,6 +412,14 @@ class RuntimeAccessMap:
             section,
             source,
             slug,
+        )
+
+    def allows_project(self, profile: MemberProfile, source: str) -> bool:
+        return _allows_project(
+            self._catalog_source.catalog(),
+            self._policy_source.policy(),
+            profile,
+            source,
         )
 
     def listings(self, profile: MemberProfile, *, include_all: bool = False) -> list[AccessItem]:
@@ -440,6 +455,33 @@ def _allows_item(
     if item.visibility == "public":
         return ANY_MEMBER.allows(profile)
     return policy.rule_for(section, source, slug).allows(profile)
+
+
+def _allows_project(
+    catalog: ItemCatalog | None,
+    policy: AccessPolicy | None,
+    profile: MemberProfile,
+    source: str,
+) -> bool:
+    """May this member read a project-scoped surface (D26 calendar)?
+
+    A project is readable when at least one of its items is readable under the
+    same joined policy as `/private/items`. An unknown source is not readable;
+    the owner is always allowed. This never widens an item rule: it only lets a
+    member see that project's calendar events, not its unreadable items.
+    """
+    if profile.is_owner:
+        return True
+    if policy is None or catalog is None:
+        return False
+    for item in catalog.items.values():
+        if item.source != source:
+            continue
+        if item.visibility == "public" or policy.rule_for(item.section, item.source, item.slug).allows(
+            profile
+        ):
+            return True
+    return False
 
 
 def _allows_object(

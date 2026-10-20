@@ -12,8 +12,9 @@
 //
 // Three checks, in the order contract/publish/action.yml runs them:
 //
-//   schema  validateManifestShape()  JSON Schema + the two contract rules JSON
-//                                    Schema cannot express (slug uniqueness).
+//   schema  validateManifestShape()  JSON Schema + the contract rules JSON
+//                                    Schema cannot express (slug and deadline-id
+//                                    uniqueness, real deadline dates/ranges).
 //   paths   checkPaths()             every item's path resolves inside dist/,
 //                                    symlinks included (ADR-0002).
 //   source  checkSource()            the manifest's source equals the input.
@@ -315,7 +316,73 @@ export function validateManifestShape(manifest, options = {}) {
     });
   }
 
+  // Contract rule: a deadline id is unique within a manifest, for the same
+  // reason a slug is. JSON Schema cannot express "unique by property".
+  if (Array.isArray(manifest?.deadlines)) {
+    const firstSeenAt = new Map();
+    manifest.deadlines.forEach((deadline, index) => {
+      const id = deadline?.id;
+      if (typeof id !== 'string') return;
+      if (firstSeenAt.has(id)) {
+        errors.push({
+          layer: 'contract-rule',
+          path: `deadlines[${index}].id`,
+          message: `duplicate deadline id ${JSON.stringify(id)} — deadlines[${firstSeenAt.get(id)}] already uses it, and id must be unique within a manifest`,
+        });
+      } else {
+        firstSeenAt.set(id, index);
+      }
+    });
+
+    // JSON Schema can pin the SHAPE of an ISO date but not that it exists.
+    // An impossible date would otherwise reach the calendar and be dropped,
+    // which looks like a successful publish with a missing event.
+    manifest.deadlines.forEach((deadline, index) => {
+      const start = deadlineInstant(deadline?.start);
+      if (deadline?.start !== undefined && start === null) {
+        errors.push({
+          layer: 'contract-rule',
+          path: `deadlines[${index}].start`,
+          message: `start ${JSON.stringify(deadline.start)} is not a real date or time`,
+        });
+      }
+      if (deadline?.end === undefined) return;
+      const end = deadlineInstant(deadline.end);
+      if (end === null) {
+        errors.push({
+          layer: 'contract-rule',
+          path: `deadlines[${index}].end`,
+          message: `end ${JSON.stringify(deadline.end)} is not a real date or time`,
+        });
+        return;
+      }
+      if (start !== null && end < start) {
+        errors.push({
+          layer: 'contract-rule',
+          path: `deadlines[${index}].end`,
+          message: `end ${JSON.stringify(deadline.end)} is before start ${JSON.stringify(deadline.start)}`,
+        });
+      }
+    });
+  }
+
   return errors;
+}
+
+/**
+ * Milliseconds for an ISO date or offset datetime, or null when the value is
+ * not a real calendar instant. Date-only values compare as the start of that
+ * UTC day; the calendar's AoE rule applies later, at display time.
+ */
+function deadlineInstant(value) {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  const day = new Date(`${text.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== text.slice(0, 10)) {
+    return null;
+  }
+  const parsed = Date.parse(text.includes('T') ? text : `${text}T00:00:00Z`);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 /**

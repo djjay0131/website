@@ -183,19 +183,21 @@ describe("manifest_version is accepted, defaulted and vetted", () => {
   });
 
   it("accepts a known version explicitly declared", () => {
-    expect(KNOWN_MANIFEST_VERSIONS).toEqual(["1"]);
+    expect(KNOWN_MANIFEST_VERSIONS).toEqual(["1", "2"]);
     expect(isKnownManifestVersion("1")).toBe(true);
+    expect(isKnownManifestVersion("2")).toBe(true);
     expect(() => check(manifest({ manifest_version: "1" }))).not.toThrow();
+    expect(() => check(manifest({ manifest_version: "2" }))).not.toThrow();
   });
 
   it("FAILS THE BUILD on a version the hub does not know (decision 3)", () => {
     // The same shape as the existing schema_version check, because it is the
     // same kind of mistake: reading a document written to rules you have never
     // seen and assuming they are the rules you know.
-    expect(isKnownManifestVersion("2")).toBe(false);
-    expect(() => check(manifest({ manifest_version: "2" }))).toThrow(HubContentError);
-    expect(() => check(manifest({ manifest_version: "2" }))).toThrow(
-      /manifest_version: "2" is not an envelope version this hub understands/,
+    expect(isKnownManifestVersion("3")).toBe(false);
+    expect(() => check(manifest({ manifest_version: "3" }))).toThrow(HubContentError);
+    expect(() => check(manifest({ manifest_version: "3" }))).toThrow(
+      /manifest_version: "3" is not an envelope version this hub understands/,
     );
   });
 
@@ -209,6 +211,61 @@ describe("manifest_version is accepted, defaulted and vetted", () => {
     const parsed = manifestSchema.safeParse(dotted);
     expect(parsed.success).toBe(false);
     expect(JSON.stringify(parsed.error?.issues)).toMatch(/manifest_version/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Deadline events (D26 / ADR-0027)
+// ---------------------------------------------------------------------------
+describe("optional deadline events are mirrored and versioned", () => {
+  const deadline = {
+    id: "paper-submission",
+    title: "Paper submission",
+    kind: "submission",
+    start: "2026-10-23",
+    all_day: true,
+    timezone: "AoE",
+    conference: "ExampleConf",
+  };
+  const manifest = (over: Record<string, unknown> = {}) => ({
+    source: "phd-milestones",
+    manifest_version: "2",
+    published: "2026-09-17T00:00:00Z",
+    items: [],
+    deadlines: [deadline],
+    ...over,
+  });
+
+  it("accepts a version 2 manifest carrying a deadline", () => {
+    expect(() => check(manifest())).not.toThrow();
+  });
+
+  it("old manifests without deadlines and without a version stay valid", () => {
+    expect(() => check({ source: "phd-milestones", published: "2026-09-17T00:00:00Z", items: [] })).not.toThrow();
+  });
+
+  it("requires manifest_version 2 when deadlines are present", () => {
+    expect(() => check(manifest({ manifest_version: undefined }))).toThrow(/manifest envelope version 2/);
+    expect(() => check(manifest({ manifest_version: "1" }))).toThrow(/manifest envelope version 2/);
+  });
+
+  it("rejects duplicate deadline ids and malformed values", () => {
+    expect(() => check(manifest({ deadlines: [deadline, deadline] }))).toThrow(/duplicate deadline id/);
+    expect(() => check(manifest({ deadlines: [{ ...deadline, kind: "deadline" }] }))).toThrow();
+    expect(() => check(manifest({ deadlines: [{ ...deadline, start: "23/10/2026" }] }))).toThrow();
+    expect(() => check(manifest({ deadlines: [{ ...deadline, url: "javascript:alert(1)" }] }))).toThrow();
+  });
+
+  it("rejects impossible dates and a reversed range", () => {
+    expect(() => check(manifest({ deadlines: [{ ...deadline, start: "2026-02-31" }] }))).toThrow(
+      /is not a real date or time/,
+    );
+    expect(() =>
+      check(manifest({ deadlines: [{ ...deadline, start: "2026-11-05", end: "2026-11-01" }] })),
+    ).toThrow(/is before start/);
+    expect(() =>
+      check(manifest({ deadlines: [{ ...deadline, start: "2026-11-05", end: "2026-11-06" }] })),
+    ).not.toThrow();
   });
 });
 

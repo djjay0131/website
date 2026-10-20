@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/djjay0131/website/main/contract/manifest.schema.json",
   "title": "Research hub publishing manifest",
-  "description": "The entire interface between a satellite repository and the research hub. A satellite publishes a finished dist/ folder and this manifest describing what is in it (design doc section 4, as amended by ADR-0008; ADR-0002). The hub reads the manifest; it never needs to know how the satellite built its output. This file is the single definition of a manifest: site/src/content.config.ts mirrors it field for field and both ends validate against it (phase-2-seams SEAM-1). Two contract rules cannot be expressed in JSON Schema and are enforced by contract/validate-manifest.mjs alongside this file: slug uniqueness within a manifest, and the filesystem resolution of every path inside dist/ (symlinks included). Any validator of this schema must enforce those two rules separately.",
+  "description": "The entire interface between a satellite repository and the research hub. A satellite publishes a finished dist/ folder and this manifest describing what is in it (design doc section 4, as amended by ADR-0008; ADR-0002). The hub reads the manifest; it never needs to know how the satellite built its output. This file is the single definition of a manifest: site/src/content.config.ts mirrors it field for field and both ends validate against it (phase-2-seams SEAM-1). Some contract rules cannot be expressed in JSON Schema and are enforced by contract/validate-manifest.mjs alongside this file: slug and deadline-id uniqueness within a manifest, real deadline dates and ranges, and the filesystem resolution of every path inside dist/ (symlinks included). Any validator of this schema must enforce those rules separately.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -31,6 +31,14 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/item"
+      }
+    },
+    "deadlines": {
+      "description": "Optional project deadlines/events. Added by ADR-0027 with manifest_version 2; a manifest that carries deadlines MUST declare manifest_version \"2\". Older manifests remain valid unchanged, and satellites that publish no deadlines declare nothing. The hub derives the project from the source key, so an entry cannot name another project.",
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/deadline"
       }
     }
   },
@@ -154,6 +162,98 @@
           }
         }
       ]
+    },
+    "deadline": {
+      "description": "One project deadline or active-work event. Dates are ISO dates (no time) or ISO datetimes with an explicit offset/Z; `timezone` names an IANA zone or the special value `AoE` (Anywhere on Earth, UTC-12).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "start"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "maxLength": 64
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "submission",
+            "abstract",
+            "notification",
+            "camera-ready",
+            "conference",
+            "milestone",
+            "work"
+          ]
+        },
+        "start": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2})?(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2}))?$"
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2})?(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2}))?$"
+        },
+        "all_day": {
+          "type": "boolean"
+        },
+        "timezone": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_+/-]{0,63}$"
+        },
+        "conference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://[^\\s]+$",
+          "maxLength": 500
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "done",
+            "cancelled"
+          ]
+        }
+      }
     }
-  }
+  },
+  "allOf": [
+    {
+      "$comment": "ADR-0027: deadlines are an envelope version 2 field. A manifest carrying them must declare version 2; an absent version stays version 1.",
+      "if": {
+        "required": [
+          "deadlines"
+        ]
+      },
+      "then": {
+        "required": [
+          "manifest_version"
+        ],
+        "properties": {
+          "manifest_version": {
+            "const": "2"
+          }
+        }
+      }
+    }
+  ]
 }

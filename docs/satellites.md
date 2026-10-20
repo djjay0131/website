@@ -78,7 +78,8 @@ hub build validates it again. A manifest that fails either one does not publish.
 | Field | Rule |
 |---|---|
 | `source` | Your assigned source name. Must match the prefix you upload to. |
-| `manifest_version` | Optional, for now. A plain integer as a string. Absent means `"1"`. See below. |
+| `manifest_version` | Optional, for now. A plain integer as a string. Absent means `"1"`. `deadlines` requires `"2"`. See below. |
+| `deadlines` | Optional project deadlines for the members' calendar. Requires `manifest_version: "2"`. |
 | `published` | ISO 8601 timestamp. |
 | `slug` | Unique within your source. |
 | `title` | Shown in the hub's navigation and indexes. |
@@ -109,6 +110,46 @@ rule that does not exist.
 **Today it is optional and absent means `"1"`**, so you need do nothing. It becomes required
 in a later phase, and you will be told before that happens. Sending a version the hub does not
 recognise fails the hub's build rather than publishing something half-understood.
+
+### Optional deadlines (manifest version 2)
+
+You may publish deadlines and active-work events for the hub's members-only
+calendar. Add `deadlines` to the manifest and declare `manifest_version: "2"`.
+The hub derives the project from your `source`, so an entry cannot name another
+project. Members see only events for projects they may open; the public site
+never carries them.
+
+```json
+"manifest_version": "2",
+"deadlines": [
+  {
+    "id": "paper-submission",
+    "title": "Paper submission",
+    "kind": "submission",
+    "start": "2026-10-23",
+    "all_day": true,
+    "timezone": "AoE",
+    "conference": "ExampleConf 2027"
+  }
+]
+```
+
+| Field | Rule |
+|---|---|
+| `id` | Slug-shaped and unique within your manifest. |
+| `title` | 1–200 characters. |
+| `kind` | `submission`, `abstract`, `notification`, `camera-ready`, `conference`, `milestone` or `work`. |
+| `start` | `YYYY-MM-DD`, or an ISO datetime with an offset. |
+| `end` | Optional, same shape as `start`. |
+| `all_day` | Optional boolean. Date-only starts default to true. |
+| `timezone` | Optional IANA zone or `AoE` (Anywhere on Earth, UTC-12). |
+| `conference` | Optional; used by the calendar's conference filter. |
+| `url` | Optional `https://` link. |
+| `notes` | Optional plain text, up to 2000 characters. |
+| `status` | Optional `active` (default), `done` or `cancelled`. |
+
+Publishing no `deadlines` is the normal case and needs no change: every existing
+manifest stays valid as version 1.
 
 ### Formats
 

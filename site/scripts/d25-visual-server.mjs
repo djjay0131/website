@@ -23,7 +23,13 @@ const MIME = {
 };
 
 const SHARED_PREFIXES = ["_astro/", "emblem/", "badges/"];
-const MEMBER_PAGES = new Set(["index.html", "projects/index.html", "shares/index.html", "notes/index.html"]);
+const MEMBER_PAGES = new Set([
+  "index.html",
+  "projects/index.html",
+  "calendar/index.html",
+  "shares/index.html",
+  "notes/index.html",
+]);
 const SHARED_FILES = new Set(["favicon.ico", "favicon.svg"]);
 
 function allows(rule, profile) {
@@ -33,10 +39,26 @@ function allows(rule, profile) {
   return (rule.groups ?? []).some((group) => (profile.groups ?? []).includes(group));
 }
 
-export function createVisualServer({ distDir, catalogPath, policyPath, principals, notFoundPath, port = 0 }) {
+export function createVisualServer({
+  distDir,
+  catalogPath,
+  policyPath,
+  principals,
+  notFoundPath,
+  calendarPath = null,
+  ownerCalendarPath = null,
+  port = 0,
+}) {
   const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
   const policy = JSON.parse(fs.readFileSync(policyPath, "utf8"));
   const notFound = fs.readFileSync(notFoundPath, "utf8");
+  const readEvents = (file) => {
+    if (!file) return [];
+    const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+    return Array.isArray(raw) ? raw : raw.events ?? [];
+  };
+  const satelliteEvents = readEvents(calendarPath);
+  const ownerEvents = readEvents(ownerCalendarPath);
   const byCookie = new Map(principals.map((principal) => [principal.id, principal]));
 
   const allowedItem = (profile, key) => {
@@ -47,6 +69,13 @@ export function createVisualServer({ distDir, catalogPath, policyPath, principal
     return allows(
       policy.items?.[key] ?? policy.sources?.[item.source] ?? policy.sections?.[item.section] ?? policy.default,
       profile,
+    );
+  };
+
+  const allowedProject = (profile, source) => {
+    if (profile.role === "owner") return true;
+    return Object.entries(catalog.items).some(
+      ([key, item]) => item.source === source && allowedItem(profile, key),
     );
   };
 
@@ -93,6 +122,21 @@ export function createVisualServer({ distDir, catalogPath, policyPath, principal
         .map(([, item]) => item);
       res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
       res.end(JSON.stringify({ items }));
+      return;
+    }
+
+    if (url.pathname === "/private/calendar") {
+      if (!principal) {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ status: "forbidden" }));
+        return;
+      }
+      const events = [...satelliteEvents, ...ownerEvents].filter(
+        (event) =>
+          principal.role === "owner" || (event.project && allowedProject(principal, event.project)),
+      );
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ events }));
       return;
     }
 

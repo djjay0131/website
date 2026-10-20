@@ -38,6 +38,7 @@ from `0000-template.md`.
 | [0024](0024-cv-consolidation-per-variant-visibility.md) | One CV section — five public documents, six variants, per-variant visibility (D22) | Accepted |
 | [0025](0025-roles-groups-private-access.md) | Private access is role/group based, owner-managed in Firestore, and enforced per item (D24) | Accepted |
 | [0026](0026-project-sections-inline-private-content.md) | Private projects are site sections, with sanitised inline content (D25) | Accepted |
+| [0027](0027-private-calendar.md) | A private calendar for active work and submission deadlines (D26) | Accepted |
 
 ## Lifecycle
 
