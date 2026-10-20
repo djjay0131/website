@@ -4751,3 +4751,267 @@ Firestore REST API with an ADC token (the seed script's method).
 **Signed-in URLs for the owner's browser check:**
 `https://jason.cusati.us/p/research/saner2027/study-overview/`,
 `…/study-design-and-pool/`, `…/study-plan-and-timeline/`, `…/study-literature/`.
+
+## D24 — access-control redesign and private UX (owner task, 2026-10-19)
+
+### D24-B — owner decision: the policy moves to Firestore (2026-10-19)
+
+Owner decision D24-B, verbatim intent: **"we should be able to change roles w/o a
+PR. the repo doesn't control access to the website."** The website repository is
+**public**, so it must not reveal what private content exists or who it is for.
+
+**Design decision: ADR-0025 (amended).** Access stays under `/p/` this wave.
+Moving private items to their real `/research/...`, `/cv/...` paths would need
+Hosting rewrites over public prefixes and a new public-build leak proof;
+per-item gating under `/p/` is the smaller, safer change. The manifest gains
+**no** `access` field, so satellites 1–6 keep publishing unchanged and an
+untrusted manifest cannot widen access.
+
+### The model (D24-B)
+
+- `members/{email}` carries optional `groups[]`; `role` is `owner` or `member`
+  (absent means member). The owner is always allowed.
+- **The policy lives in Firestore at `access_policy/current`.** It is resolved
+  **item → source → section → default**. Shape:
+  `{version: 1, default: {groups, roles}, sections: {name: rule},
+  sources: {name: rule}, items: {"section/source/slug": rule}}`, where each
+  rule is `{groups: [string], roles: [string]}`. Member role/groups stay on
+  `members/{email}`.
+- The gate reads the policy at request time, caches it for **at most 30s**
+  (`GATE_ACCESS_POLICY_CACHE_SECONDS`, default 30), and **fails closed** if it is
+  missing or malformed. The owner is always allowed. A policy or group change
+  takes effect with **no PR, no rebuild and no redeploy**.
+- The private build emits **`_hub/catalog.json`** (version 2) into
+  `dist-private`: item metadata plus an **object → item-key map** for every
+  staged payload and item-scoped `_doc/` file. It carries **no groups or roles**.
+  The gate joins it with the Firestore policy. `_hub/**` is never served; an
+  unmapped object fails closed.
+- The gate enforces the joined rule on `/p/**` pages, `_payload/**`, `_doc/**`,
+  annotation create/list, and `GET /private/items`. Unknown item keys fail
+  closed, so "restricted item" and "no such item" produce the same 404 body.
+- Signed-out `/p/**` returns a styled site 404 and no sign-in prompt. A signed-in
+  member without access gets the same 404 status with a generic styled message.
+  Sign-in remains in the normal footer/nav link.
+- Private item pages are **de-framed**: no iframe. They render top-level in the
+  normal site header/nav/footer and link the document itself top-level. The
+  landing page, Shares and My notes fetch `/private/items` instead of embedding
+  the catalogue in static HTML.
+- **Owner tooling:** `infra/scripts/access.py` shows the policy and sets/clears a
+  default, section, source or item rule; adds/removes member groups; sets a
+  role; and replaces the whole policy from an out-of-repo JSON file. Every name
+  is an argument and the script contains no member email, item key, source name,
+  section name, group name or role name. Every write is one Firestore
+  transaction that also appends an `access_audit` record (who, when, action,
+  target, before, after). Firestore rules deny every client read/write to
+  `access_policy` and `access_audit`.
+
+### Initial policy (not written; owner action after merge approval)
+
+The owner approved, out-of-band, an initial policy that preserves the access set
+that existed before D24. It is deliberately **not recorded in this public
+repository**: the repository must not disclose private item keys, source names,
+group names or member emails. After Jason approves the merge, the owner runs
+`infra/scripts/access.py` (or `replace-policy --file` with an out-of-repo JSON
+file) to write the policy, then the same script to add member groups. No live
+Firestore write was made by the agent.
+
+The Fellow CV owner-only decision is still pending with Jason; the initial
+policy leaves it on the default. It is now a one-command change:
+
+    ./access.py set-rule --scope item --name <section>/<source>/<slug> --roles owner
+
+### PR stack (owner merges; none merged by the agent)
+
+| PR | Branch | What |
+|---|---|---|
+| **#136** | `docs/d24-adr-0025` | amended ADR-0025 + index |
+| **#137** | `fix/d24-404-no-access` | gate styled 404/no-access pages; public 404 shell via the redirect-stub generator |
+| **#138** | `feat/d24-roles-groups` | member profiles/groups, Firestore policy + cache, `_hub/catalog.json`, gate enforcement, `/private/items`, owner tooling, filtered landing/Shares/My notes |
+| **#139** | `feat/d24-private-top-level` | de-frame private item pages; normal site chrome/nav |
+| **#140** | `record/d24` | this STATE + verification record |
+
+Bases are stacked: #137 → #136, #138 → #137, #139 → #138, #140 → #139.
+Retarget each to `main` in order as the owner merges, or merge in stack order.
+
+**History note.** The D24 branches were force-pushed to remove
+`site/private-access.json` and every access value the first cut had committed.
+It never lands on `main` from this stack. GitHub PR timelines/history may still
+retain the earlier diff; the current branch tips do not contain the file.
+
+### Public-repository scrub
+
+D24-B removes every private item key, private source name, group name and member
+email that the first D24 cut had added. New tests and fixtures use synthetic
+names. Names already on `main` are **flagged for Jason and were not changed
+without approval**:
+
+| Location | What is exposed | Status |
+|---|---|---|
+| `infra/scripts/seed-members.sh` | three real member email addresses and the owner-sign-in note | flagged |
+| `infra/satellites.tf`, `infra/variables.tf`, `infra/terraform.tfvars.example` | satellite/source names, including the private satellite keys | flagged |
+| `site/fixtures/content/sources/**` and `site/src/content/sources/**` | private item keys, source names and fixture titles | flagged |
+| `gate/tests/conftest.py`, `gate/tests/test_shares.py`, `gate/tests/test_serve.py`, `gate/tests/test_scope.py` and related test fixtures | real member emails and private item/source names inherited from `main` | flagged |
+| `llm/sprints/2026-09-hub/STATE.md` (history above D24) and earlier ADRs/handoffs | private source names, item keys, group names and member emails in the historical record | flagged |
+
+`infra/scripts/seed-members.sh` was reverted to its `main` content on this stack;
+the owner tool manages groups and roles from now on. No such values are present
+in the D24-B code, tests, ADR or this record.
+
+### Verification run locally (2026-10-19, D24-B)
+
+- Gate: `ruff check`, `ruff format --check`, `pytest` — **694 passed**. Includes
+  Firestore policy parsing and precedence, fail-closed missing/malformed policy,
+  30s cache expiry, policy change with no deploy, group change with no deploy,
+  no-oracle parity, owner/group/role allow, catalog object-map denial, unmapped
+  object denial, annotation create/list filtering, and the exact route table
+  with `/private/items`.
+- Site: `vitest` — **562 passed, 2 skipped** (42 files). Includes the catalog
+  builder (no access fields), `entry` basenames, `/private/items` client, and the
+  de-frame structural assertions.
+- Private build: emits `_hub/catalog.json` (10 items, 12 object mappings), 110
+  files; `check:private-links` PASS (147 outbound anchors allowed, no off-origin
+  sub-resource, every link resolves).
+- Public build + `redirects:stubs` + `check:no-private-in-public` PASS: 4 private
+  items and 1 draft Rabbit Holes post absent from every path/content; no
+  redirect rule names a private slug; source-identity needles absent.
+- Leak-check self-test (`demo:leak-check`) PASS: the injected private item and
+  source-identity marker turned the guard red in all 11 derived outputs.
+- `check:publish-allowlist` PASS (22 entries, 0 conflicts, 0 stale).
+- Contract suite: **57 passed**.
+- `sync-private` dry run against a temp destination: 110 uploads, 0 deletes
+  (receipt present).
+
+### Adversarial round (local, D24-B changed surface)
+
+| Target | Result |
+|---|---|
+| Policy tamper/absence | Missing, malformed, wrong-version and uppercase-name policies fail closed for members; the owner remains allowed. PASS |
+| Cache staleness | A Firestore policy change is invisible inside the 30s window and applies immediately after it; a malformed write after the window denies. PASS |
+| Group change without deploy | Adding a member's group in the directory allows the next request with no app rebuild. PASS |
+| Group bypass on page | Member without the group gets `no_access` before the bucket; real and imaginary items are byte-identical. PASS |
+| Object-map bypass | A `_payload/**`/`_doc/**` object not in `_hub/catalog.json` fails closed before the bucket. PASS |
+| Catalog tamper | A catalog carrying `access`/`groups`/`roles`, an unknown item key, or a `_hub/` mapping is refused as malformed; a stale catalog cannot widen access because rules come only from Firestore. PASS |
+| Annotation bypass | Create on an inaccessible item is 403; own-note list filters inaccessible items; owner moderation is unchanged. PASS |
+| Share interplay | Shares remain owner-minted bearer grants for one `_doc` item; all existing share confinement tests pass. PASS |
+| Public leak check | PASS with the widened private set; no policy values or catalog data in `dist-public`. PASS |
+
+### Residuals / notes
+
+- Payload files shared by items of one source are allowed when **any** mapped
+  item is allowed (the catalog stores all item keys that stage the object).
+- A satellite document opened top-level keeps the satellite's own chrome; the
+  hub no longer wraps it in a second header. Private annotation *capture UI* on
+  item pages was removed with the iframe; the annotation API still enforces item
+  access, and public item pages keep the shared island.
+- **No live deploy and no live Firestore write were performed by the agent.**
+  Live verification is pending the owner's merge, CI deploy and initial policy
+  write.
+- Until the initial policy is written, the gate fails closed for members (the
+  owner can still sign in). This is intentional.
+
+### Live verification checklist (after merge, deploy and policy write)
+
+1. Signed out: `/p/` and a real private item both return the same styled 404,
+   no sign-in prompt; `/research/does-not-exist/` returns the same shell.
+2. Owner: sees every item in `/p/`; can open pages and payloads.
+3. Member in the matching group: sees only the permitted items; a denied item
+   returns the same no-access 404.
+4. Member without the group: denied before the bucket.
+5. Payload: a denied item's `_payload/**` request is refused before the bucket;
+   an allowed item's document opens top-level with no iframe.
+6. `/private/items` returns only the caller's accessible items; an anonymous
+   request is refused.
+7. `infra/scripts/access.py set-rule ...` changes the result within 30 seconds
+   with no rebuild or redeploy; an `access_audit` record exists for the write.
+
+### D24-C — approved rollout: live policy, merge, deploy and live checks (2026-10-20)
+
+Owner approval: **"Merge d24"**, then **"Go"** for the full rollout below.
+Executed in the required order. No Terraform apply, destroy, publish-allowlist
+change or satellite contract change was made.
+
+#### 1. Initial live policy (before merging)
+
+The owner-approved initial policy and member groups were written to live
+Firestore **before** the new gate could read them, using
+`infra/scripts/access.py` with an out-of-repo JSON file under `~/`. The approved
+values are deliberately **not repeated in this public repository**. They set:
+
+- a two-group default rule;
+- the approved source overrides for the two private satellite sources; and
+- the approved groups on the committee member and the research-team member;
+  the owner account stayed `owner`.
+
+`access.py show` confirmed the policy and each member document. The first three
+`access_audit` records exist (`replace_policy`, then two `add_group` writes), all
+attributed to the owner's signed-in gcloud identity. The live gate ignored these
+documents at that moment, so no access decision changed before the deploy.
+
+#### 2. Merge order
+
+Each PR was green on its current base immediately before its merge. Merge
+commits:
+
+| PR | What | Merge commit | Result |
+|---|---|---|---|
+| **#136** | amended ADR-0025 | `faca932` | merged |
+| **#137** | styled 404 / no-access pages | `cab3ed5` | merged |
+| **#138** | Firestore policy, catalog map, owner tooling | `8112705` | merged |
+| **#139** | de-framed private item pages | `0e701e5` | merged |
+| **#140** | D24-B record | `a7e8bc5` | merged |
+
+Deleting each head branch closed the next stacked PR rather than retargeting it.
+Each was reopened, retargeted to `main`, and re-run; the checks above passed on
+the re-run before its merge. An unrelated owner PR **#141** merged during the
+rollout (`2b02377`, chapter proposal page); the final deploy includes it.
+
+#### 3. Deploy
+
+- Deploy run: <https://github.com/djjay0131/website/actions/runs/39366698502>
+  on `a7e8bc5` — every job succeeded, including `build`, `build-firebase`,
+  `firebase-deploy`, `private-sync`, `deploy`, `smoke-test` and
+  `firebase-smoke-test`.
+- Cloud Run `hub-gate`: revision **`hub-gate-00014-lsx`** is the latest ready
+  revision and carries **100%** of traffic. No Terraform apply or new IAM was
+  needed.
+
+#### 4. Live verification
+
+Signed-out HTTP checks against `https://jason.cusati.us` (real requests):
+
+| Check | Result |
+|---|---|
+| `/p/` root, a real private item, an imaginary private path, a real `_payload` object and a real `_doc` object | all **404**, all five bodies byte-identical (`sha256 31d7e027…`), styled site 404, `cache-control` unchanged | 
+| Sign-in prompt | none; the only sign-in text is the normal footer/nav link to `/signin/` |
+| `/private/items` with no session | **403** |
+
+No real member session could be minted in this environment, so member decisions
+were computed by the gate's own decision code against **live Firestore** member
+and policy documents and the **live `_hub/catalog.json`** read from the private
+bucket. These are simulated principals, not live cookies:
+
+| Principal | `/private/items` | Item decisions | Payload / `_doc` |
+|---|---|---|---|
+| Owner | 16 items (10 private + 6 public) | all allowed | all allowed |
+| Committee-only member | 12 items | the 4 team-scoped source items denied; all others allowed | that source's payload denied; committee `_doc` allowed |
+| Research-team member | 16 items | all allowed | all allowed |
+| Signed-in non-member | 403 | all denied | all denied |
+
+Other live checks:
+
+| Check | Result |
+|---|---|
+| De-framed private item page (live private bucket artifact) | **0** `<iframe`; normal site band present; document link `target="_top"` |
+| Policy change without deploy | throwaway source rule: cached decision unchanged at 2.5s, new decision at 31s, clear cached at 2.5s, original decision restored at 31s. No rebuild/redeploy. Audit shows `set_rule` and `clear_rule` with timestamps. Throwaway rule removed. |
+| Public leak check — build at `a7e8bc5` | PASS: 180 files in `dist-public`, 53 redirect stubs; no private key/route/payload path/slug/title/summary or annotation/source-identity needle |
+| Public leak check — live surface | PASS: 53 live public URLs scanned for all 10 live private items with 290 needles (qualified ids, routes, payload paths, slugs, titles); no hit |
+| Leak-check self-test | PASS: injected leak turned the guard red in all 11 derived outputs |
+
+#### 5. Status and follow-ups
+
+- The Fellow CV remains on the default rule; the owner has not decided
+  owner-only yet. It is a one-command change.
+- The throwaway policy rule was removed; the live policy is back to the approved
+  initial set.
+- No live private content was exposed; no traffic rollback was needed.
+- This record is on `record/d24-live` and its PR is **not merged**.
