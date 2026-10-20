@@ -257,18 +257,25 @@ def test_a_shared_asset_prefix_cannot_read_an_item_payload(restricted_client, ve
     assert store.fetches == []
 
 
-def test_a_project_hub_page_is_a_member_page_but_its_sub_pages_are_not(
-    restricted_client, verifier, store, transport
-):
+def test_a_project_hub_page_is_readable_by_a_member_with_one_project_item(deps, verifier, store, transport):
     session = _session(verifier, "project-hub", MEMBER_B)
     headers = request_headers(transport, {"__session": session})
     store.objects["projects/index.html"] = b"landing"
     store.objects["projects/source-a/index.html"] = b"project"
     store.objects[f"projects/{SOURCE}/{SLUG_A}/index.html"] = b"item"
+    catalog = _catalog()
+    catalog = ItemCatalog(
+        items=catalog.items,
+        objects={
+            **catalog.objects,
+            f"projects/{SOURCE}/index.html": (ITEM_A, ITEM_B),
+        },
+    )
+    client = TestClient(create_app(_restricted(deps, catalog=catalog)), raise_server_exceptions=False)
 
-    landing = restricted_client.get("/p/projects/", headers=headers)
-    project = restricted_client.get(f"/p/projects/{SOURCE}/", headers=headers)
-    inaccessible_item = restricted_client.get(f"/p/projects/{SOURCE}/{SLUG_A}/", headers=headers)
+    landing = client.get("/p/projects/", headers=headers)
+    project = client.get(f"/p/projects/{SOURCE}/", headers=headers)
+    inaccessible_item = client.get(f"/p/projects/{SOURCE}/{SLUG_A}/", headers=headers)
 
     assert landing.status_code == 200
     assert project.status_code == 200

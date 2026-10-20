@@ -1,0 +1,75 @@
+---
+// THE PROJECTS LANDING (D25).
+//
+// "Shared with you" becomes "Projects": one card per project the viewer can
+// open, never a flat item list. No project title or item exists in this static
+// HTML -- the gate's `/private/items` response is the only source, and it is
+// already filtered by access.
+import PrivateBase from "../../layouts/PrivateBase.astro";
+
+const base = import.meta.env.BASE_URL;
+---
+
+<PrivateBase title="Projects">
+  <h1>Projects</h1>
+  <p class="lede">
+    Each project is a section of this site. Open one to read its pages inside
+    the normal site layout, with its own navigation.
+  </p>
+
+  <div id="projects-landing" class="projects-landing" data-base={base} aria-live="polite">
+    <p class="projects-note">Loading your projects…</p>
+  </div>
+
+  <script>
+    import { loadPrivateItems } from "../../lib/private-items.mjs";
+    import { mountProjectLanding, showProjectError } from "../../lib/project-ui.mjs";
+
+    const root = document.getElementById("projects-landing");
+    if (root) {
+      const base = root.dataset.base ?? "/p/";
+      const result = await loadPrivateItems();
+      if (!result.ok) {
+        showProjectError(root, "Could not load your projects. Try again shortly.");
+      } else {
+        mountProjectLanding(root, result.items, base);
+      }
+    }
+  </script>
+</PrivateBase>
+
+<style>
+  .lede { color: var(--color-muted); margin-bottom: 1.75rem; max-width: 65ch; }
+  .projects-note, .projects-empty { color: var(--color-muted); }
+  .projects-landing :global(.project-cards) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: 1rem;
+  }
+  .projects-landing :global(.project-card) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+  .projects-landing :global(.project-card-title) { font-size: 1.2rem; margin: 0; }
+  .projects-landing :global(.project-card-description) { color: var(--color-muted); margin: 0; }
+  .projects-landing :global(.project-card-meta) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.25rem;
+    margin: auto 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+  .projects-landing :global(.project-card-meta div) { display: flex; gap: 0.35rem; }
+  .projects-landing :global(.project-card-meta dt) { text-transform: uppercase; letter-spacing: 0.05em; }
+  .projects-landing :global(.project-card-meta dd) { margin: 0; color: var(--color-text); }
+</style>

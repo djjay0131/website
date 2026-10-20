@@ -72,13 +72,15 @@ describe("the shared capture island lives in the public tree (D20)", () => {
     expect(publicFrame).toMatch(/data-annotation-frame/);
   });
 
-  it("the PRIVATE item page is de-framed (D24): no iframe, no island, a top-level link", () => {
+  it("the PRIVATE item page is inline (D25): no iframe and the shared capture island is restored", () => {
     const privatePage = fs.readFileSync(path.resolve("src-private/pages/[...itemPath].astro"), "utf8");
+    const inlineComponent = fs.readFileSync(path.resolve("src-private/components/InlineItem.astro"), "utf8");
     expect(privatePage).not.toMatch(/<iframe/);
-    expect(privatePage).not.toMatch(/AnnotationsMount/);
     expect(privatePage).not.toMatch(/data-annotation-frame/);
-    expect(privatePage).toMatch(/payloadUrlFor/);
-    expect(privatePage).toMatch(/target="_top"/);
+    expect(inlineComponent).not.toMatch(/<iframe/);
+    expect(inlineComponent).toMatch(/AnnotationsMount/);
+    expect(inlineComponent).toMatch(/data-annotation-document/);
+    expect(inlineComponent).toMatch(/target="_top"/);
   });
 
   it("no file under src-private/other than the island imports is required for the public build", () => {
@@ -140,23 +142,28 @@ describe.runIf(fs.existsSync(path.join(PRIVATE_DIST, "index.html")))(
       expect(fs.existsSync(path.join(PRIVATE_DIST, "notes", "index.html"))).toBe(true);
     });
 
-    it("emits no capture-island code for private item frames (D24)", () => {
-      const astro = path.join(PRIVATE_DIST, "_astro");
-      const files = fs.existsSync(astro) ? fs.readdirSync(astro) : [];
-      for (const name of files.filter((file) => /\.js$/.test(file))) {
-        const text = fs.readFileSync(path.join(astro, name), "utf8");
-        expect(text).not.toContain("data-annotation-frame");
-        expect(text).not.toContain("annotations-island");
+    it("emits the shared inline annotation mount, and no private page contains a frame (D25)", () => {
+      const page = path.join(PRIVATE_DIST, "phd", "phd-milestones", "milestones", "index.html");
+      const html = fs.readFileSync(page, "utf8");
+      expect(html).toContain("data-annotation-island");
+      for (const rel of ["index.html", "projects/index.html", "notes/index.html"]) {
+        const pathname = path.join(PRIVATE_DIST, rel);
+        if (!fs.existsSync(pathname)) continue;
+        expect(fs.readFileSync(pathname, "utf8")).not.toContain("<iframe");
+        expect(fs.readFileSync(pathname, "utf8")).not.toContain("data-annotation-frame");
       }
     });
 
-    it("emits a normal-chrome item page with no embedded payload (D24)", () => {
+    it("emits a normal-chrome item page with sanitised inline content and a sub-nav (D25)", () => {
       const page = path.join(PRIVATE_DIST, "phd", "phd-milestones", "milestones", "index.html");
       expect(fs.existsSync(page), "fixture item page").toBe(true);
       const html = fs.readFileSync(page, "utf8");
       expect(html).not.toContain("data-annotation-frame");
       expect(html).not.toContain("<iframe");
       expect(html).toContain('class="site-band"');
+      expect(html).toContain("data-project-document");
+      expect(html).toContain("data-project-nav");
+      expect(html).toContain("data-annotation-island");
       expect(html).toContain("_payload/phd-milestones/site/index.html");
     });
   },

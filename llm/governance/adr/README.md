@@ -37,6 +37,7 @@ from `0000-template.md`.
 | [0023](0023-rabbit-holes-blog-content-and-feeds.md) | Rabbit Holes — the blog content model, feeds and subscription (D21) | Accepted |
 | [0024](0024-cv-consolidation-per-variant-visibility.md) | One CV section — five public documents, six variants, per-variant visibility (D22) | Accepted |
 | [0025](0025-roles-groups-private-access.md) | Private access is role/group based, owner-managed in Firestore, and enforced per item (D24) | Accepted |
+| [0026](0026-project-sections-inline-private-content.md) | Private projects are site sections, with sanitised inline content (D25) | Accepted |
 
 ## Lifecycle
 

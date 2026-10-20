@@ -1,0 +1,89 @@
+---
+// ONE PROJECT SECTION (D25). The shell is member-readable; its page list comes
+// from `/private/items`, so a member only sees pages they may open.
+import { getCollection } from "astro:content";
+import PrivateBase from "../../../layouts/PrivateBase.astro";
+import { isProjectItem, projectTitle } from "../../../lib/projects.mjs";
+
+export async function getStaticPaths() {
+  const all = (await getCollection("sources", ({ data }) => data.format !== "data")).map(
+    (entry) => entry.data,
+  );
+  const privateItems = all.filter(
+    (item) => item.effective_visibility === "private" && isProjectItem(item),
+  );
+  const bySource = new Map();
+  for (const item of privateItems) {
+    if (!bySource.has(item.source)) bySource.set(item.source, []);
+    bySource.get(item.source).push(item);
+  }
+  return [...bySource.entries()].map(([source, items]) => ({
+    params: { project: source },
+    props: { source, title: projectTitle(items, source) },
+  }));
+}
+
+const { source, title } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<PrivateBase title={title}>
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href={`${base}projects/`}>Projects</a></li>
+      <li aria-current="page">{title}</li>
+    </ol>
+  </nav>
+
+  <h1>{title}</h1>
+  <div
+    id="project-pages"
+    class="project-pages-root"
+    data-source={source}
+    data-base={base}
+    data-title={title}
+    aria-live="polite"
+  >
+    <p class="project-pages-note">Loading project pages…</p>
+  </div>
+
+  <script>
+    import { loadPrivateItems } from "../../../lib/private-items.mjs";
+    import { mountProjectPages, showProjectError } from "../../../lib/project-ui.mjs";
+
+    const root = document.getElementById("project-pages");
+    if (root) {
+      const base = root.dataset.base ?? "/p/";
+      const source = root.dataset.source ?? "";
+      const title = root.dataset.title ?? "";
+      const result = await loadPrivateItems();
+      if (!result.ok) {
+        showProjectError(root, "Could not load this project's pages. Try again shortly.");
+      } else {
+        mountProjectPages(root, result.items, source, base, title);
+      }
+    }
+  </script>
+</PrivateBase>
+
+<style>
+  .breadcrumbs { font-size: 0.9rem; margin-bottom: 1.25rem; }
+  .breadcrumbs ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .breadcrumbs li + li::before { content: "›"; margin-right: 0.3rem; color: var(--color-muted); }
+  .breadcrumbs [aria-current="page"] { color: var(--color-muted); }
+  .project-pages-note { color: var(--color-muted); }
+  .project-pages-root :global(.project-pages) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .project-pages-root :global(.project-page-card) {
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+  }
+  .project-pages-root :global(.project-page-title) { font-size: 1.15rem; margin: 0 0 0.2rem; }
+  .project-pages-root :global(.project-page-meta) { color: var(--color-muted); margin: 0; font-size: 0.9rem; }
+</style>

@@ -22,3 +22,6 @@ site/public/photo_jason_1.jpeg
 site/public/og-card.png
 site/public/og-card.svg
 .aiese-raw/
+
+# D25 Playwright screenshots (CI artifact, never committed: private pages)
+/site/d25-screenshots/

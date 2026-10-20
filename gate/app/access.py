@@ -72,13 +72,6 @@ RESERVED_PREFIX = "_hub/"
 SHARED_ASSET_PREFIXES = (ASTRO_PREFIX, "emblem/", "badges/")
 SHARED_ASSET_FILES = frozenset({"favicon.ico", "favicon.svg"})
 
-# A project section's landing page is a member page, not an item. It contains no
-# static item metadata: its cards and sub-navigation are fetched from
-# `/private/items`, which the gate filters. The per-item sub-pages below it
-# still resolve through the catalog object map, so this prefix cannot widen
-# access to any item.
-_PROJECT_HUB_PAGE = re.compile(r"^projects/[a-z0-9][a-z0-9-]{0,63}/index\.html$")
-
 # The maximum the brief allows. A stale policy can only be stale for this long.
 DEFAULT_CACHE_SECONDS = 30
 MAX_CACHE_SECONDS = 30
@@ -147,6 +140,7 @@ class AccessItem:
     visibility: str
     href: str | None
     entry: str | None
+    summary: str | None = None
     date: str | None = None
     order: int | None = None
 
@@ -164,6 +158,7 @@ class AccessItem:
             "visibility": self.visibility,
             "href": self.href,
             "entry": self.entry,
+            **({"summary": self.summary} if self.summary is not None else {}),
             **({"date": self.date} if self.date is not None else {}),
             **({"order": self.order} if self.order is not None else {}),
         }
@@ -289,6 +284,7 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
     visibility = raw.get("visibility")
     href = raw.get("href")
     entry = raw.get("entry")
+    summary = raw.get("summary")
     date = raw.get("date")
     order = raw.get("order")
     if not all(isinstance(v, str) and v for v in (section, source, slug, title, fmt, visibility)):
@@ -300,6 +296,8 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
     if href is not None and not isinstance(href, str):
         return None
     if entry is not None and not isinstance(entry, str):
+        return None
+    if summary is not None and (not isinstance(summary, str) or not summary or len(summary) > 500):
         return None
     if date is not None and (not isinstance(date, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date)):
         return None
@@ -317,6 +315,7 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
         visibility=visibility,
         href=href,
         entry=entry,
+        summary=summary,
         date=date,
         order=order,
     )
@@ -463,7 +462,6 @@ def _allows_object(
         relative in MEMBER_PAGES
         or relative in SHARED_ASSET_FILES
         or relative.startswith(SHARED_ASSET_PREFIXES)
-        or _PROJECT_HUB_PAGE.fullmatch(relative)
     ):
         return True
     items = catalog.items_for_object(relative)

@@ -1,0 +1,30 @@
+---
+// ONE PROJECT SUB-PAGE (D25), rendered inline inside the normal site layout.
+import { getCollection } from "astro:content";
+import PrivateBase from "../../../layouts/PrivateBase.astro";
+import ProjectSection from "../../../components/ProjectSection.astro";
+import { isProjectItem } from "../../../lib/projects.mjs";
+
+export async function getStaticPaths() {
+  const all = (await getCollection("sources", ({ data }) => data.format !== "data")).map(
+    (entry) => entry.data,
+  );
+  const privateItems = all.filter(
+    (item) => item.effective_visibility === "private" && isProjectItem(item),
+  );
+  return privateItems.map((item) => ({
+    params: { project: item.source, slug: item.slug },
+    props: {
+      item,
+      siblings: privateItems.filter((other) => other.source === item.source),
+    },
+  }));
+}
+
+const { item, siblings } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<PrivateBase title={item.title}>
+  <ProjectSection item={item} siblings={siblings} base={base} />
+</PrivateBase>
