@@ -1,0 +1,15 @@
+{
+  "source": "example-notes",
+  "manifest_version": "2",
+  "published": "2026-10-20T00:00:00Z",
+  "items": [],
+  "deadlines": [
+    {
+      "id": "conference",
+      "title": "Conference",
+      "kind": "conference",
+      "start": "2026-11-05",
+      "end": "2026-11-01"
+    }
+  ]
+}

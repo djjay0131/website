@@ -10,7 +10,7 @@ const sourcesDir = path.resolve("src/content/sources");
 const outDir = path.resolve(process.argv[2] ?? "/tmp/d25-visual");
 fs.mkdirSync(outDir, { recursive: true });
 
-function writeSource(source, items) {
+function writeSource(source, items, deadlines = []) {
   const dir = path.join(sourcesDir, source, "site");
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
@@ -18,7 +18,7 @@ function writeSource(source, items) {
     `${JSON.stringify(
       {
         source,
-        manifest_version: "1",
+        ...(deadlines.length ? { manifest_version: "2", deadlines } : { manifest_version: "1" }),
         published: "2026-10-20T00:00:00.000Z",
         items,
       },
@@ -63,6 +63,23 @@ writeSource("visual-study", [
     date: "2026-10-19",
     summary: "Design page for the visual fixture.",
   },
+], [
+  {
+    id: "paper-submission",
+    title: "Visual Study paper submission",
+    kind: "submission",
+    start: "2026-10-23",
+    all_day: true,
+    timezone: "AoE",
+    conference: "VisualConf 2027",
+  },
+  {
+    id: "review-meeting",
+    title: "Visual Study review",
+    kind: "work",
+    start: "2026-11-05T15:00:00Z",
+    timezone: "UTC",
+  },
 ]);
 writeSource("visual-other", [
   {
@@ -74,6 +91,16 @@ writeSource("visual-other", [
     visibility: "private",
     date: "2026-10-18",
     summary: "A second project, open to the committee group.",
+  },
+], [
+  {
+    id: "abstract",
+    title: "Visual Other abstract",
+    kind: "abstract",
+    start: "2026-10-30",
+    all_day: true,
+    timezone: "UTC",
+    conference: "OtherConf",
   },
 ]);
 

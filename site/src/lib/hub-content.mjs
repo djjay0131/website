@@ -143,7 +143,7 @@ export const DEFAULT_MANIFEST_VERSION = "1";
  *
  * Add a version here only together with the code that understands it.
  */
-export const KNOWN_MANIFEST_VERSIONS = ["1"];
+export const KNOWN_MANIFEST_VERSIONS = ["1", "2"];
 
 /** The envelope version of a manifest, applying the "absent means 1" default. */
 export function manifestVersionOf(manifest) {

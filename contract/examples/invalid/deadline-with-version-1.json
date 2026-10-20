@@ -1,0 +1,14 @@
+{
+  "source": "example-notes",
+  "manifest_version": "1",
+  "published": "2026-10-20T00:00:00Z",
+  "items": [],
+  "deadlines": [
+    {
+      "id": "paper",
+      "title": "Paper",
+      "kind": "submission",
+      "start": "2026-10-23"
+    }
+  ]
+}

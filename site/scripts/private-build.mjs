@@ -30,6 +30,7 @@ import {
   isProjectItem,
   itemKey,
 } from "../src-private/lib/catalog.mjs";
+import { CALENDAR_OBJECT, buildCalendar } from "../src-private/lib/calendar.mjs";
 import { RECEIPT_NAME } from "./sync-private.mjs";
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -203,6 +204,14 @@ export function privateBuild(options = {}) {
             `${Object.keys(catalog.objects).length} object mapping(s)`,
         );
 
+        // D26 / ADR-0027: satellite deadlines. The file carries no access
+        // decision; the gate filters each event by the project's item rule.
+        const calendar = buildCalendar({ sourcesDir });
+        const calendarPath = path.join(outDir, CALENDAR_OBJECT);
+        fs.mkdirSync(path.dirname(calendarPath), { recursive: true });
+        fs.writeFileSync(calendarPath, `${JSON.stringify(calendar, null, 2)}\n`);
+        logger.info(`wrote ${CALENDAR_OBJECT}: ${calendar.events.length} event(s)`);
+
         // SD-7. Every emitted path must be one the gate can actually serve,
         // checked BEFORE the receipt is written so an unservable build cannot
         // sync. Failing here turns "the member gets a 404 and nothing in the
@@ -245,6 +254,7 @@ export function privateBuild(options = {}) {
           pageCount: pages?.length ?? 0,
           payloadFileCount: plan.length,
           docFileCount: docPlan.length,
+          calendarEventCount: calendar.events.length,
           fileCount: countFiles(outDir),
         };
         fs.writeFileSync(

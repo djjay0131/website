@@ -39,12 +39,16 @@ const projectsUrl = `${base}projects/`;
       </div>
     </nav>
     <nav class="project-prevnext" data-project-prevnext aria-label="Previous and next pages"></nav>
+    <section class="project-upcoming" data-project-upcoming aria-live="polite">
+      <p class="project-nav-note">Loading deadlines…</p>
+    </section>
   </aside>
 </div>
 
 <script>
   import { loadPrivateItems } from "../lib/private-items.mjs";
   import { mountProjectNavigation, showProjectError } from "../lib/project-ui.mjs";
+  import { loadCalendar, mountProjectUpcoming } from "../lib/calendar-ui.mjs";
 
   const navRoot = document.querySelector<HTMLElement>("[data-project-nav]");
   const prevRoot = document.querySelector<HTMLElement>("[data-project-prevnext]");
@@ -55,11 +59,17 @@ const projectsUrl = `${base}projects/`;
   const title = section?.dataset.title ?? "";
 
   if (source && slug) {
-    const result = await loadPrivateItems();
+    const [result, calendar] = await Promise.all([loadPrivateItems(), loadCalendar()]);
     if (!result.ok) {
       if (navRoot) showProjectError(navRoot, "Could not load the project pages. Try again shortly.");
     } else {
       mountProjectNavigation({ navRoot, prevRoot, items: result.items, source, slug, base, title });
+    }
+    const upcoming = document.querySelector<HTMLElement>("[data-project-upcoming]");
+    if (upcoming && calendar.ok) {
+      mountProjectUpcoming(upcoming, calendar.events, source);
+    } else if (upcoming) {
+      upcoming.replaceChildren();
     }
   }
 </script>
@@ -133,6 +143,16 @@ const projectsUrl = `${base}projects/`;
     border-radius: var(--radius);
   }
   .project-prevnext :global(.project-next) { text-align: right; }
+  .project-upcoming {
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+  }
+  .project-upcoming :global(.project-upcoming-title) { font-size: 1rem; margin-bottom: 0.5rem; }
+  .project-upcoming :global(.calendar-upcoming-list) { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
+  .project-upcoming :global(.calendar-upcoming-item) { display: grid; gap: 0.15rem; font-size: 0.85rem; }
+  .project-upcoming :global(.calendar-countdown) { font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-accent, #e6751f); }
+  .project-upcoming :global(.calendar-when) { font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); }
+  .project-upcoming :global(.calendar-note) { color: var(--color-muted); font-size: 0.85rem; }
   .project-prevnext :global(.project-prev-label) {
     font-family: var(--font-mono);
     font-size: 0.72rem;

@@ -16,6 +16,7 @@ The gate implements §6 responsibilities 1–4, and only those:
 | `POST /session/end` | Sign out: clear `__session`. Origin-checked; identical whether or not a session existed |
 | `GET /p/{path}` | Verify the session, check the allowlist **and the item's access rule**, stream the object |
 | `GET /private/items` | **Member.** The viewer's item list — public items plus the private items their role/groups allow. The owner gets everything. The landing page, Shares and My notes use this instead of embedding the catalogue |
+| `GET /private/calendar` | **Member.** The merged satellite and owner calendar, filtered to projects the viewer may open. Non-project events are owner-only. No count of denied events is returned |
 | `POST /share` | **Owner only**, origin-checked. Mint a token for one `(section, source, slug)`; body `{section, source, slug, entry, expires_in_days}`; returns `{token, expires_at, url}`. `entry` names the item's document relative to `_doc/` and defaults to `index.html` when omitted; it is validated with the same segment allowlist as a served path. `expires_in_days` is capped at 30; a bad item, entry or expiry is 400, a non-owner is 403 |
 | `GET /share` | **Owner only**. List active shares. Never returns a full token — a short display id (`id`) plus `section`, `source`, `slug`, `entry`, `created_by`, `expires_at` |
 | `DELETE /share/{token}` | **Owner only**, origin-checked. Revoke. Idempotent |
@@ -42,6 +43,17 @@ metadata plus an object → item-key map for staged payloads and `_doc/` files.
 It carries **no groups or roles**. The gate joins that map with the Firestore
 policy. `_hub/**` is never served through `/p/**`; an unmapped object fails
 closed.
+
+## The private calendar (ADR-0027, D26)
+
+`_hub/calendar.json` carries the optional `deadlines[]` that satellites publish
+in a manifest version 2. `calendar_events` in Firestore carries owner-managed
+events, including non-project milestones. The gate merges both and applies the
+same joined policy: an event with `project: "<source>"` is returned only when
+the viewer may open that project (at least one of its items is readable); an
+event with no project is owner-only. Both sources fail closed, and the response
+never reports how many events were filtered out. `calendar_events` and
+`calendar_audit` are covered by the existing deny-all client rules.
 
 The owner is always allowed. A member is allowed when the item is effectively
 public, the rule lists their role, or the rule's groups intersect the member's

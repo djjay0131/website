@@ -1,0 +1,193 @@
+---
+// THE MEMBERS' CALENDAR (D26 / ADR-0027).
+//
+// Private build only. The static page carries no event; the gate's
+// `/private/calendar` returns only events for projects this viewer may open.
+// Signed-out requests never reach this page (the gate returns its styled 404).
+import PrivateBase from "../layouts/PrivateBase.astro";
+---
+
+<PrivateBase title="Calendar">
+  <h1>Calendar</h1>
+  <p class="lede">
+    Active work, submission deadlines and milestones across the projects you can
+    open. Times shown in AoE keep their Anywhere-on-Earth meaning and include
+    your local equivalent.
+  </p>
+
+  <div id="calendar-root" class="calendar-root" aria-live="polite">
+    <p class="calendar-note">Loading the calendar…</p>
+  </div>
+
+  <script>
+    import { loadCalendar, mountCalendar } from "../lib/calendar-ui.mjs";
+
+    const root = document.getElementById("calendar-root");
+    if (root) {
+      const result = await loadCalendar();
+      if (!result.ok) {
+        root.replaceChildren();
+        const message = document.createElement("p");
+        message.className = "calendar-note";
+        message.setAttribute("role", "alert");
+        message.textContent = "Could not load the calendar. Try again shortly.";
+        root.append(message);
+      } else {
+        mountCalendar({ root, events: result.events });
+      }
+    }
+  </script>
+</PrivateBase>
+
+<style>
+  .lede { color: var(--color-muted); margin-bottom: 1.5rem; max-width: 70ch; }
+  .calendar-note { color: var(--color-muted); }
+  .calendar-root { display: grid; gap: 1.5rem; }
+  .calendar-root :global(.calendar-controls) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2rem;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .calendar-root :global(.calendar-filters) { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; }
+  .calendar-root :global(.calendar-filter) {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+  }
+  .calendar-root :global(.calendar-filter legend) {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-muted);
+    margin-right: 0.35rem;
+  }
+  .calendar-root :global(.calendar-chip) {
+    min-height: 38px;
+    padding: 0.25rem 0.7rem;
+    font: inherit;
+    font-size: 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .calendar-root :global(.calendar-chip[aria-pressed="true"]),
+  .calendar-root :global(.calendar-chip.is-active) {
+    background: var(--color-accent, #e6751f);
+    border-color: var(--color-accent, #e6751f);
+    color: #fff;
+  }
+  .calendar-root :global(.calendar-view-toggle) { display: flex; gap: 0.35rem; }
+  .calendar-root :global(.calendar-upcoming) {
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+  .calendar-root :global(.calendar-upcoming h2) { font-size: 1.1rem; margin-bottom: 0.6rem; }
+  .calendar-root :global(.calendar-upcoming-list),
+  .calendar-root :global(.calendar-agenda-list),
+  .calendar-root :global(.calendar-day-events) { list-style: none; padding: 0; margin: 0; }
+  .calendar-root :global(.calendar-upcoming-list) { display: grid; gap: 0.55rem; }
+  .calendar-root :global(.calendar-upcoming-item) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.75rem;
+    align-items: baseline;
+    font-size: 0.92rem;
+  }
+  .calendar-root :global(.calendar-countdown) {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-accent, #e6751f);
+    min-width: 4.5rem;
+  }
+  .calendar-root :global(.calendar-kind) {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-muted);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 0.05rem 0.45rem;
+  }
+  .calendar-root :global(.calendar-when) {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--color-muted);
+  }
+  .calendar-root :global(.calendar-month-header) {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+  .calendar-root :global(.calendar-month-header h2) { margin: 0; font-size: 1.2rem; }
+  .calendar-root :global(.calendar-grid) {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .calendar-root :global(.calendar-grid th) {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    text-align: left;
+    padding: 0.35rem;
+  }
+  .calendar-root :global(.calendar-grid td) {
+    vertical-align: top;
+    border: 1px solid var(--color-border);
+    height: 7rem;
+    padding: 0.3rem;
+    overflow: hidden;
+  }
+  .calendar-root :global(.calendar-grid td.is-outside) { color: var(--color-muted); opacity: 0.65; }
+  .calendar-root :global(.calendar-day) { font-family: var(--font-mono); font-size: 0.75rem; }
+  .calendar-root :global(.calendar-day-events) { display: grid; gap: 0.2rem; margin-top: 0.2rem; }
+  .calendar-root :global(.calendar-event) {
+    font-size: 0.72rem;
+    line-height: 1.25;
+    padding: 0.15rem 0.25rem;
+    border-left: 2px solid var(--color-accent, #e6751f);
+    background: var(--color-bg);
+    overflow-wrap: anywhere;
+  }
+  .calendar-root :global(.calendar-event .calendar-kind),
+  .calendar-root :global(.calendar-event .calendar-when) { display: none; }
+  .calendar-root :global(.calendar-event.is-done),
+  .calendar-root :global(.calendar-event.is-past) { opacity: 0.6; border-left-color: var(--color-border); }
+  .calendar-root :global(.calendar-event.is-done a),
+  .calendar-root :global(.calendar-event.is-done span) { text-decoration: line-through; }
+  .calendar-root :global(.calendar-agenda-month) { margin-bottom: 1.5rem; }
+  .calendar-root :global(.calendar-agenda-month h2) { font-size: 1.15rem; margin-bottom: 0.4rem; }
+  .calendar-root :global(.calendar-agenda-list) { display: grid; gap: 0.5rem; }
+  .calendar-root :global(.calendar-agenda-list .calendar-event) {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-accent, #e6751f);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.75rem;
+    font-size: 0.92rem;
+  }
+  .calendar-root :global(.calendar-agenda-list .calendar-event .calendar-kind),
+  .calendar-root :global(.calendar-agenda-list .calendar-event .calendar-when) { display: inline; }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 52rem) {
+    .calendar-root :global(.calendar-grid td) { height: 5.5rem; }
+    .calendar-root :global(.calendar-event) { font-size: 0.67rem; }
+    .calendar-root :global(.calendar-grid th) { font-size: 0.62rem; }
+  }
+</style>

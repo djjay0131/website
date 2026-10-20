@@ -49,6 +49,11 @@ a version 1 manifest and stays valid unchanged. It becomes **required in Phase 5
 satellite emits it — which is the only order that works, because `additionalProperties: false`
 means a satellite cannot send a field before the hub accepts it.
 
+**Version 2 adds the optional `deadlines[]` array (ADR-0027).** It is additive: a version 1
+manifest is still valid, and a manifest with no deadlines may still declare `"2"`. A manifest
+that carries `deadlines` MUST declare `"2"`, because a version 1 reader would otherwise accept a
+field it does not understand.
+
 A `manifest_version` the hub does not recognise **fails the hub build**, exactly as an
 unrecognised `schema_version` does. Silent tolerance of an unknown envelope version is how a
 contract stops meaning anything.
@@ -89,7 +94,44 @@ it (SEAM-2).
 |---|---|---|
 | `source` | yes | Your assigned source name, `^[a-z][a-z0-9-]{0,38}$`. It must equal the `source` input to the action, and it is the literal bucket prefix you publish under. |
 | `published` | yes | ISO 8601 timestamp with `Z` or a numeric offset, e.g. `2026-09-10T14:02:11Z`. |
+| `manifest_version` | no | Integer envelope version; absent means `"1"`. The hub understands `"1"` and `"2"`. A manifest carrying `deadlines` MUST declare `"2"`. |
+| `deadlines` | no | Array of project deadlines/events (ADR-0027). See below. Requires `manifest_version: "2"`. |
 | `items` | yes | Array of items. **May be empty** — an empty array withdraws everything this source publishes. |
+
+### Deadline fields (optional, manifest version 2)
+
+The hub derives the project from the manifest's `source`; an entry cannot name
+another project. The calendar is members-only, and the gate shows only events for
+projects the viewer may open.
+
+| Field | Required | Rule |
+|---|---|---|
+| `id` | yes | Slug-shaped and unique within the manifest, e.g. `paper-submission`. |
+| `title` | yes | 1–200 characters. |
+| `kind` | yes | `submission`, `abstract`, `notification`, `camera-ready`, `conference`, `milestone` or `work`. |
+| `start` | yes | `YYYY-MM-DD` or an ISO datetime with an explicit offset (or `Z`). |
+| `end` | no | Same shape as `start`, for multi-day events. |
+| `all_day` | no | Boolean. |
+| `timezone` | no | IANA zone or `AoE` (Anywhere on Earth, UTC-12). |
+| `conference` | no | 1–120 characters. Used by the calendar's conference filter. |
+| `url` | no | `https://` URL. |
+| `notes` | no | Plain text, up to 2000 characters. |
+| `status` | no | `active` (default), `done` or `cancelled`. |
+
+```json
+"manifest_version": "2",
+"deadlines": [
+  {
+    "id": "paper-submission",
+    "title": "Paper submission",
+    "kind": "submission",
+    "start": "2026-10-23",
+    "all_day": true,
+    "timezone": "AoE",
+    "conference": "ExampleConf 2027"
+  }
+]
+```
 
 ### Item fields
 
