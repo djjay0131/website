@@ -57,6 +57,24 @@ function readManifests(sourcesDir) {
   return sources;
 }
 
+/** Sections whose sources are document collections, not projects (D25). */
+export const NON_PROJECT_SECTIONS = new Set(["cv"]);
+
+/** True when an item belongs to a project section (D25). */
+export function isProjectItem(item) {
+  return !NON_PROJECT_SECTIONS.has(item.section);
+}
+
+/** The member route for an item inside its project section (D25). */
+export function projectRouteFor(item, base = "/p/") {
+  return `${base}projects/${item.source}/${item.slug}/`;
+}
+
+/** The pre-D25 item route, kept working (D25). */
+export function legacyItemRouteFor(item, base = "/p/") {
+  return routeFor(item, base);
+}
+
 /** The public URL a member is linked to for an effectively-public item. */
 export function publicHrefFor(item, siteOrigin) {
   let rel = null;
@@ -90,7 +108,7 @@ export function buildItemCatalog(options = {}) {
 
   const items = {};
   for (const { source, manifest } of readManifests(sourcesDir)) {
-    for (const item of manifest.items) {
+    for (const [order, item] of manifest.items.entries()) {
       if (item.format === "data") continue;
       const visibility = effectiveVisibility(item, source, allowlist);
       const key = itemKey(item.section, source, item.slug);
@@ -108,6 +126,8 @@ export function buildItemCatalog(options = {}) {
           visibility === "private"
             ? routeFor({ ...item, source }, base)
             : publicHrefFor({ ...item, source }, siteOrigin),
+        date: item.date,
+        order,
       };
     }
   }
