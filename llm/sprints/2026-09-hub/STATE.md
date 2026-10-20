@@ -5158,3 +5158,148 @@ Other checks:
   the committed CI artifact uses synthetic projects so no private content is
   published. The check exercises the same templates and access join.
 - No live private content was exposed; no gate rollback was needed.
+
+## D26 — private calendar for active work and deadlines (owner task, 2026-10-20)
+
+Owner task D26, after D25: one members-only calendar of active work and
+submission deadlines, filterable by project and conference, showing a project's
+events only to members who may open it. Design authority is **ADR-0027**. No
+Terraform apply, destroy, publish-allowlist change, public route or satellite
+contract break was made. No event data, private source name, group name or
+member email was added to the repository.
+
+### Design and the one deliberate departure
+
+- **Contract v2, additive:** satellites may publish optional `deadlines[]`.
+  The array requires `manifest_version: "2"`; absent still means `"1"`, and the
+  existing v1 manifests remain valid. The project is the assigned source prefix
+  (the staging directory), never a field an event can choose. A manifest whose
+  declared source disagrees is refused.
+- **Two sources, one view:** `_hub/calendar.json` from the private build and
+  owner-managed Firestore `calendar_events`, merged by `GET /private/calendar`.
+- **The gate reuses the item policy.** A project event is returned only when the
+  viewer may open at least one item in that project; non-project events are
+  owner-only; the owner sees everything. Both sources fail closed, and the
+  response never reports a denied-event count.
+- **Departure from "stage per project":** the build writes one
+  `_hub/calendar.json` rather than a file per project. `_hub/**` is never
+  served, the gate already reads one private document (`catalog.json`), and the
+  project is a field on each event. Per-project files would add fetch fan-out
+  without changing who may read an event. Recorded in ADR-0027 decision 3.
+- **Owner tooling:** `infra/scripts/calendar_events.py` (`list/add/update/done/
+  remove`) reads an out-of-repo JSON file, writes in one Firestore transaction
+  and appends a `calendar_audit` record. Firestore client rules stay deny-all;
+  the existing `datastore.user` grant covers the new collections, so no IAM
+  change was needed.
+- **UI:** `/p/calendar/` inside the normal private layout: month grid and agenda
+  toggle, upcoming strip with countdowns, multi-select project/conference chips
+  persisted in the query string, kind badges, done/past styling, AoE with local
+  conversion, keyboard/aria controls. Project sections show their own upcoming
+  events from the same endpoint. No iframe.
+
+### Time and validation rules
+
+- Date-only values are calendar dates; a timed value must carry an explicit
+  offset or `Z`. AoE is Anywhere on Earth (UTC−12): a date-only AoE deadline
+  ends at 23:59:59 UTC−12 on that date (the following day in UTC). The UI shows
+  the AoE date and the viewer's local equivalent.
+- Contract rules beyond JSON Schema: deadline-id uniqueness, real calendar
+  dates (no 2026-02-31), and `end` not before `start`. The build and the
+  publish-side validator both enforce them; the gate and owner tool re-check
+  before use.
+
+### PRs and deploy
+
+| PR | Branch | What | Merge |
+|---|---|---|---|
+| **#148** | `feat/d26-calendar-contract` | contract v2 `deadlines[]`, build, gate route, owner tool, UI, ADR-0027, visual workflow | `f1d8409` |
+| **#149** | `fix/d26-calendar-route` | add `/private/calendar` to the Hosting rewrites after the live check found the public 404 | `26cef06` |
+
+Deploy runs:
+
+| Run | Commit | Result |
+|---|---|---|
+| <https://github.com/djjay0131/website/actions/runs/39482319845> | `f1d8409` | every job succeeded; Cloud Run `hub-gate-00018-l5q` at 100% |
+| <https://github.com/djjay0131/website/actions/runs/39483089324> | `26cef06` | every job succeeded; hosting rewrite only, gate revision unchanged |
+
+Screenshots (synthetic principals): <https://github.com/djjay0131/website/actions/runs/39482036036/artifacts>
+(`d25-d26-screenshots`).
+
+### Verification (local, 2026-10-20)
+
+| Check | Result |
+|---|---|
+| Contract suite | **76 passed**; old v1 manifests accepted, six deadline fixtures + v1/v2 fixtures |
+| Gate | ruff clean, **724 passed**; filtering per principal, no-oracle, fail-closed, owner-only non-project events, malformed/missing sources, audit metadata, route table |
+| Site | **596 passed, 2 skipped**; calendar build/sanitisation, time/date rules, AoE conversion, DOM toggle/navigation |
+| Private build (fixtures) | 4 private items, 126 files, `_hub/calendar.json` written (0 events), receipt count matches |
+| `check:private-links` | PASS — 240 outbound anchors across 18 private pages |
+| Public build + stubs + `check:no-private-in-public` | PASS; 185 public files and 53 stubs scanned |
+| `check:publish-allowlist` | PASS (23 entries, 0 conflicts, 0 stale) |
+| Leak-check self-test | PASS; the injected leak reddened all 11 derived outputs |
+| `sync:private` dry run | 126 uploads, 0 deletes; `_hub/calendar.json` included |
+| Visual check | D25 **58/58**, D26 **35/35**: owner, committee-only, project-team, signed-out; month/agenda/filter/upcoming/project strip |
+| CI on #148 and #149 | all jobs green, including `screenshots`, `contract-tests`, `governance-checks`, `leak-check-self-test`, both builds, `private-sync`, both smoke tests |
+
+### Live verification (2026-10-20)
+
+Signed-out HTTP against `https://jason.cusati.us`:
+
+| Path | Status | Result |
+|---|---|---|
+| `/p/`, `/p/calendar/`, `/p/projects/` | **404** each | byte-identical styled 404 (`sha256 31d7e027…`), `cache-control: private, no-store`, `x-frame-options: DENY`, `x-robots-tag: noindex, nofollow` |
+| `/private/calendar` | **403** | `{"status":"forbidden"}`, `cache-control: private, no-store`, `x-robots-tag: noindex, nofollow` |
+| `/private/calendar` direct on Cloud Run | **403** | same body; proves the route itself, not only Hosting |
+
+The first live pass (**before #149**) returned the public styled 404 for
+`/private/calendar` because `firebase.json` had no rewrite for the route. The
+gate's direct URL already returned 403. #149 added the rewrite and the live
+check above passed after its deploy. This is why the route is now pinned by
+`site/scripts/private-structure.test.ts`.
+
+Live decision check (live Firestore policy/members + live `_hub/catalog.json`,
+no live cookie; synthetic events added only in memory):
+
+| Measure | Result |
+|---|---|
+| Live catalog / policy | 16 items; policy parses |
+| Live satellite calendar / Firestore events | present, **0 events each**; both sources parse |
+| Principals | 4 (owner + 3 members) |
+| Owner | sees all synthetic events, including the non-project owner-only one |
+| Members | each sees exactly its readable project set; the live policy currently makes all six projects readable to all three members, so the live run had no restricted project to exercise |
+| Leak / owner-only leak | **0**; non-owner principals never saw the non-project event |
+
+Restricted-project filtering (a member with one project and not another) is
+covered by the gate suite and the Playwright principals, because the current
+live policy grants every member all six projects.
+
+### Adversarial round
+
+| Target | Result |
+|---|---|
+| Oracle via counts | Response carries no denied count; the no-oracle test asserts a hidden event's id is absent. PASS |
+| Oracle via filters | Chips are built only from returned events; filters narrow the already-filtered list. PASS |
+| Cross-project leak | Event project comes from the staging directory; a manifest claiming another source is refused. Gate returns only readable projects. PASS |
+| Manifest injection | Titles/notes stripped of markup, URLs restricted to `https:`, unknown fields refused, ids/kind/status/date validated. PASS |
+| Date parsing | Impossible dates, reversed ranges and timed values without an offset are refused by contract, build, gate and owner tool. PASS |
+| Missing/malformed source | Missing policy/catalog/satellite file/event document fails closed; satellite and owner contributions are independent. PASS |
+| Owner-only default | Non-project events are returned only to the owner. PASS |
+| Route exposure | `/private/calendar` is a gate rewrite; signed-out gets the styled 404 on `/p/calendar/` and 403 on the endpoint. PASS after #149 |
+| Public leak | Public build, live public surface, allowlist, and self-test all clean; no public calendar route. PASS |
+| No contract break | Satellites 1–6 need no change; v1 manifests still validate. PASS |
+
+### Residuals / notes
+
+- **No live event was written.** Candidate deadlines are in the out-of-repo
+  file `~/d26-seed-deadlines.json` (16 events: SANER 2027, the Springer chapter,
+  and PhD tracker targets) and are listed for Jason to confirm. Satellite
+  `deadlines[]` support shipped without data.
+- **`.ics` feeds are out of scope.** A bearer feed URL is a secret and needs a
+  revocation design; ADR-0027 records the deferral.
+- Firestore event changes apply within the existing 30-second cache window.
+- The gate's item-policy join is "at least one readable item in the project",
+  matching the D25 project section rule.
+- The owner tool is committed non-executable (`python3 calendar_events.py …`)
+  to satisfy the executable-bit guard; it is reached through the interpreter.
+- No live private content was exposed, no gate rollback was needed, and no
+  Terraform or allowlist change was made.
