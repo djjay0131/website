@@ -1,67 +1,14 @@
 ---
-// THE PRIVATE NAVIGATION (contract D1: "the navigation that reaches them").
+// THE MEMBERS' LANDING PAGE (D24 / ADR-0025).
 //
-// Served by the gate at /p/. This is the ONLY page that lists private items, and
-// it exists only in the private output: the public build's srcDir is ./src and
-// never resolves this directory, so no fragment of this list can reach
-// dist-public by any build path. That is the structural guarantee, not a filter
-// someone has to remember to apply.
-import { getCollection } from "astro:content";
+// No collection is read here. The gate's /private/items endpoint is the only
+// source of the list, and it returns exactly what the viewer may open. That
+// keeps the private catalogue out of the static HTML a member can download.
 import PrivateBase from "../layouts/PrivateBase.astro";
-import { memberHref } from "../lib/private-content.mjs";
-
-// SEAM-B4: the members' area shows EVERY item across every section (data items
-// are build inputs, not documents). Private items are framed under /p/; public
-// items are linked to their public URL (memberHref) and are NOT staged into the
-// private bucket — staging a public satellite's bytes too failed
-// `check:private-links` on the real deploy.
-const items = (await getCollection("sources", ({ data }) => data.format !== "data"))
-  .map((entry) => entry.data)
-  .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug < b.slug ? -1 : 1));
-
-const base = import.meta.env.BASE_URL;
-const site = Astro.site?.toString() ?? "";
-const href = (item: (typeof items)[number]) => memberHref(item, { base, site });
-const nav = items
-  .map((item) => ({ href: href(item), label: item.title }))
-  .filter((n): n is { href: string; label: string } => n.href !== null);
+import PrivateItems from "../components/PrivateItems.astro";
 ---
 
-<PrivateBase title="Members' area" nav={nav}>
+<PrivateBase title="Members' area">
   <h1>Shared with you</h1>
-
-  {items.length > 0 ? (
-    <ul class="items">
-      {items.map((item) => (
-        <li>
-          {href(item) ? (
-            <h2><a href={href(item)}>{item.title}</a></h2>
-          ) : (
-            <h2>{item.title}</h2>
-          )}
-          <p class="meta">
-            <time datetime={item.date}>{item.date}</time> · {item.source}
-            {item.effective_visibility === "public" && " · public"}
-          </p>
-          {item.summary && <p class="summary">{item.summary}</p>}
-        </li>
-      ))}
-    </ul>
-  ) : (
-    <p>Nothing has been shared with you yet.</p>
-  )}
+  <PrivateItems />
 </PrivateBase>
-
-<style>
-  .items { list-style: none; padding: 0; margin: 0; }
-  .items li { padding: 1rem 0; border-bottom: 1px solid var(--color-border); }
-  .items li:last-child { border-bottom: none; }
-  .items h2 { font-size: 1.2rem; margin: 0 0 0.25rem; border: none; padding: 0; }
-  .meta {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--color-muted);
-    margin-bottom: 0.35rem;
-  }
-  .summary { color: var(--color-muted); }
-</style>

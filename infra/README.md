@@ -66,6 +66,11 @@ later owns them): share infrastructure of any kind (`/s/**`, `/share/**`, the
 module ever create the **contents** of anything: no member document, no
 published object, no gate image. Seeding the allowlist is the owner's step at
 Checkpoint 4, which is why no real email address appears anywhere in `infra/`.
+D24 adds optional `groups` to each member document. Use
+`scripts/access.py` to set roles and groups and to manage the Firestore access
+policy (`access_policy/current`); the script also appends an `access_audit`
+record for every write. Item-level access is not in Terraform and not in this
+repository: the repository is public.
 
 Still not Terraformed and deliberately manual (see §Phase 3 manual steps):
 enabling **Identity Platform in the Marketplace**, enabling **Google sign-in**

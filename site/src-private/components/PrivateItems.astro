@@ -1,0 +1,82 @@
+---
+// THE VIEWER'S ITEMS (D24 / ADR-0025).
+//
+// This component is the landing page's only item list. It ships NO item title in
+// the static HTML: the browser asks the gate at /private/items, which returns
+// only what this account may open. A member with one group therefore cannot
+// read another group's catalogue by loading the page source.
+---
+<div id="private-items" data-endpoint="/private/items" aria-live="polite">
+  <p class="items-note" id="private-items-status">Loading what has been shared with you…</p>
+</div>
+
+<script>
+  import { loadPrivateItems } from "../lib/private-items.mjs";
+
+  const root = document.getElementById("private-items");
+  const status = document.getElementById("private-items-status");
+
+  function line(label: string, value: string): HTMLLIElement {
+    const item = document.createElement("li");
+    const meta = document.createElement("p");
+    meta.className = "meta";
+    meta.textContent = `${label} · ${value}`;
+    item.append(meta);
+    return item;
+  }
+
+  if (root) {
+    const result = await loadPrivateItems();
+    root.replaceChildren();
+    if (!result.ok) {
+      const message = document.createElement("p");
+      message.className = "items-note";
+      message.setAttribute("role", "alert");
+      message.textContent = "Could not load what has been shared with you. Try again shortly.";
+      root.append(message);
+    } else if (result.items.length === 0) {
+      const message = document.createElement("p");
+      message.className = "items-note";
+      message.textContent = "Nothing has been shared with you yet.";
+      root.append(message);
+    } else {
+      const list = document.createElement("ul");
+      list.className = "items";
+      for (const item of result.items as Array<Record<string, unknown>>) {
+        const entry = document.createElement("li");
+        const heading = document.createElement("h2");
+        const href = typeof item.href === "string" ? item.href : "";
+        if (href) {
+          const link = document.createElement("a");
+          link.href = href;
+          link.textContent = String(item.title ?? item.slug ?? "Untitled");
+          heading.append(link);
+        } else {
+          heading.textContent = String(item.title ?? item.slug ?? "Untitled");
+        }
+        entry.append(heading, line(String(item.source ?? ""), String(item.format ?? "")));
+        if (item.visibility === "public") {
+          const meta = entry.querySelector(".meta");
+          meta?.append(" · public");
+        }
+        list.append(entry);
+      }
+      root.append(list);
+    }
+    if (status && status.parentElement === null) status.remove();
+  }
+</script>
+
+<style>
+  .items-note { color: var(--color-muted); }
+  .items { list-style: none; padding: 0; margin: 0; }
+  .items li { padding: 1rem 0; border-bottom: 1px solid var(--color-border); }
+  .items li:last-child { border-bottom: none; }
+  .items h2 { font-size: 1.2rem; margin: 0 0 0.25rem; border: none; padding: 0; }
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    margin-bottom: 0.35rem;
+  }
+</style>

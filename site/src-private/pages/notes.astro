@@ -1,43 +1,21 @@
 ---
-// MY NOTES (AN-USE; contract site-wave-6 requirement 4).
+// MY NOTES (AN-USE; contract site-wave-6 requirement 4; D24).
 //
-// Served by the gate at /p/notes/. Private build only: the public build's srcDir
-// is ./src and never resolves this directory, so the page and its island cannot
-// reach dist-public by any build path (proved by build; see wave-6-structure).
-//
-// The page is static and reveals nothing. The island reads GET /annotations,
-// which returns only the caller's own notes; the gate is the authority.
-import { getCollection } from "astro:content";
+// Private build only. The page reveals no item titles: NotesIsland asks
+// /private/items for the viewer's accessible items and GET /annotations for
+// their notes. The gate filters both by access.
 import PrivateBase from "../layouts/PrivateBase.astro";
-import { memberHref } from "../lib/private-content.mjs";
 import NotesIsland from "../components/NotesIsland.tsx";
-
-const items = (await getCollection("sources", ({ data }) => data.format !== "data"))
-  .map((entry) => entry.data)
-  .sort((a, b) => (a.title < b.title ? -1 : 1));
-
-const base = import.meta.env.BASE_URL;
-const site = Astro.site?.toString() ?? "";
-const known = items.map((item) => ({
-  section: item.section,
-  source: item.source,
-  slug: item.slug,
-  title: item.title,
-  href: memberHref(item, { base, site }),
-}));
-const nav = items
-  .map((item) => ({ href: memberHref(item, { base, site }), label: item.title }))
-  .filter((entry): entry is { href: string; label: string } => entry.href !== null);
 ---
 
-<PrivateBase title="My notes" nav={nav}>
+<PrivateBase title="My notes">
   <h1>My notes</h1>
   <p class="lede">
     Everything you have highlighted or commented on, grouped by item. Filters
     narrow by intent and date; a note whose item is no longer in the build is
     marked orphan and is never lost.
   </p>
-  <NotesIsland items={known} client:load />
+  <NotesIsland client:load />
 </PrivateBase>
 
 <style>

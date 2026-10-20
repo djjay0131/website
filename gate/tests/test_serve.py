@@ -124,6 +124,8 @@ def test_hosting_strips_every_cookie_but___session(client, member_session, trans
 
 
 def test_member_asking_for_a_missing_object_gets_the_generic_page(client, member_session, transport):
+    # The owner is always allowed by policy, so an absent object is an ordinary
+    # miss rather than a no-access response.
     response = client.get(
         "/p/phd/not-a-real-item/index.html",
         headers=request_headers(transport, {"__session": member_session}),

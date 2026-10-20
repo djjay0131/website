@@ -26,6 +26,7 @@ import {
   revokeSavedShare,
   sharesView,
 } from "../lib/shares.mjs";
+import { loadPrivateItems, shareableItems } from "../lib/private-items.mjs";
 
 type AnyRecord = Record<string, any>;
 
@@ -47,8 +48,9 @@ function sessionStore(): any {
   }
 }
 
-export default function SharesIsland({ items = [] }: { items?: ShareableItem[] }) {
+export default function SharesIsland() {
   const [status, setStatus] = useState<AnyRecord | null>(null);
+  const [items, setItems] = useState<ShareableItem[]>([]);
   const [selected, setSelected] = useState(0);
   const [days, setDays] = useState(DEFAULT_DAYS);
   const [minted, setMinted] = useState<AnyRecord | null>(null);
@@ -57,7 +59,11 @@ export default function SharesIsland({ items = [] }: { items?: ShareableItem[] }
   const [busy, setBusy] = useState(false);
 
   async function refresh() {
-    setStatus(await listShares());
+    const [shareResult, itemResult] = await Promise.all([listShares(), loadPrivateItems()]);
+    setStatus(shareResult);
+    // Only the owner reaches the mint form; this keeps the item list out of the
+    // static HTML and out of a non-owner's UI.
+    setItems(shareableItems(itemResult.items) as ShareableItem[]);
   }
 
   useEffect(() => {

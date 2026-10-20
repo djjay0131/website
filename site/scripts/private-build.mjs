@@ -24,6 +24,11 @@ import {
   findUnservablePaths,
   stagingPlanFor,
 } from "../src-private/lib/private-content.mjs";
+import {
+  CATALOG_OBJECT,
+  buildItemCatalog,
+  itemKey,
+} from "../src-private/lib/catalog.mjs";
 import { RECEIPT_NAME } from "./sync-private.mjs";
 
 const SITE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -98,6 +103,35 @@ export function privateBuild(options = {}) {
         // catalogue and links its payload through `/p/` (Dissenter Wave 3 D1).
         const docPlan = docStagingPlanFor(sourcesDir, items);
 
+        // D24-B / ADR-0025: the build emits the object -> item map only. It
+        // carries NO groups or roles. The access decision lives in Firestore
+        // and is joined by the gate at request time, so a policy change needs
+        // no rebuild or redeploy.
+        const catalog = buildItemCatalog({
+          sourcesDir,
+          allowlist,
+          siteOrigin: process.env.SITE_URL || "https://jason.cusati.us",
+          base: process.env.SITE_BASE || "/p/",
+        });
+
+        for (const item of items) {
+          const key = itemKey(item.section, item.source, item.slug);
+          if (!catalog.items[key]) {
+            throw new Error(
+              `the private build stages ${key}, but the catalog did not list it. ` +
+                `Refusing to emit an object the gate cannot resolve to an item.`,
+            );
+          }
+          for (const entry of [
+            ...stagingPlanFor(sourcesDir, [item]),
+            ...docStagingPlanFor(sourcesDir, [item]),
+          ]) {
+            const keys = catalog.objects[entry.to] ?? [];
+            if (!keys.includes(key)) keys.push(key);
+            catalog.objects[entry.to] = keys;
+          }
+        }
+
         // `_payload/<source>/…` and `<section>/<source>/<slug>/_doc/…` are
         // disjoint by construction, but a malformed manifest must not silently
         // have one plan overwrite a file the other staged. Fail closed instead.
@@ -125,6 +159,17 @@ export function privateBuild(options = {}) {
         logger.info(
           `staged ${docPlan.length} item-scoped _doc file(s) for ` +
             `${items.length} private item(s) (the share-servable copy)`,
+        );
+
+        // `_hub/**` is never served through /p/**; the gate reads this object
+        // directly from the bucket. Written before the receipt so the sync
+        // cannot upload the pages without the map that resolves them to items.
+        const catalogPath = path.join(outDir, CATALOG_OBJECT);
+        fs.mkdirSync(path.dirname(catalogPath), { recursive: true });
+        fs.writeFileSync(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
+        logger.info(
+          `wrote ${CATALOG_OBJECT}: ${Object.keys(catalog.items).length} item(s), ` +
+            `${Object.keys(catalog.objects).length} object mapping(s)`,
         );
 
         // SD-7. Every emitted path must be one the gate can actually serve,

@@ -194,6 +194,7 @@ describe("firebase.json routes sharing to the gate without disturbing the rest",
     // `/annotations` is required because `/annotations/**` does not match it
     // (AN-REWRITES). The four pre-existing gate rewrites are unchanged.
     expect(rewrites.map((r) => r.source)).toEqual([
+      "/private/items",
       "/p/**",
       "/session",
       "/session/end",

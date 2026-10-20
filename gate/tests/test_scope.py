@@ -30,6 +30,7 @@ def test_the_route_table_is_exactly_this(deps):
         "/session",
         "/session/end",
         "/p/{path:path}",
+        "/private/items",
         "/share",
         "/share/{token}",
         "/s/{token}/{path:path}",

@@ -14,7 +14,8 @@ The gate implements §6 responsibilities 1–4, and only those:
 |---|---|
 | `POST /session` | Verify a Firebase ID token, mint a 14-day session cookie |
 | `POST /session/end` | Sign out: clear `__session`. Origin-checked; identical whether or not a session existed |
-| `GET /p/{path}` | Verify the session, check the allowlist, stream the object |
+| `GET /p/{path}` | Verify the session, check the allowlist **and the item's access rule**, stream the object |
+| `GET /private/items` | **Member.** The viewer's item list — public items plus the private items their role/groups allow. The owner gets everything. The landing page, Shares and My notes use this instead of embedding the catalogue |
 | `POST /share` | **Owner only**, origin-checked. Mint a token for one `(section, source, slug)`; body `{section, source, slug, entry, expires_in_days}`; returns `{token, expires_at, url}`. `entry` names the item's document relative to `_doc/` and defaults to `index.html` when omitted; it is validated with the same segment allowlist as a served path. `expires_in_days` is capped at 30; a bad item, entry or expiry is 400, a non-owner is 403 |
 | `GET /share` | **Owner only**. List active shares. Never returns a full token — a short display id (`id`) plus `section`, `source`, `slug`, `entry`, `created_by`, `expires_at` |
 | `DELETE /share/{token}` | **Owner only**, origin-checked. Revoke. Idempotent |
@@ -26,6 +27,34 @@ The gate implements §6 responsibilities 1–4, and only those:
 
 `tests/test_scope.py` asserts the route table exactly, so a new route cannot
 appear without a test and a README entry.
+
+## Access by role and group (ADR-0025, D24)
+
+`members/{email}` carries `role` (`owner` or `member`, absent means member) and
+optional `groups: [string]`. The item decision lives in Firestore at
+`access_policy/current`, resolved item → source → section → default. It is read
+at request time and cached for at most 30 seconds, so a policy or group change
+takes effect with no PR, rebuild or redeploy. The gate **fails closed** if the
+policy is missing or malformed.
+
+The private build writes `_hub/catalog.json` into the private bucket: item
+metadata plus an object → item-key map for staged payloads and `_doc/` files.
+It carries **no groups or roles**. The gate joins that map with the Firestore
+policy. `_hub/**` is never served through `/p/**`; an unmapped object fails
+closed.
+
+The owner is always allowed. A member is allowed when the item is effectively
+public, the rule lists their role, or the rule's groups intersect the member's
+groups. The gate consults the same rule for `/p/**` pages, staged
+`_payload/**` files, `_doc/**`, annotation create/list, and the landing list.
+Unknown item keys fail closed, so a restricted item and a nonexistent one
+produce the same 404 body. `infra/scripts/access.py` is the owner tool; every
+write also appends an `access_audit` record, and Firestore rules deny every
+client.
+
+Signed-out `/p/**` returns the site 404 shell with no sign-in prompt. A member
+without access gets the same 404 status and a generic styled message. Share
+tokens remain owner-minted bearer grants for one item and do not consult groups.
 
 ## Sharing
 
