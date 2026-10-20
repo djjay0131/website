@@ -12,11 +12,11 @@ collection through service-account credentials.
 
 Examples (values are placeholders):
 
-    ./calendar.py list
-    ./calendar.py add --file /path/outside/the/repo/event.json
-    ./calendar.py update --id EVENT_ID --file /path/outside/the/repo/event.json
-    ./calendar.py done --id EVENT_ID
-    ./calendar.py remove --id EVENT_ID
+    python3 calendar_events.py list
+    python3 calendar_events.py add --file /path/outside/the/repo/event.json
+    python3 calendar_events.py update --id EVENT_ID --file /path/outside/the/repo/event.json
+    python3 calendar_events.py done --id EVENT_ID
+    python3 calendar_events.py remove --id EVENT_ID
 
 `--by` defaults to `ACCESS_BY`, then to the active `gcloud` account. Use
 `--dry-run` to print the before/after without writing.
