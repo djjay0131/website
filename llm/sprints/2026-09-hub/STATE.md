@@ -4735,3 +4735,95 @@ in the D24-B code, tests, ADR or this record.
    request is refused.
 7. `infra/scripts/access.py set-rule ...` changes the result within 30 seconds
    with no rebuild or redeploy; an `access_audit` record exists for the write.
+
+### D24-C — approved rollout: live policy, merge, deploy and live checks (2026-10-20)
+
+Owner approval: **"Merge d24"**, then **"Go"** for the full rollout below.
+Executed in the required order. No Terraform apply, destroy, publish-allowlist
+change or satellite contract change was made.
+
+#### 1. Initial live policy (before merging)
+
+The owner-approved initial policy and member groups were written to live
+Firestore **before** the new gate could read them, using
+`infra/scripts/access.py` with an out-of-repo JSON file under `~/`. The approved
+values are deliberately **not repeated in this public repository**. They set:
+
+- a two-group default rule;
+- the approved source overrides for the two private satellite sources; and
+- the approved groups on the committee member and the research-team member;
+  the owner account stayed `owner`.
+
+`access.py show` confirmed the policy and each member document. The first three
+`access_audit` records exist (`replace_policy`, then two `add_group` writes), all
+attributed to the owner's signed-in gcloud identity. The live gate ignored these
+documents at that moment, so no access decision changed before the deploy.
+
+#### 2. Merge order
+
+Each PR was green on its current base immediately before its merge. Merge
+commits:
+
+| PR | What | Merge commit | Result |
+|---|---|---|---|
+| **#136** | amended ADR-0025 | `faca932` | merged |
+| **#137** | styled 404 / no-access pages | `cab3ed5` | merged |
+| **#138** | Firestore policy, catalog map, owner tooling | `8112705` | merged |
+| **#139** | de-framed private item pages | `0e701e5` | merged |
+| **#140** | D24-B record | `a7e8bc5` | merged |
+
+Deleting each head branch closed the next stacked PR rather than retargeting it.
+Each was reopened, retargeted to `main`, and re-run; the checks above passed on
+the re-run before its merge. An unrelated owner PR **#141** merged during the
+rollout (`2b02377`, chapter proposal page); the final deploy includes it.
+
+#### 3. Deploy
+
+- Deploy run: <https://github.com/djjay0131/website/actions/runs/39366698502>
+  on `a7e8bc5` — every job succeeded, including `build`, `build-firebase`,
+  `firebase-deploy`, `private-sync`, `deploy`, `smoke-test` and
+  `firebase-smoke-test`.
+- Cloud Run `hub-gate`: revision **`hub-gate-00014-lsx`** is the latest ready
+  revision and carries **100%** of traffic. No Terraform apply or new IAM was
+  needed.
+
+#### 4. Live verification
+
+Signed-out HTTP checks against `https://jason.cusati.us` (real requests):
+
+| Check | Result |
+|---|---|
+| `/p/` root, a real private item, an imaginary private path, a real `_payload` object and a real `_doc` object | all **404**, all five bodies byte-identical (`sha256 31d7e027…`), styled site 404, `cache-control` unchanged | 
+| Sign-in prompt | none; the only sign-in text is the normal footer/nav link to `/signin/` |
+| `/private/items` with no session | **403** |
+
+No real member session could be minted in this environment, so member decisions
+were computed by the gate's own decision code against **live Firestore** member
+and policy documents and the **live `_hub/catalog.json`** read from the private
+bucket. These are simulated principals, not live cookies:
+
+| Principal | `/private/items` | Item decisions | Payload / `_doc` |
+|---|---|---|---|
+| Owner | 16 items (10 private + 6 public) | all allowed | all allowed |
+| Committee-only member | 12 items | the 4 team-scoped source items denied; all others allowed | that source's payload denied; committee `_doc` allowed |
+| Research-team member | 16 items | all allowed | all allowed |
+| Signed-in non-member | 403 | all denied | all denied |
+
+Other live checks:
+
+| Check | Result |
+|---|---|
+| De-framed private item page (live private bucket artifact) | **0** `<iframe`; normal site band present; document link `target="_top"` |
+| Policy change without deploy | throwaway source rule: cached decision unchanged at 2.5s, new decision at 31s, clear cached at 2.5s, original decision restored at 31s. No rebuild/redeploy. Audit shows `set_rule` and `clear_rule` with timestamps. Throwaway rule removed. |
+| Public leak check — build at `a7e8bc5` | PASS: 180 files in `dist-public`, 53 redirect stubs; no private key/route/payload path/slug/title/summary or annotation/source-identity needle |
+| Public leak check — live surface | PASS: 53 live public URLs scanned for all 10 live private items with 290 needles (qualified ids, routes, payload paths, slugs, titles); no hit |
+| Leak-check self-test | PASS: injected leak turned the guard red in all 11 derived outputs |
+
+#### 5. Status and follow-ups
+
+- The Fellow CV remains on the default rule; the owner has not decided
+  owner-only yet. It is a one-command change.
+- The throwaway policy rule was removed; the live policy is back to the approved
+  initial set.
+- No live private content was exposed; no traffic rollback was needed.
+- This record is on `record/d24-live` and its PR is **not merged**.
