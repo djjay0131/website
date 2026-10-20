@@ -192,9 +192,11 @@ describe("firebase.json routes sharing to the gate without disturbing the rest",
     // for POST/GET, `/share/**` for DELETE by token, and `/s/**` for the
     // signed-out view. Wave 6 appends the annotation routes; the bare
     // `/annotations` is required because `/annotations/**` does not match it
-    // (AN-REWRITES). The four pre-existing gate rewrites are unchanged.
+    // (AN-REWRITES). D26 adds `/private/calendar` beside `/private/items`.
+    // The pre-existing gate rewrites are unchanged.
     expect(rewrites.map((r) => r.source)).toEqual([
       "/private/items",
+      "/private/calendar",
       "/p/**",
       "/session",
       "/session/end",
@@ -205,6 +207,13 @@ describe("firebase.json routes sharing to the gate without disturbing the rest",
       "/annotations",
       "/annotations/**",
     ]);
+  });
+
+  it("routes the private calendar endpoint to the gate", () => {
+    expect(bySource.get("/private/calendar")).toEqual({
+      source: "/private/calendar",
+      run: { serviceId: "hub-gate", region: "us-east1" },
+    });
   });
 
   it("still publishes dist-public with trailing slashes", () => {
