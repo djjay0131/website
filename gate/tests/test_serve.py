@@ -53,12 +53,12 @@ def test_signed_out_response_is_identical_for_real_and_imaginary_paths(client, t
     assert real.text == imaginary.text
 
 
-def test_non_member_gets_not_shared_with_you(client, non_member_session, store, transport):
+def test_non_member_gets_the_no_access_page(client, non_member_session, store, transport):
     """SEAM-3, and the roadmap's non-member criterion."""
     response = client.get(TRACKER, headers=request_headers(transport, {"__session": non_member_session}))
 
     assert response.status_code == 404
-    assert "Not shared with you" in response.text
+    assert "This page isn't available" in response.text
     assert b"Milestone tracker" not in response.content
     assert store.fetches == []
 
@@ -130,7 +130,7 @@ def test_member_asking_for_a_missing_object_gets_the_generic_page(client, member
     )
 
     assert response.status_code == 404
-    assert "Not found" in response.text
+    assert "Page not found" in response.text
 
 
 def test_directory_request_serves_the_index_document(client, member_session, transport):
@@ -160,7 +160,7 @@ def test_membership_is_rechecked_on_every_request(client, deps, member_session, 
 
     second = client.get(TRACKER, headers=headers)
     assert second.status_code == 404
-    assert "Not shared with you" in second.text
+    assert "This page isn't available" in second.text
 
 
 def test_unhandled_error_returns_no_detail(client, store, member_session, transport):
@@ -175,3 +175,22 @@ def test_unhandled_error_returns_no_detail(client, store, member_session, transp
     assert "milestones" not in response.text
     assert "RuntimeError" not in response.text
     assert "Traceback" not in response.text
+
+
+def test_signed_out_404_is_the_styled_site_404(client, transport):
+    """D24: no white sign-in page and no sign-in prompt for a secured path."""
+    response = client.get(TRACKER, headers=request_headers(transport))
+
+    assert response.status_code == 404
+    assert "Page not found" in response.text
+    assert 'class="site-band"' in response.text
+    assert "Sign in and try again" not in response.text
+
+
+def test_no_access_page_uses_the_same_site_chrome(client, non_member_session, transport):
+    response = client.get(TRACKER, headers=request_headers(transport, {"__session": non_member_session}))
+
+    assert response.status_code == 404
+    assert "This page isn't available to your account." in response.text
+    assert 'class="site-band"' in response.text
+    assert "Milestone tracker" not in response.text

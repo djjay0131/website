@@ -200,6 +200,95 @@ export function render404(fileRoutes = []) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Page not found</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --font-display: "Spectral", "Iowan Old Style", Georgia, "Times New Roman", serif;
+    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --max-width: 800px;
+    --color-bg: #f4f5f1;
+    --color-surface: #fbfbf8;
+    --color-border: #d7d9d1;
+    --color-text: #14181b;
+    --color-muted: #636a68;
+    --color-link: #861f41;
+    --color-band: #861f41;
+    --color-on-band: #ffffff;
+    --rule-orange: #e5751f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-bg: #111413;
+      --color-surface: #1a1f1e;
+      --color-border: #2b312f;
+      --color-text: #edeee9;
+      --color-muted: #8a918c;
+      --color-link: #f0913f;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+  html { background: var(--color-bg); }
+  body {
+    font-family: var(--font-body);
+    color: var(--color-text);
+    background: var(--color-bg);
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  a { color: var(--color-link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .site-band {
+    background: var(--color-band);
+    color: var(--color-on-band);
+    border-bottom: 4px solid var(--rule-orange);
+  }
+  .band-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0.85rem 1.5rem 0.75rem;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem 1.5rem;
+    flex-wrap: wrap;
+  }
+  .band-brand {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    color: var(--color-on-band);
+    margin-right: auto;
+  }
+  .band-brand:hover { color: var(--color-on-band); text-decoration: none; }
+  .band-wordmark { font-family: var(--font-display); font-weight: 600; font-size: 1.4rem; }
+  .band-affiliation { font-family: var(--font-body); font-size: 0.8rem; opacity: 0.9; }
+  .band-nav ul { display: flex; gap: 0.75rem 1.25rem; list-style: none; padding: 0; margin: 0; flex-wrap: wrap; }
+  .band-nav a { color: var(--color-on-band); font-family: var(--font-body); font-size: 0.9rem; }
+  main {
+    flex: 1;
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    width: 100%;
+  }
+  h1 { font-family: var(--font-display); font-weight: 600; line-height: 1.25; font-size: 2rem; margin-bottom: 1rem; }
+  p { color: var(--color-muted); max-width: 65ch; }
+  .site-footer {
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+  .footer-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 0.75rem 1.25rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: var(--color-muted);
+  }
+</style>
 <script>
   (function () {
     var origin = ${origin};
@@ -220,9 +309,35 @@ export function render404(fileRoutes = []) {
 </script>
 </head>
 <body>
-<h1>Page not found</h1>
-<p>This page has moved or does not exist. Continue to
-<a href="${originHtml}/">${originHtml}/</a>.</p>
+<header class="site-band">
+  <div class="band-inner">
+    <a class="band-brand" href="${originHtml}/">
+      <span class="band-wordmark">Jason Cusati</span>
+      <span class="band-affiliation">Virginia Tech</span>
+    </a>
+    <nav class="band-nav" aria-label="Main navigation">
+      <ul>
+        <li><a href="${originHtml}/research/">Research</a></li>
+        <li><a href="${originHtml}/projects/">Projects</a></li>
+        <li><a href="${originHtml}/rabbit-holes/">Rabbit Holes</a></li>
+        <li><a href="${originHtml}/cv/">CV</a></li>
+        <li><a href="${originHtml}/papers/">Papers</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="main-content">
+  <h1>Page not found</h1>
+  <p>This page has moved or does not exist. Continue to
+  <a href="${originHtml}/">${originHtml}/</a>.</p>
+</main>
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span>Jason Cusati — Research hub</span>
+    <a href="${originHtml}/signin/">Sign in</a>
+    <a href="${originHtml}/privacy/">Privacy</a>
+  </div>
+</footer>
 </body>
 </html>
 `;
