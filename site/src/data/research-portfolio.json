@@ -71,9 +71,9 @@
           "public": true
         },
         {
-          "name": "Governed Agentic Empirical Research (Springer chapter)",
+          "name": "From Papers to Progress, with Agents (Springer chapter, with Chris Brown)",
           "goal": "Argue, and show with working tooling, that once agents participate in empirical SE research the research process itself must be governed, provenance-first and reproducible.",
-          "status": "Proposal draft abstract and the AI-across-the-empirical-SE-lifecycle research track (219 sources) published; one-page proposal due 2026-10-23.",
+          "status": "Proposal draft v1 published for review; due 2026-10-23. Research track on AI across the empirical-SE lifecycle (219 sources) published.",
           "href": "/research/governed-agentic-research/",
           "repo": "ai-empirical-se-chapter",
           "public": true

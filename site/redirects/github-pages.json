@@ -228,6 +228,10 @@
     "to": "/research/governed-agentic-research/ai-in-empirical-se/synthesis/"
   },
   {
+    "from": "/website/research/governed-agentic-research/proposal/",
+    "to": "/research/governed-agentic-research/proposal/"
+  },
+  {
     "from": "/website/research/soa-agentic-se/",
     "to": "/research/soa-agentic-se/"
   },
