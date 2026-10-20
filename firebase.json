@@ -16,6 +16,13 @@
         }
       },
       {
+        "source": "/private/calendar",
+        "run": {
+          "serviceId": "hub-gate",
+          "region": "us-east1"
+        }
+      },
+      {
         "source": "/p/**",
         "run": {
           "serviceId": "hub-gate",
