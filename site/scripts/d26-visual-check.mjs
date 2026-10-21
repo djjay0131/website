@@ -78,6 +78,7 @@ for (const principal of principals) {
     check((response?.status() ?? 0) === 404, "signed-out calendar is a styled 404", principal.label);
     check((await page.locator(".site-band").count()) > 0, "signed-out 404 keeps the site header", principal.label);
     check((await page.locator(".calendar-root").count()) === 0, "signed-out page has no calendar", principal.label);
+    check(!(await page.content()).includes("github.com/example/"), "signed-out page carries no repository link", principal.label);
     await page.screenshot({ path: path.join(outDir, `${principal.id}-calendar-404.png`), fullPage: true });
     await context.close();
     continue;
@@ -124,6 +125,24 @@ for (const principal of principals) {
   if (principal.expectSource) {
     const pageResponse = await page.goto(`${base}/p/projects/${principal.expectSource}/`, { waitUntil: "networkidle" });
     check((pageResponse?.status() ?? 0) === 200, "project section still loads", principal.label);
+    check(
+      (await page.locator("[data-project-upcoming] .calendar-upcoming-item").count()) > 0,
+      "project hub shows its own upcoming deadlines",
+      principal.label,
+    );
+    const repoHref = `https://github.com/example/${principal.expectSource}`;
+    check(
+      (await page.locator(`.repository-link a[href="${repoHref}"]`).count()) === 1,
+      "project hub shows the repository link",
+      principal.label,
+    );
+    check(
+      (await page.locator(".repository-link-note").innerText()).includes("Requires GitHub access"),
+      "repository link carries the access note",
+      principal.label,
+    );
+    await page.screenshot({ path: path.join(outDir, `${principal.id}-project-hub.png`), fullPage: true });
+
     const projectPageHref = page.locator(".project-page-card a").first();
     if (await projectPageHref.count()) {
       await projectPageHref.click();
@@ -131,6 +150,11 @@ for (const principal of principals) {
       check(
         (await page.locator("[data-project-upcoming] .calendar-upcoming-item").count()) > 0,
         "project section shows its own upcoming deadlines",
+        principal.label,
+      );
+      check(
+        (await page.locator(`.repository-link a[href="${repoHref}"]`).count()) === 1,
+        "project sub-page keeps the repository link",
         principal.label,
       );
       await page.screenshot({ path: path.join(outDir, `${principal.id}-project-upcoming.png`), fullPage: true });

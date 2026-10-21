@@ -3,6 +3,7 @@
 // from `/private/items`, so a member only sees pages they may open.
 import { getCollection } from "astro:content";
 import PrivateBase from "../../../layouts/PrivateBase.astro";
+import RepositoryLink from "../../../components/RepositoryLink.astro";
 import { isProjectItem, projectTitle } from "../../../lib/projects.mjs";
 
 export async function getStaticPaths() {
@@ -36,6 +37,9 @@ const base = import.meta.env.BASE_URL;
   </nav>
 
   <h1>{title}</h1>
+
+  <RepositoryLink source={source} />
+
   <div
     id="project-pages"
     class="project-pages-root"
@@ -47,20 +51,31 @@ const base = import.meta.env.BASE_URL;
     <p class="project-pages-note">Loading project pages…</p>
   </div>
 
+  <section class="project-hub-upcoming" data-project-upcoming aria-live="polite">
+    <p class="project-pages-note">Loading deadlines…</p>
+  </section>
+
   <script>
     import { loadPrivateItems } from "../../../lib/private-items.mjs";
     import { mountProjectPages, showProjectError } from "../../../lib/project-ui.mjs";
+    import { loadCalendar, mountProjectUpcoming } from "../../../lib/calendar-ui.mjs";
 
     const root = document.getElementById("project-pages");
     if (root) {
       const base = root.dataset.base ?? "/p/";
       const source = root.dataset.source ?? "";
       const title = root.dataset.title ?? "";
-      const result = await loadPrivateItems();
+      const [result, calendar] = await Promise.all([loadPrivateItems(), loadCalendar()]);
       if (!result.ok) {
         showProjectError(root, "Could not load this project's pages. Try again shortly.");
       } else {
         mountProjectPages(root, result.items, source, base, title);
+      }
+      const upcoming = document.querySelector<HTMLElement>("[data-project-upcoming]");
+      if (upcoming && calendar.ok) {
+        mountProjectUpcoming(upcoming, calendar.events, source);
+      } else if (upcoming) {
+        upcoming.replaceChildren();
       }
     }
   </script>
@@ -86,4 +101,32 @@ const base = import.meta.env.BASE_URL;
   }
   .project-pages-root :global(.project-page-title) { font-size: 1.15rem; margin: 0 0 0.2rem; }
   .project-pages-root :global(.project-page-meta) { color: var(--color-muted); margin: 0; font-size: 0.9rem; }
+  .project-hub-upcoming {
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+  }
+  .project-hub-upcoming :global(.project-upcoming-title) { font-size: 1.1rem; margin-bottom: 0.6rem; }
+  .project-hub-upcoming :global(.calendar-upcoming-list) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 0.55rem;
+  }
+  .project-hub-upcoming :global(.calendar-upcoming-item) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.75rem;
+    align-items: baseline;
+    font-size: 0.92rem;
+  }
+  .project-hub-upcoming :global(.calendar-countdown) {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-accent, #e6751f);
+    min-width: 4.5rem;
+  }
+  .project-hub-upcoming :global(.calendar-when) { font-family: var(--font-mono); font-size: 0.76rem; color: var(--color-muted); }
+  .project-hub-upcoming :global(.calendar-note) { color: var(--color-muted); }
 </style>

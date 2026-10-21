@@ -165,14 +165,20 @@ def _list_events(base: str, token: str) -> list[dict[str, Any]]:
     return sorted(out, key=lambda event: (str(event.get("start", "")), str(event.get("title", "")).lower()))
 
 
+def _filter_events(
+    events: list[dict[str, Any]], project: str | None, include_done: bool
+) -> list[dict[str, Any]]:
+    if project is not None:
+        events = [event for event in events if event.get("project") == project]
+    if not include_done:
+        events = [event for event in events if event.get("status") != "done"]
+    return events
+
+
 def command_list(args: argparse.Namespace) -> None:
     base = _access._base_url(args.project, args.database)
     token = _access._token()
-    events = _list_events(base, token)
-    if args.project is not None:
-        events = [event for event in events if event.get("project") == args.project]
-    if not args.include_done:
-        events = [event for event in events if event.get("status") != "done"]
+    events = _filter_events(_list_events(base, token), args.filter_project, args.include_done)
     print(json.dumps(events, indent=2, sort_keys=True))
 
 

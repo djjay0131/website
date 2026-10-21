@@ -4,6 +4,7 @@
 // the static HTML: a viewer who can open one page must not learn the others.
 import { pageLabel, projectHref, projectTitle } from "../lib/projects.mjs";
 import InlineItem from "./InlineItem.astro";
+import RepositoryLink from "./RepositoryLink.astro";
 
 interface Props {
   item: any;
@@ -42,6 +43,7 @@ const projectsUrl = `${base}projects/`;
     <section class="project-upcoming" data-project-upcoming aria-live="polite">
       <p class="project-nav-note">Loading deadlines…</p>
     </section>
+    <RepositoryLink source={item.source} compact />
   </aside>
 </div>
 

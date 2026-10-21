@@ -44,3 +44,18 @@ def test_malformed_events_are_refused():
         calendar_tool._validate_event({**base, "start": "2026-10-23T09:00:00"})
     with pytest.raises(calendar_tool.AccessToolError):
         calendar_tool._validate_event({**base, "timezone": "not a zone"})
+
+
+def test_list_filters_by_the_event_project_not_the_gcp_project():
+    events = [
+        {"id": "a", "project": "source-a", "status": "active"},
+        {"id": "b", "project": "source-b", "status": "active"},
+        {"id": "c", "project": "source-a", "status": "done"},
+    ]
+    assert [e["id"] for e in calendar_tool._filter_events(events, "source-a", False)] == ["a"]
+    assert [e["id"] for e in calendar_tool._filter_events(events, "source-a", True)] == ["a", "c"]
+    assert [e["id"] for e in calendar_tool._filter_events(events, None, False)] == ["a", "b"]
+
+    args = calendar_tool._parser().parse_args(["--project", "gcp-project", "list", "--project", "source-a"])
+    assert args.project == "gcp-project"
+    assert args.filter_project == "source-a"

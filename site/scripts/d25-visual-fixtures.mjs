@@ -127,6 +127,7 @@ fs.writeFileSync(
         label: "Owner",
         role: "owner",
         groups: [],
+        expectSource: "visual-study",
         expectSources: ["phd-milestones", "visual-other", "visual-study"],
       },
       {
@@ -134,6 +135,7 @@ fs.writeFileSync(
         label: "Committee-only member",
         role: "member",
         groups: ["committee"],
+        expectSource: "visual-other",
         expectSources: ["phd-milestones", "visual-other"],
         forbidSource: "visual-study",
       },

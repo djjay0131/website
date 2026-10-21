@@ -60,6 +60,24 @@ export function createVisualServer({
   const satelliteEvents = readEvents(calendarPath);
   const ownerEvents = readEvents(ownerCalendarPath);
   const byCookie = new Map(principals.map((principal) => [principal.id, principal]));
+  // D27: an in-memory annotation store so the screenshot test can exercise the
+  // capture island (GET/POST/DELETE) as a simulated member. Synthetic only.
+  const notes = [];
+  const readJson = (req) =>
+    new Promise((resolve) => {
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk;
+        if (body.length > 1_000_000) req.destroy();
+      });
+      req.on("end", () => {
+        try {
+          resolve(JSON.parse(body || "{}"));
+        } catch {
+          resolve(null);
+        }
+      });
+    });
 
   const allowedItem = (profile, key) => {
     const item = catalog.items[key];
@@ -94,7 +112,7 @@ export function createVisualServer({
 
   const serveIndex = (relative) => (relative === "" || relative.endsWith("/") ? `${relative}index.html` : relative);
 
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     const cookies = Object.fromEntries(
       (req.headers.cookie ?? "")
@@ -122,6 +140,59 @@ export function createVisualServer({
         .map(([, item]) => item);
       res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
       res.end(JSON.stringify({ items }));
+      return;
+    }
+
+    if (url.pathname === "/annotations" && req.method === "GET") {
+      if (!principal) {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ status: "forbidden" }));
+        return;
+      }
+      const source = url.searchParams.get("source");
+      const slug = url.searchParams.get("slug");
+      const rows = notes.filter(
+        (note) => (!source || note.source === source) && (!slug || note.slug === slug),
+      );
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ notes: rows }));
+      return;
+    }
+
+    if (url.pathname === "/annotations" && req.method === "POST") {
+      if (!principal) {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ status: "forbidden" }));
+        return;
+      }
+      const note = await readJson(req);
+      if (!note || typeof note !== "object") {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify({ status: "bad_request" }));
+        return;
+      }
+      const row = {
+        id: `note-${notes.length + 1}`,
+        ...note,
+        created: "2026-10-21T00:00:00Z",
+      };
+      notes.unshift(row);
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ id: row.id, created: true }));
+      return;
+    }
+
+    if (url.pathname.startsWith("/annotations/") && req.method === "DELETE") {
+      if (!principal) {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ status: "forbidden" }));
+        return;
+      }
+      const id = decodeURIComponent(url.pathname.slice("/annotations/".length));
+      const at = notes.findIndex((note) => note.id === id);
+      if (at >= 0) notes.splice(at, 1);
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ deleted: at >= 0 }));
       return;
     }
 
