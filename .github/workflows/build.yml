@@ -95,6 +95,7 @@ jobs:
       use_bucket: ${{ steps.final.outputs.use_bucket }}
       content_fingerprint: ${{ steps.compare.outputs.content_fingerprint }}
       cv_fingerprint: ${{ steps.compare.outputs.cv_fingerprint }}
+      pulled_fingerprint: ${{ steps.compare.outputs.pulled_fingerprint }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -205,6 +206,20 @@ jobs:
           echo "cv_fingerprint=${FP}" >> "$GITHUB_OUTPUT"
           echo "cv release fingerprint: ${FP}"
 
+      # D28-B: public Pages sources pulled at build time. This is a public
+      # repository, so the fingerprint needs no credential; a changed commit
+      # must wake the hourly schedule even when the content bucket is unchanged.
+      # "unavailable" is deliberate: a transient GitHub failure makes the
+      # scheduled comparison differ and build, where the pull step then uses its
+      # last good copy (or fails if there is none).
+      - name: Fingerprint the pulled Pages sources
+        id: pulled
+        working-directory: site
+        run: |
+          FP="$(node scripts/pull-sources.mjs --fingerprint --config pulled-sources.json)"
+          echo "pulled_fingerprint=${FP}" >> "$GITHUB_OUTPUT"
+          echo "pulled sources fingerprint: ${FP}"
+
       - name: Compare against the deployed build
         id: compare
         env:
@@ -212,6 +227,7 @@ jobs:
           USE_BUCKET: ${{ steps.final.outputs.use_bucket }}
           CONTENT_FINGERPRINT: ${{ steps.bucket.outputs.content_fingerprint }}
           CV_FINGERPRINT: ${{ steps.release.outputs.cv_fingerprint }}
+          PULLED_FINGERPRINT: ${{ steps.pulled.outputs.pulled_fingerprint }}
           # SEAM-5 / ADR-0020: read the deployed build info from SITE_URL when the
           # owner has set it, else from the Firebase Hosting default URL. GitHub
           # Pages no longer serves the full site (Phase 6), so it is no longer a
@@ -221,6 +237,7 @@ jobs:
         run: |
           echo "content_fingerprint=${CONTENT_FINGERPRINT}" >> "$GITHUB_OUTPUT"
           echo "cv_fingerprint=${CV_FINGERPRINT}" >> "$GITHUB_OUTPUT"
+          echo "pulled_fingerprint=${PULLED_FINGERPRINT}" >> "$GITHUB_OUTPUT"
 
           if [ "${USE_BUCKET}" = "true" ]; then
             FIELD="content_fingerprint"
@@ -245,11 +262,14 @@ jobs:
           # So does a deployed build recorded against the OTHER source: after
           # Checkpoint 3 the first scheduled poll finds no content_fingerprint
           # and rebuilds once, which is correct.
-          DEPLOYED=$(curl -sfL "${DEPLOYED_SITE}/build-info.json" \
-            | jq -r ".${FIELD} // \"\"" 2>/dev/null || true)
+          DEPLOYED_JSON=$(curl -sfL "${DEPLOYED_SITE}/build-info.json" 2>/dev/null || true)
+          DEPLOYED=$(printf '%s' "${DEPLOYED_JSON}" | jq -r ".${FIELD} // \"\"" 2>/dev/null || true)
+          DEPLOYED_PULLED=$(printf '%s' "${DEPLOYED_JSON}" | jq -r '.pulled_fingerprint // ""' 2>/dev/null || true)
           echo "deployed ${FIELD}: ${DEPLOYED:-<none>}"
+          echo "deployed pulled_fingerprint: ${DEPLOYED_PULLED:-<none>}"
 
-          if [ -n "${DEPLOYED}" ] && [ "${DEPLOYED}" = "${CURRENT}" ]; then
+          if [ -n "${DEPLOYED}" ] && [ "${DEPLOYED}" = "${CURRENT}" ] \
+            && [ "${DEPLOYED_PULLED}" = "${PULLED_FINGERPRINT}" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "::notice::published content unchanged since the deployed build; skipping build and deploy."
           else
@@ -1052,15 +1072,17 @@ jobs:
         env:
           CONTENT_FINGERPRINT: ${{ needs.check.outputs.content_fingerprint }}
           CV_FINGERPRINT: ${{ needs.check.outputs.cv_fingerprint }}
+          PULLED_FINGERPRINT: ${{ needs.check.outputs.pulled_fingerprint }}
           CONTENT_SOURCE: ${{ needs.check.outputs.use_bucket == 'true' && 'bucket' || 'cv-release' }}
         run: |
           jq -n \
             --arg content "${CONTENT_FINGERPRINT}" \
             --arg fp "${CV_FINGERPRINT}" \
+            --arg pulled "${PULLED_FINGERPRINT}" \
             --arg src "${CONTENT_SOURCE}" \
             --arg sha "${GITHUB_SHA}" \
             --arg run "${GITHUB_RUN_ID}" \
-            '{content_fingerprint: $content, cv_fingerprint: $fp, content_source: $src, built_from_sha: $sha, run_id: $run}' \
+            '{content_fingerprint: $content, cv_fingerprint: $fp, pulled_fingerprint: $pulled, content_source: $src, built_from_sha: $sha, run_id: $run}' \
             > public/build-info.json
           cat public/build-info.json
 
@@ -1206,15 +1228,17 @@ jobs:
         env:
           CONTENT_FINGERPRINT: ${{ needs.check.outputs.content_fingerprint }}
           CV_FINGERPRINT: ${{ needs.check.outputs.cv_fingerprint }}
+          PULLED_FINGERPRINT: ${{ needs.check.outputs.pulled_fingerprint }}
           CONTENT_SOURCE: ${{ needs.check.outputs.use_bucket == 'true' && 'bucket' || 'cv-release' }}
         run: |
           jq -n \
             --arg content "${CONTENT_FINGERPRINT}" \
             --arg fp "${CV_FINGERPRINT}" \
+            --arg pulled "${PULLED_FINGERPRINT}" \
             --arg src "${CONTENT_SOURCE}" \
             --arg sha "${GITHUB_SHA}" \
             --arg run "${GITHUB_RUN_ID}" \
-            '{content_fingerprint: $content, cv_fingerprint: $fp, content_source: $src, built_from_sha: $sha, run_id: $run}' \
+            '{content_fingerprint: $content, cv_fingerprint: $fp, pulled_fingerprint: $pulled, content_source: $src, built_from_sha: $sha, run_id: $run}' \
             > public/build-info.json
           cat public/build-info.json
 
@@ -1249,6 +1273,23 @@ jobs:
       # site/dist-public.
       - name: Check smoke-test routes exist (Firebase Hosting variant)
         run: npm run check:smoke-routes
+
+      # D28-B: the public Pages source is pulled into the PRIVATE build only,
+      # after the public output above has already been built. It therefore
+      # cannot reach dist-public, and the leak check below still runs with its
+      # manifest in the tree. The cache is the "last good copy": a fetch failure
+      # reuses it, and an empty cache plus a failed fetch stops the build rather
+      # than letting the destructive private sync withdraw the project.
+      - name: Restore the last good pulled Pages tree
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: site/.pulled-sources
+          key: pulled-sources-${{ github.run_id }}
+          restore-keys: |
+            pulled-sources-
+
+      - name: Pull pages-hosted sources into the private build
+        run: node scripts/pull-sources.mjs --allow-stale
 
       # THE SECOND OUTPUT (ADR-0005 decision 1). Same source tree, same synced
       # content, same validated manifests; HUB_OUTPUT=private selects

@@ -2,7 +2,7 @@
 // A PRIVATE-ONLY repository link (D27). The map is read at build time from the
 // hub-side Terraform satellite config; the public build never imports this
 // component. A satellite with no mapping renders nothing.
-import { githubRepositoryUrl, repositoryFor } from "../lib/repositories.mjs";
+import { githubRepositoryUrl, repositoryFor, repositoryNoteFor } from "../lib/repositories.mjs";
 
 interface Props {
   source: string;
@@ -12,6 +12,7 @@ interface Props {
 const { source, compact = false } = Astro.props;
 const repository = repositoryFor(source);
 const url = githubRepositoryUrl(repository);
+const note = repositoryNoteFor(source) ?? "Requires GitHub access to the repository.";
 ---
 
 {url && (
@@ -25,7 +26,7 @@ const url = githubRepositoryUrl(repository);
         <span class="repository-link-name">{repository}</span>
       </span>
     </a>
-    <p class="repository-link-note">Requires GitHub access to the repository.</p>
+    <p class="repository-link-note">{note}</p>
   </div>
 )}
 

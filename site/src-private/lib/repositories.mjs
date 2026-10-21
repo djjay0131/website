@@ -33,7 +33,9 @@ export const REPO_ROOT =
 const SOURCE = /^[a-z][a-z0-9-]{0,38}$/;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const ENV_NAME = "HUB_SATELLITE_REPOS";
+const PULLED_CONFIG = "site/pulled-sources.json";
 const cache = new Map();
+const pulledCache = new Map();
 
 /** Strip HCL comments; the config blocks we read contain no `#` in values. */
 function withoutComments(text) {
@@ -122,13 +124,48 @@ function fromEnvironment(env) {
   }
 }
 
+/**
+ * Repositories and notes declared by hub-pulled Pages sources (D28-B).
+ *
+ * These are not satellites: they have no publishing identity and no Terraform
+ * entry. The config is the hub-side declaration that the private build uses for
+ * the project's Repository card. Malformed entries are ignored, as above.
+ */
+export function readPulledSources({ root = REPO_ROOT } = {}) {
+  if (pulledCache.has(root)) return pulledCache.get(root);
+  const result = { repositories: {}, notes: {} };
+  let raw;
+  try {
+    raw = JSON.parse(fs.readFileSync(path.join(root, PULLED_CONFIG), "utf8"));
+  } catch {
+    pulledCache.set(root, result);
+    return result;
+  }
+  const sources = Array.isArray(raw?.sources) ? raw.sources : [];
+  for (const entry of sources) {
+    if (!entry || typeof entry !== "object") continue;
+    const source = entry.source;
+    const repository = entry.repo;
+    if (typeof source !== "string" || !SOURCE.test(source)) continue;
+    if (typeof repository !== "string" || !REPOSITORY.test(repository)) continue;
+    result.repositories[source] = repository;
+    if (typeof entry.repositoryNote === "string" && entry.repositoryNote.trim()) {
+      result.notes[source] = entry.repositoryNote.trim().slice(0, 300);
+    }
+  }
+  pulledCache.set(root, result);
+  return result;
+}
+
 /** Read the map once per root. An explicit env map wins over the files. */
 export function readSatelliteRepositories({ root = REPO_ROOT, env = process.env } = {}) {
   const override = fromEnvironment(env);
   if (override !== null) return override;
   if (cache.has(root)) return cache.get(root);
 
-  let repositories = {};
+  // Pulled sources are merged first: a Terraform entry, where one exists, is
+  // still the satellite roster and wins on a name collision.
+  const repositories = { ...readPulledSources({ root }).repositories };
   for (const relative of ["infra/terraform.tfvars", "infra/variables.tf"]) {
     let text;
     try {
@@ -136,17 +173,26 @@ export function readSatelliteRepositories({ root = REPO_ROOT, env = process.env 
     } catch {
       continue;
     }
-    repositories = parseSatelliteRepositories(text);
-    if (Object.keys(repositories).length > 0) break;
+    const parsed = parseSatelliteRepositories(text);
+    if (Object.keys(parsed).length > 0) {
+      Object.assign(repositories, parsed);
+      break;
+    }
   }
   cache.set(root, repositories);
   return repositories;
 }
 
-/** The owner/repo for one source, or null when the satellite declares none. */
+/** The owner/repo for one source, or null when the source declares none. */
 export function repositoryFor(source, options = {}) {
   if (typeof source !== "string" || !SOURCE.test(source)) return null;
   return readSatelliteRepositories(options)[source] ?? null;
+}
+
+/** A source-specific note for the Repository card, or null. */
+export function repositoryNoteFor(source, options = {}) {
+  if (typeof source !== "string" || !SOURCE.test(source)) return null;
+  return readPulledSources(options).notes[source] ?? null;
 }
 
 export function githubRepositoryUrl(repository) {

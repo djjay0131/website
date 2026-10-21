@@ -5,8 +5,10 @@ import path from "node:path";
 import {
   githubRepositoryUrl,
   parseSatelliteRepositories,
+  readPulledSources,
   readSatelliteRepositories,
   repositoryFor,
+  repositoryNoteFor,
 } from "./repositories.mjs";
 
 const VARIABLES = `
@@ -97,6 +99,58 @@ describe("repository root discovery", () => {
     fs.mkdirSync(nested, { recursive: true });
     expect(findRepoRoot(nested)).toBe(root);
     expect(findRepoRoot(path.join(root, "no-such-dir"))).toBe(root);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+describe("the hub-pulled Pages source map (D28-B)", () => {
+  it("reads a pulled source and its note without a Terraform entry", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pulled-repos-"));
+    fs.mkdirSync(path.join(root, "site"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "site", "pulled-sources.json"),
+      JSON.stringify({
+        version: 1,
+        sources: [
+          {
+            source: "pulled-example",
+            repo: "example/pulled-example",
+            repositoryNote: "Source of truth: the public repository.",
+          },
+        ],
+      }),
+    );
+    expect(readPulledSources({ root })).toEqual({
+      repositories: { "pulled-example": "example/pulled-example" },
+      notes: { "pulled-example": "Source of truth: the public repository." },
+    });
+    expect(repositoryFor("pulled-example", { root, env: {} })).toBe("example/pulled-example");
+    expect(repositoryNoteFor("pulled-example", { root })).toBe(
+      "Source of truth: the public repository.",
+    );
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("ignores a malformed pulled entry and leaves satellite names to Terraform", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pulled-repos-"));
+    fs.mkdirSync(path.join(root, "site"), { recursive: true });
+    fs.mkdirSync(path.join(root, "infra"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "site", "pulled-sources.json"),
+      JSON.stringify({
+        version: 1,
+        sources: [
+          { source: "bad", repo: "no-slash" },
+          { source: "pulled-example", repo: "example/pulled-example" },
+        ],
+      }),
+    );
+    fs.writeFileSync(path.join(root, "infra", "variables.tf"), VARIABLES);
+    expect(readPulledSources({ root }).repositories).toEqual({
+      "pulled-example": "example/pulled-example",
+    });
+    expect(repositoryFor("pulled-example", { root, env: {} })).toBe("example/pulled-example");
+    expect(repositoryFor("source-a", { root, env: {} })).toBe("example/source-a");
     fs.rmSync(root, { recursive: true, force: true });
   });
 });

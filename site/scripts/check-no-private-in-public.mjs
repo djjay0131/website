@@ -374,7 +374,12 @@ export const ANNOTATION_ALLOWED_IN_PUBLIC = ["/annotations", "data-annotation-"]
  * path or in a file's contents (the gzip Pagefind payloads included), exactly as
  * the annotation needles are.
  */
-export const SOURCE_IDENTITY_NEEDLES = ["saner2027", "saner2027-governed-agents"];
+export const SOURCE_IDENTITY_NEEDLES = [
+  "saner2027",
+  "saner2027-governed-agents",
+  "ebay-erupt",
+  "ebay_erupt_2027",
+];
 
 /**
  * HTML entities a browser decodes before an attribute value or URL is used.
