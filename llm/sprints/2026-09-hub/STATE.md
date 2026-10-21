@@ -5303,3 +5303,148 @@ live policy grants every member all six projects.
   to satisfy the executable-bit guard; it is reached through the interpreter.
 - No live private content was exposed, no gate rollback was needed, and no
   Terraform or allowlist change was made.
+
+## D27 — live deadlines, repository links and the note composer (owner feedback, 2026-10-21)
+
+Owner feedback after D26: the SANER project showed no upcoming deadlines, a
+repository link would help, and the live note/comment box could not be focused.
+A fourth item, the committee section, was raised mid-round and then **cancelled
+by the owner** after he found it; no committee page or route was changed.
+
+### Live event write (owner-approved; values not recorded here)
+
+The D26 owner tool was used against live Firestore **before** the code merge. The
+approved six project-scoped events and eight owner-only chapter events were
+written; the two unconfirmed PhD dates were deliberately not written. Firestore
+holds 14 events and 14 `calendar_audit` records (`add_event`, actor the owner's
+signed-in gcloud identity). Abstract status is `done` as instructed. No event
+value, title or date was committed to this repository.
+
+Writing exposed a tool bug: `calendar_events.py list` filtered by the **GCP
+project** (`args.project`) instead of the event-project filter
+(`args.filter_project`), so it printed `[]` after successful writes. Fixed with a
+pure `_filter_events()` helper and a regression test before continuing.
+
+### Why the project hub showed no deadlines
+
+D26 put the "Upcoming deadlines" block in `ProjectSection.astro`, which renders
+project **sub-pages**. The project **hub** route
+(`/p/projects/<source>/`) never rendered a block. With live events present, the
+hub therefore had nothing to show. D27 adds the same upcoming block to the hub,
+loads `/private/calendar` there, filters by the hub's source, and keeps the
+"no upcoming" state honest. The sub-page block is unchanged.
+
+### Repository link
+
+- A **Repository** card (GitHub mark + `owner/repo`) now appears on the project
+  hub, and a compact version in the project sub-page sidebar. It carries the
+  note "Requires GitHub access to the repository."
+- The map is read at private-build time from the hub-side Terraform satellite
+  config: `infra/terraform.tfvars` when present, otherwise the `default` of
+  `var.satellites` in `infra/variables.tf`. **No manifest field was added and no
+  repository name was added to the repository.** The parser is defensive: bad
+  entries are dropped, and a source with no mapping renders nothing.
+- The module lives under `src-private/`; the public build never imports it.
+  Signed-out pages are the styled 404 and carry no repository link. CI
+  screenshots set `HUB_SATELLITE_REPOS` to a synthetic map, so the public PR
+  artifact never carries a real private repository name.
+- Tests cover the Terraform default map, tfvars precedence, malformed/missing
+  config, environment override, missing mapping and root discovery.
+
+### Note composer focus bug — root cause and fix
+
+**Cause:** the capture toolbar installs `mousedown`/`pointerdown` handlers that
+call `preventDefault()` to preserve the text selection (the D20 fix). The
+Comment composer's `<textarea>` is inside that same toolbar, so the hold
+cancelled the textarea's default mousedown and the browser never focused it.
+Clicking the box could not place a caret, so typing was impossible.
+
+**Fix:** the hold now skips text-entry targets (`textarea`, `input`, `select`,
+`contenteditable`) and still applies to buttons and chips. A jsdom regression
+test asserts both: a textarea mousedown is not cancelled, and a chip mousedown
+still is. A Playwright check selects document text, opens Comment, clicks the
+textarea, types, saves, and confirms the note reached the endpoint. It writes
+`note-composer-before.png` (opened composer) and `note-composer-after.png`
+(typed text), plus the saved state.
+
+### PRs and deploy
+
+| PR | Branch | What | Merge |
+|---|---|---|---|
+| **#151** | `feat/d27-project-upcoming-repository` | hub upcoming block, repository links, note focus fix, owner-tool list fix, visual checks | `461ebeb` |
+
+Deploy run: <https://github.com/djjay0131/website/actions/runs/39607819507> on
+`461ebeb` — every job succeeded. Cloud Run `hub-gate` revision
+**`hub-gate-00019-9nx`** carries 100% of traffic. No Terraform apply, destroy,
+allowlist change or public route was made.
+
+Screenshots (synthetic principals): <https://github.com/djjay0131/website/actions/runs/39607527213/artifacts>
+(`d25-d27-screenshots`, artifact id 12349985092). It contains the per-principal
+project hubs and calendar, the note composer before/after, and the saved state.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| Contract | **76 passed** |
+| Gate | ruff clean, **725 passed** |
+| Site | **604 passed, 2 skipped** |
+| D25 visual | **58/58** |
+| D26 visual | **52/52** — hub and sub-page upcoming, repository link + note, owner/committee/project-team/signed-out |
+| D27 note composer | **8/8** — select, open, focus, type, save, endpoint, screenshots |
+| Private build (live-mirror content) | 10 private items, 290 files; repository link rendered from the real Terraform map |
+| Private build (fixtures) | 4 items, 126 files; `check:private-links` PASS (246 anchors), public-leak PASS, allowlist PASS, leak self-test PASS, sync dry run 126/0 |
+| Public build | no `repository-link`, no satellite repository name |
+| CI #151 | all jobs green |
+
+### Live verification (2026-10-21)
+
+Signed-out HTTP against `https://jason.cusati.us`:
+
+| Path | Result |
+|---|---|
+| `/p/`, `/p/calendar/`, `/p/projects/saner2027/` | **404** each, byte-identical styled 404 (`sha256 31d7e027…`), `private, no-store` |
+| `/private/calendar` | **403** `{"status":"forbidden"}`, `private, no-store`, `noindex` |
+
+Live decision code against live Firestore policy/members and the live catalog:
+
+| Measure | Result |
+|---|---|
+| Live events | 14 (6 project-scoped, 8 owner-only) |
+| Owner | sees all 14 |
+| Non-owner members who can open the project | 3; each sees exactly its 6 project events and **zero** owner-only events |
+| Owner-only leak | 0 |
+
+Live UI check (private build from the live content bucket, live policy/events,
+simulated principals, screenshots kept out of the repo): **14/14** assertions:
+
+| Principal | `/p/projects/saner2027/` | `/p/calendar/` | Repository link |
+|---|---|---|---|
+| Owner | SANER paper visible in upcoming | SANER + chapter events | present |
+| SANER 2027 team member | SANER paper visible in upcoming | SANER events, no chapter | present |
+| Signed out | styled 404 | 404 (and `/private/calendar` 403) | absent |
+
+### Adversarial round
+
+| Target | Result |
+|---|---|
+| Live event write scope | Only the 14 approved events written; PhD dates untouched; 14 matching audit records. PASS |
+| Owner-only leak | Non-owner principals see zero chapter/owner-only events in decision code and in the rendered calendar. PASS |
+| Repository-name leak | Public build and signed-out pages carry no satellite repository name or repository-link markup; CI artifact uses synthetic names. PASS |
+| Repository map trust | Build-time map comes from existing Terraform config; malformed/missing entries render nothing; no manifest field. PASS |
+| Note composer focus | A textarea mousedown is focusable while chip mousedowns still preserve the selection. PASS |
+| Project hub with data | With live events present, the hub's upcoming block renders the source's events instead of an empty section. PASS |
+| Calendar access | The hub and calendar use the same gated endpoint; no new route or ACL. PASS |
+
+### Residuals
+
+- The repository link is shown to every member who can open the project, even
+  when they are not a GitHub collaborator; the note says access may be required.
+- CI reads the committed Terraform satellite default map. If a deployment
+  overrides `var.satellites` in an out-of-repo `terraform.tfvars`, the build can
+  be given the resulting `HUB_SATELLITE_REPOS` JSON to stay in step; the
+  defaults are the current source of truth.
+- The owner-only chapter events are intentionally not visible to members; they
+  are in the calendar only for the owner.
+- The committee-section item was cancelled by the owner; no committee page,
+  route or access rule was changed in D27.
