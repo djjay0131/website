@@ -5448,3 +5448,135 @@ simulated principals, screenshots kept out of the repo): **14/14** assertions:
   are in the calendar only for the owner.
 - The committee-section item was cancelled by the owner; no committee page,
   route or access rule was changed in D27.
+
+## D28-B — pulled public Pages source: eBay eRUPT (owner decision, 2026-10-21)
+
+Owner decision D28-B: the eBay eRUPT proposal should appear in Jason's
+Projects space while he and Chris revise it this week. Chris Brown's repository
+`chbrown13/ebay_erupt_2027` stays the source of truth. Do not ask Chris to change
+the repository, do not touch its Pages or visibility, and do not fork or copy it.
+This is convenience, not satellite onboarding.
+
+### What was built
+
+A **hub-side pulled source**, not satellite 7. There is no new repository, WIF
+provider, service account, Terraform resource, content-bucket write or Pages
+change. The only cloud identity involved is the existing `hub-deploy` identity
+in the private sync.
+
+- `site/pulled-sources.json` declares source `ebay-erupt`, the public repository
+  and branch, its `docs/` Pages path, the item slug/title/summary/order and the
+  source-of-truth note. It is a config, not a second manifest contract.
+- `site/scripts/pull-sources.mjs` reads the public repository over HTTPS with no
+  token. It validates the configured Pages tree, rejects symlinks and special
+  files, enforces file-count and byte limits, and generates a normal v1 manifest
+  with every item forced to `visibility: private` and `section: projects`.
+- The pull runs only in `build-firebase`, **after** `dist-public` has been
+  built and before `build:private`. The private build, catalog, sanitiser, gate
+  policy and destructive private sync then treat it like any private project.
+  The public build cannot see it.
+- The pulled commit SHA is part of the scheduled fingerprint, so a new upstream
+  commit wakes the hourly build even when the content bucket is unchanged.
+- The last good pulled tree is cached under `site/.pulled-sources/`. A fetch or
+  validation failure reuses it and warns; with no cached copy the build fails.
+  The destructive private sync therefore cannot silently withdraw the project.
+- `repositories.mjs` and `RepositoryLink.astro` read the pulled-source map and
+  render the repository link plus: “Source of truth: Chris Brown’s public
+  repository. Edits there appear on the hub within the hour.”
+- ADR-0028 records the decision. `SOURCE_IDENTITY_NEEDLES` now includes
+  `ebay-erupt` and `ebay_erupt_2027`. There is no `publish-allowlist.json` entry.
+
+### Access (live, owner-approved)
+
+Applied with `infra/scripts/access.py` against live Firestore before the deploy:
+the source `ebay-erupt` is granted to a dedicated eBay group, and the approved
+member (Chris Brown) was added to that group. The owner remains always allowed;
+no other group or role is granted. `access_audit` records `set_rule` and
+`add_group` at 2026-10-21T19:32:14Z and 19:32:16Z, attributed to the owner's
+signed-in gcloud identity. The values are deliberately not repeated here beyond
+the source key already committed in the pulled-source config.
+
+### PRs, deploy and workflow
+
+| What | Reference |
+|---|---|
+| Feature PR | **#153** `feat/d28b-ebay-pulled-source` — merge `011bddb` |
+| Deploy + pull run | <https://github.com/djjay0131/website/actions/runs/39663067110> |
+| CI screenshots | <https://github.com/djjay0131/website/actions/runs/39662782080/artifacts> (`d25-d28-screenshots`, id 12376325175) |
+
+The deploy run pulled `chbrown13/ebay_erupt_2027@6d18c2d` (1 item, 3 payload
+files), built 11 private items, and the private sync applied 299 uploads with
+**0 deletes**.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| Site tests | **614 passed, 2 skipped** |
+| Contract suite | unchanged, **pass** |
+| Governance checks | **pass** (ADR-0028 and index) |
+| Pull unit tests | **8 passed** — config, traversal/symlink limits, private manifest, last-good copy |
+| `check:no-private-in-public` | **PASS** with the pulled manifest in the tree; 5 private items scanned |
+| Leak-check self-test | **PASS** — injected leak reddened all 11 derived outputs |
+| `check:private-links` | **PASS** — 288 anchors across 22 private pages |
+| `check:publish-allowlist` | **PASS** (23 entries, 0 conflicts, 0 stale) |
+| CI visual | D25 **96/96**, D26 **66/66**, D27 **8/8**, D28 **38/38** |
+| Live payload identity | live `_payload/ebay-erupt/site/index.html` == upstream `docs/index.html` at `6d18c2d` (sha256 `4ea1d80e…`) |
+
+Live private bucket after deploy: `_hub/catalog.json` version 2 with **17
+items** and the item `projects/ebay-erupt/erupt-proposal`, plus 8 object
+mappings (project page, payload HTML/PDF/figure and the item-scoped `_doc`
+copy). The project hub and proposal page are at
+`/p/projects/ebay-erupt/` and `/p/projects/ebay-erupt/erupt-proposal/`.
+
+Signed-out HTTP against `https://jason.cusati.us`:
+
+| Path | Result |
+|---|---|
+| `/p/projects/ebay-erupt/` | **404**, styled, byte-identical to the other private 404s (`sha256 31d7e027…`) |
+| `/p/projects/ebay-erupt/erupt-proposal/` | **404**, same body |
+| `/p/_payload/ebay-erupt/site/index.html` | **404**, same body |
+| `/private/items` | **403** |
+
+Live decision code against live Firestore policy and the live catalog:
+
+| Principal | eBay item / project | Notes |
+|---|---|---|
+| Owner | allowed | sees 17 items |
+| The approved member (real Firestore profile) | allowed | has the eBay group; owner-approved |
+| Committee-only (synthetic principal) | **denied** | no eBay group |
+| SANER-only (synthetic principal) | **denied** | no eBay group |
+| Signed in, no group | denied | fail closed |
+
+Live Playwright against the **live private bucket** and live policy (simulated
+principals, screenshots kept outside the repository): **33/33** assertions.
+Owner and eBay member saw the card, project hub, repository link, source-of-truth
+note, inline proposal and references; committee-only, SANER-only and signed-out
+saw no card and a 404 on the project hub. No iframe and no script/frame inside
+the pulled document.
+
+### Adversarial round
+
+| Target | Result |
+|---|---|
+| Untrusted pulled HTML | Scripts, frames, forms, handlers and `javascript:`/`data:` navigation are removed by the existing sanitiser; live document segment contains **0** scripts and no iframe. PASS |
+| Path escape / symlinks | Config paths reject absolute and `..`; symlinks and special files are refused before staging. PASS |
+| Size / count limits | 2,000 files, 50 MiB total and 15 MiB per file, checked before replacing the last good copy. PASS |
+| Visibility widening | Manifest generation forces `private` and `projects`; no config field can make an item public; no allowlist entry exists. PASS |
+| Source identity leak | `ebay-erupt` and `ebay_erupt_2027` needles scanned in every public output; leak self-test still passes. PASS |
+| Upstream failure / withdrawal | Cached last-good copy is reused with a warning; no cache is a build failure, so the destructive sync cannot delete the project by accident. PASS |
+| Access oracle | Committee-only and SANER-only get no card and the same styled 404 as a missing project; no eBay item appears in `/private/items` for them. PASS |
+| No new infrastructure | No Terraform apply, no IAM change, no Pages change, no content-bucket write. PASS |
+
+### Residuals
+
+- `chbrown13/ebay_erupt_2027` remains **public with Pages on**. Pulling it into
+  the private hub does not make the upstream repository or its Pages site
+  private; the owner decided not to change either.
+- Freshness is the hourly build. The project card states that upstream edits
+  appear within the hour.
+- The pulled proposal keeps its upstream masthead inside the hub project page,
+  so the proposal title appears both in the project chrome and in the document.
+  That is deliberate: the upstream reading page is preserved.
+- A persistent upstream failure keeps the last good copy visible and logs a
+  warning on every stale reuse, rather than withdrawing the project.
