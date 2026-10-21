@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "source": "ebay-erupt",
+      "repo": "chbrown13/ebay_erupt_2027",
+      "ref": "main",
+      "basePath": "docs",
+      "stageDir": "site",
+      "repositoryNote": "Source of truth: Chris Brown's public repository. Edits there appear on the hub within the hour.",
+      "pages": [
+        {
+          "slug": "erupt-proposal",
+          "title": "eBay eRUPT proposal",
+          "path": "index.html",
+          "summary": "Agentic knowledge graphs over code history for enterprise software automation: the eBay eRUPT 2027 proposal.",
+          "order": 0
+        }
+      ]
+    }
+  ]
+}

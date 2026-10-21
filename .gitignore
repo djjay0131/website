@@ -23,5 +23,9 @@ site/public/og-card.png
 site/public/og-card.svg
 .aiese-raw/
 
+# D28-B pulled public Pages sources: the last good copy, and the staged tree
+# copied into site/src/content/sources/ (already ignored as synced content).
+/site/.pulled-sources/
+
 # D25 Playwright screenshots (CI artifact, never committed: private pages)
 /site/d25-screenshots/

@@ -81,6 +81,48 @@ writeSource("visual-study", [
     timezone: "UTC",
   },
 ]);
+writeSource("ebay-erupt", [
+  {
+    slug: "erupt-proposal",
+    title: "eBay eRUPT proposal",
+    section: "projects",
+    format: "html",
+    path: "site/index.html",
+    visibility: "private",
+    date: "2026-10-21",
+    summary: "The pulled eBay proposal, visible only to the eBay group.",
+  },
+], [
+  {
+    id: "erupt-revision",
+    title: "eBay eRUPT revision round",
+    kind: "work",
+    start: "2026-10-24",
+    all_day: true,
+    timezone: "UTC",
+  },
+]);
+writeSource("visual-saner", [
+  {
+    slug: "overview",
+    title: "Visual Saner: overview",
+    section: "research",
+    format: "html",
+    path: "site/overview.html",
+    visibility: "private",
+    date: "2026-10-17",
+    summary: "A project restricted to the SANER group.",
+  },
+], [
+  {
+    id: "saner-study",
+    title: "Visual SANER study milestone",
+    kind: "milestone",
+    start: "2026-10-28",
+    all_day: true,
+    timezone: "UTC",
+  },
+]);
 writeSource("visual-other", [
   {
     slug: "notes",
@@ -111,7 +153,11 @@ fs.writeFileSync(
       version: 1,
       default: { groups: ["committee", "project-team"], roles: [] },
       sections: {},
-      sources: { "visual-study": { groups: ["project-team"], roles: [] } },
+      sources: {
+        "visual-study": { groups: ["project-team"], roles: [] },
+        "ebay-erupt": { groups: ["ebay-erupt"], roles: [] },
+        "visual-saner": { groups: ["saner2027-team"], roles: [] },
+      },
       items: {},
     },
     null,
@@ -128,7 +174,7 @@ fs.writeFileSync(
         role: "owner",
         groups: [],
         expectSource: "visual-study",
-        expectSources: ["phd-milestones", "visual-other", "visual-study"],
+        expectSources: ["phd-milestones", "visual-other", "visual-study", "ebay-erupt", "visual-saner"],
       },
       {
         id: "committee",
@@ -146,6 +192,22 @@ fs.writeFileSync(
         groups: ["project-team"],
         expectSource: "visual-study",
         expectSources: ["phd-milestones", "visual-other", "visual-study"],
+      },
+      {
+        id: "ebay-member",
+        label: "eBay eRUPT member",
+        role: "member",
+        groups: ["ebay-erupt"],
+        expectSources: ["ebay-erupt"],
+        forbidSource: "visual-saner",
+      },
+      {
+        id: "saner-only",
+        label: "SANER-only member",
+        role: "member",
+        groups: ["saner2027-team"],
+        expectSources: ["visual-saner"],
+        forbidSource: "ebay-erupt",
       },
       { id: "signedout", label: "Signed out", signedOut: true },
     ],

@@ -513,7 +513,12 @@ describe("the PRIVATE annotation surface never reaches the public output (D20)",
 // stay covered by the manifest-derived title needles.
 describe("the private satellite's source identity never reaches the public output (D23)", () => {
   it("declares exactly the committed source-identity needles", () => {
-    expect(SOURCE_IDENTITY_NEEDLES).toEqual(["saner2027", "saner2027-governed-agents"]);
+    expect(SOURCE_IDENTITY_NEEDLES).toEqual([
+      "saner2027",
+      "saner2027-governed-agents",
+      "ebay-erupt",
+      "ebay_erupt_2027",
+    ]);
   });
 
   it("passes a clean public output", () => {
