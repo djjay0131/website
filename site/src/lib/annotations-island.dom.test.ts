@@ -112,6 +112,26 @@ describe("capture island works with real mouse events on the page's own document
     expect(down.defaultPrevented).toBe(true);
   });
 
+  it("does not prevent default on the composer textarea (D27 focus bug)", () => {
+    // The toolbar's selection hold used to run for EVERY descendant, including
+    // the textarea, so mousedown was cancelled and the browser never focused
+    // the field. A member could open Comment and type nothing.
+    realClick(buttonWithText("Comment")!);
+    const textarea = document.querySelector<HTMLTextAreaElement>(".annotation-comment-input")!;
+    expect(textarea, "the Comment composer exists").toBeTruthy();
+    for (const type of ["mousedown", "pointerdown"]) {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true });
+      const notCancelled = textarea.dispatchEvent(event);
+      expect(notCancelled, `${type} must not be defaultPrevented on the textarea`).toBe(true);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    // Buttons keep the D20 hold: selection survives their press.
+    const chip = chipWithText("brainstorm")!;
+    const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    expect(chip.dispatchEvent(down)).toBe(false);
+    expect(down.defaultPrevented).toBe(true);
+  });
+
   it("changes the intent on a real click on a chip", () => {
     expect(chipWithText("paper")!.classList.contains("is-active")).toBe(true);
     realClick(chipWithText("brainstorm")!);

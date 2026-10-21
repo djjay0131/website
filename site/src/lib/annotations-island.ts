@@ -373,6 +373,18 @@ class AnnotationIsland {
         "data-annotation-chrome": "1",
       });
       const hold = (event: Event) => {
+        // D27: the composer's textarea lives in this toolbar. Preventing the
+        // default on its mousedown/pointerdown stops the browser focusing it,
+        // so a member can open Comment and never type. Buttons and chips still
+        // need the D20 hold: without it the press collapses the selection and
+        // the toolbar disappears before the click synthesises.
+        const target = event.target;
+        if (
+          target instanceof Element &&
+          target.closest("textarea, input, select, [contenteditable='true'], [contenteditable='']")
+        ) {
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
       };
