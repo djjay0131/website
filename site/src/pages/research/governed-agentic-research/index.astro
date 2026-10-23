@@ -2,19 +2,20 @@
 // Project page for the Springer book-chapter proposal "From Papers to Progress,
 // with Agents" (Cusati & Brown). Source repository: djjay0131/ai-empirical-se-chapter
 // (private until the chapter is accepted). The goals paragraph below and the
-// proposal page are draft v1 of 20 October 2026, published as a draft for review.
+// proposal page are the final version of 23 October 2026.
 import Base from "../../../layouts/Base.astro";
 import lifecycle from "../../../data/governed-agentic-research/ai-in-empirical-se/sources.json";
 const base = import.meta.env.BASE_URL;
 const research = `${base}research/`;
 const soa = `${base}research/soa-agentic-se/`;
 const proposal = `${base}research/governed-agentic-research/proposal/`;
+const pdf = `${proposal}cusati-brown-chapter-proposal-2026-10-23.pdf`;
 ---
 
 <Base
   annotatable
   title="Jason Cusati — Governed Agentic Empirical Research"
-  description="From Papers to Progress, with Agents — a Springer book-chapter proposal by Jason Cusati and Chris Brown arguing that once AI agents participate in empirical software engineering research, the research process itself must be governed. Draft proposal and the research behind it."
+  description="From Papers to Progress, with Agents — a Springer book-chapter proposal by Jason Cusati and Chris Brown arguing that once AI agents participate in empirical software engineering research, the research process itself must be governed. The proposal and the research behind it."
 >
   <p class="crumbs"><a href={research}>← Research</a></p>
   <h1>From Papers to Progress, with Agents</h1>
@@ -26,7 +27,7 @@ const proposal = `${base}research/governed-agentic-research/proposal/`;
     accepted, through June 2027.
   </p>
 
-  <h2>The argument <span class="badge">proposal draft v1 · 20 October 2026</span></h2>
+  <h2>The argument <span class="badge">proposal · final · 23 October 2026</span></h2>
   <div class="abstract">
     <p>
       AI is no longer a tool a researcher calls at one step of a study; in
@@ -55,9 +56,8 @@ const proposal = `${base}research/governed-agentic-research/proposal/`;
     </p>
   </div>
   <p class="note">
-    A working draft ahead of the 23 October submission, published so that
-    collaborators can read it in context. <a href={proposal}>Read the full
-    one-page proposal →</a>
+    From the final proposal of 23 October 2026. <a href={proposal}>Read the
+    full one-page proposal →</a> or <a href={pdf}>download the PDF</a>.
   </p>
 
   <h2>Proposal and research</h2>
@@ -65,7 +65,7 @@ const proposal = `${base}research/governed-agentic-research/proposal/`;
     <a class="card" href={proposal}>
       <span class="card-title">The chapter proposal</span>
       <span class="card-desc">The one-page proposal in the five parts the editors asked for: authors, category, goals and audience, a six-part chapter outline, and the supplementary material we will release.</span>
-      <span class="card-meta">Draft v1 · 20 October 2026 · due 23 October</span>
+      <span class="card-meta">Final · 23 October 2026 · PDF available</span>
     </a>
     <a class="card" href={`${base}research/governed-agentic-research/ai-in-empirical-se/`}>
       <span class="card-title">AI and agents across the empirical-SE lifecycle</span>
@@ -110,8 +110,8 @@ const proposal = `${base}research/governed-agentic-research/proposal/`;
 
   <h2>Status</h2>
   <p>
-    Draft v1 of the one-page proposal is with the co-authors for review;
-    submission is due 23 October 2026, with notification on 6 November. The
+    The one-page proposal was finalized for the 23 October 2026 deadline;
+    notification is expected on 6 November. The
     chapter repository stays private until the chapter is accepted.
   </p>
 </Base>
