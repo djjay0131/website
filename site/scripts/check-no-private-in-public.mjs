@@ -379,6 +379,30 @@ export const SOURCE_IDENTITY_NEEDLES = [
   "saner2027-governed-agents",
   "ebay-erupt",
   "ebay_erupt_2027",
+  "ai-empirical-se-chapter",
+  "aiemse-chapter",
+];
+
+/**
+ * THE PRIVATE-TEXT NEEDLES (D30; owner decision, 2026-10-23).
+ *
+ * The Springer chapter is private (owner + the chapter group only). Its
+ * proposal title and distinctive proposal sentences must not reach the public
+ * output, even though the public research digest is allowed to remain. These
+ * literals are committed deliberately, at the owner's instruction: the public
+ * site used to carry them, so they are already disclosed; committing them as
+ * needles is the backstop that catches a reintroduction.
+ *
+ * The private items' own title/summary/path needles are derived from the
+ * private manifest at build time. This list covers the proposal prose that is
+ * not an item title.
+ */
+export const PRIVATE_TEXT_NEEDLES = [
+  "From Papers to Progress, with Agents: Governing AI-Assisted Empirical Software Engineering Research",
+  "operationalizes four published principles for research artifacts",
+  "hidden delegated decisions, prompt and model drift, circular validation",
+  "A shorter version, for a one-page proposal",
+  "Notes for the proposal",
 ];
 
 /**
@@ -479,6 +503,22 @@ export function findAnnotationLeaks(distDir) {
     }
   }
   return leaks;
+}
+
+/**
+ * Every trace of a private chapter-proposal needle under a built output
+ * (D30). Reuses the source-identity scanner and labels the result separately.
+ *
+ * @param {string} distDir
+ * @param {readonly string[]} [needles]
+ * @returns {{file: string, where: "path"|"contents", item: string, kind: string, needle: string, context: string}[]}
+ */
+export function findPrivateTextLeaks(distDir, needles = PRIVATE_TEXT_NEEDLES) {
+  return findSourceIdentityLeaks(distDir, needles).map((leak) => ({
+    ...leak,
+    kind: "private-text",
+    item: "private chapter proposal",
+  }));
 }
 
 /**
@@ -983,12 +1023,17 @@ if (isMain) {
     ...findSourceIdentityLeaks(distDir),
     ...(stubsDir ? findSourceIdentityLeaks(stubsDir) : []),
   ];
+  // D30: the private chapter proposal's title and distinctive prose.
+  const privateTextLeaks = [
+    ...findPrivateTextLeaks(distDir),
+    ...(stubsDir ? findPrivateTextLeaks(stubsDir) : []),
+  ];
   const redirectLeaks = findRedirectRuleLeaks(path.join(SITE_ROOT, "..", "firebase.json"), items);
 
   if (args.json) {
     console.log(
       JSON.stringify(
-        { dist: distDir, stubs: stubsDir, privateItems: items, draftPosts: drafts, leaks, stubLeaks, annotationLeaks, sourceIdentityLeaks, redirectLeaks, scopeProblems, derived, warnings },
+        { dist: distDir, stubs: stubsDir, privateItems: items, draftPosts: drafts, leaks, stubLeaks, annotationLeaks, sourceIdentityLeaks, privateTextLeaks, redirectLeaks, scopeProblems, derived, warnings },
         null,
         2,
       ),
@@ -1026,6 +1071,7 @@ if (isMain) {
     stubLeaks.length +
     annotationLeaks.length +
     sourceIdentityLeaks.length +
+    privateTextLeaks.length +
     redirectLeaks.length;
 
   if (leakCount > 0) {
@@ -1077,6 +1123,17 @@ if (isMain) {
         );
       }
     }
+    for (const leak of privateTextLeaks) {
+      console.error(`  ${leak.file}  (private chapter proposal)`);
+      console.error(`    ${leak.where}: ${JSON.stringify(leak.needle)} (D30)`);
+      if (leak.where === "contents") console.error(`    …${leak.context}…`);
+      if (process.env.GITHUB_ACTIONS === "true") {
+        console.log(
+          `::error file=${leak.file}::private-text needle ${JSON.stringify(leak.needle)} appears ` +
+            `in the ${leak.where} of ${leak.file} under the PUBLIC output`,
+        );
+      }
+    }
     for (const leak of redirectLeaks) {
       console.error(`  ${leak.file}  (${leak.where})`);
       console.error(`    ${leak.kind} of ${leak.item} — ${JSON.stringify(leak.needle)}`);
@@ -1114,8 +1171,9 @@ if (isMain) {
     console.log(
       `check:no-private-in-public: NO PRIVATE ITEMS OR DRAFT POSTS exist, so this run proves ` +
         `nothing about ${shownDist} with the item needles. The annotation needles ` +
-        `(${ANNOTATION_NEEDLES.join(", ")}) and the source-identity needles ` +
-        `(${SOURCE_IDENTITY_NEEDLES.join(", ")}) WERE checked and none was found. Run ` +
+        `(${ANNOTATION_NEEDLES.join(", ")}), the source-identity needles ` +
+        `(${SOURCE_IDENTITY_NEEDLES.join(", ")}) and the private-text needles ` +
+        `(${PRIVATE_TEXT_NEEDLES.join(", ")}) WERE checked and none was found. Run ` +
         `npm run demo:leak-check to see the check actually fail.`,
     );
     process.exit(0);
@@ -1146,14 +1204,19 @@ if (isMain) {
     `check:no-private-in-public: source-identity needles scanned (D23): ` +
       `${SOURCE_IDENTITY_NEEDLES.join(", ")}`,
   );
+  console.log(
+    `check:no-private-in-public: private-text needles scanned (D30): ` +
+      `${PRIVATE_TEXT_NEEDLES.join(", ")}`,
+  );
 
   console.log(
     `\ncheck:no-private-in-public: PASS — no private item's or draft post's slug, route, payload ` +
       `path, title or summary appears in any path or any file's contents under ${shownDist}` +
       `${shownStubs ? ` and no private title or summary appears in any stub under ${shownStubs}` : ""}` +
       `; no redirect rule names a private slug; and none of the annotation needles ` +
-      `(${ANNOTATION_NEEDLES.join(", ")}) or source-identity needles ` +
-      `(${SOURCE_IDENTITY_NEEDLES.join(", ")}) appears` +
+      `(${ANNOTATION_NEEDLES.join(", ")}), source-identity needles ` +
+      `(${SOURCE_IDENTITY_NEEDLES.join(", ")}) or private-text needles ` +
+      `(${PRIVATE_TEXT_NEEDLES.join(", ")}) appears` +
       ` (${walkFiles(distDir).length} file(s) scanned in ${shownDist}` +
       `${shownStubs ? `, ${walkFiles(stubsDir).length} in ${shownStubs}` : ""}).`,
   );

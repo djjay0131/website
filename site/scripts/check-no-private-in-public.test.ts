@@ -7,6 +7,7 @@ import zlib from "node:zlib";
 import {
   ANNOTATION_ALLOWED_IN_PUBLIC,
   ANNOTATION_NEEDLES,
+  PRIVATE_TEXT_NEEDLES,
   SOURCE_IDENTITY_NEEDLES,
   collectDraftRabbitHoles,
   collectPrivateItems,
@@ -15,6 +16,7 @@ import {
   containsNormalizedNeedle,
   findAnnotationLeaks,
   findLeaks,
+  findPrivateTextLeaks,
   findSourceIdentityLeaks,
   htmlEscape,
   needlesFor,
@@ -518,6 +520,8 @@ describe("the private satellite's source identity never reaches the public outpu
       "saner2027-governed-agents",
       "ebay-erupt",
       "ebay_erupt_2027",
+      "ai-empirical-se-chapter",
+      "aiemse-chapter",
     ]);
   });
 
@@ -589,6 +593,37 @@ describe("the private satellite's source identity never reaches the public outpu
     } finally {
       fs.rmSync(dist, { recursive: true, force: true });
       fs.rmSync(emptySources, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the private chapter proposal never reaches the public output (D30)", () => {
+  it("declares the committed proposal title/text needles", () => {
+    expect(PRIVATE_TEXT_NEEDLES).toContain(
+      "From Papers to Progress, with Agents: Governing AI-Assisted Empirical Software Engineering Research",
+    );
+    expect(PRIVATE_TEXT_NEEDLES.length).toBeGreaterThan(1);
+  });
+
+  it("passes a clean public output", () => {
+    const dist = tree({ "index.html": "<h1>Research</h1>" });
+    try {
+      expect(findPrivateTextLeaks(dist)).toEqual([]);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("flags a proposal sentence in contents and the source key in a path", () => {
+    const dist = tree({
+      "ai-empirical-se-chapter/index.html": "<p>clean</p>",
+      "index.html": "<p>operationalizes four published principles for research artifacts</p>",
+    });
+    try {
+      expect(findPrivateTextLeaks(dist).some((l) => l.kind === "private-text")).toBe(true);
+      expect(findSourceIdentityLeaks(dist).some((l) => l.needle === "ai-empirical-se-chapter")).toBe(true);
+    } finally {
+      fs.rmSync(dist, { recursive: true, force: true });
     }
   });
 });

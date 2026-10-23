@@ -1,6 +1,6 @@
 ---
 // Track landing page. Data is generated from the research store in
-// djjay0131/ai-empirical-se-chapter (docs/research/ai-in-empirical-se/) by
+// the private research repository (docs/research/ai-in-empirical-se/) by
 // site/scripts/build-aiese-track.py; edit the store, then rebuild.
 import Base from "../../../../layouts/Base.astro";
 import sources from "../../../../data/governed-agentic-research/ai-in-empirical-se/sources.json";
@@ -29,7 +29,7 @@ const agentic = count((r) => (r.ai_role ?? []).some((a: string) => a === "autono
   title="Jason Cusati — AI across the Empirical-SE Lifecycle"
   description="What has been published on LLMs and AI agents at each stage of empirical software engineering research, what it says about rigor, reproducibility and the human role, and where the gap is — a 219-record source explorer and synthesis."
 >
-  <p class="crumbs"><a href={project}>← From Papers to Progress, with Agents</a></p>
+  <p class="crumbs"><a href={project}>← Governed Agentic Empirical Research</a></p>
   <h1>AI and Agents across the Empirical-SE Research Lifecycle</h1>
   <p class="lede">
     What has been published on LLMs and AI agents at each stage of empirical
@@ -37,14 +37,14 @@ const agentic = count((r) => (r.ai_role ?? []).some((a: string) => a === "autono
     repository mining, qualitative and quantitative analysis, artifact
     generation, reporting — and what those sources say about rigor, validity,
     reproducibility and the human role. A research digest as of
-    <strong>6 October 2026</strong>, gathered for the chapter proposal.
+    <strong>6 October 2026</strong>, gathered for research on AI across the empirical-SE lifecycle.
   </p>
 
   <div class="cards">
-    <a class="card" href={`${here}synthesis/`}><span class="card-title">Read the synthesis</span><span class="card-desc">Eight sections: the lifecycle map, rigor stage by stage, the reporting guidance that already exists, human-in-the-loop and provenance work, agentic-science systems, the gap, the sources that complicate the thesis, notes for the proposal.</span></a>
+    <a class="card" href={`${here}synthesis/`}><span class="card-title">Read the synthesis</span><span class="card-desc">Eight sections: the lifecycle map, rigor stage by stage, the reporting guidance that already exists, human-in-the-loop and provenance work, agentic-science systems, the gap, the sources that complicate the thesis, notes for the research write-up.</span></a>
     <a class="card" href={`${here}sources/`}><span class="card-title">Explore the {total} sources</span><span class="card-desc">Filter by lifecycle stage, year, evidence type, AI role, discovery channel and verification status. Every claim in the synthesis links here.</span></a>
     <a class="card" href={`${here}consensus/`}><span class="card-title">Consensus searches</span><span class="card-desc">The eight consensus.app queries, one per lifecycle stage, with the ranked results and the channel agent's synthesis of each.</span></a>
-    <a class="card" href={`${here}literature-gap/`}><span class="card-title">Literature-gap table</span><span class="card-desc">The plan's Task 1 view: for each key source, what it establishes, where it falls short, and whether the proposal cites it or positions against it.</span></a>
+    <a class="card" href={`${here}literature-gap/`}><span class="card-title">Literature-gap table</span><span class="card-desc">The plan's Task 1 view: for each key source, what it establishes, where it falls short, and whether the research cites it or positions against it.</span></a>
   </div>
 
   <h2>The one-paragraph answer</h2>
@@ -90,8 +90,8 @@ const agentic = count((r) => (r.ai_role ?? []).some((a: string) => a === "autono
     every Consensus-only record in the sample, the anchor — and its corrections
     were applied in place. The synthesis was written by a further agent that
     read only the records and the channel memos. No record here is citable in
-    the proposal until it has been verified again through the chapter
-    repository's citation tooling.
+    the research write-up until it has been verified again through the citation
+    tooling.
   </p>
   <p class="note">
     Caveats: 139 records remain unchecked; the field is preprint-heavy

@@ -1,84 +1,50 @@
 ---
-// Project page for the Springer book-chapter proposal "From Papers to Progress,
-// with Agents" (Cusati & Brown). Source repository: djjay0131/ai-empirical-se-chapter
-// (private until the chapter is accepted). The goals paragraph below and the
-// proposal page are draft v1 of 20 October 2026, published as a draft for review.
+// Project page for governed agentic empirical research. Current writing is
+// private; this page carries only the public research digest and project context.
 import Base from "../../../layouts/Base.astro";
 import lifecycle from "../../../data/governed-agentic-research/ai-in-empirical-se/sources.json";
 const base = import.meta.env.BASE_URL;
 const research = `${base}research/`;
 const soa = `${base}research/soa-agentic-se/`;
-const proposal = `${base}research/governed-agentic-research/proposal/`;
+const track = `${base}research/governed-agentic-research/ai-in-empirical-se/`;
 ---
 
 <Base
   annotatable
   title="Jason Cusati — Governed Agentic Empirical Research"
-  description="From Papers to Progress, with Agents — a Springer book-chapter proposal by Jason Cusati and Chris Brown arguing that once AI agents participate in empirical software engineering research, the research process itself must be governed. Draft proposal and the research behind it."
+  description="Research on governing AI-assisted empirical software engineering: provenance, bounded agent authority, typed claims and reproducible checks."
 >
   <p class="crumbs"><a href={research}>← Research</a></p>
-  <h1>From Papers to Progress, with Agents</h1>
-  <p class="subtitle">Governing AI-assisted empirical software engineering research · Jason Cusati and Chris Brown, Virginia Tech</p>
+  <h1>Governed Agentic Empirical Research</h1>
+  <p class="subtitle">Governing AI-assisted empirical software engineering research</p>
   <p class="lede">
-    A chapter proposal for the Springer edited volume <em>Using Artificial
-    Intelligence in Empirical Software Engineering Research</em> (eds. Mäntylä,
-    Mendez, Franch, Kalinowski). Proposal due 23 October 2026; chapter, if
-    accepted, through June 2027.
+    Research on what must be recorded and checked when AI agents participate in
+    empirical software engineering research: which decisions are delegated, what
+    evidence supports them, and how the process stays reviewable.
   </p>
 
-  <h2>The argument <span class="badge">proposal draft v1 · 20 October 2026</span></h2>
-  <div class="abstract">
-    <p>
-      AI is no longer a tool a researcher calls at one step of a study; in
-      empirical software engineering it now plans, retrieves, extracts and
-      critiques, with decisions delegated to it along the way. Current guidance
-      asks authors to disclose models and prompts, keep session traces and
-      validate AI output by hand, and stage-specific frameworks now govern
-      literature screening and repository mining. What no standard yet
-      specifies is the research <em>process</em> as a governed object: which
-      decisions were delegated to AI and under what authority, which
-      intermediate artifacts they produced, and which human checks accepted
-      them, recorded as reviewable provenance across the whole study. This is
-      the loss of provenance already known to limit knowledge accumulation in
-      software engineering, now inside the study and at machine speed — and the
-      same agents can make the remedy affordable.
-    </p>
-    <p>
-      The chapter operationalizes four published principles for research
-      artifacts — structured, inspectable, long-lived, governed (Cusati and
-      Brown, ICSE 2026 Future of Software Engineering) — for AI-assisted
-      empirical research: agents work under bounded authority, claims are
-      recorded as typed entities, decisions leave durable provenance, and
-      reproducibility is built in as executable checks. It is grounded in
-      working tooling and two worked cases, presented as an experience report
-      and reference implementation rather than a validated method.
-    </p>
-  </div>
-  <p class="note">
-    A working draft ahead of the 23 October submission, published so that
-    collaborators can read it in context. <a href={proposal}>Read the full
-    one-page proposal →</a>
+  <h2>The research digest</h2>
+  <p>
+    The public digest maps what has been published on LLMs and agents at each
+    stage of empirical software engineering research — question design,
+    literature reviews, repository mining, qualitative and quantitative
+    analysis, artifact generation and reporting — and what those sources say
+    about rigor, validity, reproducibility and the human role. It is anchored on
+    Gomes et al. (2026) and backed by a source explorer and dated method note.
   </p>
-
-  <h2>Proposal and research</h2>
   <div class="cards">
-    <a class="card" href={proposal}>
-      <span class="card-title">The chapter proposal</span>
-      <span class="card-desc">The one-page proposal in the five parts the editors asked for: authors, category, goals and audience, a six-part chapter outline, and the supplementary material we will release.</span>
-      <span class="card-meta">Draft v1 · 20 October 2026 · due 23 October</span>
-    </a>
-    <a class="card" href={`${base}research/governed-agentic-research/ai-in-empirical-se/`}>
+    <a class="card" href={track}>
       <span class="card-title">AI and agents across the empirical-SE lifecycle</span>
-      <span class="card-desc">What has been published on LLMs and agents at each stage of empirical SE research — study design, literature reviews, repository mining, qualitative and quantitative analysis, artifact generation, reporting — and what it says about rigor, validity, reproducibility and the human role. Anchored on Gomes et al. (2026).</span>
-      <span class="card-meta">{lifecycle.length} sources · 6 October 2026 · synthesis, source explorer, Consensus searches, literature-gap table</span>
+      <span class="card-desc">The synthesis, the {lifecycle.length}-record source explorer, the Consensus searches and the literature-gap table.</span>
+      <span class="card-meta">{lifecycle.length} sources · 6 October 2026</span>
     </a>
   </div>
 
   <h2>How this relates to the other projects</h2>
   <p>
-    The chapter is the methodological layer on top of work that is reported
+    This project is the methodological layer on top of work that is reported
     elsewhere on this site. Each project below supplies one strand of the
-    argument; none of them is the chapter.
+    argument; none of them is the whole research programme.
   </p>
   <ul class="relations">
     <li>
@@ -92,7 +58,7 @@ const proposal = `${base}research/governed-agentic-research/proposal/`;
     </li>
     <li>
       <strong>Research.AI</strong> (the <code>agentic-kg</code> project under
-      the knowledge-graphs tenet) supplies the chapter's sharpest case for human
+      the knowledge-graphs tenet) supplies the sharpest case for human
       methodological judgement: reconciling a gold-label schema where the
       labelling choice itself could distort measured precision and recall, so
       the evaluation would measure the researchers' decision rather than the
@@ -101,7 +67,7 @@ const proposal = `${base}research/governed-agentic-research/proposal/`;
     <li>
       A time-boxed empirical study run in August 2026 under the framework's
       tooling (<code>agentic-governance</code>, <code>agentic-research</code>)
-      is one of the proposal's two worked cases: typed claims, pre-registered
+      is one of this project's two worked cases: typed claims, pre-registered
       thresholds, a human re-derivation ledger and an adversarial reviewer
       gating what could be reported. Changes that came out of it flowed back
       into both tools.
@@ -110,9 +76,8 @@ const proposal = `${base}research/governed-agentic-research/proposal/`;
 
   <h2>Status</h2>
   <p>
-    Draft v1 of the one-page proposal is with the co-authors for review;
-    submission is due 23 October 2026, with notification on 6 November. The
-    chapter repository stays private until the chapter is accepted.
+    The research digest on AI across the empirical-SE lifecycle is public (219
+    sources, 6 October 2026). Current writing is private.
   </p>
 </Base>
 
@@ -120,11 +85,6 @@ const proposal = `${base}research/governed-agentic-research/proposal/`;
   .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
   .lede { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 1rem; }
   .subtitle { font-family: var(--font-body); color: var(--color-muted); margin: -0.5rem 0 1rem; }
-  .badge { font-family: var(--font-body); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-muted); border: 1px solid var(--color-border); border-radius: 3px; padding: 0.1em 0.5em; vertical-align: middle; margin-left: 0.5em; }
-  .abstract { border-left: 4px solid var(--color-accent); background: var(--color-surface); padding: 1rem 1.25rem; margin: 1rem 0; }
-  .abstract p { margin: 0 0 0.75rem; }
-  .abstract p:last-child { margin-bottom: 0; }
-  .note { font-size: 0.9rem; color: var(--color-muted); }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
   .card { display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem 1.1rem; border: 1px solid var(--color-border); border-left: 4px solid var(--color-accent); border-radius: 4px; background: var(--color-surface); color: var(--color-text); text-decoration: none; }
   .card:hover { border-left-color: var(--color-link); text-decoration: none; }
