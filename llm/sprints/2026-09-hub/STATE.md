@@ -5580,3 +5580,143 @@ the pulled document.
   That is deliberate: the upstream reading page is preserved.
 - A persistent upstream failure keeps the last good copy visible and logs a
   warning on every stale reuse, rather than withdrawing the project.
+
+## D29 — SANER submission PDF as a private project page (owner task, 2026-10-23)
+
+Owner task D29, paper due today AoE. The SANER project already carried four
+private study pages; it now also carries the current submission build as a
+private PDF item, rendered inline in the project layout. Private only: no
+allowlist entry, no public route, no Terraform apply, no destroy, no satellite
+contract break, and no change to the study repository's visibility.
+
+### Paper build used
+
+| Field | Value |
+|---|---|
+| Exact file | `paper/build/main.pdf` in `djjay0131/saner2027-governed-agents` |
+| Commit | `688131f` on `paper/s1-s4-s6` (PR #29) |
+| Built | 2026-10-23 19:11 UTC |
+| Pages | **8** (body ends on page 7; references-only page 8) |
+| SHA-256 | `62a49530166e54ce7a251e861e9c2d5fb0b73e35f085dd595674d95769d00cf6` |
+| Anonymity | `Anonymous Author(s)`; no names, affiliations or acknowledgments |
+
+Other candidate: a 4-page tables-only build from `9c2dab7` (branch
+`analysis/paper-tables`, built 2026-10-23 15:58 UTC). It is a working draft, not
+the full submission, so the 8-page build was used. The PDF is committed at
+`docs/hub/paper/` in the private study repository; `paper/build/` stays
+git-ignored.
+
+### What changed
+
+- **Study repository PR #30** (`hub/d29-paper-pdf`, merge `13641d1`): the
+  generator stages the PDF and adds one `format: pdf`, `visibility: private`
+  item, with a distinctive slug (not the generic `paper`; the D23 lesson), the
+  paper title, section `research`. The overview page now carries the current
+  165-word abstract and the real project status (coding/agreement, tables, the
+  8-page draft, submission build). Tests cover the PDF item being private,
+  staged and a real `%PDF-` file.
+- **Hub PR #156** (`feat/d29-private-pdf-viewer`, merge `2256551`): private PDF
+  items now render an inline `<object type="application/pdf">` viewer plus
+  Download and Open-in-new-tab links to the same gated payload. No new route and
+  no access rule: the page and payload stay catalog-mapped to the item. A
+  synthetic PDF fixture and `d29-visual-check.mjs` assert the viewer, the
+  download link, the `application/pdf` payload and the styled 404 + payload 404
+  for denied principals.
+- The other four study pages were checked against `origin/master`: byte-identical
+  apart from the build banner, so no content refresh was needed. The rebuild
+  updates their banner commit/date.
+
+### Publish, deploy and workflows
+
+| What | Reference |
+|---|---|
+| Study PR | **#30** — <https://github.com/djjay0131/saner2027-governed-agents/pull/30> |
+| Publish workflow (push to `master`) | run `40012111478` — green; **Publish to the research hub** step success |
+| Hub PR | **#156** — <https://github.com/djjay0131/website/pull/156> |
+| Hub build-and-deploy (picked up the new content) | run `40012190340` — every job succeeded |
+| Live `build-info.json` | `built_from_sha 2256551`, `run_id 40012190340` |
+| Cloud Run | `hub-gate-00019-9nx` at 100%; site-only change, no gate image/revision change |
+
+The content bucket now has 5 `saner2027` items, all `visibility: private`. The
+private build/catalog has 18 items and 213 object mappings; the new item maps
+its project page, old page, gated payload and item-scoped `_doc/` PDF. The
+private sync applied the output with no deletes.
+
+### Privacy verification (live)
+
+**Leak check.** `check:no-private-in-public` on a public build of the **live
+bucket tree** (11 private items) **PASSED**, with the new item's title, slug,
+qualified id, route, payload path and summary as needles: 248 files in
+`dist-public`, 53 redirect stubs, 0 hits. The leak-check self-test still reddens
+all 11 derived outputs on the injected leak.
+
+**Signed-out HTTP** against `https://jason.cusati.us`:
+
+| Path | Result |
+|---|---|
+| `/p/projects/saner2027/` (project hub) | **404**, styled, byte-identical to a missing private path (`sha256 31d7e027…`) |
+| `/p/projects/saner2027/<paper-slug>/` | **404**, same body |
+| `/p/research/saner2027/<paper-slug>/` (old route) | **404**, same body |
+| `/p/_payload/saner2027/paper/<paper-file>.pdf` | **404**, same body |
+| `/private/items` | **403** `{"status":"forbidden"}` |
+| Random control `/p/projects/zzz-nonexistent-6f3a/` | **404**, same body |
+
+Every 404 carried `cache-control: private, no-store` and
+`x-robots-tag: noindex, nofollow`; no body named the study, the slug, the title
+or `saner2027`.
+
+**Decision code against live Firestore + the live catalog** (the gate's own
+`parse_access_policy`, `parse_catalog_document` and `StaticAccessMap`; no live
+member cookie was minted):
+
+| Principal | Paper item | Project page | Payload | SANER project | Listing |
+|---|---|---|---|---|---|
+| Owner (real profile) | allowed | allowed | allowed | allowed | 18 items |
+| Atharva (real `saner2027-team` profile) | allowed | allowed | allowed | allowed | 17 items, 5 SANER |
+| Chris (real profile; committee + eBay + SANER team) | allowed | allowed | allowed | allowed | 18 items, 5 SANER |
+| Yovi (real `saner2027-team` profile) | allowed | allowed | allowed | allowed | 17 items, 5 SANER |
+| Committee-only (synthetic) | **denied** | **denied** | **denied** | **denied** | 12 items, 0 SANER |
+| eBay-only (synthetic) | **denied** | **denied** | **denied** | **denied** | 7 items, 0 SANER |
+| Signed in, no group | **denied** | **denied** | **denied** | **denied** | 6 items, 0 SANER |
+
+The live private bucket carries the viewer markup
+(`<object type="application/pdf" data="/p/_payload/saner2027/paper/…">`), the
+download link and a `noindex` meta; the payload object's SHA-256 matches the
+committed PDF. The page URL is
+`/p/projects/saner2027/<paper-slug>/` (slug deliberately not repeated in this
+public record).
+
+### Verification (local)
+
+| Check | Result |
+|---|---|
+| Study generator tests | **17 passed** |
+| Contract validator | schema, paths and source passed |
+| Hub site tests | **614 passed, 2 skipped** |
+| D29 visual (PDF viewer, allowed + denied) | **40/40** |
+| D25 / D26 / D27 / D28 visual | **96/96**, **66/66**, **8/8**, **38/38** |
+| `check:private-links` on the live-tree private build | PASS — 726 anchors across 60 pages |
+| `check:publish-allowlist` | PASS — 23 entries, 0 conflicts, 0 stale |
+| Leak-check self-test | PASS |
+
+### Adversarial round
+
+| Target | Result |
+|---|---|
+| Public leak of the new item | Public build, sitemap, feeds, stubs, Pagefind and live public surfaces carry no title, slug, route or payload path. PASS |
+| Signed-out existence oracle | PDF page, old route, payload and project hub are all the same byte-identical styled 404 as a missing path. PASS |
+| Committee-only / eBay-only widening | Source rule `saner2027` remains team-only; both synthetic principals are denied item, page, payload and project. PASS |
+| Payload spoofing | The gate's extension-based `application/pdf` + `nosniff`; the object route is catalog-mapped, so the bytes cannot be served under an HTML name. PASS |
+| Viewer HTML injection | The viewer is hub-side markup; satellite HTML still loses objects/frames/scripts in the sanitiser. The PDF is never parsed as HTML. PASS |
+| Contract / infrastructure | Manifest stays private v1; no allowlist, Terraform, IAM or repository-visibility change. PASS |
+
+### Residuals
+
+- The browser's built-in PDF viewer decides whether to render inline; the page
+  keeps a Download link and an Open-in-new-tab link as the fallback.
+- The PDF is a committed build output in the private study repository, not
+  rebuilt in CI. Its commit and SHA-256 are recorded above; `paper/build/` stays
+  ignored.
+- The paper title and abstract remain private to the study repository and the
+  gated hub. This public record deliberately omits the title and the full page
+  slug.
