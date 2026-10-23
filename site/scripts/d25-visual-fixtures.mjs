@@ -27,6 +27,13 @@ function writeSource(source, items, deadlines = []) {
     )}\n`,
   );
   for (const item of items) {
+    if (item.format === "pdf") {
+      fs.copyFileSync(
+        path.resolve("fixtures/content/sources/cv/one-page.pdf"),
+        path.join(sourcesDir, source, item.path),
+      );
+      continue;
+    }
     fs.writeFileSync(
       path.join(sourcesDir, source, item.path),
       `<!doctype html><html><head><style>:root{--fixture:red} body{font-family:serif}.bad{position:fixed;z-index:9999}</style></head><body>
@@ -62,6 +69,16 @@ writeSource("visual-study", [
     visibility: "private",
     date: "2026-10-19",
     summary: "Design page for the visual fixture.",
+  },
+  {
+    slug: "submission-paper",
+    title: "Visual Study: submission paper",
+    section: "research",
+    format: "pdf",
+    path: "site/paper.pdf",
+    visibility: "private",
+    date: "2026-10-23",
+    summary: "A private PDF rendered with the inline viewer.",
   },
 ], [
   {
