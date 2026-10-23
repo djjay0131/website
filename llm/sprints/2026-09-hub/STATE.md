@@ -5720,3 +5720,187 @@ public record).
 - The paper title and abstract remain private to the study repository and the
   gated hub. This public record deliberately omits the title and the full page
   slug.
+
+## D30 — Springer chapter made private and published to the private project (owner task, 2026-10-23)
+
+Owner decision D30, immediately after D29: the Springer edited-book chapter is
+**private**. Close the public proposal PR without merging; remove the proposal
+from the public site; publish the final one-page proposal and a short project
+page only in the private chapter project, shared with the owner and
+`dcbrown@vt.edu`.
+
+### The public exposure found and removed
+
+**PR #155 (`research/proposal-submitted`) was the immediate risk.** It was open
+against `main` and would have:
+
+- added the final proposal PDF at a **public** route
+  `/research/governed-agentic-research/proposal/<final>.pdf`;
+- updated the public proposal page to the final text (`badge final · 23 October
+  2026`, outline item 2, PDF link);
+- updated the project page, `research-portfolio.json` status and redirect map.
+
+It was **closed without merging** with a comment that the chapter is private.
+Nothing from its PDF or page edits reached `main`.
+
+**The merged public pages already exposed the draft proposal.** PRs #141/#142
+had published, on the public site:
+
+- `/research/governed-agentic-research/proposal/` — the full one-page proposal
+  in all five CFP parts (authors, category, goals, outline, supplementary);
+- `/research/governed-agentic-research/` — the proposal title, authors,
+  abstract/argument, a “Read the full one-page proposal” link and a proposal
+  card;
+- the public lifecycle digest — proposal notes, a “shorter version, for a
+  one-page proposal”, “Notes for the proposal”, and proposal references in the
+  literature-gap and consensus views;
+- `research-portfolio.json` and the home/research index — the proposal name and
+  “Proposal draft v1 published for review” status.
+
+All of that is now removed (see below). The research digest itself — the
+219-source store and its synthesis — remains public; only proposal-specific
+text, notes and links were taken out.
+
+### Public removal (PR #158, merge `42a9640`)
+
+- Deleted `site/src/pages/research/governed-agentic-research/proposal/index.astro`.
+- Removed the proposal redirect entry, so both the canonical and legacy
+  `/website/.../proposal/` URLs return the **normal 404**, with no redirect that
+  would reveal the private location.
+- Reworked `/research/governed-agentic-research/` as a neutral project page:
+  no proposal title, abstract, authors, badge, proposal card or link.
+- Scrubbed proposal references from `research-portfolio.json` and the lifecycle
+  digest (`ai-in-empirical-se/index`, `literature-gap`, `synthesis`, `consensus`),
+  including the one-page-proposal block and the “Notes for the proposal”
+  section.
+- Extended the leak check:
+  - source-identity needles `ai-empirical-se-chapter` and `aiemse-chapter`;
+  - committed private-text needles for the proposal title and distinctive
+    proposal sentences (owner instruction: keep them as needles);
+  - a D30 scanner test and a route-inventory regression test asserting the
+    proposal route is neither served nor redirected.
+
+### Private chapter project
+
+The chosen mechanism is **the existing content-bucket contract with an
+owner-run upload**, not satellite 7 and not a private-repo read credential
+(ADR-0003 in the chapter repository). No Terraform, IAM, service account or
+repository-visibility change was made.
+
+| Field | Value |
+|---|---|
+| Chapter repository PR | #10, merge `61287b6` |
+| Repo | `djjay0131/ai-empirical-se-chapter` (private, unchanged) |
+| PDF | `proposal/proposal-cusati-brown-2026-10-23.pdf`, from `proposal/first-draft` `1518572` |
+| PDF build | 1 page, 2026-10-23 16:43:55 UTC, SHA-256 `f73e155f…` |
+| Source key | `ai-empirical-se-chapter` |
+| Section / visibility | `projects` / `private` for both items |
+| Slugs | `aiemse-chapter-project` (HTML) and `aiemse-chapter-proposal-2026-10-23` (PDF) |
+| Bucket | `gs://cusati-hub-content/sources/ai-empirical-se-chapter/` (3 objects) |
+| Access group | `aiemse-chapter`; contains Chris Brown only |
+
+The short project page carries the title, status and the eight chapter
+deadlines. The PDF page uses the D29 inline viewer + download link. The live
+private bucket bytes match the committed PDF SHA-256.
+
+Access writes (owner-approved, live Firestore, with `access_audit` records):
+`set_rule` for source `ai-empirical-se-chapter` → group `aiemse-chapter`, and
+`add_group` for `dcbrown@vt.edu`. The eight Springer calendar events were moved
+from owner-only (`project: null`) to `project: ai-empirical-se-chapter` with
+audited `update_event` writes; their titles, dates and status are unchanged.
+
+### Deploy and workflows
+
+| What | Reference |
+|---|---|
+| Website PR | **#158** — <https://github.com/djjay0131/website/pull/158> |
+| Website deploy | run `40025120392` — every job succeeded; live `built_from_sha 42a9640` |
+| Chapter PR | **#10** — <https://github.com/djjay0131/ai-empirical-se-chapter/pull/10> |
+| Closed without merge | **#155** — <https://github.com/djjay0131/website/pull/155> |
+| Live private catalog | 20 items, 223 object mappings; both chapter items and their page/payload/`_doc` objects present |
+
+Chapter CI: `governance-links`, `adr-index` and `adr-status` pass. The only
+failure is the pre-existing `layout` finding on
+`docs/research/ai-in-empirical-se/consensus/q1-question-design.md`; it is
+present on `origin/main` (merged PR #8) and is untouched by D30.
+
+### Privacy verification (live)
+
+**Leak check** on a public build of the live bucket tree: **PASS** — 13 private
+items, 247 public files, 52 redirect stubs, 0 hits. The chapter’s title, slug,
+qualified id, route, payload path and summary are needles, as are the committed
+private-text and source-identity needles. The self-test still catches the
+injected leak.
+
+**Public URLs** against `https://jason.cusati.us`:
+
+| Path | Result |
+|---|---|
+| `/research/governed-agentic-research/proposal/` | **404**, normal public 404, no redirect |
+| `/website/research/governed-agentic-research/proposal/` | **404**, no redirect |
+| same routes on `djjay0131.github.io/website` | **404** |
+| `/research/governed-agentic-research/` | **200**, clean project page; no proposal title/text/link |
+| `/research/governed-agentic-research/ai-in-empirical-se/` | **200**, digest remains; no proposal-specific text |
+
+The 404 response carries `cache-control: max-age=3600`; a browser or CDN cache
+that already held the old page can serve it for up to an hour. GitHub Pages
+returns 404 too. No public PDF was ever published by `main` (PR #155 was never
+merged).
+
+**Private URLs, signed out:** project hub, project page, PDF page and PDF
+payload all return the styled private 404 (`sha256 31d7e027…`); `/private/items`
+returns 403.
+
+**Decision code against live Firestore + the live catalog** (the gate’s own
+parser and `StaticAccessMap`; no live member cookie):
+
+| Principal | Chapter page | PDF item | Payload | Project | Listing |
+|---|---|---|---|---|---|
+| Owner (real profile) | allowed | allowed | allowed | allowed | 20 items |
+| Chris Brown (real profile, `aiemse-chapter`) | allowed | allowed | allowed | allowed | 20 items, 2 chapter |
+| Atharva (real `saner2027-team` profile) | **denied** | **denied** | **denied** | **denied** | 17, 0 chapter |
+| Yovi (real `saner2027-team` profile) | **denied** | **denied** | **denied** | **denied** | 17, 0 chapter |
+| Committee-only (synthetic) | **denied** | **denied** | **denied** | **denied** | 12, 0 chapter |
+| eBay-only (synthetic) | **denied** | **denied** | **denied** | **denied** | 7, 0 chapter |
+| Signed in, no group | **denied** | **denied** | **denied** | **denied** | 6, 0 chapter |
+
+**Calendar:** the eight chapter events are live with
+`project: ai-empirical-se-chapter`. Owner and Chris each see all **8**; Atharva,
+Yovi and the synthetic principals see **0** chapter events.
+
+### Verification (local)
+
+| Check | Result |
+|---|---|
+| Website tests | **617 passed, 2 skipped** |
+| Leak-check tests | **50 passed** |
+| `check:no-private-in-public` (live tree) | **PASS** — 13 private items, 247 files, 52 stubs |
+| `redirects:check` | 73 routes, 73 entries, every route covered; proposal route absent |
+| `check:publish-allowlist` | PASS — 23 entries, 0 conflicts, 0 stale |
+| `check:private-links` (live private build) | PASS — 786 anchors across 65 pages |
+| Chapter hub tests | 2 passed; contract validator schema/paths/source PASS |
+| Chapter publish | 3 objects uploaded to the chapter prefix |
+
+### Adversarial round
+
+| Target | Result |
+|---|---|
+| Public proposal page or PDF | Removed; canonical and legacy URLs are 404 with no redirect; no PDF on `main`. PASS (cache caveat above) |
+| Public proposal text in other pages | Project page, portfolio, digest synthesis and gap table scrubbed; live pages carry none of the committed title/text needles. PASS |
+| Leak check vacuity | Private-text and source-identity needles committed and tested; the self-test still reddens the injected leak. PASS |
+| Private access widening | Source rule wins over the default; only `aiemse-chapter` (Chris) and the owner are allowed. Committee, Saner team, eBay and non-members are denied. PASS |
+| Calendar leak | Chapter events moved to the project; only the owner and the group that can open the project see them. PASS |
+| New credential / IAM | None created; publish uses the owner’s existing `gcloud` login. PASS |
+| Contract | Normal private v1 manifest; no allowlist entry; no public output. PASS |
+
+### Residuals
+
+- Publishing is manual (`docs/hub/publish.sh`); the hub picks it up on its next
+  build or a manual dispatch. A later satellite migration is additive.
+- A CDN/browser cache may serve the old public proposal page for up to one hour.
+  GitHub Pages itself now returns 404.
+- The chapter CI `layout` finding is pre-existing on `main` and remains open as
+  a separate governance cleanup.
+- The private bucket’s project `_doc/` tree includes the source `manifest.json`
+  and the PDF (the prefix-root staging rule); both are reachable only through
+  the gate’s item policy, never signed out.
