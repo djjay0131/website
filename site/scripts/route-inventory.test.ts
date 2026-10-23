@@ -95,6 +95,12 @@ describe("committed redirect map (redirects/github-pages.json)", () => {
     expect(new Set(map.map((e) => e.from)).size).toBe(map.length);
   });
 
+  it("does not serve or redirect the private chapter proposal (D30)", () => {
+    const routes = routesFromPagesDir(path.resolve("src/pages"));
+    expect(routes).not.toContain("/research/governed-agentic-research/proposal/");
+    expect(map.some((e) => e.to.includes("/governed-agentic-research/proposal/"))).toBe(false);
+  });
+
   it("covers every static page, public file, redirect source, smoke route and CI file", () => {
     const routes = [
       ...routesFromPagesDir(path.resolve("src/pages")),
