@@ -84,6 +84,14 @@ jobs:
           PLAYWRIGHT_CHROMIUM: /usr/bin/google-chrome
         run: node scripts/d27-notes-check.mjs
 
+      - name: D29 private PDF viewer and download
+        env:
+          D25_PRINCIPALS: /tmp/d25-visual/principals.json
+          D25_POLICY: /tmp/d25-visual/policy.json
+          D29_SCREENSHOTS: /tmp/d29-screenshots
+          PLAYWRIGHT_CHROMIUM: /usr/bin/google-chrome
+        run: node scripts/d29-visual-check.mjs
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -94,5 +102,6 @@ jobs:
             /tmp/d26-screenshots
             /tmp/d27-screenshots
             /tmp/d28-screenshots
+            /tmp/d29-screenshots
           if-no-files-found: warn
 

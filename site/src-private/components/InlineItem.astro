@@ -81,9 +81,23 @@ if (item.format === "html" || item.format === "bundle" || item.format === "md") 
       <div class="project-document" data-project-document set:html={documentHtml}></div>
     </>
   ) : item.format === "pdf" ? (
-    <p class="project-item-fallback">
-      <a class="document-link" href={payload} target="_top" rel="noopener">Open the PDF</a>
-    </p>
+    <div class="project-pdf">
+      <object
+        class="project-pdf-viewer"
+        data={payload}
+        type="application/pdf"
+        aria-label={`${item.title} (PDF)`}
+      >
+        <p class="project-item-fallback">
+          This browser cannot display the PDF inline.
+          <a class="document-link" href={payload} download>Download the PDF</a>.
+        </p>
+      </object>
+      <p class="project-pdf-actions">
+        <a class="document-link" href={payload} download>Download the PDF</a>
+        <a class="document-link" href={payload} target="_blank" rel="noopener">Open in a new tab</a>
+      </p>
+    </div>
   ) : (
     <p class="project-item-fallback" role="alert">
       {embedError || "This document cannot be displayed inline."}
@@ -113,6 +127,22 @@ if (item.format === "html" || item.format === "bundle" || item.format === "md") 
     margin-top: 1.5rem;
     font-size: 0.9rem;
     color: var(--color-muted);
+  }
+  .project-pdf { margin-top: 1.5rem; }
+  .project-pdf-viewer {
+    display: block;
+    width: 100%;
+    height: min(80vh, 900px);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+  .project-pdf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-top: 0.9rem;
   }
   .project-item-original { display: none; }
   .document-link {
