@@ -4,11 +4,14 @@
 
 // Research tracks moved under research/soa-agentic-se/ (PR #8). Astro writes a
 // redirect page at each `from`; astro.config.mjs prefixes each `to` with the base.
+// `remote-robotics-control` was merged into `mrs-cloud-architecture` in cv D31;
+// the old project URL forwards there so existing inbound links keep working.
 export const LEGACY_REDIRECTS = [
   { from: "research/agentic-harnesses", to: "research/soa-agentic-se/agentic-harnesses/" },
   { from: "research/agentic-harnesses/synthesis", to: "research/soa-agentic-se/agentic-harnesses/synthesis/" },
   { from: "research/agentic-harnesses/sources", to: "research/soa-agentic-se/agentic-harnesses/sources/" },
   { from: "research/agentic-harnesses/consensus", to: "research/soa-agentic-se/agentic-harnesses/consensus/" },
+  { from: "projects/remote-robotics-control", to: "projects/mrs-cloud-architecture/" },
 ];
 
 // Sections that carry <meta name="robots" content="noindex">, stay out of the
