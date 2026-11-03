@@ -823,3 +823,44 @@ def test_the_mint_log_carries_no_item_material(client, member_session, transport
         assert private not in records, private
     assert short_id in records
     assert token not in records
+
+
+# --- D32 adversarial: the recipient banner cannot be broken ------------------
+
+
+def test_the_share_document_page_escapes_a_hostile_payload_url():
+    from app.pages import share_banner_html, share_document_page
+
+    banner = share_banner_html(datetime(2026, 1, 1, tzinfo=UTC))
+    page = share_document_page(
+        "Shared document",
+        '/p/x"><script>alert(1)</script><iframe src="',
+        banner,
+    )
+
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+    assert page.count('class="share-doc"') == 1
+
+
+def test_the_recipient_banner_is_always_inserted_and_never_altered():
+    from app.pages import inject_share_banner, share_banner_html
+
+    banner = share_banner_html(datetime(2026, 1, 1, tzinfo=UTC))
+    encoded = banner.encode()
+
+    hostile = b'<BODY class="x"><div class="share-banner">fake</div><script>alert(1)</script></BODY>'
+    injected = inject_share_banner(hostile, banner)
+
+    assert injected.index(encoded) > injected.index(b"<BODY")
+    assert b"<script>alert(1)</script>" in injected
+
+
+def test_the_recipient_banner_prepends_a_fragment_with_no_body_tag():
+    from app.pages import inject_share_banner, share_banner_html
+
+    banner = share_banner_html(datetime(2026, 1, 1, tzinfo=UTC))
+    injected = inject_share_banner(b"<p>fragment</p>", banner)
+
+    assert injected.startswith(banner.encode())
+    assert injected.endswith(b"<p>fragment</p>")
