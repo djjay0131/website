@@ -70,6 +70,12 @@ export default defineConfig({
   // The legacy GitHub Pages redirects are public routes and have no meaning in
   // the private output. D21 retires the "Writing" slot: /writing/ redirects to
   // the Rabbit Holes blog (the old route is kept as a redirect, as D21 asks).
+  // D32 / ADR-0029: `/p/` is not a second landing page. `src-private/pages/
+  // index.astro` emits a RELATIVE redirect to the one canonical Projects URL.
+  // Astro's redirect helper would add an absolute canonical link, and the
+  // private-link guard correctly rejects an off-origin href. The gate's access
+  // decision runs before this object is served, so a signed-out caller still
+  // receives the styled 404 and learns nothing from the redirect.
   redirects: isPrivate
     ? {}
     : {

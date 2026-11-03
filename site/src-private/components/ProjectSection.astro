@@ -33,12 +33,9 @@ const projectsUrl = `${base}projects/`;
   </div>
 
   <aside class="project-sidebar" aria-label="Project navigation">
-    <nav class="project-subnav" aria-labelledby="project-subnav-title">
-      <p class="project-nav-title" id="project-subnav-title">In this project</p>
-      <div data-project-nav aria-live="polite">
-        <p class="project-nav-note">Loading project pages…</p>
-      </div>
-    </nav>
+    <!-- D32 / ADR-0029: no secondary nav here. Breadcrumbs are the depth
+         navigation, and the project home page lists the project's pages. This
+         sidebar keeps only previous/next, deadlines and the repository link. -->
     <nav class="project-prevnext" data-project-prevnext aria-label="Previous and next pages"></nav>
     <section class="project-upcoming" data-project-upcoming aria-live="polite">
       <p class="project-nav-note">Loading deadlines…</p>
@@ -52,7 +49,6 @@ const projectsUrl = `${base}projects/`;
   import { mountProjectNavigation, showProjectError } from "../lib/project-ui.mjs";
   import { loadCalendar, mountProjectUpcoming } from "../lib/calendar-ui.mjs";
 
-  const navRoot = document.querySelector<HTMLElement>("[data-project-nav]");
   const prevRoot = document.querySelector<HTMLElement>("[data-project-prevnext]");
   const section = document.querySelector<HTMLElement>("[data-project-section]");
   const base = section?.dataset.base ?? "/p/";
@@ -63,9 +59,9 @@ const projectsUrl = `${base}projects/`;
   if (source && slug) {
     const [result, calendar] = await Promise.all([loadPrivateItems(), loadCalendar()]);
     if (!result.ok) {
-      if (navRoot) showProjectError(navRoot, "Could not load the project pages. Try again shortly.");
+      if (prevRoot) showProjectError(prevRoot, "Could not load the project pages. Try again shortly.");
     } else {
-      mountProjectNavigation({ navRoot, prevRoot, items: result.items, source, slug, base, title });
+      mountProjectNavigation({ prevRoot, items: result.items, source, slug, base, title });
     }
     const upcoming = document.querySelector<HTMLElement>("[data-project-upcoming]");
     if (upcoming && calendar.ok) {
@@ -78,9 +74,12 @@ const projectsUrl = `${base}projects/`;
 
 <div
   data-project-section
+  data-share-item
   data-base={base}
+  data-section={item.section}
   data-source={item.source}
   data-slug={item.slug}
+  data-entry={String(item.path ?? "").split("/").pop()}
   data-title={title}
   hidden></div>
 

@@ -28,29 +28,35 @@ import path from "node:path";
 
 interface Props {
   title: string;
+  /**
+   * D32 / ADR-0029. When set, the page is a static redirect: a meta refresh, a
+   * canonical link and an immediate client navigation, with a real link as the
+   * fallback. The gate's access decision has already run before this object is
+   * served, so a signed-out caller still receives the styled 404.
+   */
+  redirectTo?: string;
 }
 
-const { title } = Astro.props;
+const { title, redirectTo } = Astro.props;
 
 const base = import.meta.env.BASE_URL; // "/p/"
 const site = Astro.site?.toString().replace(/\/$/, "") ?? "";
-const sharesHref = `${base}shares/`;
 const notesHref = `${base}notes/`;
 
 // Public pages are reached by their CANONICAL public URL, not a /p/-relative
 // link: the gate serves dist-private under /p/, and a bare /research/ would
 // escape the base (check:private-links).
 const canon = (rel: string) => (site ? `${site}/${rel}` : `/${rel}`);
-// D24: the members' header is the NORMAL site navigation, not a list of every
-// private item. The item catalogue is fetched by the landing page from the gate
-// and contains only what the viewer may open.
+// D32 / ADR-0029: the members' header is the NORMAL site navigation. Signing
+// in adds entries to it; it does not create a second menu. Projects points at
+// the one canonical private index, Calendar and Notes sit beside it, and Admin
+// is appended by a script only after the gate confirms the owner role (so a
+// non-owner's HTML never contains it).
 const bandNav = [
   { href: canon("research/"), label: "Research" },
-  // D25: inside the members' area, "Projects" is the private project index.
-  // The PUBLIC projects index remains reachable from the footer and from the
-  // normal site when signed out. D26 adds Calendar beside it.
   { href: `${base}projects/`, label: "Projects" },
   { href: `${base}calendar/`, label: "Calendar" },
+  { href: notesHref, label: "Notes" },
   { href: canon("rabbit-holes/"), label: "Rabbit Holes" },
   { href: canon("cv/"), label: "CV" },
   { href: canon("papers/"), label: "Papers" },
@@ -65,7 +71,6 @@ const footerNav = [
   { label: "Projects", href: `${base}projects/` },
   { label: "Calendar", href: `${base}calendar/` },
   { label: "My notes", href: notesHref },
-  { label: "Shares", href: sharesHref },
   { label: "Research", href: canon("research/") },
   { label: "Public projects", href: canon("projects/") },
   { label: "Rabbit Holes", href: canon("rabbit-holes/") },
@@ -88,6 +93,8 @@ const footerNav = [
          no crawler can reach, but a private page must never be indexable even if
          it somehow escapes. -->
     <meta name="robots" content="noindex, nofollow, noarchive" />
+    {redirectTo && <meta http-equiv="refresh" content={`0; url=${redirectTo}`} />}
+    {redirectTo && <link rel="canonical" href={redirectTo} />}
     <title>{title}</title>
   </head>
   <body>
@@ -95,9 +102,8 @@ const footerNav = [
     <SiteBand
       homeHref={base}
       nav={bandNav}
-      membersTag="Members"
       wordmark={meta.name}
-      navLabel="Private navigation"
+      navLabel="Main navigation"
     >
       <!-- THE SIGN-OUT CONTROL (SD-4; finding B-8).
            A BUTTON, not a link: sign-out is a state change, so it is a POST.
@@ -107,15 +113,43 @@ const footerNav = [
            pinned by tests rather than by review.
            It sits in the layout so that EVERY private page carries it -- a
            sign-out a member has to go looking for is one they will not use. -->
+      <button slot="band-actions" id="share-page" type="button" class="sign-out" hidden>
+        Share this page
+      </button>
       <button slot="band-actions" id="sign-out" type="button" class="sign-out">Sign out</button>
     </SiteBand>
+
+    <dialog id="share-dialog" class="share-dialog" aria-labelledby="share-dialog-title">
+      <form method="dialog" id="share-form">
+        <h2 id="share-dialog-title">Share this page</h2>
+        <p class="share-dialog-note">
+          The link is a bearer credential: anyone who has it can read this page
+          until it expires. Only this page is shared.
+        </p>
+        <label class="share-dialog-field">
+          Expires in days
+          <input id="share-days" type="number" min="1" max="30" value="7" required />
+        </label>
+        <p id="share-status" class="share-dialog-status" role="status"></p>
+        <input id="share-url" class="share-dialog-url" type="text" readonly hidden aria-label="Share link" />
+        <menu class="share-dialog-actions">
+          <button type="button" id="share-create">Create link</button>
+          <button type="button" id="share-copy" hidden>Copy link</button>
+          <button type="submit" value="close">Close</button>
+        </menu>
+      </form>
+    </dialog>
 
     <!-- A failed sign-out must be SEEN. A member who believes they signed out
          and did not is worse off than one who sees an error. -->
     <p id="sign-out-error" class="sign-out-error" role="alert" hidden></p>
 
     <main id="main-content">
-      <slot />
+      {redirectTo ? (
+        <p><a href={redirectTo}>Continue to the new address</a></p>
+      ) : (
+        <slot />
+      )}
     </main>
 
     <SiteFooter
@@ -146,6 +180,92 @@ const footerNav = [
       // the caller. The endpoint and the request shape are NOT spelled here:
       // they belong to signout.mjs, so there is one copy of them and a test can
       // assert it.
+      // D32 / ADR-0029: Admin is owner-only. The static private build cannot
+      // know the viewer, so it ships no Admin entry at all. The gate answers
+      // /private/me with the caller's own role; only an owner's browser adds
+      // the link. A non-owner's HTML and rendered navigation never name it.
+      const { installMemberNav } = await import("../../src/lib/member-nav.mjs");
+      await installMemberNav();
+
+      // D32 / ADR-0029: "Share this page" is owner-only and item-only. The
+      // static page carries the button hidden and no item identity unless the
+      // page is an item. The gate enforces ownership on POST /share anyway.
+      const shareTarget = document.querySelector<HTMLElement>("[data-share-item]");
+      const shareButton = document.getElementById("share-page") as HTMLButtonElement | null;
+      const shareDialog = document.getElementById("share-dialog") as HTMLDialogElement | null;
+      const shareForm = document.getElementById("share-form") as HTMLFormElement | null;
+      const shareDays = document.getElementById("share-days") as HTMLInputElement | null;
+      const shareStatus = document.getElementById("share-status");
+      const shareUrl = document.getElementById("share-url") as HTMLInputElement | null;
+      const shareCreate = document.getElementById("share-create") as HTMLButtonElement | null;
+      const shareCopy = document.getElementById("share-copy") as HTMLButtonElement | null;
+
+      if (shareTarget && shareButton && shareDialog) {
+        try {
+          const who = await fetch("/private/me", { credentials: "same-origin" });
+          if (who.ok && (await who.json()).owner === true) shareButton.hidden = false;
+        } catch {
+          // Leaving the button hidden is the safe failure.
+        }
+        shareButton.addEventListener("click", () => shareDialog.showModal());
+        shareForm?.addEventListener("submit", () => {
+          if (shareStatus) shareStatus.textContent = "";
+          if (shareUrl) {
+            shareUrl.value = "";
+            shareUrl.hidden = true;
+          }
+          if (shareCopy) shareCopy.hidden = true;
+        });
+        shareCreate?.addEventListener("click", async () => {
+          const days = Number(shareDays?.value ?? 7);
+          if (!Number.isInteger(days) || days < 1 || days > 30) {
+            if (shareStatus) shareStatus.textContent = "Choose a whole number of days from 1 to 30.";
+            return;
+          }
+          shareCreate.disabled = true;
+          if (shareStatus) shareStatus.textContent = "Creating…";
+          try {
+            const response = await fetch("/share", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                section: shareTarget.dataset.section,
+                source: shareTarget.dataset.source,
+                slug: shareTarget.dataset.slug,
+                entry: shareTarget.dataset.entry,
+                expires_in_days: days,
+              }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || typeof data.url !== "string") {
+              if (shareStatus) shareStatus.textContent = "Could not create the link.";
+              return;
+            }
+            const absolute = new URL(data.url, location.origin).href;
+            if (shareUrl) {
+              shareUrl.value = absolute;
+              shareUrl.hidden = false;
+            }
+            if (shareCopy) shareCopy.hidden = false;
+            if (shareStatus) shareStatus.textContent = "Link created.";
+          } catch {
+            if (shareStatus) shareStatus.textContent = "Could not reach the server.";
+          } finally {
+            shareCreate.disabled = false;
+          }
+        });
+        shareCopy?.addEventListener("click", async () => {
+          if (!shareUrl?.value) return;
+          try {
+            await navigator.clipboard.writeText(shareUrl.value);
+            if (shareStatus) shareStatus.textContent = "Link copied.";
+          } catch {
+            if (shareStatus) shareStatus.textContent = "Copy the link from the field.";
+          }
+        });
+      }
+
       const { signOut } = await import("../lib/signout.mjs");
       const signOutButton = document.getElementById("sign-out") as HTMLButtonElement | null;
       const signOutError = document.getElementById("sign-out-error");
@@ -240,6 +360,46 @@ const footerNav = [
   .sign-out:hover { background: rgba(255, 255, 255, 0.12); }
   .sign-out:focus-visible { outline: 2px solid var(--rule-orange); outline-offset: 2px; }
   .sign-out[disabled] { opacity: 0.6; cursor: progress; }
+  .share-dialog {
+    max-width: 32rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+  .share-dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+  .share-dialog h2 { margin-bottom: 0.5rem; font-size: 1.2rem; }
+  .share-dialog-note { color: var(--color-muted); margin-bottom: 0.75rem; }
+  .share-dialog-field { display: grid; gap: 0.25rem; margin-bottom: 0.75rem; }
+  .share-dialog-field input {
+    font: inherit;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+  .share-dialog-url {
+    width: 100%;
+    font: inherit;
+    padding: 0.35rem 0.5rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+  }
+  .share-dialog-status { color: var(--color-muted); min-height: 1.3rem; margin-bottom: 0.5rem; }
+  .share-dialog-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .share-dialog-actions button {
+    font: inherit;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .share-dialog-actions button:disabled { opacity: 0.6; cursor: progress; }
   .sign-out-error {
     max-width: var(--max-width);
     margin: 0.5rem auto 0;

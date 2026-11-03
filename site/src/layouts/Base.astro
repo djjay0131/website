@@ -178,6 +178,15 @@ const footerNav = [
       buildInfo={buildInfo}
       signInHref={`${base}signin/`}
     />
+
+    <script>
+      // D32 / ADR-0029: signed-in visitors get the SAME menu plus Calendar,
+      // Notes and (owner only) Admin. Signed-out visitors get nothing added.
+      // The additions arrive from the gate, so no private path is baked into
+      // the public bundle and a signed-out menu is unchanged.
+      import { installMemberNav } from "../lib/member-nav.mjs";
+      await installMemberNav();
+    </script>
   </body>
 </html>
 

@@ -14,6 +14,10 @@ signed-in member who is not allowed an item gets a generic page with the same
 
 from __future__ import annotations
 
+import html as _html
+import re
+from datetime import datetime as _datetime
+
 DEFAULT_SITE_ORIGIN = "https://jason.cusati.us"
 
 # Mirrors the public site's design tokens closely enough that the gate's error
@@ -227,3 +231,65 @@ def server_error(site_origin: str = DEFAULT_SITE_ORIGIN) -> str:
 NOT_FOUND = not_found()
 NO_ACCESS = no_access()
 SERVER_ERROR = server_error()
+
+
+# --- D32 / ADR-0029: the share-recipient banner -----------------------------
+
+# The ONLY place this phrase is allowed. The owner asked that "Shared with you"
+# appear on a share link and nowhere else, so it is defined once here and the
+# leak/route tests assert it is absent from the rest of the site.
+SHARE_BANNER_PREFIX = "Shared with you"
+SHARE_BANNER_BY = "Jason"
+
+
+def share_banner_html(expires_at: _datetime) -> str:
+    """A fixed, server-generated banner. No document value is interpolated."""
+    expires = expires_at.strftime("%Y-%m-%d")
+    return (
+        '<div role="note" class="share-banner">'
+        f"<strong>{_html.escape(SHARE_BANNER_PREFIX)}</strong>"
+        f" &middot; Shared by {_html.escape(SHARE_BANNER_BY)}"
+        f' &middot; expires <time datetime="{_html.escape(expires)}">{_html.escape(expires)}</time>'
+        "</div>"
+        "<style>"
+        ".share-banner{position:sticky;top:0;z-index:1000;margin:0;padding:.55rem 1rem;"
+        "background:#861f41;color:#fff;font:500 .9rem/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;"
+        "text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.25)}"
+        ".share-banner strong{color:#fff}"
+        "@media (prefers-color-scheme:dark){.share-banner{background:#a3284f}}"
+        "</style>"
+    )
+
+
+_BODY_TAG = re.compile(rb"<body\b[^>]*>", re.IGNORECASE)
+
+
+def inject_share_banner(body: bytes, banner: str) -> bytes:
+    """Insert the banner immediately after the document's `<body>` tag.
+
+    A fragment with no `<body>` tag gets the banner prepended: attribution is
+    required, and prepending markup to an HTML fragment is safe. A non-HTML
+    content type never reaches this function.
+    """
+    match = _BODY_TAG.search(body)
+    if match is None:
+        return banner.encode("utf-8") + body
+    return body[: match.end()] + banner.encode("utf-8") + body[match.end() :]
+
+
+def share_document_page(title: str, payload_url: str, banner: str) -> str:
+    """A banner page around a PDF that the browser renders inline."""
+    safe_payload = _html.escape(payload_url)
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<meta name="robots" content="noindex, nofollow, noarchive">'
+        f"<title>{_html.escape(title)}</title>"
+        "<style>html,body{margin:0;height:100%;background:#f4f5f1;color:#14181b;font-family:system-ui,sans-serif}"
+        ".share-doc{width:100%;height:calc(100vh - 42px);border:0}"
+        "@media (prefers-color-scheme:dark){body{background:#111413;color:#edeee9}}</style>"
+        "</head><body>"
+        f"{banner}"
+        f'<iframe class="share-doc" src="{safe_payload}" title="{_html.escape(title)}"></iframe>'
+        "</body></html>"
+    )

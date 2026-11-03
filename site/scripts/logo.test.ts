@@ -127,7 +127,7 @@ describe("D16 — the emblem's visible rings meet AA non-text contrast on the ba
 // ci.yml, but build.yml runs it after them, so these fire as soon as a build is
 // present — the same conditional pattern as wave-5-structure.test.ts.
 const PUBLIC_INDEX = path.join(siteRoot, "dist-public/index.html");
-const PRIVATE_INDEX = path.join(siteRoot, "dist-private/index.html");
+const PRIVATE_INDEX = path.join(siteRoot, "dist-private/projects/index.html");
 
 describe.runIf(fs.existsSync(PUBLIC_INDEX))("built / carries the emblem and the badge", () => {
   it("has the linked emblem with its alt text", () => {
@@ -146,7 +146,7 @@ describe.runIf(fs.existsSync(PUBLIC_INDEX))("built / carries the emblem and the 
   });
 });
 
-describe.runIf(fs.existsSync(PRIVATE_INDEX))("built /p/ carries the emblem but not the badge", () => {
+describe.runIf(fs.existsSync(PRIVATE_INDEX))("built /p/projects/ carries the emblem but not the badge", () => {
   it("has the emblem with its alt text", () => {
     const html = fs.readFileSync(PRIVATE_INDEX, "utf8");
     expect(html).toContain('alt="Jason Cusati research emblem"');
