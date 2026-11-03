@@ -10,6 +10,20 @@ const sourcesDir = path.resolve("src/content/sources");
 const outDir = path.resolve(process.argv[2] ?? "/tmp/d25-visual");
 fs.mkdirSync(outDir, { recursive: true });
 
+// Deadlines are relative to the run so the visual check never rots into "no
+// upcoming events" as the calendar passes a hard-coded date.
+const soon = (days) => {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+};
+const soonAt = (days, hour = 15) => {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + days);
+  date.setUTCHours(hour, 0, 0, 0);
+  return date.toISOString().replace(".000Z", "Z");
+};
+
 function writeSource(source, items, deadlines = []) {
   const dir = path.join(sourcesDir, source, "site");
   fs.mkdirSync(dir, { recursive: true });
@@ -85,7 +99,7 @@ writeSource("visual-study", [
     id: "paper-submission",
     title: "Visual Study paper submission",
     kind: "submission",
-    start: "2026-10-23",
+    start: soon(3),
     all_day: true,
     timezone: "AoE",
     conference: "VisualConf 2027",
@@ -94,7 +108,7 @@ writeSource("visual-study", [
     id: "review-meeting",
     title: "Visual Study review",
     kind: "work",
-    start: "2026-11-05T15:00:00Z",
+    start: soonAt(10),
     timezone: "UTC",
   },
 ]);
@@ -114,7 +128,7 @@ writeSource("ebay-erupt", [
     id: "erupt-revision",
     title: "eBay eRUPT revision round",
     kind: "work",
-    start: "2026-10-24",
+    start: soon(5),
     all_day: true,
     timezone: "UTC",
   },
@@ -135,7 +149,7 @@ writeSource("visual-saner", [
     id: "saner-study",
     title: "Visual SANER study milestone",
     kind: "milestone",
-    start: "2026-10-28",
+    start: soon(7),
     all_day: true,
     timezone: "UTC",
   },
@@ -156,7 +170,7 @@ writeSource("visual-other", [
     id: "abstract",
     title: "Visual Other abstract",
     kind: "abstract",
-    start: "2026-10-30",
+    start: soon(4),
     all_day: true,
     timezone: "UTC",
     conference: "OtherConf",

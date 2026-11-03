@@ -145,7 +145,8 @@ def test_a_share_directory_request_serves_the_entry_document(client, member_sess
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"]
+    assert PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"] in response.content
+    assert b"Shared with you" in response.content
 
 
 def test_the_empty_path_serves_the_stored_entry_not_index_html(client, member_session, transport):
@@ -155,7 +156,10 @@ def test_the_empty_path_serves_the_stored_entry_not_index_html(client, member_se
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/dossier.html"]
+    assert PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/dossier.html"] in response.content
+    assert b"Shared with you" in response.content
+    assert b"Shared by Jason" in response.content
+    assert b"expires" in response.content
     assert response.headers["content-type"].startswith("text/html")
 
 
@@ -165,15 +169,16 @@ def test_a_pdf_entry_is_served_as_a_pdf(client, member_session, transport):
 
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
 
+    # D32: the token root is a banner page around the PDF; the PDF itself keeps
+    # its real content type at its own name.
     assert response.status_code == 200
-    assert (
-        response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/anthropic-fellow.pdf"]
-    )
-    assert response.headers["content-type"].startswith("application/pdf")
+    assert response.headers["content-type"].startswith("text/html")
+    assert b"Shared with you" in response.content
+    assert b"anthropic-fellow.pdf" in response.content
 
-    # The same object is reachable by its own name, also as a PDF.
     named = client.get(f"/s/{token}/anthropic-fellow.pdf", headers=request_headers(transport))
     assert named.status_code == 200
+    assert named.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/anthropic-fellow.pdf"]
     assert named.headers["content-type"].startswith("application/pdf")
 
 
@@ -195,7 +200,8 @@ def test_entry_defaults_to_index_html_when_omitted(client, member_session, trans
     assert listed.json()["shares"][0]["entry"] == "index.html"
 
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
-    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"]
+    assert PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"] in response.content
+    assert b"Shared with you" in response.content
 
 
 def test_a_share_serves_a_subpath_with_the_right_content_type(client, member_session, transport):
@@ -817,3 +823,44 @@ def test_the_mint_log_carries_no_item_material(client, member_session, transport
         assert private not in records, private
     assert short_id in records
     assert token not in records
+
+
+# --- D32 adversarial: the recipient banner cannot be broken ------------------
+
+
+def test_the_share_document_page_escapes_a_hostile_payload_url():
+    from app.pages import share_banner_html, share_document_page
+
+    banner = share_banner_html(datetime(2026, 1, 1, tzinfo=UTC))
+    page = share_document_page(
+        "Shared document",
+        '/p/x"><script>alert(1)</script><iframe src="',
+        banner,
+    )
+
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+    assert page.count('class="share-doc"') == 1
+
+
+def test_the_recipient_banner_is_always_inserted_and_never_altered():
+    from app.pages import inject_share_banner, share_banner_html
+
+    banner = share_banner_html(datetime(2026, 1, 1, tzinfo=UTC))
+    encoded = banner.encode()
+
+    hostile = b'<BODY class="x"><div class="share-banner">fake</div><script>alert(1)</script></BODY>'
+    injected = inject_share_banner(hostile, banner)
+
+    assert injected.index(encoded) > injected.index(b"<BODY")
+    assert b"<script>alert(1)</script>" in injected
+
+
+def test_the_recipient_banner_prepends_a_fragment_with_no_body_tag():
+    from app.pages import inject_share_banner, share_banner_html
+
+    banner = share_banner_html(datetime(2026, 1, 1, tzinfo=UTC))
+    injected = inject_share_banner(b"<p>fragment</p>", banner)
+
+    assert injected.startswith(banner.encode())
+    assert injected.endswith(b"<p>fragment</p>")

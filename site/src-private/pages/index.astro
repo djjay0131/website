@@ -1,14 +1,14 @@
 ---
-// THE MEMBERS' LANDING PAGE (D24 / ADR-0025).
-//
-// No collection is read here. The gate's /private/items endpoint is the only
-// source of the list, and it returns exactly what the viewer may open. That
-// keeps the private catalogue out of the static HTML a member can download.
-import PrivateBase from "../layouts/PrivateBase.astro";
-import PrivateItems from "../components/PrivateItems.astro";
 ---
-
-<PrivateBase title="Members' area">
-  <h1>Shared with you</h1>
-  <PrivateItems />
-</PrivateBase>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0;url=projects/" />
+    <meta name="robots" content="noindex" />
+    <title>Projects</title>
+  </head>
+  <body>
+    <a href="projects/">Projects</a>
+  </body>
+</html>

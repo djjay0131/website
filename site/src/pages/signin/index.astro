@@ -18,7 +18,7 @@
 // token and follows the redirect. Doing otherwise is how a sign-in works when
 // tested directly and fails through Hosting.
 //
-// A non-member who signs in successfully gets the gate's "not shared with you"
+// A non-member who signs in successfully gets the gate's not-a-member
 // response. That is a correct outcome, not an error, and it is rendered plainly
 // here -- no retry loop, no "access denied" alarm, and no hint that there was
 // something to be denied.
@@ -51,8 +51,8 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
 >
   <h1>Sign in</h1>
   <p class="lede">
-    Some material here is shared with named people. Sign in to see anything that
-    has been shared with you.
+    Some material here is available to named people. Sign in to see the
+    projects, calendar and notes your account can open.
   </p>
 
   {configured ? (
@@ -129,7 +129,7 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
 
       // Hand the ID token to the gate. This is the whole interface (SEAM-2): the
       // gate verifies it, mints the __session cookie and answers. A non-member
-      // gets the gate's "not shared with you" response, which is a correct
+      // gets the gate's not-a-member response, which is a correct
       // answer and is shown as plainly as any other.
       async function exchange(idToken: string) {
         say("Signing you in…");
@@ -163,12 +163,12 @@ const configured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain &&
         if (body?.status === "not_a_member") {
           // Deliberately the gate's own wording, and deliberately not alarming:
           // it names nothing and implies nothing about what exists.
-          say("You're signed in, but nothing here has been shared with you.");
+          say("You're signed in, but this account is not on the access list.");
           recordEvent("signin_not_a_member", { stage: "exchange" }, { immediate: true });
           return;
         }
         if (response.ok && body?.status === "ok") {
-          window.location.assign("/p/");
+          window.location.assign("/p/projects/");
           return;
         }
         say("Sign-in did not complete. Please try again.");

@@ -37,12 +37,14 @@ describe("the projects DOM", () => {
     expect(root.querySelectorAll(".project-card li")).toHaveLength(0);
   });
 
-  it("renders a sub-nav, current page and previous/next links", () => {
+  it("renders previous/next and no duplicate sub-nav (D32)", () => {
     const nav = document.createElement("nav");
     const prev = document.createElement("nav");
     mountProjectNavigation({ navRoot: nav, prevRoot: prev, items, source: "study-a", slug: "design" });
-    expect([...nav.querySelectorAll("a")].map((a) => a.textContent)).toEqual(["Overview", "Design"]);
-    expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe("Design");
+    expect(nav.querySelectorAll("a")).toHaveLength(0);
+    expect([...prev.querySelectorAll("a")].map((a) => a.textContent)).toEqual([
+      "PreviousOverview",
+    ]);
     expect(prev.querySelector('[rel="prev"]')?.getAttribute("href")).toBe("/p/projects/study-a/overview/");
     expect(prev.querySelector('[rel="next"]')).toBeNull();
   });

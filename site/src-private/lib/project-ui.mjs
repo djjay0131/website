@@ -83,29 +83,18 @@ export function mountProjectPages(root, items, source, base = "/p/", title) {
   return pages;
 }
 
-/** Render a project's sub-navigation and previous/next links. */
-export function mountProjectNavigation({ navRoot, prevRoot, items, source, slug, base = "/p/", title }) {
+/**
+ * Render previous/next links.
+ *
+ * D32 / ADR-0029 removed the duplicate in-project sub-navigation: the
+ * breadcrumb is the depth navigation and the project home page lists the
+ * project's pages. `navRoot` is accepted and ignored so older callers cannot
+ * bring the duplicate list back by accident.
+ */
+export function mountProjectNavigation({ prevRoot, items, source, slug, base = "/p/", title }) {
   const around = neighbours(items, source, slug);
   const pages = around.pages;
   const projectName = title || projectTitle(pages, source);
-
-  if (navRoot) {
-    navRoot.replaceChildren();
-    if (pages.length === 0) {
-      navRoot.append(el("p", { class: "project-nav-note", text: "No project pages are available." }));
-    } else {
-      const list = el("ul", { class: "project-subnav-list" });
-      for (const item of pages) {
-        const link = el("a", {
-          href: projectPageHref(item, base),
-          text: pageLabel(item, projectName),
-        });
-        if (item.slug === slug) link.setAttribute("aria-current", "page");
-        list.append(el("li", {}, link));
-      }
-      navRoot.append(list);
-    }
-  }
 
   if (prevRoot) {
     prevRoot.replaceChildren();
