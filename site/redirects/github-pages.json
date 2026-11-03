@@ -4,6 +4,46 @@
     "to": "/"
   },
   {
+    "from": "/website/about/site/",
+    "to": "/about/site/"
+  },
+  {
+    "from": "/website/about/site/admin.png",
+    "to": "/about/site/admin.png"
+  },
+  {
+    "from": "/website/about/site/build/",
+    "to": "/about/site/build/"
+  },
+  {
+    "from": "/website/about/site/calendar.png",
+    "to": "/about/site/calendar.png"
+  },
+  {
+    "from": "/website/about/site/private-404.png",
+    "to": "/about/site/private-404.png"
+  },
+  {
+    "from": "/website/about/site/project.png",
+    "to": "/about/site/project.png"
+  },
+  {
+    "from": "/website/about/site/projects.png",
+    "to": "/about/site/projects.png"
+  },
+  {
+    "from": "/website/about/site/publishing/",
+    "to": "/about/site/publishing/"
+  },
+  {
+    "from": "/website/about/site/share.png",
+    "to": "/about/site/share.png"
+  },
+  {
+    "from": "/website/about/site/use/",
+    "to": "/about/site/use/"
+  },
+  {
     "from": "/website/badges/vt-badge-hokiebird-laptop-tower-research-today-2x.png",
     "to": "/badges/vt-badge-hokiebird-laptop-tower-research-today-2x.png"
   },

@@ -1,0 +1,185 @@
+---
+import Base from "../../../../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base
+  title="How publishing works"
+  description="From a repository push to a validated manifest, a content bucket and a project page behind the gate."
+>
+  <article class="about-page">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href={`${base}about/site/`}>About this site</a>
+      <span aria-hidden="true">›</span>
+      <span aria-current="page">How publishing works</span>
+    </nav>
+
+    <p class="eyebrow">About this site</p>
+    <h1>How publishing works</h1>
+    <p class="lede">
+      Publishing is a repository push, not a database edit. A project's pages and its manifest are
+      validated together, uploaded to the content bucket, and then picked up by the next hub build
+      or sync.
+    </p>
+
+    <ol class="steps">
+      <li>
+        <h2>Push</h2>
+        <p>
+          A project repository pushes its rendered pages and a versioned manifest. The hub
+          repository does the same for its own private pages.
+        </p>
+      </li>
+      <li>
+        <h2>Validate</h2>
+        <p>
+          The contract check verifies the manifest's schema, its declared paths and its source
+          identity. A broken manifest stops the publish; it cannot produce a partially live project.
+        </p>
+      </li>
+      <li>
+        <h2>Upload</h2>
+        <p>
+          Validated objects go to the private content bucket under the project's prefix. Their
+          bytes are not copied into the public build, and the public origin has no route to them.
+        </p>
+      </li>
+      <li>
+        <h2>Sync</h2>
+        <p>
+          The next hub build (or a manual sync) records the new objects in the private catalog.
+          Projects and Calendar read that catalog, so the new page appears in the right project for
+          the people whose groups may open it.
+        </p>
+      </li>
+      <li>
+        <h2>Report</h2>
+        <p>
+          The publish writes a status object with the time, commit and result. Admin shows it per
+          project and flags a project as stale or failed, so a silent publishing failure is visible.
+        </p>
+      </li>
+    </ol>
+
+    <section>
+      <h2>Pulled sources</h2>
+      <p>
+        Material that originates in another system can be pulled in through the same contract. The
+        pull records where the bytes came from and treats them exactly like a satellite publish:
+        validated, uploaded to the bucket, and never written to the public build.
+      </p>
+    </section>
+
+    <section>
+      <h2>The privacy model</h2>
+      <ul>
+        <li>
+          <strong>Two outputs.</strong> The public build and the private build are separate. There is
+          no route from the public site to a private object.
+        </li>
+        <li>
+          <strong>Styled 404.</strong> A forbidden private path and a missing one return the same
+          response, so the gate is not an oracle for which paths exist.
+        </li>
+        <li>
+          <strong>Access rules.</strong> Access is decided per item, then source, then section, then
+          the default rule. Groups and roles are stored in Firestore and changed only through the
+          audited Admin area.
+        </li>
+        <li>
+          <strong>Leak check.</strong> Every public byte is scanned for the titles, summaries,
+          slugs, routes and payload paths of private items. The check has a self-test that must go
+          red on an injected leak.
+        </li>
+        <li>
+          <strong>Publish allowlist.</strong> Only an allowlisted project may publish to the public
+          origin. Everything else stays behind the gate.
+        </li>
+        <li>
+          <strong>Private-link check.</strong> Every link in the private build must resolve under
+          the gate's base, so a member never follows a link to a public 404 or another origin.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>What the owner can see</h2>
+      <p>
+        Admin lists each project's last publish, its commit and result, and links to the run. A
+        project that has not published recently is flagged stale; a failed publish is flagged
+        failed instead of being hidden behind an empty page.
+      </p>
+    </section>
+  </article>
+</Base>
+
+<style>
+  .about-page {
+    max-width: 72ch;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+  }
+
+  .crumbs {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    margin-bottom: 1.5rem;
+    font-family: var(--font-sans, system-ui, sans-serif);
+    font-size: 0.9rem;
+  }
+
+  .eyebrow {
+    margin: 0;
+    font-family: var(--font-sans, system-ui, sans-serif);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent, #861f41);
+  }
+
+  h1 {
+    margin: 0.3rem 0 1rem;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.1;
+  }
+
+  .lede {
+    font-size: 1.15rem;
+    line-height: 1.6;
+  }
+
+  h2 {
+    margin: 2rem 0 0.6rem;
+    font-size: 1.35rem;
+  }
+
+  p,
+  li {
+    line-height: 1.65;
+  }
+
+  .steps {
+    margin: 2rem 0;
+    padding-left: 1.4rem;
+  }
+
+  .steps li {
+    margin-bottom: 1.4rem;
+  }
+
+  .steps h2 {
+    margin: 0 0 0.35rem;
+    font-size: 1.2rem;
+  }
+
+  ul {
+    padding-left: 1.4rem;
+  }
+
+  li {
+    margin-bottom: 0.5rem;
+  }
+</style>

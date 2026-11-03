@@ -167,6 +167,27 @@ describe("the leak check fails on a private item in the public output", () => {
     }
   });
 
+  it("CONTENTS: the public About-the-site pages are in scope too", () => {
+    // D32: the About pages are ordinary public output, so the same walk that
+    // covers the sitemap and the feed covers them. A private title quoted into
+    // one of them is a leak like any other.
+    const leaky = tree({
+      "about/site/use/index.html": `<p>Example: ${PRIVATE_ITEM.title}</p>`,
+    });
+    const clean = tree({
+      "about/site/use/index.html": "<p>Collaborators see their projects, calendar and notes.</p>",
+    });
+    try {
+      const leaks = findLeaks(leaky, [PRIVATE_ITEM]);
+      expect(leaks.some((l) => l.where === "contents" && l.kind === "title")).toBe(true);
+      expect(leaks[0].file).toContain("about/site/use/index.html");
+      expect(findLeaks(clean, [PRIVATE_ITEM])).toEqual([]);
+    } finally {
+      fs.rmSync(leaky, { recursive: true, force: true });
+      fs.rmSync(clean, { recursive: true, force: true });
+    }
+  });
+
   it("CONTENTS: an HTML-escaped private title still matches", () => {
     const item = { ...PRIVATE_ITEM, title: 'Jason & the "Committee" Dossier' };
     const dist = tree({ "index.html": `<h2>${htmlEscape(item.title)}</h2>` });
