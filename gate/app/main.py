@@ -32,6 +32,7 @@ import sys
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -41,6 +42,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import pages
 from .access import AccessMap, BucketCatalogStore, FirestoreAccessPolicyStore, RuntimeAccessMap
+from .admin import (
+    AdminError,
+    AdminStore,
+    FirestoreAdminStore,
+    parse_publish_status,
+)
 from .annotations import (
     ANNOTATION_INTENTS,
     DEFAULT_INTENT,
@@ -170,6 +177,12 @@ MAX_SESSION_BODY_BYTES = 8192
 # an anonymous caller must never make the gate read an arbitrary amount.
 MAX_SHARE_BODY_BYTES = 4096
 
+# An admin write is a small JSON object. Same discipline as the share body.
+MAX_ADMIN_BODY_BYTES = 16384
+
+# The public repository the sync status links back to. Not private content.
+REPOSITORY_SLUG = "djjay0131/website"
+
 # An annotation body carries a quote (up to 2000 chars), context (2 x 64), a
 # comment (up to 5000) and tags (10 x 40), plus JSON overhead. The cap is large
 # enough for the largest valid note and small enough that an authenticated
@@ -258,6 +271,9 @@ class Dependencies:
     # The notes export (ADR-0022/D18). None when unconfigured, so a dormant gate
     # behaves exactly as before and makes no GitHub call.
     notes_sync: NotesSync | None = None
+    # D32 / ADR-0029: owner administration. None leaves every /admin/* route
+    # closed (503) rather than open; production always wires it.
+    admin: AdminStore | None = None
 
 
 def _export_entries(rows: object) -> list[ExportEntry]:
@@ -337,6 +353,12 @@ def build_dependencies(settings: Settings | None = None) -> Dependencies:
             cache_seconds=resolved.calendar_cache_seconds,
         ),
         notes_sync=notes_sync,
+        admin=FirestoreAdminStore(
+            project_id=resolved.project_id,
+            members_collection=resolved.members_collection,
+            policy_collection=resolved.access_policy_collection,
+            policy_document=resolved.access_policy_document,
+        ),
     )
 
 
@@ -465,7 +487,13 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         # name -- set by serve_private only on a 200 -- so a 404, a denial or a
         # miss keeps DENY. `served_object_name` is absent on every non-/p route.
         served = getattr(request.state, "served_object_name", None)
-        if isinstance(served, str) and _is_payload_object(served, deps.settings.private_prefix):
+        share_view = getattr(request.state, "share_view", False)
+        if share_view or (
+            isinstance(served, str) and _is_payload_object(served, deps.settings.private_prefix)
+        ):
+            # A share's PDF/HTML wrapper frames only its own token root, and a
+            # private payload document is framed only by the capture island on
+            # the same origin. Every other response stays DENY.
             response.headers["X-Frame-Options"] = "SAMEORIGIN"
         else:
             response.headers["X-Frame-Options"] = "DENY"
@@ -619,6 +647,265 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         return response
 
     # ---------------------------------------------------------------------
+    # D32 / ADR-0029: owner administration. Every route below is owner-only,
+    # state changes are origin-checked, and every write appends an audit
+    # record (the store owns the transaction). A non-owner receives the SAME
+    # 404 a missing private path returns, so the admin surface is not an oracle.
+    # ---------------------------------------------------------------------
+    def _admin_profile(request: Request) -> Principal | None:
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not principal.email_verified:
+            logger.info("event=deny scope=admin reason=%s", reason or "email_not_verified")
+            return None
+        profile = deps.members.profile(principal.email)
+        if profile is None or not profile.is_owner:
+            logger.info("event=deny scope=admin reason=not_owner member=%s", principal.email)
+            return None
+        return principal
+
+    def _admin_missing() -> Response:
+        return JSONResponse({"status": "not_found"}, status_code=404)
+
+    def _admin_unavailable() -> Response:
+        return JSONResponse({"status": "unavailable"}, status_code=503)
+
+    def _admin_bad(exc: AdminError) -> Response:
+        logger.info("event=reject scope=admin reason=%s", exc.code)
+        return JSONResponse({"status": exc.code}, status_code=400)
+
+    @app.get("/p/admin")
+    @app.get("/p/admin/")
+    async def admin_page(request: Request) -> Response:
+        # The admin shell is a private-build object, but it is deliberately NOT
+        # in the catalog: this route is the only way to reach it, and it runs
+        # the owner check before the bucket. A member can neither enumerate nor
+        # read it.
+        if _admin_profile(request) is None:
+            return _html(pages.not_found(deps.settings.site_origin), 404)
+        try:
+            name = safe_object_path("admin/index.html", deps.settings.private_prefix)
+        except UnsafePath as exc:
+            logger.warning("event=deny scope=admin stage=path reason=%s", exc.reason)
+            return _html(pages.not_found(deps.settings.site_origin), 404)
+        obj = deps.store.fetch(name)
+        if obj is None:
+            logger.info("event=miss scope=admin")
+            return _html(pages.not_found(deps.settings.site_origin), 404)
+        logger.info("event=allow scope=admin action=page")
+        headers = {} if obj.size is None else {"content-length": str(obj.size)}
+        return StreamingResponse(obj.chunks(), status_code=200, media_type=obj.content_type, headers=headers)
+
+    @app.get("/admin/members")
+    async def admin_list_members(request: Request) -> Response:
+        if _admin_profile(request) is None:
+            return _admin_missing()
+        if deps.admin is None:
+            return _admin_unavailable()
+        return JSONResponse({"members": [row.as_json() for row in deps.admin.list_members()]})
+
+    @app.post("/admin/members")
+    async def admin_add_member(request: Request) -> Response:
+        header_only = _refuse_cross_origin("admin", request, deps)
+        if header_only is not None:
+            return header_only
+        if _admin_profile(request) is None:
+            return _admin_missing()
+        if deps.admin is None:
+            return _admin_unavailable()
+        body = await _read_small_body(request, MAX_ADMIN_BODY_BYTES)
+        if body is None:
+            return JSONResponse({"status": "invalid_request"}, status_code=413)
+        payload, bad = _json_object_body(body)
+        if payload is None:
+            return bad  # type: ignore[return-value]
+        email = payload.get("email")
+        note = payload.get("note")
+        if not isinstance(email, str) or (note is not None and not isinstance(note, str)):
+            return JSONResponse({"status": "invalid_request"}, status_code=400)
+        actor = normalise_email(_admin_actor(_admin_profile(request))) or ""
+        try:
+            member = deps.admin.add_member(
+                email,
+                payload.get("role", "member"),
+                payload.get("groups", []),
+                note,
+                actor,
+            )
+        except AdminError as exc:
+            return _admin_bad(exc)
+        logger.info("event=allow scope=admin action=add_member by=%s", actor)
+        return JSONResponse({"member": member.as_json()}, status_code=200)
+
+    @app.patch("/admin/members/{email:path}")
+    async def admin_update_member(email: str, request: Request) -> Response:
+        header_only = _refuse_cross_origin("admin", request, deps)
+        if header_only is not None:
+            return header_only
+        principal = _admin_profile(request)
+        if principal is None:
+            return _admin_missing()
+        if deps.admin is None:
+            return _admin_unavailable()
+        body = await _read_small_body(request, MAX_ADMIN_BODY_BYTES)
+        if body is None:
+            return JSONResponse({"status": "invalid_request"}, status_code=413)
+        payload, bad = _json_object_body(body)
+        if payload is None:
+            return bad  # type: ignore[return-value]
+        if "role" not in payload or "groups" not in payload:
+            return JSONResponse({"status": "invalid_request"}, status_code=400)
+        actor = normalise_email(principal.email) or principal.email
+        try:
+            member = deps.admin.update_member(email, payload.get("role"), payload.get("groups"), actor)
+        except AdminError as exc:
+            return _admin_bad(exc)
+        logger.info("event=allow scope=admin action=update_member by=%s", actor)
+        return JSONResponse({"member": member.as_json()}, status_code=200)
+
+    @app.delete("/admin/members/{email:path}")
+    async def admin_remove_member(email: str, request: Request) -> Response:
+        header_only = _refuse_cross_origin("admin", request, deps)
+        if header_only is not None:
+            return header_only
+        principal = _admin_profile(request)
+        if principal is None:
+            return _admin_missing()
+        if deps.admin is None:
+            return _admin_unavailable()
+        actor = normalise_email(principal.email) or principal.email
+        try:
+            deps.admin.remove_member(email, actor)
+        except AdminError as exc:
+            return _admin_bad(exc)
+        logger.info("event=allow scope=admin action=remove_member by=%s", actor)
+        return JSONResponse({"status": "ok"}, status_code=200)
+
+    @app.get("/admin/policy")
+    async def admin_policy(request: Request) -> Response:
+        if _admin_profile(request) is None:
+            return _admin_missing()
+        if deps.admin is None:
+            return _admin_unavailable()
+        try:
+            policy = deps.admin.policy()
+        except AdminError as exc:
+            return _admin_bad(exc)
+        return JSONResponse({"policy": policy})
+
+    @app.post("/admin/policy/rule")
+    async def admin_set_rule(request: Request) -> Response:
+        header_only = _refuse_cross_origin("admin", request, deps)
+        if header_only is not None:
+            return header_only
+        principal = _admin_profile(request)
+        if principal is None:
+            return _admin_missing()
+        if deps.admin is None:
+            return _admin_unavailable()
+        body = await _read_small_body(request, MAX_ADMIN_BODY_BYTES)
+        if body is None:
+            return JSONResponse({"status": "invalid_request"}, status_code=413)
+        payload, bad = _json_object_body(body)
+        if payload is None:
+            return bad  # type: ignore[return-value]
+        actor = normalise_email(principal.email) or principal.email
+        try:
+            policy = deps.admin.set_rule(
+                payload.get("scope"),
+                payload.get("name"),
+                payload.get("groups", []),
+                payload.get("roles", []),
+                actor,
+            )
+        except AdminError as exc:
+            return _admin_bad(exc)
+        logger.info("event=allow scope=admin action=set_rule by=%s", actor)
+        return JSONResponse({"policy": policy}, status_code=200)
+
+    @app.delete("/admin/policy/rule")
+    async def admin_clear_rule(request: Request) -> Response:
+        header_only = _refuse_cross_origin("admin", request, deps)
+        if header_only is not None:
+            return header_only
+        principal = _admin_profile(request)
+        if principal is None:
+            return _admin_missing()
+        if deps.admin is None:
+            return _admin_unavailable()
+        actor = normalise_email(principal.email) or principal.email
+        try:
+            policy = deps.admin.clear_rule(
+                request.query_params.get("scope", ""),
+                request.query_params.get("name"),
+                actor,
+            )
+        except AdminError as exc:
+            return _admin_bad(exc)
+        logger.info("event=allow scope=admin action=clear_rule by=%s", actor)
+        return JSONResponse({"policy": policy}, status_code=200)
+
+    @app.get("/admin/audit")
+    async def admin_audit(request: Request) -> Response:
+        if _admin_profile(request) is None:
+            return _admin_missing()
+        if deps.admin is None:
+            return _admin_unavailable()
+        return JSONResponse({"audit": deps.admin.audit()})
+
+    @app.delete("/admin/shares/{share_id}")
+    async def admin_revoke_share(share_id: str, request: Request) -> Response:
+        header_only = _refuse_cross_origin("admin", request, deps)
+        if header_only is not None:
+            return header_only
+        principal = _admin_profile(request)
+        if principal is None:
+            return _admin_missing()
+        if not _valid_share_id(share_id):
+            logger.info("event=miss scope=admin action=revoke_share reason=invalid_id")
+            return _admin_missing()
+        matches = [share for share in deps.shares.list_active() if share.token.startswith(share_id)]
+        if len(matches) != 1:
+            logger.info("event=miss scope=admin action=revoke_share reason=not_unique")
+            return _admin_missing()
+        share = matches[0]
+        deps.shares.revoke(share.token)
+        _record_share(deps, "revoke", share, normalise_email(principal.email) or principal.email)
+        logger.info(
+            "event=allow scope=admin action=revoke_share id=%s by=%s",
+            _short_share_id(share.token),
+            principal.email,
+        )
+        return JSONResponse({"status": "ok"}, status_code=200)
+
+    @app.get("/admin/sync")
+    async def admin_sync(request: Request) -> Response:
+        if _admin_profile(request) is None:
+            return _admin_missing()
+        try:
+            obj = deps.store.fetch(deps.settings.publish_status_object)
+        except Exception:  # a bucket read must not turn into a 500 for the owner
+            obj = None
+        if obj is None:
+            return JSONResponse({"status": "failed", "reason": "missing", "projects": []})
+        try:
+            parsed = parse_publish_status(json.loads(b"".join(obj.chunks())))
+        except Exception:
+            return JSONResponse({"status": "failed", "reason": "malformed", "projects": []})
+        run_id = parsed.get("run_id")
+        commit = parsed.get("commit")
+        return JSONResponse(
+            {
+                "status": "ok",
+                "built_at": parsed.get("built_at"),
+                "commit": commit,
+                "run_id": run_id,
+                "run_url": f"https://github.com/{REPOSITORY_SLUG}/actions/runs/{run_id}" if run_id else None,
+                "commit_url": f"https://github.com/{REPOSITORY_SLUG}/commit/{commit}" if commit else None,
+                "projects": parsed.get("projects", []),
+            }
+        )
+
+    # ---------------------------------------------------------------------
     # Responsibilities 2 and 3: the allowlist, and serving the private bucket.
     # ---------------------------------------------------------------------
     @app.get("/p/{path:path}")
@@ -704,6 +991,40 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             principal.email,
         )
         return JSONResponse({"items": [item.as_listing() for item in items]}, status_code=200)
+
+    @app.get("/private/me")
+    async def private_me(request: Request) -> Response:
+        """The caller's own role and the navigation entries to add (D32).
+
+        This is not a directory listing and names no item. It exists so the
+        public static build can augment the ONE menu after a real sign-in
+        without baking private paths into public JavaScript, and so the private
+        build can reveal Admin only to the owner. A signed-out caller gets 403.
+        """
+        principal, reason = _authenticate(request, deps)
+        if principal is None or not principal.email_verified:
+            logger.info("event=deny scope=me reason=%s", reason or "email_not_verified")
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+        profile = deps.members.profile(principal.email)
+        if profile is None:
+            logger.info("event=deny scope=me reason=not_a_member member=%s", principal.email)
+            return JSONResponse({"status": "forbidden"}, status_code=403)
+
+        nav = [
+            {"label": "Calendar", "href": "/p/calendar/"},
+            {"label": "Notes", "href": "/p/notes/"},
+        ]
+        if profile.is_owner:
+            nav.append({"label": "Admin", "href": "/p/admin/"})
+        return JSONResponse(
+            {
+                "member": True,
+                "owner": profile.is_owner,
+                "projects_href": "/p/projects/",
+                "nav": nav,
+            },
+            status_code=200,
+        )
 
     @app.get("/private/calendar")
     async def list_private_calendar(request: Request) -> Response:
@@ -795,6 +1116,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             created_at=now,
         )
         deps.shares.create(share)
+        _record_share(deps, "mint", share, principal.email)
         # The item triple and the document filename are private material and are
         # NOT logged: the gate keeps object paths out of logs
         # (GATE_LOG_OBJECT_PATHS), and a share's section/source/slug/entry is
@@ -854,7 +1176,10 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             logger.info("event=deny scope=share action=revoke reason=%s", reason or "not_owner")
             return JSONResponse({"status": "forbidden"}, status_code=403)
 
+        existing = deps.shares.get(token)
         deps.shares.revoke(token)
+        if existing is not None:
+            _record_share(deps, "revoke", existing, principal.email)
         logger.info(
             "event=allow scope=share action=revoke id=%s by=%s",
             _short_share_id(token),
@@ -890,7 +1215,8 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         # 2026-10-03), so a `pdf` item is returned as a PDF. A non-empty path
         # resolves as before; a corrupt or traversal `entry` is still refused by
         # `safe_object_path` below, which re-validates it inside the prefix.
-        if path == "":
+        token_root = path == ""
+        if token_root:
             path = share.entry
 
         try:
@@ -903,6 +1229,37 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
         if obj is None:
             logger.info("event=miss scope=share%s", _log_path(name, deps.settings))
             return _html(pages.not_found(deps.settings.site_origin), 404)
+
+        # D32 / ADR-0029: the recipient sees the one shared item with a small
+        # attribution and expiry banner. Sub-resource requests (an item's own
+        # CSS, images, a PDF requested from the wrapper) are served unchanged.
+        request.state.share_view = True
+        banner = pages.share_banner_html(share.exp)
+        if token_root and obj.content_type.split(";")[0].strip() == "text/html":
+            raw = b"".join(obj.chunks())
+            with_banner = pages.inject_share_banner(raw, banner)
+            if len(with_banner) != len(raw):
+                logger.info("event=allow scope=share action=view")
+                return Response(
+                    with_banner,
+                    status_code=200,
+                    media_type=obj.content_type,
+                    headers={"content-length": str(len(with_banner))},
+                )
+            # No <body> tag: use the wrapper rather than prepend markup to a
+            # document whose structure is unknown.
+            payload = f"/s/{quote(share.token, safe='')}/{quote(share.entry, safe='/')}"
+            return HTMLResponse(
+                pages.share_document_page("Shared document", payload, banner),
+                status_code=200,
+            )
+        if token_root and obj.content_type.split(";")[0].strip() == "application/pdf":
+            payload = f"/s/{quote(share.token, safe='')}/{quote(share.entry, safe='/')}"
+            logger.info("event=allow scope=share action=view")
+            return HTMLResponse(
+                pages.share_document_page("Shared document", payload, banner),
+                status_code=200,
+            )
 
         logger.info("event=allow scope=share%s", _log_path(name, deps.settings))
         headers = {} if obj.size is None else {"content-length": str(obj.size)}
@@ -1422,6 +1779,30 @@ def _is_payload_object(name: str, private_prefix: str) -> bool:
             return False
         name = name[len(cleaned) + 1 :]
     return name == "_payload" or name.startswith("_payload/")
+
+
+def _admin_actor(principal: Principal | None) -> str:
+    """The actor string for an audit record: the verified email only."""
+    return "" if principal is None else principal.email
+
+
+def _valid_share_id(value: object) -> bool:
+    """A short share id is URL-safe base64; reject anything else before a lookup."""
+    return isinstance(value, str) and bool(re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value))
+
+
+def _record_share(deps: Dependencies, action: str, share: Share, actor: str) -> None:
+    """Append a share mint/revoke to the owner's change log.
+
+    The target is the SHORT id, never the token: the full credential must not
+    reach an audit document or a read-only admin response.
+    """
+    if deps.admin is None:
+        return
+    try:
+        deps.admin.record_share(action, f"share:{_short_share_id(share.token)}", actor)
+    except Exception:  # the share already succeeded; the audit must not undo it
+        logger.warning("event=error scope=admin action=record_share")
 
 
 def _share_item_prefix(section: str, source: str, slug: str) -> str | None:

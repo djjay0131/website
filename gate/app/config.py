@@ -144,6 +144,10 @@ class Settings:
     # served through /p/**.
     catalog_object: str = "_hub/catalog.json"
     catalog_cache_seconds: int = 30
+    # D32 / ADR-0029: per-project publish status written by the private build.
+    # It carries source names and publish timestamps only; the gate returns it
+    # to the owner (never to a member) from /admin/sync.
+    publish_status_object: str = "_hub/publish-status.json"
     # D26 / ADR-0027: the satellite deadlines file and the owner-managed event
     # collection. The gate reads Firestore; the owner tool writes it. Dependency
     # on `datastore.user` is the same grant already used for shares and
@@ -220,4 +224,8 @@ def load_settings() -> Settings:
             os.environ.get("GATE_CATALOG_OBJECT", "_hub/catalog.json").strip() or "_hub/catalog.json"
         ),
         catalog_cache_seconds=_positive_int("GATE_CATALOG_CACHE_SECONDS", default=30, maximum=30),
+        publish_status_object=(
+            os.environ.get("GATE_PUBLISH_STATUS_OBJECT", "_hub/publish-status.json").strip()
+            or "_hub/publish-status.json"
+        ),
     )

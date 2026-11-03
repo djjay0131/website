@@ -143,7 +143,7 @@ describe.runIf(fs.existsSync(path.join(PRIVATE_DIST, "index.html")))(
     });
 
     it("emits the shared inline annotation mount, and no private page contains a frame (D25)", () => {
-      const page = path.join(PRIVATE_DIST, "phd", "phd-milestones", "milestones", "index.html");
+      const page = path.join(PRIVATE_DIST, "projects", "phd-milestones", "milestones", "index.html");
       const html = fs.readFileSync(page, "utf8");
       expect(html).toContain("data-annotation-island");
       for (const rel of ["index.html", "projects/index.html", "notes/index.html"]) {
@@ -154,15 +154,16 @@ describe.runIf(fs.existsSync(path.join(PRIVATE_DIST, "index.html")))(
       }
     });
 
-    it("emits a normal-chrome item page with sanitised inline content and a sub-nav (D25)", () => {
-      const page = path.join(PRIVATE_DIST, "phd", "phd-milestones", "milestones", "index.html");
+    it("emits a normal-chrome item page with sanitised inline content and no duplicate sub-nav (D32)", () => {
+      const page = path.join(PRIVATE_DIST, "projects", "phd-milestones", "milestones", "index.html");
       expect(fs.existsSync(page), "fixture item page").toBe(true);
       const html = fs.readFileSync(page, "utf8");
       expect(html).not.toContain("data-annotation-frame");
       expect(html).not.toContain("<iframe");
       expect(html).toContain('class="site-band"');
       expect(html).toContain("data-project-document");
-      expect(html).toContain("data-project-nav");
+      expect(html).not.toContain("data-project-nav");
+      expect(html).toContain("data-project-prevnext");
       expect(html).toContain("data-annotation-island");
       expect(html).toContain("_payload/phd-milestones/site/index.html");
     });

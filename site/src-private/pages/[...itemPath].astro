@@ -9,8 +9,7 @@
 import { getCollection } from "astro:content";
 import PrivateBase from "../layouts/PrivateBase.astro";
 import InlineItem from "../components/InlineItem.astro";
-import ProjectSection from "../components/ProjectSection.astro";
-import { isProjectItem } from "../lib/projects.mjs";
+import { isProjectItem, projectPageHref } from "../lib/projects.mjs";
 
 export async function getStaticPaths() {
   const all = (await getCollection("sources", ({ data }) => data.format !== "data")).map(
@@ -20,21 +19,18 @@ export async function getStaticPaths() {
 
   return privateItems.map((item) => ({
     params: { itemPath: `${item.section}/${item.source}/${item.slug}` },
-    props: {
-      item,
-      siblings: privateItems.filter((other) => other.source === item.source),
-    },
+    props: { item },
   }));
 }
 
-const { item, siblings } = Astro.props;
+const { item } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
 
 {isProjectItem(item) ? (
-  <PrivateBase title={item.title}>
-    <ProjectSection item={item} siblings={siblings} base={base} />
-  </PrivateBase>
+  // D32 / ADR-0029: the pre-D25 item route is retired. It is a static redirect
+  // to the project route, reached only after the gate's item access decision.
+  <PrivateBase title={item.title} redirectTo={projectPageHref(item, base)} />
 ) : (
   <PrivateBase title={item.title}>
     <nav class="breadcrumbs" aria-label="Breadcrumb">
@@ -43,7 +39,16 @@ const base = import.meta.env.BASE_URL;
         <li aria-current="page">{item.title}</li>
       </ol>
     </nav>
-    <InlineItem item={item} base={base} />
+    <div
+      data-share-item
+      data-section={item.section}
+      data-source={item.source}
+      data-slug={item.slug}
+      data-entry={String(item.path ?? "").split("/").pop()}
+      data-title={item.title}
+    >
+      <InlineItem item={item} base={base} />
+    </div>
   </PrivateBase>
 )}
 

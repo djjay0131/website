@@ -27,6 +27,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.access import AccessItem, AccessPolicy, AccessRule, ItemCatalog, StaticAccessMap
+from app.admin import StaticAdminStore
 from app.annotations import StaticAnnotationStore
 from app.auth import Principal, TokenRejected, principal_from_claims
 from app.config import Settings
@@ -262,7 +263,17 @@ def access() -> StaticAccessMap:
 
 
 @pytest.fixture
-def deps(settings, verifier, members, store, shares, annotations, access) -> Dependencies:
+def admin_store() -> StaticAdminStore:
+    return StaticAdminStore(
+        members=[
+            {"email": MEMBER_EMAIL, "role": "owner", "groups": []},
+            {"email": OTHER_MEMBER_EMAIL, "role": "member", "groups": ["committee"]},
+        ]
+    )
+
+
+@pytest.fixture
+def deps(settings, verifier, members, store, shares, annotations, access, admin_store) -> Dependencies:
     return Dependencies(
         settings=settings,
         verifier=verifier,
@@ -271,6 +282,7 @@ def deps(settings, verifier, members, store, shares, annotations, access) -> Dep
         shares=shares,
         annotations=annotations,
         access=access,
+        admin=admin_store,
     )
 
 

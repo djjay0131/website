@@ -1,0 +1,134 @@
+---
+// D32 / ADR-0029: the owner administration page.
+//
+// This object lives in the private build, but it is deliberately NOT listed in
+// `_hub/catalog.json`. The gate's `/p/admin/` route checks the owner before it
+// reads this object from the bucket, so a member cannot enumerate or open it.
+// The page itself names no member, group, source or item; every value arrives
+// from the owner-only API.
+import PrivateBase from "../../layouts/PrivateBase.astro";
+---
+
+<PrivateBase title="Admin">
+  <h1>Admin</h1>
+  <p class="lede">
+    Manage who can read what, the active share links, the publish status and the
+    change log. Every write is recorded with your signed-in account.
+  </p>
+
+  <div class="admin-grid">
+    <section class="admin-panel" data-admin-members aria-live="polite">
+      <p class="admin-note">Loading members…</p>
+    </section>
+    <section class="admin-panel" data-admin-policy aria-live="polite">
+      <p class="admin-note">Loading access rules…</p>
+    </section>
+    <section class="admin-panel" data-admin-shares aria-live="polite">
+      <p class="admin-note">Loading share links…</p>
+    </section>
+    <section class="admin-panel" data-admin-sync aria-live="polite">
+      <p class="admin-note">Loading sync status…</p>
+    </section>
+    <section class="admin-panel admin-wide" data-admin-audit aria-live="polite">
+      <p class="admin-note">Loading the change log…</p>
+    </section>
+  </div>
+
+  <script>
+    import { mountAdmin } from "../../lib/admin-ui.mjs";
+    const root = document.querySelector(".admin-grid");
+    if (root) await mountAdmin(root);
+  </script>
+</PrivateBase>
+
+<style>
+  .lede { color: var(--color-muted); margin-bottom: 1.5rem; max-width: 70ch; }
+  .admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .admin-panel {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.2rem;
+    background: var(--color-surface);
+    min-width: 0;
+  }
+  .admin-wide { grid-column: 1 / -1; }
+  .admin-panel :global(.admin-note) { color: var(--color-muted); font-size: 0.9rem; }
+  .admin-panel :global(.admin-error) { color: var(--color-risk); font-size: 0.9rem; }
+  .admin-panel :global(h2) { font-size: 1.2rem; margin: 0 0 0.4rem; border: none; padding: 0; }
+  .admin-panel :global(h3) { font-size: 1rem; margin: 1rem 0 0.4rem; }
+  .admin-panel :global(.admin-groups) { margin: 0.5rem 0; padding-left: 1.2rem; font-size: 0.9rem; }
+  .admin-panel :global(.admin-table) {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+    display: block;
+    overflow-x: auto;
+  }
+  .admin-panel :global(.admin-table th),
+  .admin-panel :global(.admin-table td) {
+    text-align: left;
+    padding: 0.35rem 0.45rem;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: top;
+  }
+  .admin-panel :global(.admin-table th) {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-muted);
+  }
+  .admin-panel :global(.admin-actions) { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+  .admin-panel :global(button) {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .admin-panel :global(button.danger) { border-color: var(--color-risk); }
+  .admin-panel :global(button:disabled) { opacity: 0.6; cursor: progress; }
+  .admin-panel :global(.admin-form) {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--color-border);
+  }
+  .admin-panel :global(.admin-form label) { display: grid; gap: 0.15rem; font-size: 0.85rem; }
+  .admin-panel :global(input),
+  .admin-panel :global(select) {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.45rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    min-width: 0;
+  }
+  .admin-panel :global(.admin-rules) { margin: 0.5rem 0; padding-left: 1.1rem; font-size: 0.88rem; }
+  .admin-panel :global(.admin-rules li) { margin-bottom: 0.3rem; }
+  .admin-panel :global(.admin-pill) {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+  }
+  .admin-panel :global(.admin-pill.ok) { color: var(--color-text); }
+  .admin-panel :global(.admin-pill.warn) { border-color: var(--color-risk); color: var(--color-risk); }
+  @media (max-width: 52rem) {
+    .admin-grid { grid-template-columns: 1fr; }
+  }
+</style>

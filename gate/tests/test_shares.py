@@ -145,7 +145,8 @@ def test_a_share_directory_request_serves_the_entry_document(client, member_sess
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"]
+    assert PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"] in response.content
+    assert b"Shared with you" in response.content
 
 
 def test_the_empty_path_serves_the_stored_entry_not_index_html(client, member_session, transport):
@@ -155,7 +156,10 @@ def test_the_empty_path_serves_the_stored_entry_not_index_html(client, member_se
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
 
     assert response.status_code == 200
-    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/dossier.html"]
+    assert PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/dossier.html"] in response.content
+    assert b"Shared with you" in response.content
+    assert b"Shared by Jason" in response.content
+    assert b"expires" in response.content
     assert response.headers["content-type"].startswith("text/html")
 
 
@@ -165,15 +169,16 @@ def test_a_pdf_entry_is_served_as_a_pdf(client, member_session, transport):
 
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
 
+    # D32: the token root is a banner page around the PDF; the PDF itself keeps
+    # its real content type at its own name.
     assert response.status_code == 200
-    assert (
-        response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/anthropic-fellow.pdf"]
-    )
-    assert response.headers["content-type"].startswith("application/pdf")
+    assert response.headers["content-type"].startswith("text/html")
+    assert b"Shared with you" in response.content
+    assert b"anthropic-fellow.pdf" in response.content
 
-    # The same object is reachable by its own name, also as a PDF.
     named = client.get(f"/s/{token}/anthropic-fellow.pdf", headers=request_headers(transport))
     assert named.status_code == 200
+    assert named.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/anthropic-fellow.pdf"]
     assert named.headers["content-type"].startswith("application/pdf")
 
 
@@ -195,7 +200,8 @@ def test_entry_defaults_to_index_html_when_omitted(client, member_session, trans
     assert listed.json()["shares"][0]["entry"] == "index.html"
 
     response = client.get(f"/s/{token}/", headers=request_headers(transport))
-    assert response.content == PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"]
+    assert PRIVATE_OBJECTS["phd/phd-milestones/committee-dossier/_doc/index.html"] in response.content
+    assert b"Shared with you" in response.content
 
 
 def test_a_share_serves_a_subpath_with_the_right_content_type(client, member_session, transport):

@@ -212,6 +212,52 @@ export function privateBuild(options = {}) {
         fs.writeFileSync(calendarPath, `${JSON.stringify(calendar, null, 2)}\n`);
         logger.info(`wrote ${CALENDAR_OBJECT}: ${calendar.events.length} event(s)`);
 
+        // D32 / ADR-0029: the owner's sync status. Source names and publish
+        // timestamps only; `_hub/**` is never served, and `/admin/sync` is
+        // owner-only. A missing or malformed file is reported as a failure by
+        // the gate rather than hidden.
+        const projects = [];
+        if (fs.existsSync(sourcesDir)) {
+          for (const source of fs.readdirSync(sourcesDir).sort()) {
+            const manifestPath = path.join(sourcesDir, source, "manifest.json");
+            if (!fs.existsSync(manifestPath)) continue;
+            let manifest;
+            try {
+              manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+            } catch {
+              continue;
+            }
+            const name = manifest.source ?? source;
+            const all = (manifest.items ?? []).filter((item) => item?.format !== "data");
+            const privateCount = all.filter(
+              (item) => effectiveVisibility(item, name, allowlist) === "private",
+            ).length;
+            projects.push({
+              source: name,
+              published: manifest.published ?? null,
+              items: all.length,
+              private_items: privateCount,
+            });
+          }
+        }
+        const publishStatusPath = path.join(outDir, "_hub", "publish-status.json");
+        fs.mkdirSync(path.dirname(publishStatusPath), { recursive: true });
+        fs.writeFileSync(
+          publishStatusPath,
+          `${JSON.stringify(
+            {
+              version: 1,
+              built_at: new Date().toISOString(),
+              commit: process.env.GITHUB_SHA ?? null,
+              run_id: process.env.GITHUB_RUN_ID ?? null,
+              projects,
+            },
+            null,
+            2,
+          )}\n`,
+        );
+        logger.info(`wrote _hub/publish-status.json: ${projects.length} project(s)`);
+
         // SD-7. Every emitted path must be one the gate can actually serve,
         // checked BEFORE the receipt is written so an unservable build cannot
         // sync. Failing here turns "the member gets a 404 and nothing in the

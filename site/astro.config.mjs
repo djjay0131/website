@@ -70,8 +70,14 @@ export default defineConfig({
   // The legacy GitHub Pages redirects are public routes and have no meaning in
   // the private output. D21 retires the "Writing" slot: /writing/ redirects to
   // the Rabbit Holes blog (the old route is kept as a redirect, as D21 asks).
+  // D32 / ADR-0029: `/p/` is not a second landing page. The private build emits
+  // a static redirect to the one canonical Projects URL. The gate's access
+  // decision runs before this object is served, so a signed-out caller still
+  // receives the styled 404 and learns nothing from the redirect.
   redirects: isPrivate
-    ? {}
+    ? {
+        "/": withBase(base, "projects/"),
+      }
     : {
         ...Object.fromEntries(LEGACY_REDIRECTS.map(({ from, to }) => [`/${from}`, withBase(base, to)])),
         "/writing": withBase(base, "rabbit-holes/"),

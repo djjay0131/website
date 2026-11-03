@@ -7,7 +7,7 @@
 // read another group's catalogue by loading the page source.
 ---
 <div id="private-items" data-endpoint="/private/items" aria-live="polite">
-  <p class="items-note" id="private-items-status">Loading what has been shared with you…</p>
+  <p class="items-note" id="private-items-status">Loading your items…</p>
 </div>
 
 <script>
@@ -32,12 +32,12 @@
       const message = document.createElement("p");
       message.className = "items-note";
       message.setAttribute("role", "alert");
-      message.textContent = "Could not load what has been shared with you. Try again shortly.";
+      message.textContent = "Could not load your items. Try again shortly.";
       root.append(message);
     } else if (result.items.length === 0) {
       const message = document.createElement("p");
       message.className = "items-note";
-      message.textContent = "Nothing has been shared with you yet.";
+      message.textContent = "Nothing is available to your account yet.";
       root.append(message);
     } else {
       const list = document.createElement("ul");

@@ -196,7 +196,9 @@ describe("firebase.json routes sharing to the gate without disturbing the rest",
     // The pre-existing gate rewrites are unchanged.
     expect(rewrites.map((r) => r.source)).toEqual([
       "/private/items",
+      "/private/me",
       "/private/calendar",
+      "/admin/**",
       "/p/**",
       "/session",
       "/session/end",
