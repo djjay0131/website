@@ -4,6 +4,46 @@
     "to": "/"
   },
   {
+    "from": "/website/about/site/",
+    "to": "/about/site/"
+  },
+  {
+    "from": "/website/about/site/admin.png",
+    "to": "/about/site/admin.png"
+  },
+  {
+    "from": "/website/about/site/build/",
+    "to": "/about/site/build/"
+  },
+  {
+    "from": "/website/about/site/calendar.png",
+    "to": "/about/site/calendar.png"
+  },
+  {
+    "from": "/website/about/site/private-404.png",
+    "to": "/about/site/private-404.png"
+  },
+  {
+    "from": "/website/about/site/project.png",
+    "to": "/about/site/project.png"
+  },
+  {
+    "from": "/website/about/site/projects.png",
+    "to": "/about/site/projects.png"
+  },
+  {
+    "from": "/website/about/site/publishing/",
+    "to": "/about/site/publishing/"
+  },
+  {
+    "from": "/website/about/site/share.png",
+    "to": "/about/site/share.png"
+  },
+  {
+    "from": "/website/about/site/use/",
+    "to": "/about/site/use/"
+  },
+  {
     "from": "/website/badges/vt-badge-hokiebird-laptop-tower-research-today-2x.png",
     "to": "/badges/vt-badge-hokiebird-laptop-tower-research-today-2x.png"
   },
@@ -104,56 +144,20 @@
     "to": "/projects/"
   },
   {
-    "from": "/website/projects/agentic-kg/",
-    "to": "/projects/agentic-kg/"
+    "from": "/website/projects/fixture-one/",
+    "to": "/projects/fixture-one/"
   },
   {
-    "from": "/website/projects/construction-ai/",
-    "to": "/projects/construction-ai/"
-  },
-  {
-    "from": "/website/projects/insurance-schema-framework/",
-    "to": "/projects/insurance-schema-framework/"
+    "from": "/website/projects/fixture-two/",
+    "to": "/projects/fixture-two/"
   },
   {
     "from": "/website/projects/kgis/kgis-docs/",
     "to": "/projects/kgis/kgis-docs/"
   },
   {
-    "from": "/website/projects/llm-coding-assistant/",
-    "to": "/projects/llm-coding-assistant/"
-  },
-  {
-    "from": "/website/projects/llm-data-importer/",
-    "to": "/projects/llm-data-importer/"
-  },
-  {
-    "from": "/website/projects/mrs-cloud-architecture/",
-    "to": "/projects/mrs-cloud-architecture/"
-  },
-  {
-    "from": "/website/projects/nfl-ml/",
-    "to": "/projects/nfl-ml/"
-  },
-  {
     "from": "/website/projects/remote-robotics-control/",
     "to": "/projects/remote-robotics-control/"
-  },
-  {
-    "from": "/website/projects/security-classifier/",
-    "to": "/projects/security-classifier/"
-  },
-  {
-    "from": "/website/projects/sentiment-yelp/",
-    "to": "/projects/sentiment-yelp/"
-  },
-  {
-    "from": "/website/projects/vttsi/",
-    "to": "/projects/vttsi/"
-  },
-  {
-    "from": "/website/projects/vvuq-beam-solver/",
-    "to": "/projects/vvuq-beam-solver/"
   },
   {
     "from": "/website/rabbit-holes/",

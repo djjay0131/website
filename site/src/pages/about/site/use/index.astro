@@ -1,0 +1,197 @@
+---
+import Base from "../../../../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+
+const shots = [
+  {
+    src: `${base}about/site/projects.png`,
+    alt: "Projects landing page with a small set of project cards in a signed-in browser.",
+    title: "Projects",
+    body: "A collaborator sees the projects their groups can open. Breadcrumbs and previous/next links carry depth; there is no second project menu.",
+  },
+  {
+    src: `${base}about/site/project.png`,
+    alt: "A project home page showing the project's pages, upcoming deadlines and a repository link.",
+    title: "A project home",
+    body: "Each project home lists its own pages and the next deadlines that belong to that project.",
+  },
+  {
+    src: `${base}about/site/calendar.png`,
+    alt: "A month calendar with project-coloured events and an upcoming strip.",
+    title: "Calendar",
+    body: "The calendar collects active work and deadlines from every project the signed-in member can open.",
+  },
+  {
+    src: `${base}about/site/admin.png`,
+    alt: "The owner-only admin page with panels for members, access rules, share links, publish status and the change log.",
+    title: "Admin (owner only)",
+    body: "The owner manages members, group rules, share links and publish status here. Every change is audited.",
+  },
+  {
+    src: `${base}about/site/share.png`,
+    alt: "A single shared page with a small banner naming the sharer and the expiry date.",
+    title: "A share link",
+    body: "A share link exposes one page for a limited time. The recipient sees the page and a small attribution banner, nothing else.",
+  },
+  {
+    src: `${base}about/site/private-404.png`,
+    alt: "The styled not-found page returned for a private path when nobody is signed in.",
+    title: "Signed out",
+    body: "A signed-out request for a private path gets the same styled 404 as a path that does not exist.",
+  },
+];
+---
+
+<Base
+  title="How this site is used"
+  description="What a collaborator sees after signing in: projects, calendar, notes, share links, and the owner-only admin area."
+>
+  <article class="about-page">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href={`${base}about/site/`}>About this site</a>
+      <span aria-hidden="true">›</span>
+      <span aria-current="page">How it's used</span>
+    </nav>
+
+    <p class="eyebrow">About this site</p>
+    <h1>How it's used</h1>
+    <p class="lede">
+      Collaborators use the same site as everyone else. Signing in adds Projects, Calendar and
+      Notes to the main menu instead of opening a separate members' area. The owner sees one extra
+      item: Admin.
+    </p>
+
+    <section>
+      <h2>For collaborators</h2>
+      <p>
+        Your account belongs to one or more groups. A project is visible when your group has been
+        granted access to it. Inside a project, the breadcrumb is the way up and the previous/next
+        links are the way through; browser back and forward behave normally.
+      </p>
+      <p>
+        Notes are private to you. The calendar shows the deadlines and active work from the
+        projects you can open, with filters by project.
+      </p>
+    </section>
+
+    <section>
+      <h2>Share links</h2>
+      <p>
+        The owner can turn a single private page into a time-limited share link. The recipient does
+        not sign in and cannot browse to anything else. The page carries a small banner naming the
+        sharer and the expiry date, and the owner can revoke the link from Admin.
+      </p>
+    </section>
+
+    <section>
+      <h2>For the owner</h2>
+      <p>
+        Admin has five panels: members and groups, per-project access rules, share links, publish
+        status, and a change log that merges access, calendar and share actions. Removal actions
+        ask for confirmation, and the owner cannot remove their own owner role.
+      </p>
+    </section>
+
+    <h2>Screens</h2>
+    <p class="note">
+      These screens were rendered by the site's visual test from synthetic projects, groups and
+      people. No real collaborator, project or item appears in them.
+    </p>
+
+    <div class="shots">
+      {
+        shots.map((shot) => (
+          <figure>
+            <img src={shot.src} alt={shot.alt} loading="lazy" width="1280" height="1000" />
+            <figcaption>
+              <strong>{shot.title}.</strong> {shot.body}
+            </figcaption>
+          </figure>
+        ))
+      }
+    </div>
+  </article>
+</Base>
+
+<style>
+  .about-page {
+    max-width: 82ch;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+  }
+
+  .crumbs {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    margin-bottom: 1.5rem;
+    font-family: var(--font-sans, system-ui, sans-serif);
+    font-size: 0.9rem;
+  }
+
+  .eyebrow {
+    margin: 0;
+    font-family: var(--font-sans, system-ui, sans-serif);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent, #861f41);
+  }
+
+  h1 {
+    margin: 0.3rem 0 1rem;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.1;
+  }
+
+  .lede {
+    font-size: 1.15rem;
+    line-height: 1.6;
+  }
+
+  h2 {
+    margin: 2rem 0 0.6rem;
+    font-size: 1.35rem;
+  }
+
+  p {
+    line-height: 1.65;
+  }
+
+  .note {
+    font-size: 0.9rem;
+    color: var(--color-muted, #5c5550);
+  }
+
+  .shots {
+    display: grid;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  @media (min-width: 58rem) {
+    .shots {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  figure {
+    margin: 0;
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--color-border, #d8d2cc);
+    border-radius: 0.6rem;
+  }
+
+  figcaption {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+</style>

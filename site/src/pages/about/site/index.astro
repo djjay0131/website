@@ -1,0 +1,154 @@
+---
+import Base from "../../../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+
+const pages = [
+  {
+    href: `${base}about/site/build/`,
+    title: "How it's built",
+    summary: "The public hub, the private layer, the sign-in gate, and the leak checks that keep them apart.",
+  },
+  {
+    href: `${base}about/site/use/`,
+    title: "How it's used",
+    summary: "What a collaborator sees after signing in: projects, calendar, notes, and single-page share links.",
+  },
+  {
+    href: `${base}about/site/publishing/`,
+    title: "How publishing works",
+    summary: "From a repository push to a validated manifest, a content bucket, and a project page behind the gate.",
+  },
+];
+---
+
+<Base
+  title="About this site"
+  description="How this research site is built, how collaborators use it, and how private work is published without leaking."
+>
+  <article class="about-site">
+    <p class="eyebrow">About this site</p>
+    <h1>One public hub, one private layer</h1>
+    <p class="lede">
+      This site has a public face and a members-only layer behind a sign-in gate. The two are built
+      from the same repository but never share an output directory. Public pages are static; private
+      pages are served only after the gate has made an access decision.
+    </p>
+
+    <nav class="about-cards" aria-label="About this site">
+      {
+        pages.map((page) => (
+          <a class="about-card" href={page.href}>
+            <span class="about-card-title">{page.title}</span>
+            <span class="about-card-summary">{page.summary}</span>
+          </a>
+        ))
+      }
+    </nav>
+
+    <section>
+      <h2>The short version</h2>
+      <p>
+        The public site is a static build published from this repository. The private layer is a
+        second build of the same repository, uploaded to a content bucket and served through a
+        Cloud Run gate that checks a Firebase session and a Firestore access policy. Research
+        projects publish into that bucket as versioned manifests, so a project can be updated
+        without rebuilding the hub.
+      </p>
+      <p>
+        Three guardrails keep private work private: a styled not-found response that is identical
+        whether a private page is missing or forbidden; an allowlist for what may be published to
+        the public origin; and a leak check that scans every public byte for the titles, summaries,
+        slugs and paths of private items.
+      </p>
+    </section>
+
+    <section>
+      <h2>Who sees what</h2>
+      <p>
+        A signed-out visitor sees the public research, papers, CV and writing. Signing in does not
+        open a second site: it adds Projects, Calendar and Notes to the same menu. The owner also
+        sees an Admin area for members, access rules, share links and publish status.
+      </p>
+    </section>
+  </article>
+</Base>
+
+<style>
+  .about-site {
+    max-width: 72ch;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+  }
+
+  .eyebrow {
+    margin: 0;
+    font-family: var(--font-sans, system-ui, sans-serif);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent, #861f41);
+  }
+
+  h1 {
+    margin: 0.3rem 0 1rem;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.1;
+  }
+
+  .lede {
+    font-size: 1.15rem;
+    line-height: 1.6;
+  }
+
+  .about-cards {
+    display: grid;
+    gap: 1rem;
+    margin: 2rem 0 3rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (min-width: 46rem) {
+    .about-cards {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .about-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--color-border, #d8d2cc);
+    border-radius: 0.6rem;
+    text-decoration: none;
+    color: inherit;
+    background: var(--color-surface, #fff);
+  }
+
+  .about-card:hover,
+  .about-card:focus-visible {
+    border-color: var(--color-accent, #861f41);
+  }
+
+  .about-card-title {
+    font-family: var(--font-sans, system-ui, sans-serif);
+    font-weight: 600;
+  }
+
+  .about-card-summary {
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+
+  h2 {
+    margin: 2rem 0 0.6rem;
+    font-size: 1.35rem;
+  }
+
+  p {
+    line-height: 1.65;
+  }
+</style>
