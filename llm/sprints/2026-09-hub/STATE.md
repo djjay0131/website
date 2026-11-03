@@ -5904,3 +5904,118 @@ Yovi and the synthetic principals see **0** chapter events.
 - The private bucket’s project `_doc/` tree includes the source `manifest.json`
   and the PDF (the prefix-root staging rule); both are reachable only through
   the gate’s item policy, never signed out.
+
+## D32 — one navigation, owner administration, share-recipient view (owner task, 2026-11-03)
+
+Owner task D32. Signing in augments the one main menu; it does not create a
+second one. Depth is breadcrumbs plus previous/next. `/p/` is no longer a second
+landing page. The owner gets a server-enforced Admin area, and a share link shows
+one page to one recipient. Public About-the-site pages explain the build, the
+member experience and publishing without naming anything private.
+
+### Decisions
+
+- **ADR-0029** — one navigation, owner administration, share-recipient view.
+  Accepted and merged in PR #162.
+- The private band is the ordinary public band plus `Calendar` and `Notes`, with
+  `Projects` pointing at the one canonical private index. `Admin` is appended by
+  a script only after `/private/me` reports the owner role, so a non-owner's HTML
+  never names it.
+- `/p/` and legacy `/p/<section>/<source>/<slug>/` item URLs redirect to the
+  canonical project route. The private redirect is relative, because an absolute
+  canonical link is an off-origin href and the private-link guard correctly
+  refuses it.
+- The in-project secondary navigation is gone. A project home lists its pages;
+  breadcrumbs and previous/next carry depth; browser history is untouched.
+- Admin writes are owner-only, origin-checked (CSRF), transactional and audited.
+  Self-demote and self-remove are refused. Share list responses never return the
+  full token; revoke resolves a unique short id.
+- The phrase “Shared with you” is defined once, in the gate's banner helper, and
+  appears only on a share-recipient page. It is absent from the public site,
+  including the About pages.
+- About-the-site pages are public (`/about/site/` plus `build/`, `use/` and
+  `publishing/`). Screenshots come from the synthetic D25/D26 fixtures.
+
+### PRs and deploys
+
+| PR | What | Merge commit | Deploy |
+|---|---|---|---|
+| **#162** | ADR-0029 | `b72f06b` | docs-only |
+| **#163** | one navigation, admin API/UI, share recipient | `6d629c9` | [gate 41686551411](https://github.com/djjay0131/website/actions/runs/41686551411), [build-and-deploy 41686551293](https://github.com/djjay0131/website/actions/runs/41686551293) |
+| **#164** | public About-the-site pages | `347bda8` | [build-and-deploy 41688186397](https://github.com/djjay0131/website/actions/runs/41688186397) |
+
+Live About URLs:
+
+- https://jason.cusati.us/about/site/
+- https://jason.cusati.us/about/site/build/
+- https://jason.cusati.us/about/site/use/
+- https://jason.cusati.us/about/site/publishing/
+
+CI screenshots for the member menu, admin, share dialog/recipient and the
+front→back→front project walk are in the `d25-d28-screenshots` artifact of the
+`d25-visual` runs on #163 and #164.
+
+### Verification (local)
+
+| Check | Result |
+|---|---|
+| Gate | **754 passed**; ruff check + format clean |
+| Website | **624 passed, 2 skipped** |
+| D25 visual (menu, admin, share, front→back→front) | **139 passed, 0 failed** |
+| D26 visual (calendar, project deadlines) | **66 passed, 0 failed** |
+| D27 note composer | **8 passed, 0 failed** |
+| `check:no-private-in-public` | **PASS** — 185 public files, 52 stubs, every private needle |
+| `check:publish-allowlist` | **PASS** — 23 entries, 0 conflicts, 0 stale |
+| `check:private-links` | **PASS** — 19 pages, every link under `/p/` |
+| `redirects:check` | every inventoried route covered; About routes added, main's entries preserved |
+| `demo:leak-check` | **PASS** — the guard reddened on the injected leak in all 11 outputs |
+| Contract | **76 passed** |
+
+The D26 deadlines are now computed relative to the run, not hard-coded in
+October 2026, so the visual check cannot rot into “no upcoming events” as the
+calendar passes the fixture date.
+
+### Adversarial round
+
+| Target | Result |
+|---|---|
+| Admin privilege escalation | Non-owner and anonymous callers get 404 on every `/admin/*` route; `/p/admin/` is 404 for a member and for signed-out. PASS |
+| CSRF on admin writes | Every write requires the accepted `Origin`; a missing or foreign origin is refused. PASS |
+| IDOR on members and shares | Member PATCH/DELETE are owner-only; share revoke is owner-only and resolves a unique active short id; the full token is never listed or audited. PASS |
+| Self-lockout | The owner cannot demote or remove their own owner role. PASS |
+| Share banner injection | The banner is server-generated from a fixed string and a date; a hostile payload URL is HTML-escaped in the PDF wrapper; a document without `<body>` gets the banner prepended. Three new gate tests pin this. PASS |
+| Share reach | A token is confined to its item prefix; traversal, a sibling section, a prefix-extended slug and a second item are refused; every share response is `private, no-store`. PASS |
+| Nav/redirect oracle | Signed-out `/p/`, `/p/projects/` and a legacy item URL all return the styled private 404 with no redirect; `/private/me` is 403. PASS |
+| About-page leak | The real public build scans clean with every private needle; a new test plants a private title under `/about/site/` and confirms the check reddens; the live About HTML carries no private source, group, item or the banner phrase. PASS |
+| Leak-check vacuity | `demo:leak-check` still reddens on the injected leak. PASS |
+| New credential / IAM | None created; no Terraform apply. PASS |
+
+### Live verification (signed out, after the About deploy)
+
+| URL | Result |
+|---|---|
+| `/about/site/`, `/about/site/build/`, `/about/site/use/`, `/about/site/publishing/` | **200** |
+| `/about/site/projects.png` | **200** |
+| `/p/`, `/p/projects/` | **404**, styled, no redirect |
+| a legacy `/p/<section>/<source>/<slug>/` item URL | **404**, no redirect |
+| `/private/me` | **403** |
+| `/p/admin/` | **404** |
+| `/` | **200**, public band unchanged (Research, Projects, Rabbit Holes, CV, Papers) |
+| Public footer | links `/about/site/` |
+| Live About HTML | no private source, group, item or “Shared with you” |
+
+Authenticated live checks (owner `/p/admin/` 200, member 404, share-recipient
+banner) were not run this session because no owner or member session was
+available; those paths are covered by the gate tests, the visual checks and the
+CI screenshots.
+
+### Residuals
+
+- The owner-only authenticated live pass remains: sign in as the owner, open
+  `/p/admin/`, mint a share link, open it signed out, and confirm a member gets
+  404 on `/p/admin/`.
+- The About pages are static prose plus synthetic screenshots. They are accurate
+  to the implementation at D32; a later architecture change must update them and
+  keep their routes in the redirect inventory.
+- The public email address already published in the footer/privacy page is
+  unchanged; the About pages add no contact details.

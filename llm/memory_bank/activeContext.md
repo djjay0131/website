@@ -1,7 +1,7 @@
 # Active Context
 
 Status: Active
-Last updated: 2026-10-16
+Last updated: 2026-11-03
 Owner: Chief Architect
 
 What belongs here: the current focus, the current stop point, and next steps —
@@ -9,6 +9,15 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
+- **D32 is merged and deployed 2026-11-03** (ADR-0029; PRs #162, #163, #164).
+  Signing in augments the one main menu (no members' menu); `/p/` and legacy item
+  URLs redirect to the canonical project route; the owner has a server-enforced
+  Admin area; share links show one page with the only “Shared with you” banner.
+  The public About-the-site pages are live at `/about/site/`. Gate **754**,
+  site **624**, D25 **139**, D26 **66**, D27 **8**; leak, allowlist, private-link
+  and contract checks pass. Remaining owner step: the authenticated live pass
+  (owner `/p/admin/` 200, member 404, mint and open a share link). Details:
+  `llm/sprints/2026-09-hub/STATE.md` §D32.
 - **Phases 0–3 are merged and deployed.** `main` is at `a930718` (after PR #75).
 - **Wave 0 merged 2026-09-23** (#45, #48, #65, #53, #67, #47; close-out #68). Applied
   from `feat/infra-wave-0` at `63fc0d3` before merge, under owner decision D9. Sign-out
