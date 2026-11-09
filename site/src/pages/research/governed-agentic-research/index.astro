@@ -6,7 +6,8 @@ import lifecycle from "../../../data/governed-agentic-research/ai-in-empirical-s
 const base = import.meta.env.BASE_URL;
 const research = `${base}research/`;
 const soa = `${base}research/soa-agentic-se/`;
-const track = `${base}research/governed-agentic-research/ai-in-empirical-se/`;
+const project = `${base}research/governed-agentic-research/`;
+const track = `${project}ai-in-empirical-se/`;
 ---
 
 <Base
@@ -37,6 +38,30 @@ const track = `${base}research/governed-agentic-research/ai-in-empirical-se/`;
       <span class="card-title">AI and agents across the empirical-SE lifecycle</span>
       <span class="card-desc">The synthesis, the {lifecycle.length}-record source explorer, the Consensus searches and the literature-gap table.</span>
       <span class="card-meta">{lifecycle.length} sources · 6 October 2026</span>
+    </a>
+  </div>
+
+  <h2>The tooling</h2>
+  <p>
+    The work here runs on two plugins I maintain: one governs how agents and people change a repository,
+    the other scaffolds and checks a paper. These pages explain what each does, where a human decides, and
+    the study being set up to measure how much of the research process the tooling actually covers.
+  </p>
+  <div class="cards">
+    <a class="card" href={`${project}how-governance-works/`}>
+      <span class="card-title">How agentic-governance works</span>
+      <span class="card-desc">The workflow, the L0 to L3 levels, the four AI roles, the L0 fast track, and every point where a human decides.</span>
+      <span class="card-meta">v0.9.1 · explainer</span>
+    </a>
+    <a class="card" href={`${project}agentic-research/`}>
+      <span class="card-title">What agentic-research does</span>
+      <span class="card-desc">Skills, agents and checks for a paper repository, how it composes with governance, and the gaps found so far.</span>
+      <span class="card-meta">v1.8.0 · explainer</span>
+    </a>
+    <a class="card" href={`${project}completeness-benchmark/`}>
+      <span class="card-title">Does the tooling cover the work?</span>
+      <span class="card-desc">A planned completeness benchmark against the research and paper-writing lifecycle.</span>
+      <span class="card-meta">planned · no results yet</span>
     </a>
   </div>
 
@@ -77,7 +102,8 @@ const track = `${base}research/governed-agentic-research/ai-in-empirical-se/`;
   <h2>Status</h2>
   <p>
     The research digest on AI across the empirical-SE lifecycle is public (219
-    sources, 6 October 2026). Current writing is private.
+    sources, 6 October 2026). Explainers for the two plugins were added on 9 November 2026, alongside the
+    design of a completeness benchmark. Current writing is private.
   </p>
 </Base>
 

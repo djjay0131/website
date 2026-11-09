@@ -1,0 +1,174 @@
+---
+// Derived view of djjay0131/agentic-research pinned at b34bfd5 (VERSION 1.8.0).
+// Projects: README.md, research/skills/*/SKILL.md, research/agents/*.md,
+// research/scripts/research-checks.mjs, llm/specs/2026-10-01-harness-independence-audit.md.
+// The "Known gaps" section records findings from a source read on 2026-11-09;
+// the measured version is the completeness benchmark (completeness-benchmark.astro).
+import Base from "../../../layouts/Base.astro";
+const base = import.meta.env.BASE_URL;
+const project = `${base}research/governed-agentic-research/`;
+const repo = "https://github.com/djjay0131/agentic-research/blob/b34bfd5";
+---
+
+<Base
+  annotatable
+  title="Jason Cusati — What agentic-research does"
+  description="What the agentic-research plugin does for a paper or proposal repository: its skills, agents and checks, where a human decides, how it composes with agentic-governance, and the gaps found so far."
+>
+  <p class="crumbs"><a href={project}>← Governed Agentic Empirical Research</a></p>
+  <h1>What agentic-research does</h1>
+  <p class="subtitle">Writing tooling for papers and proposals, installed once instead of copied</p>
+  <p class="lede">
+    agentic-research is a Claude Code plugin that sets up and polices a paper, proposal or position-paper
+    repository. One command scaffolds the repo, a compiling LaTeX skeleton for the venue, build-on-save
+    scripts, a citation store that checks references are real, and a set of writing agents. It replaced a
+    habit of copying template repositories. The same six agents had ended up in 23 near-identical copies
+    that differed only by a hardcoded path.
+  </p>
+  <p class="pin">Describes <a href={`${repo}/VERSION`}>v1.8.0</a> at commit <code>b34bfd5</code>, read on 9 November 2026.</p>
+
+  <h2>A paper repo's life with the plugin</h2>
+  <figure class="diagram">
+    <svg viewBox="0 0 920 170" role="img" aria-labelledby="ar-title ar-desc">
+      <title id="ar-title">Where each part of the plugin acts</title>
+      <desc id="ar-desc">Preflight, establish, write, cite, check and review, with the human decisions under each.</desc>
+      <defs>
+        <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fill-muted" /></marker>
+      </defs>
+      <g class="stage">
+        <rect x="10" y="20" width="135" height="58" rx="4" /><text x="77" y="45">Preflight</text><text x="77" y="63" class="sm">/research:preflight</text>
+        <rect x="165" y="20" width="135" height="58" rx="4" /><text x="232" y="45">Establish</text><text x="232" y="63" class="sm">/research:establish</text>
+        <rect x="320" y="20" width="135" height="58" rx="4" /><text x="387" y="45">Write</text><text x="387" y="63" class="sm">paper/proposal agents</text>
+        <rect x="475" y="20" width="135" height="58" rx="4" /><text x="542" y="45">Cite</text><text x="542" y="63" class="sm">add-paper, matrix</text>
+        <rect x="630" y="20" width="135" height="58" rx="4" /><text x="697" y="45">Check</text><text x="697" y="63" class="sm">checks, originality</text>
+        <rect x="785" y="20" width="125" height="58" rx="4" /><text x="847" y="45">Review gate</text><text x="847" y="63" class="sm">review-agent, audit</text>
+      </g>
+      <g class="arrows">
+        <line x1="145" y1="49" x2="163" y2="49" marker-end="url(#arr3)" /><line x1="300" y1="49" x2="318" y2="49" marker-end="url(#arr3)" />
+        <line x1="455" y1="49" x2="473" y2="49" marker-end="url(#arr3)" /><line x1="610" y1="49" x2="628" y2="49" marker-end="url(#arr3)" />
+        <line x1="765" y1="49" x2="783" y2="49" marker-end="url(#arr3)" />
+      </g>
+      <g class="human-notes">
+        <text x="77" y="104">approves each</text><text x="77" y="120">install command</text>
+        <text x="232" y="104">answers the interview;</text><text x="232" y="120">approves remote changes</text>
+        <text x="387" y="104">approves outline</text><text x="387" y="120">or design first</text>
+        <text x="542" y="104">resolves anything</text><text x="542" y="120">that can't be verified</text>
+        <text x="697" y="104">judges overlap;</text><text x="697" y="120">no automatic pass</text>
+        <text x="847" y="104">merges the</text><text x="847" y="120">writing</text>
+      </g>
+      <text x="460" y="156" class="note">Human decisions are shown under each step.</text>
+    </svg>
+  </figure>
+
+  <h2>The six skills</h2>
+  <table>
+    <thead><tr><th>Skill</th><th>What it does</th><th>Where a human decides</th></tr></thead>
+    <tbody>
+      <tr><td><code>/research:preflight</code></td><td>Checks for latexmk, a TeX distribution, the venue's font packages, Node 18+ and pdfinfo. Only git is a hard stop.</td><td>Every install is offered one command at a time, with its download size. Nothing installs without a yes.</td></tr>
+      <tr><td><code>/research:establish</code></td><td>Interviews you, writes the per-repo delta, scaffolds the layout, installs build scripts and CI, seeds the memory bank, and confirms the skeleton compiles. Upgrades an existing repo by diffing, never overwriting.</td><td>The interview asks about the research first (topic, core claim, state of the work, audience) and then the paperwork. Any question can be skipped, and the skill may not invent a project brief. It asks before creating a remote or pushing.</td></tr>
+      <tr><td><code>/research:audit</code></td><td>Reports drift from the pinned version, stale or template-text memory files, citation-matrix drift, and anything that blocks submission.</td><td>Report only.</td></tr>
+      <tr><td><code>/research:add-paper</code></td><td>Fetches one reference by DOI, arXiv id or URL, verifies it against Crossref, arXiv or OpenAlex, and writes the BibTeX and matrix entry.</td><td>It refuses to invent an entry it can't verify, which leaves the call to you.</td></tr>
+      <tr><td><code>/research:citation-matrix</code></td><td>Verifies every cited key: existence, author, title, year and venue against the scholarly APIs; flags preprints, undisclosed self-citations, orphans and missing entries.</td><td>Flagged items go to the author.</td></tr>
+      <tr><td><code>/research:originality-check</code></td><td>Looks for verbatim and close-paraphrase overlap with your sources and cited works, self-plagiarism against your own prior papers, unmarked quotations, and AI-drafted text you haven't verified.</td><td>A report for you to judge, never pass or fail. It has no access to published corpora and cannot certify originality.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>The eight agents</h2>
+  <table>
+    <thead><tr><th>Agent</th><th>Commands</th></tr></thead>
+    <tbody>
+      <tr><td><code>paper-agent</code></td><td>outline, survey, draft, revise, create-sprint, validate, camera-ready</td></tr>
+      <tr><td><code>proposal-agent</code></td><td>analyze-cfp, design, update-design, create-sprint, validate. Nothing is written without an approved design.</td></tr>
+      <tr><td><code>position-paper-agent</code></td><td>thesis, arguments, survey, draft, stress-test, validate</td></tr>
+      <tr><td><code>latex-agent</code></td><td>compile, init, check-refs, format-bib, page-count, fix-warnings</td></tr>
+      <tr><td><code>citation-agent</code></td><td>build, verify, add, check, sync. Owns the citation matrix.</td></tr>
+      <tr><td><code>originality-agent</code></td><td>review, self-check, unverified</td></tr>
+      <tr><td><code>review-agent</code></td><td>review, verify-citations, compile-check, update-matrix. The merge-gate report.</td></tr>
+      <tr><td><code>memory-agent</code></td><td>update, archive, validate, status, sync-phases</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Every agent reads its paths from the repository's research delta instead of hardcoding them. That one
+    change is what collapsed the copied variants into one installed set.
+  </p>
+
+  <h2>What the checker enforces</h2>
+  <p>
+    <code>research-checks.mjs</code> is plain Node and runs the same way for a person, an agent or CI. It
+    fails the build on: a missing or unpinned plugin version, unfilled delta placeholders, placeholder text
+    (TODO, TBD, FIXME) in the paper, a <code>\cite</code> with no bibliography entry, undefined references
+    after compiling, author details left in a double-blind submission, and a delta that disagrees with
+    whether a governance delta is present. It warns on orphan bibliography entries, cited keys missing from
+    the citation matrix, and build output left beside the source.
+  </p>
+
+  <h2>With agentic-governance</h2>
+  <p>
+    The plugin is standalone. When a repo also runs <a href={`${project}how-governance-works/`}>agentic-governance</a>,
+    <code>establish</code> is supposed to defer to the governance delta for the memory-bank path and print
+    allowlist lines that keep the paper out of the L0 lane. Paper prose is semantic work, so an agent should
+    never be able to merge writing without human review.
+  </p>
+
+  <h2>Known gaps</h2>
+  <p>
+    Found by reading the source on 9 November 2026. These are the reasons for the
+    <a href={`${project}completeness-benchmark/`}>completeness benchmark</a>.
+  </p>
+  <ul class="gaps">
+    <li>
+      <strong>Composition looks in the wrong place.</strong> <code>establish</code> and the checker look
+      for <code>docs/governance-delta.md</code>. Since governance v0.3 that file lives at
+      <code>llm/governance/governance-delta.md</code>. On a current repo, research would conclude governance is
+      absent and skip the deny lines that keep paper prose out of the L0 lane. This is a prediction from the
+      source; the benchmark's first run is set up to confirm or refute it.
+    </li>
+    <li>
+      <strong>Its own delta is in the data plane.</strong> <code>docs/research-delta.md</code> governs the repo,
+      so under governance's ADR-0001 it belongs in <code>llm/</code>.
+    </li>
+    <li>
+      <strong>It assumes Claude Code.</strong> The skills use Claude-specific tools for asking the user and for
+      locating plugin files, and they are invoked as slash commands. The 1 October audit maps the separation
+      needed for other harnesses. It hasn't been implemented.
+    </li>
+    <li>
+      <strong>It supports writing far more than research.</strong> The source never mentions hypotheses,
+      reproducibility, pre-registration, ethics review or responding to reviewers. Experiment and analysis
+      support amounts to optional <code>experiments/</code>, <code>data/</code> and <code>results/</code>
+      folders. That came from a keyword search, which is a blunt instrument. Measuring it properly is the
+      point of the benchmark.
+    </li>
+  </ul>
+
+  <p class="source">
+    Sources at commit <code>b34bfd5</code>: <a href={`${repo}/README.md`}>README</a>,
+    <a href={`${repo}/research/skills/`}>skills</a>, <a href={`${repo}/research/agents/`}>agents</a>,
+    <a href={`${repo}/research/scripts/research-checks.mjs`}>research-checks.mjs</a>,
+    <a href={`${repo}/llm/specs/2026-10-01-harness-independence-audit.md`}>harness-independence audit</a>.
+  </p>
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .subtitle { font-family: var(--font-body); color: var(--color-muted); margin: -0.5rem 0 1rem; }
+  .lede { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 0.75rem; }
+  .pin, .source { font-family: var(--font-body); font-size: 0.85rem; color: var(--color-muted); }
+  .source { margin-top: 2.5rem; border-top: 1px solid var(--color-border); padding-top: 1rem; }
+  .gaps li { margin-bottom: 0.75rem; }
+  td:first-child code { white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.25rem; font-size: 0.92rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--color-border); }
+  th { font-family: var(--font-body); font-weight: 600; background: var(--color-surface); }
+  .diagram { margin: 1.25rem 0 1.5rem; overflow-x: auto; }
+  .diagram svg { width: 100%; min-width: 640px; height: auto; font-family: var(--font-body); }
+  .diagram .stage rect { fill: var(--color-surface); stroke: var(--color-border); stroke-width: 1.5; }
+  .diagram text { fill: var(--color-text); font-size: 13px; font-weight: 600; text-anchor: middle; }
+  .diagram text.sm { font-size: 10.5px; font-weight: 400; fill: var(--color-muted); }
+  .diagram text.note { font-size: 11.5px; font-weight: 400; fill: var(--color-muted); }
+  .diagram .human-notes text { font-size: 11px; font-weight: 500; fill: var(--color-caution); }
+  .diagram .arrows line { stroke: var(--color-muted); stroke-width: 1.5; }
+  .diagram .fill-muted { fill: var(--color-muted); }
+  code { font-family: var(--font-mono); font-size: 0.9em; background: var(--color-surface); padding: 0 0.25em; }
+  @media (max-width: 640px) { table { display: block; overflow-x: auto; font-size: 0.86rem; } code { overflow-wrap: anywhere; } td:first-child code { white-space: normal; } }
+</style>
