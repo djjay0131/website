@@ -1,0 +1,127 @@
+---
+// Public summary of a planned study. The design authority is the private repo
+// agentic-research-eval, llm/specs/2026-11-09-completeness-benchmark-design.md
+// (in preparation). No results are reported here; update only when results are
+// public. Do not add material from studies under anonymous review.
+import Base from "../../../layouts/Base.astro";
+const base = import.meta.env.BASE_URL;
+const project = `${base}research/governed-agentic-research/`;
+---
+
+<Base
+  annotatable
+  title="Jason Cusati — A completeness benchmark for agentic research tooling"
+  description="A planned study measuring how much of the research and paper-writing lifecycle the agentic-research toolkit covers, and whether its checks catch what they claim to."
+>
+  <p class="crumbs"><a href={project}>← Governed Agentic Empirical Research</a></p>
+  <h1>Does the tooling cover the work?</h1>
+  <p class="subtitle">A completeness benchmark for agentic-research · planned study, no results yet</p>
+  <p class="lede">
+    <a href={`${project}agentic-research/`}>agentic-research</a> grew one fix at a time, each prompted by
+    something that went wrong on a real paper. That is a good way to build a tool and a poor way to know
+    what it misses. This study asks the question directly: set against what doing research and writing a
+    paper actually involves, what does the tool support, what does it only gesture at, and what does it leave
+    entirely to the researcher?
+  </p>
+
+  <h2>Why existing benchmarks don't answer this</h2>
+  <p>
+    Benchmarks for research agents mostly score the output of an autonomous run.
+    <a href="https://arxiv.org/abs/2504.01848">PaperBench</a> has agents replicate ICML papers from scratch,
+    graded against rubrics written with the original authors.
+    <a href="https://arxiv.org/abs/2606.07591">ResearchClawBench</a> hides a published paper and asks agents to
+    re-discover it from its literature and raw data.
+    <a href="https://arxiv.org/abs/2608.12788">ARAC-Bench</a> comes closest in spirit. It scores how completely
+    an autonomous system's trajectory covers expected methodology across proposal, experiment and synthesis,
+    and finds the experiment stage is where systems fall down.
+    <a href="https://arxiv.org/abs/2606.07462">AARRI-Bench</a> runs tasks across several agent harnesses and
+    finds that the model matters far more than the harness. On the writing side,
+    <a href="https://arxiv.org/abs/2604.01128">paper-reconstruction evaluation</a> checks AI-written papers
+    for presentation quality and hallucination, and
+    <a href="https://arxiv.org/abs/2607.28631">a multi-model review study</a> asks whether AI reviewers can
+    rank AI-scientist systems at all.
+  </p>
+  <p>
+    All of these treat the agent as the researcher. agentic-research is built on the opposite assumption: a
+    human does the research, and the tool scaffolds, checks and gates the work around them. For a tool like
+    that, the useful questions are different. Does it cover the lifecycle? Do its gates actually close? Where
+    does it hand a decision back to the human, and does it say so?
+  </p>
+
+  <h2>Research questions</h2>
+  <ol class="rqs">
+    <li><strong>Coverage.</strong> Which activities of the research and paper-writing lifecycle does the tool support, and how strongly?</li>
+    <li><strong>Enforcement.</strong> Do its mechanical checks catch the defects they claim to catch, including slightly disguised ones?</li>
+    <li><strong>The human role.</strong> At which activities does the tool hand judgment to a person, and is that hand-off explicit in the tool or left implicit?</li>
+  </ol>
+
+  <h2>How it will work</h2>
+  <h3>Stage 1: a coverage audit</h3>
+  <p>
+    The reference is a lifecycle model built from published sources, with every activity traced back to the
+    item it came from: the general standard of the
+    <a href="https://www2.sigsoft.org/EmpiricalStandards/">ACM SIGSOFT Empirical Standards</a>, the 14
+    contributor roles of <a href="https://niso.org/publications/z39104-2022-credit">CRediT (ANSI/NISO
+    Z39.104-2022)</a>, the four research stages of the
+    <a href="https://arxiv.org/abs/2501.04306">LLM4SR survey</a>, the six-stage workflow of a
+    <a href="https://arxiv.org/abs/2510.23045">recent survey of AI scientists</a>, and ARAC-Bench's stage rubric.
+    A script inventories every skill, agent, command, check and template in a pinned version of the plugin.
+    Two people then code each activity independently on a four-step scale:
+  </p>
+  <table>
+    <thead><tr><th>Level</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Enforced</td><td>A mechanical check fails when the activity isn't done.</td></tr>
+      <tr><td>Procedural</td><td>An agent or skill procedure covers it, but nothing fails if it is skipped.</td></tr>
+      <tr><td>Scaffolded</td><td>A template or folder exists for it, with no procedure behind it.</td></tr>
+      <tr><td>Absent</td><td>Nothing in the tool addresses it.</td></tr>
+    </tbody>
+  </table>
+  <p>Agreement between the coders is reported before they reconcile. An agent's proposed coding can be compared against theirs, but it is never used as the answer key.</p>
+
+  <h3>Stage 2: do the gates close?</h3>
+  <p>
+    For every claim the plugin makes about what its checker catches, a script injects that defect into a
+    clean fixture paper and records whether the checker fails. Each fault also gets disguised variants, such
+    as a citation command with options or a placeholder inside a comment. Clean fixtures run alongside as
+    controls that must pass. No model is involved, so every run is deterministic and repeatable from one
+    command. Runs where an agent performs the plugin's procedures, for example verifying a reference list
+    that has fabricated entries mixed in, are designed and pre-registered now. They will run only once
+    thresholds and a budget are set.
+  </p>
+
+  <h3>The tool is also a subject</h3>
+  <p>
+    The study's own repository is being set up by OpenCode, a different agent harness, following the
+    plugin's procedures as written for Claude Code. A step-by-step log of what it could follow, what it had
+    to adapt and what it could not do is a direct test of the harness-independence gap.
+  </p>
+
+  <h2>Where people decide</h2>
+  <ul>
+    <li>The lifecycle reference model is approved by a person before anything is scored against it.</li>
+    <li>Coverage coding is done by two people. An agent's version is a comparison, never the gold standard.</li>
+    <li>Pass thresholds and the budget for agent runs are set by a person and committed before those runs happen.</li>
+    <li>Every change to the study repository goes through governance: draft PRs, checks, human merge.</li>
+  </ul>
+
+  <h2>Status</h2>
+  <p>
+    Planned. The design and tooling are being built in a private repository as of 9 November 2026, and a
+    workshop paper is in preparation. No result on this page should be read as a finding until it appears
+    here with its data.
+  </p>
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .subtitle { font-family: var(--font-body); color: var(--color-muted); margin: -0.5rem 0 1rem; }
+  .lede { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 1rem; }
+  .rqs li { margin-bottom: 0.5rem; }
+  h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.25rem; font-size: 0.92rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--color-border); }
+  th { font-family: var(--font-body); font-weight: 600; background: var(--color-surface); }
+  td:first-child { font-weight: 600; }
+  @media (max-width: 640px) { table { display: block; overflow-x: auto; font-size: 0.86rem; } code { overflow-wrap: anywhere; } }
+</style>

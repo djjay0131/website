@@ -1,0 +1,340 @@
+---
+// Derived view (ADR-0001 data plane) of agentic-governance control-plane docs,
+// pinned at 01c7d69 (VERSION 0.9.1). It projects, and must stay consistent with:
+//   llm/governance/project-operating-system.md   (workflow, modes, contracts)
+//   llm/governance/governance-levels.md          (L0-L3, escalation, merge authority)
+//   llm/governance/architecture-governance.md    (roles, PR lifecycle, ADRs)
+//   llm/governance/l0-fast-track.md              (twelve conditions, artifact chain, honest gaps)
+//   llm/features/BACKLOG.md                      (G-1..G-3)
+//   llm/specs/2026-10-01-harness-independence-audit.md
+// When canon changes, update this page; never the reverse.
+import Base from "../../../layouts/Base.astro";
+const base = import.meta.env.BASE_URL;
+const project = `${base}research/governed-agentic-research/`;
+const canon = "https://github.com/djjay0131/agentic-governance/blob/01c7d69";
+---
+
+<Base
+  annotatable
+  title="Jason Cusati — How agentic-governance works"
+  description="How the agentic-governance operating system runs work by humans and AI agents: the workflow, the L0 to L3 levels, the four AI roles, the L0 fast track, and every point where a human decides."
+>
+  <p class="crumbs"><a href={project}>← Governed Agentic Empirical Research</a></p>
+  <h1>How agentic-governance works</h1>
+  <p class="subtitle">The workflow inside, and where the human comes in</p>
+  <p class="lede">
+    agentic-governance is the operating system my repositories run on. It says how work is planned,
+    classified, done, reviewed, merged and remembered, whether a person or an AI agent does it. The short
+    version: agents can do almost all of the work. A human approves every change that alters meaning.
+  </p>
+  <p class="pin">
+    Describes <a href={`${canon}/VERSION`}>v0.9.1</a> at commit <code>01c7d69</code>. This page is a summary.
+    Where it and the <a href={`${canon}/llm/governance/`}>canonical documents</a> disagree, the documents win.
+  </p>
+
+  <nav class="toc" aria-label="On this page">
+    <a href="#layers">Three layers</a> ·
+    <a href="#workflow">The workflow</a> ·
+    <a href="#levels">Levels</a> ·
+    <a href="#roles">Roles</a> ·
+    <a href="#modes">Execution modes</a> ·
+    <a href="#l0">The L0 lane</a> ·
+    <a href="#human">Where the human comes in</a> ·
+    <a href="#enforced">What code checks</a> ·
+    <a href="#unbuilt">Not built yet</a>
+  </nav>
+
+  <h2 id="layers">Three layers</h2>
+  <ol class="layers">
+    <li>
+      <strong>Canon.</strong> One repository holds the policy, stated once: the operating system, the
+      governance levels, the role charters, the Definition of Done, the review checklist and the templates.
+      It knows nothing about any particular project.
+    </li>
+    <li>
+      <strong>The delta.</strong> Each adopting repository carries one file,
+      <code>llm/governance/governance-delta.md</code>. It binds the canon to that project: mission,
+      design-authority document, the paths it uses, its check command, its L0 allowlist, what its platform
+      can actually enforce, and whether the steward lane is switched on. It also pins the canon version, so a
+      repository upgrades on purpose and never by accident.
+    </li>
+    <li>
+      <strong>Execution.</strong> A Claude Code plugin supplies four AI role agents, three skills
+      (<code>/governance:establish</code>, <code>/governance:audit</code>, <code>/governance:migrate</code>)
+      and a dependency-free checker, <code>governance-checks.mjs</code>. Specialist analysis is handed to the
+      separate Constellize personas rather than duplicated.
+    </li>
+  </ol>
+  <p>
+    The repository itself is split by role. Anything that governs, plans or records how the repository runs
+    lives in <code>llm/</code>, the control plane. Deliverables, external material and generated views such
+    as this page live in <code>docs/</code> or on a site, the data plane, and each view has to name the
+    control-plane document it summarizes (<a href={`${canon}/llm/governance/adr/0001-llm-control-plane-docs-data-plane.md`}>ADR-0001</a>).
+  </p>
+
+  <h2 id="workflow">The workflow</h2>
+  <p>
+    Every piece of work takes the same path, whatever produced it. Nothing skips review except an explicitly
+    authorized emergency repair.
+  </p>
+  <figure class="diagram">
+    <svg viewBox="0 0 920 250" role="img" aria-labelledby="wf-title wf-desc">
+      <title id="wf-title">The core workflow</title>
+      <desc id="wf-desc">Nine stages from roadmap to memory update. Stages owned by the author are plain; review is done by a reviewer; approval and merge of semantic work are human.</desc>
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="fill-muted" />
+        </marker>
+      </defs>
+      <g class="stage">
+        <rect x="10" y="40" width="88" height="54" rx="4" /><text x="54" y="64">Roadmap</text><text x="54" y="82" class="sm">or issue</text>
+        <rect x="112" y="40" width="88" height="54" rx="4" /><text x="156" y="64">Issue</text><text x="156" y="82" class="sm">scope + criteria</text>
+        <rect x="214" y="40" width="88" height="54" rx="4" /><text x="258" y="64">Branch</text><text x="258" y="82" class="sm">named by type</text>
+        <rect x="316" y="40" width="88" height="54" rx="4" /><text x="360" y="64">Draft PR</text><text x="360" y="82" class="sm">level declared</text>
+      </g>
+      <g class="stage review">
+        <rect x="418" y="40" width="88" height="54" rx="4" /><text x="462" y="64">Review</text><text x="462" y="82" class="sm">checklist</text>
+        <rect x="520" y="40" width="88" height="54" rx="4" /><text x="564" y="64">Fix loop</text><text x="564" y="82" class="sm">until resolved</text>
+      </g>
+      <g class="stage human">
+        <rect x="622" y="40" width="88" height="54" rx="4" /><text x="666" y="64">Approve</text><text x="666" y="82" class="sm">ready + approved</text>
+        <rect x="724" y="40" width="88" height="54" rx="4" /><text x="768" y="64">Merge</text><text x="768" y="82" class="sm">human for L1–L3</text>
+      </g>
+      <g class="stage">
+        <rect x="826" y="40" width="88" height="54" rx="4" /><text x="870" y="64">Memory</text><text x="870" y="82" class="sm">+ ADR update</text>
+      </g>
+      <g class="arrows">
+        <line x1="98" y1="67" x2="110" y2="67" marker-end="url(#arr)" /><line x1="200" y1="67" x2="212" y2="67" marker-end="url(#arr)" />
+        <line x1="302" y1="67" x2="314" y2="67" marker-end="url(#arr)" /><line x1="404" y1="67" x2="416" y2="67" marker-end="url(#arr)" />
+        <line x1="506" y1="67" x2="518" y2="67" marker-end="url(#arr)" /><line x1="608" y1="67" x2="620" y2="67" marker-end="url(#arr)" />
+        <line x1="710" y1="67" x2="722" y2="67" marker-end="url(#arr)" /><line x1="812" y1="67" x2="824" y2="67" marker-end="url(#arr)" />
+        <path d="M564,94 C564,124 462,124 462,96" fill="none" marker-end="url(#arr)" />
+      </g>
+      <g class="lanes">
+        <text x="207" y="150">Author (human or agent)</text>
+        <line x1="10" y1="160" x2="404" y2="160" class="lane" />
+        <text x="513" y="150">Reviewer (Chief Reviewer or delegate)</text>
+        <line x1="418" y1="160" x2="608" y2="160" class="lane review" />
+        <text x="717" y="150">Human owner</text>
+        <line x1="622" y1="160" x2="812" y2="160" class="lane human" />
+        <text x="870" y="150">Author</text>
+        <line x1="826" y1="160" x2="914" y2="160" class="lane" />
+      </g>
+      <text x="460" y="205" class="note">The memory-bank and ADR updates a change needs are part of the author's work, done before the PR is marked ready.</text>
+      <text x="460" y="228" class="note">L0 changes in a repo that has activated the fast track are merged by the Repository Steward instead (see below).</text>
+    </svg>
+    <figcaption>The core workflow. Source: <code>project-operating-system.md</code> §Core Workflow and <code>architecture-governance.md</code> §PR Lifecycle.</figcaption>
+  </figure>
+  <p>
+    Two rules hold the workflow together. A semantic change has to exist as a pull request before anyone can
+    review it, so opening the draft PR is the author's job, not the owner's. And no decision counts if it
+    lives only in a chat, a prompt or a meeting note, including a conversation with an AI assistant. It has
+    to land in the repository as an ADR, a design update, a memory-bank entry, or an issue or PR note before
+    anyone acts on it.
+  </p>
+
+  <h2 id="levels">Every change gets a level</h2>
+  <p>
+    Before merge, each change is classified at exactly one of four levels. The level decides who reviews it
+    and who may merge it. A change is <em>semantic</em> if a reasonable reviewer could believe it alters
+    meaning, behaviour, decisions or obligations. The burden of proof sits on the non-semantic side: if
+    deciding needs judgment, the change is semantic.
+  </p>
+  <table>
+    <thead><tr><th>Level</th><th>What it covers</th><th>Review</th><th>Who merges</th></tr></thead>
+    <tbody>
+      <tr><td><strong>L0</strong> Administrative</td><td>Fourteen closed categories of bookkeeping: memory-bank sync to merged work, checkbox progress, ADR status flips citing the approving PR, index regeneration, link repair, formatting, narrowly defined typos, branch cleanup.</td><td>Steward certification plus an independent audit</td><td>The Repository Steward, only where the repo has activated the fast track. Otherwise the human owner.</td></tr>
+      <tr><td><strong>L1</strong> Governance and architecture</td><td>ADR content, the design-authority document, architecture, domain model, governance policy, the delta itself.</td><td rowspan="3">Human review required, against the review checklist and Definition of Done</td><td rowspan="3">The human owner only. No AI role, in any mode or team size.</td></tr>
+      <tr><td><strong>L2</strong> Implementation</td><td>Code, schemas, migrations, APIs, auth, infrastructure, CI/CD behaviour, executable configuration.</td></tr>
+      <tr><td><strong>L3</strong> Product</td><td>Requirements, scope, personas, business rules, user-visible behaviour, privacy and consent, prioritization.</td></tr>
+    </tbody>
+  </table>
+  <ul class="rules">
+    <li><strong>Uncertain means semantic.</strong> If anyone is unsure, the change goes to human review at the lowest plausible semantic level.</li>
+    <li><strong>Mixed changes take the highest level.</strong> One L1 sentence in a bookkeeping PR makes the whole PR L1, which is why authors split housekeeping out.</li>
+    <li><strong>Escalation runs one way for AI.</strong> Any participant may move a change up. Only the human owner may move it down, and only by saying so on the PR or issue.</li>
+  </ul>
+
+  <h2 id="roles">Who does what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>Kind</th><th>Responsible for</th></tr></thead>
+    <tbody>
+      <tr><td>Project owner</td><td>Human</td><td>Final decisions, sole merge authority above L0, branch protection and repository administration, resolving agent and classification disputes, deciding whether the steward lane is ever activated.</td></tr>
+      <tr><td>Chief Architect</td><td>AI role</td><td>Architectural coherence. Classifies the work and picks the execution mode before substantial work starts, and records both on the issue or PR.</td></tr>
+      <tr><td>Chief Reviewer</td><td>AI role</td><td>Review quality and decision integrity for L1–L3 work. Also serves as the Governance Auditor for the L0 lane.</td></tr>
+      <tr><td>Chief Product Officer</td><td>AI role</td><td>User value and scope discipline.</td></tr>
+      <tr><td>Repository Steward</td><td>AI role</td><td>The L0 lane: certifies, opens and, only where activated and after independent audit, merges narrow bookkeeping PRs. The one exception to "no AI role merges its own work".</td></tr>
+      <tr><td>Specialists</td><td>AI or human</td><td>Scoped workstreams under a bounded contract, usually Constellize personas. They classify their own work and default to semantic when unsure.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Authoring, reviewing and merging stay separate responsibilities. In a solo project one person can wear
+    more than one hat, but for semantic work the author never reviews their own change and the reviewer
+    never merges it. Every agent starts from a bounded contract that lists its role, objective, required
+    reading, allowed and forbidden files, deliverables, Definition of Done, the boundary of what the work is
+    not, and who commits. Its handoff must state assumptions, alternatives, risks, open questions and ADR
+    candidates.
+  </p>
+
+  <h2 id="modes">Execution modes</h2>
+  <p>
+    The Chief Architect picks one of three modes for how the work is produced: a single agent on one bounded
+    contract; a team of specialists with disjoint file scopes followed by a reconciliation round; or a
+    dependency-aware orchestration that launches agents in waves and runs an independent governance audit.
+    The mode never changes what review the work needs. Work produced by a many-agent orchestration still
+    goes through Issue, Branch and PR, and a human still merges it.
+  </p>
+
+  <h2 id="l0">The L0 fast track</h2>
+  <p>
+    The only lane where an AI merges anything is for L0 bookkeeping, and it ships switched off. Turning it on
+    takes a repo-local ADR plus an activation PR that a human approves and merges. Turning it off takes a
+    human statement and a flip of the delta back to INACTIVE.
+  </p>
+  <figure class="diagram">
+    <svg viewBox="0 0 920 220" role="img" aria-labelledby="l0-title l0-desc">
+      <title id="l0-title">The L0 fast track</title>
+      <desc id="l0-desc">An L0 PR must pass the checker in L0 mode, carry the steward's certification, and receive a PASS from an auditor run in a separate session. Only then, and only if the repo activated the lane, does the steward merge. Any failure sends the PR to human review.</desc>
+      <defs>
+        <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="fill-muted" />
+        </marker>
+      </defs>
+      <g class="stage">
+        <rect x="10" y="30" width="150" height="60" rx="4" /><text x="85" y="56">L0 PR opened</text><text x="85" y="74" class="sm">admin/&lt;topic&gt; branch</text>
+        <rect x="190" y="30" width="150" height="60" rx="4" /><text x="265" y="56">1. Checks pass</text><text x="265" y="74" class="sm">checker --l0 vs allowlist</text>
+        <rect x="370" y="30" width="150" height="60" rx="4" /><text x="445" y="56">2. Certification</text><text x="445" y="74" class="sm">steward, specific to diff</text>
+        <rect x="550" y="30" width="150" height="60" rx="4" /><text x="625" y="56">3. Auditor PASS</text><text x="625" y="74" class="sm">separate session, PR comment</text>
+      </g>
+      <g class="stage review">
+        <rect x="730" y="30" width="180" height="60" rx="4" /><text x="820" y="56">Steward merges</text><text x="820" y="74" class="sm">only if delta says ACTIVE</text>
+      </g>
+      <g class="stage human">
+        <rect x="370" y="140" width="330" height="56" rx="4" /><text x="535" y="164">Human review and human merge</text><text x="535" y="182" class="sm">any failure, any doubt, or lane inactive</text>
+      </g>
+      <g class="arrows">
+        <line x1="160" y1="60" x2="188" y2="60" marker-end="url(#arr2)" /><line x1="340" y1="60" x2="368" y2="60" marker-end="url(#arr2)" />
+        <line x1="520" y1="60" x2="548" y2="60" marker-end="url(#arr2)" /><line x1="700" y1="60" x2="728" y2="60" marker-end="url(#arr2)" />
+        <path d="M265,90 L265,168 L368,168" fill="none" marker-end="url(#arr2)" />
+        <line x1="445" y1="90" x2="445" y2="138" marker-end="url(#arr2)" />
+        <line x1="625" y1="90" x2="625" y2="138" marker-end="url(#arr2)" />
+        <path d="M820,90 L820,168 L702,168" fill="none" marker-end="url(#arr2)" />
+      </g>
+    </svg>
+    <figcaption>The ordered artifact chain. Source: <code>l0-fast-track.md</code> §Ordered Artifact Chain and §Per-Repo Activation.</figcaption>
+  </figure>
+  <p>
+    A PR qualifies only if all twelve conditions hold. Among them: every line is non-semantic, no code,
+    schema, behavioural configuration, ADR content or design-authority text changes, any ADR status flip cites
+    the merged PR that approved it, the checks pass, the auditor records PASS, and no review thread is left
+    open. The checker reads the allowlist from <code>origin/main</code>, never from the PR's own tree, so an L0
+    PR cannot rewrite the rules that judge it. An auditor's rejection is final for the lane, and the steward
+    may not re-certify the same diff.
+  </p>
+
+  <h2 id="human">Where the human comes in</h2>
+  <p>
+    This is the part people ask about most. The table lists every point in the canon where a human decides,
+    and whether anything can stand in for them.
+  </p>
+  <table class="human-table">
+    <thead><tr><th>When</th><th>What the human does</th><th>Can an AI do it?</th></tr></thead>
+    <tbody>
+      <tr><td>Adopting a repo</td><td>Runs <code>/governance:establish</code>, approves each GitHub-remote change it proposes (creating the remote, branch protection), and accepts the new plugin marketplace in a later session.</td><td>No. Accepting a marketplace has no non-interactive path, and the skill reports it as a required human follow-up.</td></tr>
+      <tr><td>Every semantic PR</td><td>Reviews the result against the checklist (with the Chief Reviewer's review in hand) and merges it.</td><td>No. Sole merge authority for L1–L3.</td></tr>
+      <tr><td>Durable decisions</td><td>Approves or rejects ADRs and design-authority changes.</td><td>Agents draft and recommend; they do not accept.</td></tr>
+      <tr><td>Classification</td><td>Moves a change to a lower level, and settles any dispute about level.</td><td>AI may only escalate. Until the human rules, the change is treated as semantic.</td></tr>
+      <tr><td>Agent disagreements</td><td>Resolves conflicts the design-authority document and ADRs don't settle, then records the decision.</td><td>No.</td></tr>
+      <tr><td>The L0 lane</td><td>Writes or approves the activation ADR, merges the activation PR, and can switch the lane off at any time.</td><td>No. Adoption never grants it.</td></tr>
+      <tr><td>Layout migration</td><td>Reviews and merges the PR that <code>/governance:migrate</code> opens to move pre-v0.3 content.</td><td>The skill does the moves; the merge is human.</td></tr>
+      <tr><td>Stale branches</td><td>Decides whether to delete branches the audit lists.</td><td>The audit reports only. A branch with no PR is never deleted, because it may be the only copy.</td></tr>
+      <tr><td>Repository settings</td><td>Branch protection and repository administration.</td><td>No.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    What the human does <em>not</em> have to do: the bookkeeping. Where the fast track is active, memory-bank
+    syncs, checkbox progress and index regeneration merge without them, under certification and an audit
+    trail. Where it is inactive, which is the default, the same certification and audit still get produced
+    as review aids, but they authorize nothing.
+  </p>
+
+  <h2 id="enforced">What code checks, and what rests on judgment</h2>
+  <p>
+    The canon is unusually frank about this, and each adopting delta has to restate it for its own platform.
+  </p>
+  <div class="two-col">
+    <div>
+      <h3>Checked mechanically</h3>
+      <ul>
+        <li>Changed paths fall inside the L0 allowlist and outside the always-denied set (the delta, policy docs, code, scripts, <code>.github/</code>).</li>
+        <li>Diff shapes match their constraint: status line only, index rows only, checkbox flips only, link targets only.</li>
+        <li>The certification block is present in the PR body.</li>
+        <li>Every path the delta declares exists (<code>--layout</code>).</li>
+        <li>The audit skill's twelve checks, including whether anything actually runs the check command automatically, and whether it is a required status check.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Resting on people and discipline</h3>
+      <ul>
+        <li>Whether a change really preserves meaning. The semantic test is judgment.</li>
+        <li>Whether a cited PR really approved the decision an ADR flip records.</li>
+        <li>Whether a link fix kept pointing at the same document.</li>
+        <li>Whether the auditor's session was really independent of the steward's.</li>
+        <li>Ordering of the artifact chain, unless the platform blocks an early merge.</li>
+        <li>Anything a repo's platform can't gate, such as role separation under one shared token.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="unbuilt">Not built yet</h2>
+  <p>Four gaps are on record in the canon itself. None of them is solved by this page.</p>
+  <ul class="gaps">
+    <li><strong>Checks are wired but not required (G-2).</strong> <code>establish</code> adds the check to CI but doesn't make it a required status check, so a red PR can still merge. Since v0.9.1 the audit reports this, but the setup step doesn't close it.</li>
+    <li><strong>Outcomes aren't verified (G-3, specified 2026-09-18).</strong> The canon governs process thoroughly and outcomes hardly at all. An acceptance criterion is an anonymous checkbox, and an agent can tick it on its own evidence. The spec adds claim identifiers, verification states bound to the exact wording, and a rule that an agent's own assertion can never reach "human verified".</li>
+    <li><strong>Model choice is invisible (G-1).</strong> Which model ran a piece of work is never declared or recorded.</li>
+    <li><strong>It is bound to one harness.</strong> The execution layer is a Claude Code plugin. The 2026-10-01 audit maps what has to separate so that Claude Code, OpenCode, Codex or CI run the same protocol. Implementation hasn't started.</li>
+  </ul>
+
+  <p class="source">
+    Sources, all at commit <code>01c7d69</code>:
+    <a href={`${canon}/llm/governance/project-operating-system.md`}>project-operating-system.md</a>,
+    <a href={`${canon}/llm/governance/governance-levels.md`}>governance-levels.md</a>,
+    <a href={`${canon}/llm/governance/architecture-governance.md`}>architecture-governance.md</a>,
+    <a href={`${canon}/llm/governance/l0-fast-track.md`}>l0-fast-track.md</a>,
+    <a href={`${canon}/llm/features/BACKLOG.md`}>BACKLOG.md</a>,
+    <a href={`${canon}/llm/specs/2026-10-01-harness-independence-audit.md`}>harness-independence audit</a>.
+  </p>
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .subtitle { font-family: var(--font-body); color: var(--color-muted); margin: -0.5rem 0 1rem; }
+  .lede { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 0.75rem; }
+  .pin, .source { font-family: var(--font-body); font-size: 0.85rem; color: var(--color-muted); }
+  .source { margin-top: 2.5rem; border-top: 1px solid var(--color-border); padding-top: 1rem; }
+  .toc { font-family: var(--font-body); font-size: 0.88rem; margin: 1.25rem 0 0.5rem; line-height: 1.8; }
+  .layers li, .gaps li, .rules li { margin-bottom: 0.6rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.25rem; font-size: 0.92rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--color-border); }
+  th { font-family: var(--font-body); font-weight: 600; background: var(--color-surface); }
+  .human-table td:first-child { font-weight: 600; }
+  .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; }
+  .two-col h3 { font-size: 1rem; margin-bottom: 0.25rem; }
+  .diagram { margin: 1.25rem 0 1.5rem; overflow-x: auto; }
+  .diagram svg { width: 100%; min-width: 640px; height: auto; font-family: var(--font-body); }
+  .diagram figcaption { font-family: var(--font-body); font-size: 0.82rem; color: var(--color-muted); margin-top: 0.4rem; }
+  .diagram .stage rect { fill: var(--color-surface); stroke: var(--color-border); stroke-width: 1.5; }
+  .diagram .stage.review rect { stroke: var(--color-link); stroke-width: 2; }
+  .diagram .stage.human rect { fill: var(--color-caution-bg); stroke: var(--color-caution); stroke-width: 2; }
+  .diagram text { fill: var(--color-text); font-size: 13px; font-weight: 600; text-anchor: middle; }
+  .diagram text.sm { font-size: 10.5px; font-weight: 400; fill: var(--color-muted); }
+  .diagram text.note { font-size: 11.5px; font-weight: 400; fill: var(--color-muted); }
+  .diagram .lanes text { font-size: 11px; font-weight: 600; fill: var(--color-muted); }
+  .diagram .lane { stroke: var(--color-border); stroke-width: 4; }
+  .diagram .lane.review { stroke: var(--color-link); }
+  .diagram .lane.human { stroke: var(--color-caution); }
+  .diagram .arrows line, .diagram .arrows path { stroke: var(--color-muted); stroke-width: 1.5; }
+  .diagram .fill-muted { fill: var(--color-muted); }
+  code { font-family: var(--font-mono); font-size: 0.9em; background: var(--color-surface); padding: 0 0.25em; }
+  @media (max-width: 640px) { table { display: block; overflow-x: auto; font-size: 0.86rem; } code { overflow-wrap: anywhere; } }
+</style>

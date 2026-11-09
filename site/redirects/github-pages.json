@@ -248,6 +248,10 @@
     "to": "/research/governed-agentic-research/"
   },
   {
+    "from": "/website/research/governed-agentic-research/agentic-research/",
+    "to": "/research/governed-agentic-research/agentic-research/"
+  },
+  {
     "from": "/website/research/governed-agentic-research/ai-in-empirical-se/",
     "to": "/research/governed-agentic-research/ai-in-empirical-se/"
   },
@@ -266,6 +270,14 @@
   {
     "from": "/website/research/governed-agentic-research/ai-in-empirical-se/synthesis/",
     "to": "/research/governed-agentic-research/ai-in-empirical-se/synthesis/"
+  },
+  {
+    "from": "/website/research/governed-agentic-research/completeness-benchmark/",
+    "to": "/research/governed-agentic-research/completeness-benchmark/"
+  },
+  {
+    "from": "/website/research/governed-agentic-research/how-governance-works/",
+    "to": "/research/governed-agentic-research/how-governance-works/"
   },
   {
     "from": "/website/research/soa-agentic-se/",

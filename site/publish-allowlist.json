@@ -23,6 +23,9 @@
     { "source": "hub", "slug": "research/governed-agentic-research/ai-in-empirical-se/synthesis" },
     { "source": "hub", "slug": "research/governed-agentic-research/ai-in-empirical-se/sources" },
     { "source": "hub", "slug": "research/governed-agentic-research/ai-in-empirical-se/consensus" },
-    { "source": "hub", "slug": "research/governed-agentic-research/ai-in-empirical-se/literature-gap" }
+    { "source": "hub", "slug": "research/governed-agentic-research/ai-in-empirical-se/literature-gap" },
+    { "source": "hub", "slug": "research/governed-agentic-research/how-governance-works" },
+    { "source": "hub", "slug": "research/governed-agentic-research/agentic-research" },
+    { "source": "hub", "slug": "research/governed-agentic-research/completeness-benchmark" }
   ]
 }
