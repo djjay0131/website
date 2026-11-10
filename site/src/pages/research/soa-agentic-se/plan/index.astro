@@ -1,0 +1,149 @@
+---
+import Base from "../../../../layouts/Base.astro";
+const base = import.meta.env.BASE_URL;
+const repo = "https://github.com/djjay0131/soa-agentic-se";
+const asOf = "10 November 2026";
+
+// Venue options checked 2026-11-10 against conf.researchr.org and se-deadlines.github.io.
+// All deadlines AoE (UTC−12) unless the venue says otherwise.
+const venues = [
+  { venue: "ICSE 2027 research", deadline: "30 Jun 2026", format: "—", fit: "—", status: "closed" },
+  { venue: "ICSE 2027 NIER / SEIP", deadline: "23 Oct 2026", format: "4 pp / 10 pp", fit: "—", status: "closed" },
+  { venue: "ICSE 2028 research", deadline: "not yet public (≈ Jun 2027 if the 2027 pattern holds)", format: "≈10 pp", fit: "good, late", status: "unknown" },
+  { venue: "EASE 2027 research — target", deadline: "abstract 15 Jan · full 22 Jan 2027", format: "10 + 2 pp, ACM, double-anonymous", fit: "best: SLR-with-quality-appraisal is native; EMSE special issue", status: "open", target: true },
+  { venue: "FSE 2027 Ideas, Visions & Reflections", deadline: "12 Feb 2027", format: "4 pp + refs", fit: "the thesis alone; fallback or companion", status: "open" },
+  { venue: "FSE 2027 Industry", deadline: "23 Jan 2027", format: "5 / 10 pp", fit: "poor", status: "open" },
+  { venue: "AGENT 2027 workshop @ ICSE", deadline: "13 Nov 2026", format: "short", fit: "most on-topic; position paper only", status: "open" },
+  { venue: "MSR 2027 Registered Reports", deadline: "abstract 13 Nov · report 20 Nov 2026", format: "RR", fit: "format fits a frozen protocol; MSR scope is mining", status: "open" },
+  { venue: "EMSE / TOSEM / TSE", deadline: "rolling", format: "journal", fit: "best overall fit; full-paper home", status: "open" },
+  { venue: "arXiv", deadline: "same day as submission", format: "—", fit: "always", status: "—" },
+];
+
+const milestones = [
+  { date: "2026-11-14", label: "Decisions D1–D6; EASE target confirmed; controlled experiment moves to the EMSE extension" },
+  { date: "2026-11-24", label: "Known-item list repaired; known-item test run against the frozen protocol" },
+  { date: "2026-12-05", label: "Corpus assembled and frozen (first-public date ≤ 30 Sep 2026); PRISMA identification counts" },
+  { date: "2026-12-12", label: "Tier 1 screening audit complete (κ, false-negative rate with CI)" },
+  { date: "2026-12-19", label: "Tier 2 assigned; first M/N" },
+  { date: "2027-01-02", label: "Extraction and taxonomy calibration complete" },
+  { date: "2027-01-09", label: "Evidence map, gap list, verification pass complete; writing from data" },
+  { date: "2027-01-15", label: "EASE 2027 abstract (AoE)", deadline: true },
+  { date: "2027-01-20", label: "Co-author full read returned" },
+  { date: "2027-01-22", label: "EASE 2027 full paper (AoE) + arXiv", deadline: true },
+  { date: "2027-02-12", label: "FSE 2027 IVR — fallback / companion", deadline: true },
+  { date: "2027-03-12", label: "EASE 2027 notification" },
+];
+
+const workstreams = [
+  { weeks: "1–2", dates: "Nov 10–23", what: "Known-item repair: security venue re-sweep; unfinished channels; fold the harness, memory and atlas stores into the known-item list; verify originals", owner: "Claude; Jason reviews" },
+  { weeks: "1–3", dates: "Nov 10–Dec 6", what: "Memory-bank census into the paper (§6): amendment 16, decisions (a)–(c), dual human coding of 74 candidate layouts, tables and figure", owner: "Jason, Atharva, Claude" },
+  { weeks: "2–3", dates: "Nov 23–Dec 6", what: "Known-item test; four-channel search; snowballing to the stop rule; corpus frozen", owner: "Claude" },
+  { weeks: "3–4", dates: "Dec 1–14", what: "Tier 1 screening: LLM screen plus a ≥300-record dual human audit", owner: "Jason + Atharva; Chris adjudicates" },
+  { weeks: "4–5", dates: "Dec 8–21", what: "Full-text screen, Tier 2 assignment, first M/N, PRISMA counts", owner: "Claude; one human on every exclusion" },
+  { weeks: "5–6", dates: "Dec 15–Jan 1", what: "Extraction on the 4-tuple; taxonomy calibration with independent second coding", owner: "Claude; Jason + Atharva code" },
+  { weeks: "6–7", dates: "Dec 29–Jan 10", what: "Evidence map, unreported-fields table, ranked gaps; adversarial gap verification; separated citation verification", owner: "Claude" },
+  { weeks: "1–5", dates: "Nov 10–Dec 14", what: "Memory track: screen the atlas and candidate CSVs into the data files; benchmark decision", owner: "Atharva" },
+  { weeks: "7–10", dates: "Jan 5–22", what: "Writing from data; full co-author read; anonymisation and page fit; arXiv on submission day", owner: "all" },
+];
+
+const today = new Date().toISOString().slice(0, 10);
+---
+
+<Base
+  annotatable
+  title="Jason Cusati — SoA Agentic SE: Plan"
+  description="Venue options, deadlines, milestones and workstreams for the state-of-the-art paper on agentic software engineering, targeting EASE 2027."
+>
+  <p class="crumbs"><a href={`${base}research/soa-agentic-se/`}>← SoA Agentic SE</a></p>
+  <h1>Plan: Phase 2 to Submission</h1>
+  <p class="lede">
+    Where the paper is going and when. Target: <strong>EASE 2027</strong> research
+    track — abstract <strong>15 January</strong>, full paper <strong>22 January 2027</strong>.
+    The January submission is the systematic review plus the memory-bank census;
+    the controlled experiment on real GitHub repositories follows in the journal
+    extension. As of {asOf}.
+  </p>
+
+  <h2>Where the paper stands</h2>
+  <p>
+    Phase 1 (framing and protocol) is complete and the protocol is frozen. The
+    paper skeleton, the first prose sections (review method, background), the
+    bibliography generated from the three research stores, and a new section on
+    memory banks in the wild are on <code>main</code>. Phase 2 — the search,
+    screening and extraction — starts now. The repository is private until
+    publication; the compiled draft is available to collaborators there.
+  </p>
+
+  <h2>Venue options</h2>
+  <p>Checked {asOf}. Deadlines are Anywhere on Earth unless the venue says otherwise.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Venue / track</th><th>Deadline</th><th>Format</th><th>Fit</th><th>Status</th></tr></thead>
+      <tbody>
+        {venues.map((v) => (
+          <tr class={v.target ? "target" : ""}>
+            <td>{v.venue}</td><td>{v.deadline}</td><td>{v.format}</td><td>{v.fit}</td>
+            <td><span class={`pill pill-${v.status.replace(/[^a-z]/g, "") || "na"}`}>{v.status}</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+  <p class="small">
+    Sources: <a href="https://conf.researchr.org/home/ease-2027">EASE 2027</a>,
+    <a href="https://conf.researchr.org/dates/fse-2027">FSE 2027 dates</a>,
+    <a href="https://conf.researchr.org/track/icse-2027/icse-2027-new-ideas-and-emerging-results--nier-">ICSE 2027 NIER</a>,
+    <a href="https://se-deadlines.github.io/">SE deadlines aggregator</a>. ICSE 2028 and ASE 2027 pages were not yet public.
+  </p>
+
+  <h2>Milestones</h2>
+  <ol class="timeline">
+    {milestones.map((m) => (
+      <li class={`${m.deadline ? "deadline" : ""} ${m.date < today ? "past" : ""}`}>
+        <time datetime={m.date}>{m.date}</time>
+        <span>{m.label}</span>
+      </li>
+    ))}
+  </ol>
+
+  <h2>Workstreams</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Weeks</th><th>Dates</th><th>Work</th><th>Owner</th></tr></thead>
+      <tbody>
+        {workstreams.map((w) => (<tr><td>{w.weeks}</td><td>{w.dates}</td><td>{w.what}</td><td>{w.owner}</td></tr>))}
+      </tbody>
+    </table>
+  </div>
+  <p>
+    The binding constraints are the dual human screening in early December and
+    the dual coding over the holidays, not compute. If either window cannot be
+    staffed, the fallback is FSE IVR in February for the thesis and the journal
+    directly for the full paper. The plan of record, with effort estimates, is
+    <code>construction/design/03_phase2-plan-ease2027.md</code> in the
+    <a href={repo}>paper repository</a> (private).
+  </p>
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .lede { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 1rem; }
+  .small { font-size: 0.85rem; color: var(--color-muted); }
+  .table-wrap { overflow-x: auto; margin: 1rem 0 1.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+  th { font-family: var(--font-body); font-weight: 600; }
+  tr.target td { background: var(--color-surface); font-weight: 600; }
+  .pill { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.8rem; border: 1px solid var(--color-border); }
+  .pill-open { border-color: var(--color-accent); color: var(--color-accent); }
+  .pill-closed { color: var(--color-muted); }
+  .timeline { list-style: none; padding: 0; margin: 1rem 0 1.5rem; border-left: 2px solid var(--color-border); }
+  .timeline li { display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.75rem; padding: 0.35rem 0 0.35rem 1rem; position: relative; }
+  .timeline li::before { content: ""; position: absolute; left: -0.4rem; top: 0.85rem; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--color-border); }
+  .timeline li.deadline::before { background: var(--color-accent); }
+  .timeline li.deadline span { font-weight: 600; }
+  .timeline li.past { color: var(--color-muted); }
+  .timeline time { font-family: var(--font-mono); font-size: 0.85rem; }
+  code { font-family: var(--font-mono); font-size: 0.9em; background: var(--color-surface); padding: 0 0.25em; }
+  @media (max-width: 480px) { .timeline li { grid-template-columns: 1fr; gap: 0.1rem; } }
+</style>

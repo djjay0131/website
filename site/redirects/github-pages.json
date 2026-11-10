@@ -288,6 +288,10 @@
     "to": "/research/soa-agentic-se/agentic-harnesses/"
   },
   {
+    "from": "/website/research/soa-agentic-se/plan/",
+    "to": "/research/soa-agentic-se/plan/"
+  },
+  {
     "from": "/website/research/soa-agentic-se/agentic-harnesses/consensus/",
     "to": "/research/soa-agentic-se/agentic-harnesses/consensus/"
   },
