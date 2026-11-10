@@ -9,6 +9,7 @@
     { "source": "cv", "slug": "cv-data" },
     { "source": "kgis", "slug": "kgis-docs" },
     { "source": "hub", "slug": "research/soa-agentic-se" },
+    { "source": "hub", "slug": "research/soa-agentic-se/plan" },
     { "source": "hub", "slug": "research/soa-agentic-se/agentic-harnesses" },
     { "source": "hub", "slug": "research/soa-agentic-se/agentic-harnesses/synthesis" },
     { "source": "hub", "slug": "research/soa-agentic-se/agentic-harnesses/sources" },
