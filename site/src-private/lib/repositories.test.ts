@@ -154,3 +154,21 @@ describe("the hub-pulled Pages source map (D28-B)", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 });
+
+describe("the private satellite roster (ADR-0030)", () => {
+  it("parses a private_satellites block with the same rules", () => {
+    const text = `private_satellites = {
+  synthetic-a = {
+    repository          = "owner/synthetic-repo"
+    repository_id       = "1"
+    repository_owner_id = "2"
+    default_branch      = "main"
+  }
+}`;
+    expect(parseSatelliteRepositories(text, { key: "private_satellites" })).toEqual({
+      "synthetic-a": "owner/synthetic-repo",
+    });
+    // The committed parser never reads the private key by accident.
+    expect(parseSatelliteRepositories(text)).toEqual({});
+  });
+});

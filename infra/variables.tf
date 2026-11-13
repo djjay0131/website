@@ -309,6 +309,76 @@ variable "satellites" {
   }
 }
 
+# ADR-0030 decision 4 (2026-11-13). Satellites whose REPOSITORY NAMES must not
+# appear in this public repository -- work under double-anonymous review, where
+# a committed repository name could state that the owner has submitted that
+# work. Same shape and the same validations as var.satellites; the two maps are
+# merged into local.all_satellites, and a key in both is an error. Supplied from
+# infra/private-satellites.auto.tfvars on the owner's machine, which .gitignore
+# excludes. Their source keys are opaque (qx-*) and carry no venue or topic.
+#
+# NO DEFAULT, on purpose: a plan run without the roster must fail at input
+# rather than plan the destruction of every private satellite's identity.
+# Targeted CI runs pass TF_VAR_private_satellites='{}' explicitly.
+variable "private_satellites" {
+  description = "Satellites whose repository names are kept out of this public repository (ADR-0030). Same shape as var.satellites; merged with it. Supplied from the gitignored infra/private-satellites.auto.tfvars."
+  type = map(object({
+    repository          = string
+    repository_id       = string
+    repository_owner_id = string
+    default_branch      = string
+  }))
+  # No default (see above).
+
+  validation {
+    # A source key is one name for one prefix, one service account and one
+    # provider. merge() would silently let a private entry re-point a committed
+    # satellite's identity at another repository, so a shared key FAILS here.
+    condition     = length(setintersection(keys(var.satellites), keys(var.private_satellites))) == 0
+    error_message = "A satellite key appears in both var.satellites and var.private_satellites (ADR-0030)."
+  }
+
+  validation {
+    # SEAM-2: <source> matches ^[a-z][a-z0-9-]{0,38}$ and equals the manifest's
+    # source. The bucket prefix and the IAM condition are built from this key.
+    condition     = alltrue([for source in keys(var.private_satellites) : can(regex("^[a-z][a-z0-9-]{0,38}$", source))])
+    error_message = "Each satellite key is a source name: a lowercase letter followed by up to 38 lowercase letters, digits or hyphens (SEAM-2)."
+  }
+
+  validation {
+    # The service account is named publish-<source>. A service account ID is
+    # 6-30 characters, so the source name may be at most 22.
+    condition     = alltrue([for source in keys(var.private_satellites) : length(source) <= 22])
+    error_message = "A satellite key must be at most 22 characters: the service account is named publish-<key> and a service account ID is limited to 30 characters."
+  }
+
+  validation {
+    # The WIF provider is named github-<source>. A provider ID is 4-32
+    # characters, so the source name may be at most 25 -- less binding than the
+    # service-account limit above, but checked so a rename cannot slip past.
+    condition     = alltrue([for source in keys(var.private_satellites) : length(source) <= 25])
+    error_message = "A satellite key must be at most 25 characters: the workload identity provider is named github-<key> and a provider ID is limited to 32 characters."
+  }
+
+  validation {
+    condition     = alltrue([for satellite in values(var.private_satellites) : can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", satellite.repository))])
+    error_message = "Each satellite's repository must be in owner/name form, for example djjay0131/cv."
+  }
+
+  validation {
+    condition     = alltrue([for satellite in values(var.private_satellites) : can(regex("^[0-9]+$", satellite.repository_id)) && can(regex("^[0-9]+$", satellite.repository_owner_id))])
+    error_message = "Each satellite's repository_id and repository_owner_id must be the numeric IDs from the GitHub API, not names."
+  }
+
+  validation {
+    # The branch name is interpolated into a principalSet member as
+    # refs/heads/<default_branch>. A leading refs/heads/, a wildcard or a space
+    # would silently produce a binding that admits nothing.
+    condition     = alltrue([for satellite in values(var.private_satellites) : can(regex("^[A-Za-z0-9._/-]+$", satellite.default_branch)) && !startswith(satellite.default_branch, "refs/")])
+    error_message = "Each satellite's default_branch is a bare branch name such as master or main: no refs/heads/ prefix, no wildcards and no spaces."
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Phase 3 (issue #24): the private bucket, the gate and its supporting services.
 # ---------------------------------------------------------------------------

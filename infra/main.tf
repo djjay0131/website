@@ -6,6 +6,10 @@ data "google_project" "hub" {
 }
 
 locals {
+  # ADR-0030: every satellite, committed and private. Use this, never
+  # var.satellites, wherever a resource is created per satellite.
+  all_satellites = merge(var.satellites, var.private_satellites)
+
   # Every API Phase 1 needs, with the reason. Nothing for buckets, Artifact
   # Registry, Cloud Run, Identity Platform or Firestore (issue #10 K1; roadmap
   # "Not in this phase").

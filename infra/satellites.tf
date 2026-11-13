@@ -70,7 +70,7 @@ resource "google_iam_workload_identity_pool" "satellites" {
 # repository_id and fails step 1, and a same-repo pull request carries
 # refs/pull/<n>/merge and fails step 2.
 resource "google_iam_workload_identity_pool_provider" "satellite" {
-  for_each = var.satellites
+  for_each = local.all_satellites
 
   project                            = var.project_id
   workload_identity_pool_id          = google_iam_workload_identity_pool.satellites.workload_identity_pool_id
@@ -114,7 +114,7 @@ resource "google_iam_workload_identity_pool_provider" "satellite" {
 # It holds NO project-level role. Its only grant is the conditioned bucket
 # binding at the bottom of this file.
 resource "google_service_account" "satellite_publish" {
-  for_each = var.satellites
+  for_each = local.all_satellites
 
   project      = var.project_id
   account_id   = "publish-${each.key}"
@@ -135,7 +135,7 @@ resource "google_service_account" "satellite_publish" {
 # Pull request runs carry refs/pull/<n>/merge and other branches carry their own
 # ref, so neither can publish.
 resource "google_service_account_iam_member" "satellite_publish_wif" {
-  for_each = var.satellites
+  for_each = local.all_satellites
 
   service_account_id = google_service_account.satellite_publish[each.key].name
   role               = "roles/iam.workloadIdentityUser"
@@ -164,7 +164,7 @@ resource "google_service_account_iam_member" "satellite_publish_wif" {
 # and must stay that way: list cannot be prefix-restricted at all. See
 # satellite-role.tf for the full reasoning and the primary source.
 resource "google_storage_bucket_iam_member" "satellite_publish_prefix" {
-  for_each = var.satellites
+  for_each = local.all_satellites
 
   bucket = google_storage_bucket.content.name
   role   = google_project_iam_custom_role.satellite_publisher.name

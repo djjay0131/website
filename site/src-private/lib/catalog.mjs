@@ -33,6 +33,25 @@ export function itemKey(section, source, slug) {
 }
 
 /**
+ * The project relationships a manifest declares (ADR-0030), as catalog fields.
+ * Returns `{}` when there are none, so catalogs without relationships are
+ * byte-identical to before.
+ */
+export function projectRelationsFor(manifest, source) {
+  const project = manifest?.project;
+  if (!project || typeof project !== "object") return {};
+  const out = {};
+  if (typeof project.parent === "string" && project.parent && project.parent !== source) {
+    out.parent = project.parent;
+  }
+  if (Array.isArray(project.related)) {
+    const related = [...new Set(project.related.filter((k) => typeof k === "string" && k && k !== source && k !== out.parent))];
+    if (related.length) out.related = related;
+  }
+  return out;
+}
+
+/**
  * Every source manifest under the synced tree.
  *
  * Deliberately a plain read: the Astro collection has already run the schema
@@ -108,6 +127,11 @@ export function buildItemCatalog(options = {}) {
 
   const items = {};
   for (const { source, manifest } of readManifests(sourcesDir)) {
+    // ADR-0030: a project's relationships ride on each of its items, because
+    // the gate filters per item and the client must learn them only from items
+    // the viewer may open. Self-references are dropped defensively; the build
+    // has already refused them.
+    const relations = projectRelationsFor(manifest, source);
     for (const [order, item] of manifest.items.entries()) {
       if (item.format === "data") continue;
       const visibility = effectiveVisibility(item, source, allowlist);
@@ -131,6 +155,7 @@ export function buildItemCatalog(options = {}) {
         summary: item.summary,
         date: item.date,
         order,
+        ...relations,
       };
     }
   }

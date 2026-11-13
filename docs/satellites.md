@@ -78,8 +78,9 @@ hub build validates it again. A manifest that fails either one does not publish.
 | Field | Rule |
 |---|---|
 | `source` | Your assigned source name. Must match the prefix you upload to. |
-| `manifest_version` | Optional, for now. A plain integer as a string. Absent means `"1"`. `deadlines` requires `"2"`. See below. |
-| `deadlines` | Optional project deadlines for the members' calendar. Requires `manifest_version: "2"`. |
+| `manifest_version` | Optional, for now. A plain integer as a string. Absent means `"1"`. `deadlines` requires `"2"` or `"3"`; `project` requires `"3"`. See below. |
+| `deadlines` | Optional project deadlines for the members' calendar. Requires `manifest_version: "2"` or `"3"`. |
+| `project` | Optional parent and related projects (ADR-0030). Requires `manifest_version: "3"`. |
 | `published` | ISO 8601 timestamp. |
 | `slug` | Unique within your source. |
 | `title` | Shown in the hub's navigation and indexes. |
@@ -89,6 +90,33 @@ hub build validates it again. A manifest that fails either one does not publish.
 | `visibility` | `public` or `private`. |
 | `date` | ISO date. |
 | `summary`, `tags` | Optional. |
+
+### Optional project relationships (manifest version 3)
+
+A project may name a **parent** project (for example a conference portfolio)
+and up to ten **related** projects, by their source keys. Add `project` to the
+manifest and declare `manifest_version: "3"`; `deadlines` stays valid in
+version 3 (ADR-0030).
+
+```json
+"manifest_version": "3",
+"project": { "parent": "example-portfolio", "related": ["example-other"] }
+```
+
+| Field | Rule |
+|---|---|
+| `parent` | A source key other than your own. One level only: a project with a visible parent is never itself a parent. |
+| `related` | At most 10 source keys, none equal to your own source or your parent, none repeated. |
+
+The hub shows a relationship only to a viewer who may open **both** projects:
+a child whose parent the viewer cannot open stays a top-level card, and an
+unopenable related key is dropped. Naming a project grants no access.
+
+If your repository's name must not appear in the hub's public repository
+(work under double-anonymous review), ask for an **opaque source key** and a
+place in the private roster (`infra/private-satellites.auto.tfvars`, never
+committed), and prefix your item slugs with your key so they cannot collide
+with public prose.
 
 ### `manifest_version` — and how it differs from `schema_version`
 

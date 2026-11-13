@@ -159,7 +159,11 @@ test('the reason each fixture is rejected is the reason its name claims', async 
     'unknown-item-field.json': /unknown field "redirect_to"/,
     'deadline-unknown-field.json': /unknown field "project"/,
     'deadline-without-version-2.json': /missing required field "manifest_version"/,
-    'deadline-with-version-1.json': /must be "2" \(got "1"\)/,
+    'deadline-with-version-1.json': /must be one of "2", "3" \(got "1"\)/,
+    'project-with-version-2.json': /must be "3" \(got "2"\)/,
+    'project-unknown-field.json': /unknown field "children"/,
+    'project-parent-is-self.json': /cannot be its own parent/,
+    'project-related-duplicate.json': /duplicate related key "example-other"/,
     'deadline-duplicate-id.json': /duplicate deadline id "paper"/,
     'deadline-impossible-date.json': /"2026-02-31" is not a real date or time/,
     'deadline-end-before-start.json': /end "2026-11-01" is before start "2026-11-05"/,
@@ -195,6 +199,18 @@ test('ajv and the dependency-free interpreter agree on every fixture', async (t)
       );
     });
   }
+});
+
+test('a version 3 manifest with a project parent, related keys and deadlines is accepted', () => {
+  const manifest = {
+    source: 'example-notes',
+    manifest_version: '3',
+    published: '2026-11-13T00:00:00Z',
+    items: [],
+    project: { parent: 'example-portfolio', related: ['example-other'] },
+    deadlines: [{ id: 'paper', title: 'Paper', kind: 'submission', start: '2026-11-13' }],
+  };
+  assert.deepEqual(validateManifestShape(manifest, { schema }), []);
 });
 
 test('a version 2 manifest with a valid deadline is accepted', () => {
