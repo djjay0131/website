@@ -543,6 +543,8 @@ describe("the private satellite's source identity never reaches the public outpu
       "ebay_erupt_2027",
       "ai-empirical-se-chapter",
       "aiemse-chapter",
+      "wsese2027",
+      "wsese2027-governed-research",
     ]);
   });
 

@@ -247,6 +247,25 @@ variable "satellites" {
       repository_owner_id = "5666389"
       default_branch      = "master"
     }
+    # Satellite 7 (owner request, 2026-11-13). PRIVATE repository, PRIVATE
+    # items: the WSESE 2027 workshop paper project (status, method spec, draft).
+    # Same reason and same rule as satellite 6: once submitted the paper is under
+    # double-anonymous review (submission 2026-11-27, notification 2026-12-11), so
+    # every item is visibility: private, the satellite's build fails on any
+    # non-private item, and nothing is added to site/publish-allowlist.json.
+    #
+    # The key is wsese2027, NOT the repository name: publish-<key> must fit the
+    # 30-character service-account ID limit, and
+    # publish-wsese2027-governed-research would be 35 (ADR-0019 decision 2).
+    #
+    # Both ids read from the GitHub REST API on 2026-11-13, not copied from a
+    # brief; the same read returned default_branch main and private: true.
+    wsese2027 = {
+      repository          = "djjay0131/wsese2027-governed-research"
+      repository_id       = "1456871642"
+      repository_owner_id = "5666389"
+      default_branch      = "main"
+    }
   }
 
   validation {

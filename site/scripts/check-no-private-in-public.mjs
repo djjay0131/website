@@ -381,6 +381,8 @@ export const SOURCE_IDENTITY_NEEDLES = [
   "ebay_erupt_2027",
   "ai-empirical-se-chapter",
   "aiemse-chapter",
+  "wsese2027",
+  "wsese2027-governed-research",
 ];
 
 /**

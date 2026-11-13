@@ -132,3 +132,27 @@ None.
 ## Superseded By
 
 None.
+
+## Amendment (2026-11-13): satellite 7, `wsese2027`
+
+Owner request: add `djjay0131/wsese2027-governed-research` (private, default
+branch `main`, repository id 1456871642, owner id 5666389, read from the GitHub
+REST API on 2026-11-13) as satellite 7 under source key `wsese2027`. The
+repository name does not fit the service-account ID limit
+(`publish-wsese2027-governed-research` is 35 characters), so decision 2 applies
+exactly as it did for `saner2027`.
+
+Same visibility rule as satellite 6: the WSESE 2027 paper will be under
+double-anonymous review from submission (2026-11-27) to notification
+(2026-12-11). Every item is `visibility: private`, the satellite's own build
+fails on any non-private item, nothing is added to
+`site/publish-allowlist.json`, and the source key and repository name are added
+to `SOURCE_IDENTITY_NEEDLES` so the public leak check fails if either appears.
+
+Access: the gate's source rule for `wsese2027` admits the `wsese2027-team`
+group (set with `infra/scripts/access.py`, recorded in `access_audit`), not the
+default rule, so the project is visible to its collaborators only.
+
+Expected plan: 4 to add (`publish-wsese2027` SA, `github-wsese2027` provider,
+ref-pinned impersonation binding, prefix-conditioned bucket binding), 0 to
+change, 0 to destroy.
