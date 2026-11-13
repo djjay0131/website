@@ -545,6 +545,15 @@ describe("the private satellite's source identity never reaches the public outpu
       "aiemse-chapter",
       "wsese2027",
       "wsese2027-governed-research",
+      "qx-p",
+      "qx-s1",
+      "qx-s2",
+      "qx-s3",
+      "qx-s4",
+      "qx-s5",
+      "qx-s6",
+      "qx-s7",
+      "qx-s8",
     ]);
   });
 

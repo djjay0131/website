@@ -41,7 +41,7 @@ from starlette.datastructures import QueryParams
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import pages
-from .access import AccessMap, BucketCatalogStore, FirestoreAccessPolicyStore, RuntimeAccessMap
+from .access import AccessMap, BucketCatalogStore, FirestoreAccessPolicyStore, RuntimeAccessMap, visible_listings
 from .admin import (
     AdminError,
     AdminStore,
@@ -990,7 +990,7 @@ def create_app(dependencies: Dependencies | None = None) -> FastAPI:
             len(items),
             principal.email,
         )
-        return JSONResponse({"items": [item.as_listing() for item in items]}, status_code=200)
+        return JSONResponse({"items": visible_listings(items)}, status_code=200)
 
     @app.get("/private/me")
     async def private_me(request: Request) -> Response:

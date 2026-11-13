@@ -34,6 +34,7 @@ const SOURCE = /^[a-z][a-z0-9-]{0,38}$/;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const ENV_NAME = "HUB_SATELLITE_REPOS";
 const PULLED_CONFIG = "site/pulled-sources.json";
+const PRIVATE_ROSTER = "infra/private-satellites.auto.tfvars";
 const cache = new Map();
 const pulledCache = new Map();
 
@@ -80,10 +81,10 @@ function blockAfter(text, pattern) {
  * Extract `source -> owner/repo` from one satellites map block.
  * Malformed entries are ignored: a missing link is better than a wrong one.
  */
-export function parseSatelliteRepositories(text) {
+export function parseSatelliteRepositories(text, { key = "satellites" } = {}) {
   const clean = withoutComments(String(text ?? ""));
-  const tfvars = blockAfter(clean, /^[ \t]*satellites[ \t]*=[ \t]*\{/m);
-  const variable = /variable[ \t]+"satellites"[ \t]*\{/.exec(clean);
+  const tfvars = blockAfter(clean, new RegExp(`^[ \\t]*${key}[ \\t]*=[ \\t]*\\{`, "m"));
+  const variable = new RegExp(`variable[ \\t]+"${key}"[ \\t]*\\{`).exec(clean);
   const defaults = variable
     ? blockAfter(clean.slice(variable.index), /^[ \t]*default[ \t]*=[ \t]*\{/m)
     : null;
@@ -178,6 +179,18 @@ export function readSatelliteRepositories({ root = REPO_ROOT, env = process.env 
       Object.assign(repositories, parsed);
       break;
     }
+  }
+  // ADR-0030: the private roster, present only on the owner's machine (it is
+  // gitignored). CI builds simply show no repository card for those sources.
+  try {
+    const text = fs.readFileSync(path.join(root, PRIVATE_ROSTER), "utf8");
+    for (const [source, repository] of Object.entries(
+      parseSatelliteRepositories(text, { key: "private_satellites" }),
+    )) {
+      if (!(source in repositories)) repositories[source] = repository;
+    }
+  } catch {
+    // absent: nothing to add
   }
   cache.set(root, repositories);
   return repositories;

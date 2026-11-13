@@ -370,6 +370,12 @@ export const ANNOTATION_ALLOWED_IN_PUBLIC = ["/annotations", "data-annotation-"]
  * item-title needles already cover every title the satellite publishes, and a
  * title literal in this public repository would be a new disclosure (D23-B).
  *
+ * The qx-* keys (ADR-0030, 2026-11-13) are OPAQUE by design: they belong to
+ * satellites in the private roster, whose repository names are NOT committed
+ * here or anywhere in this repository and live only in the owner's gitignored
+ * infra/private-satellites.auto.tfvars. The keys carry no venue, topic or
+ * count, so committing them as needles adds no exposure.
+ *
  * Matched case-insensitively and after decoding the common HTML entities, in a
  * path or in a file's contents (the gzip Pagefind payloads included), exactly as
  * the annotation needles are.
@@ -383,6 +389,15 @@ export const SOURCE_IDENTITY_NEEDLES = [
   "aiemse-chapter",
   "wsese2027",
   "wsese2027-governed-research",
+  "qx-p",
+  "qx-s1",
+  "qx-s2",
+  "qx-s3",
+  "qx-s4",
+  "qx-s5",
+  "qx-s6",
+  "qx-s7",
+  "qx-s8",
 ];
 
 /**

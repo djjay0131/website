@@ -41,6 +41,7 @@ from `0000-template.md`.
 | [0027](0027-private-calendar.md) | A private calendar for active work and submission deadlines (D26) | Accepted |
 | [0028](0028-pulled-pages-sources.md) | Pull public Pages sources into the private build (D28-B) | Accepted |
 | [0029](0029-one-navigation-owner-admin-share-recipient.md) | One navigation, owner administration, and the share-recipient view (D32) | Accepted |
+| [0030](0030-project-relationships-and-private-roster.md) | Project relationships (parent and related) and a private satellite roster | Accepted |
 
 ## Lifecycle
 

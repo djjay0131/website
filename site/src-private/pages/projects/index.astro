@@ -61,6 +61,22 @@ const base = import.meta.env.BASE_URL;
   }
   .projects-landing :global(.project-card-title) { font-size: 1.2rem; margin: 0; }
   .projects-landing :global(.project-card-description) { color: var(--color-muted); margin: 0; }
+  .projects-landing :global(.project-card-parent) { grid-column: 1 / -1; }
+  .projects-landing :global(.project-card-children) {
+    list-style: none;
+    padding: 0;
+    margin: 0.25rem 0 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+  }
+  .projects-landing :global(.project-card-children a) {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    font-size: 0.88rem;
+  }
   .projects-landing :global(.project-card-meta) {
     display: flex;
     flex-wrap: wrap;

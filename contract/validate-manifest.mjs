@@ -366,6 +366,41 @@ export function validateManifestShape(manifest, options = {}) {
     });
   }
 
+  // Contract rule (ADR-0030): project relationships must point AWAY from this
+  // source and name each key once. JSON Schema cannot compare a value with a
+  // sibling field, so these live here and in the hub's mirror.
+  const project = manifest?.project;
+  if (project && typeof project === 'object' && !Array.isArray(project)) {
+    const own = manifest?.source;
+    if (typeof project.parent === 'string' && project.parent === own) {
+      errors.push({
+        layer: 'contract-rule',
+        path: 'project.parent',
+        message: `parent ${JSON.stringify(project.parent)} is this manifest's own source — a project cannot be its own parent`,
+      });
+    }
+    if (Array.isArray(project.related)) {
+      const seen = new Set();
+      project.related.forEach((key, index) => {
+        if (typeof key !== 'string') return;
+        if (key === own || key === project.parent) {
+          errors.push({
+            layer: 'contract-rule',
+            path: `project.related[${index}]`,
+            message: `related ${JSON.stringify(key)} names this manifest's own source or its parent`,
+          });
+        } else if (seen.has(key)) {
+          errors.push({
+            layer: 'contract-rule',
+            path: `project.related[${index}]`,
+            message: `duplicate related key ${JSON.stringify(key)} — each related project is named once`,
+          });
+        }
+        seen.add(key);
+      });
+    }
+  }
+
   return errors;
 }
 

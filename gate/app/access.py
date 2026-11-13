@@ -83,6 +83,10 @@ MAX_CACHE_SECONDS = 30
 _NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 
 
+# A satellite source key, the contract pattern (contract/manifest.schema.json).
+_SOURCE_KEY = re.compile(r"[a-z][a-z0-9-]{0,38}")
+
+
 @dataclass(frozen=True)
 class AccessRule:
     """Who may read one item or served object."""
@@ -145,6 +149,10 @@ class AccessItem:
     summary: str | None = None
     date: str | None = None
     order: int | None = None
+    # ADR-0030: the item's project relationships. Source keys only; the client
+    # shows a relationship only when the viewer can also open the other project.
+    parent: str | None = None
+    related: tuple[str, ...] = ()
 
     @property
     def key(self) -> str:
@@ -163,6 +171,8 @@ class AccessItem:
             **({"summary": self.summary} if self.summary is not None else {}),
             **({"date": self.date} if self.date is not None else {}),
             **({"order": self.order} if self.order is not None else {}),
+            **({"parent": self.parent} if self.parent is not None else {}),
+            **({"related": list(self.related)} if self.related else {}),
         }
 
 
@@ -206,6 +216,29 @@ class AccessMap(Protocol):
     def allows_project(self, profile: MemberProfile, source: str) -> bool: ...
 
     def listings(self, profile: MemberProfile, *, include_all: bool = False) -> list[AccessItem]: ...
+
+
+def visible_listings(items: list[AccessItem]) -> list[dict[str, Any]]:
+    """Listings with project relationships pruned to what the viewer may open.
+
+    ADR-0030: a viewer must not learn that a project they cannot open exists,
+    so a `parent` or `related` key survives only when the same response also
+    carries at least one item from that source. The client never sees a key it
+    could not follow.
+    """
+    visible = {item.source for item in items}
+    out: list[dict[str, Any]] = []
+    for item in items:
+        listing = item.as_listing()
+        if listing.get("parent") not in visible:
+            listing.pop("parent", None)
+        related = [key for key in listing.get("related", []) if key in visible]
+        if related:
+            listing["related"] = related
+        else:
+            listing.pop("related", None)
+        out.append(listing)
+    return out
 
 
 def _strip_prefix(name: str, private_prefix: str) -> str:
@@ -291,6 +324,8 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
     summary = raw.get("summary")
     date = raw.get("date")
     order = raw.get("order")
+    parent = raw.get("parent")
+    related = raw.get("related")
     if not all(isinstance(v, str) and v for v in (section, source, slug, title, fmt, visibility)):
         return None
     if f"{section}/{source}/{slug}" != key:
@@ -307,6 +342,20 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
         return None
     if order is not None and (isinstance(order, bool) or not isinstance(order, int) or order < 0):
         return None
+    if parent is not None and (
+        not isinstance(parent, str) or not _SOURCE_KEY.fullmatch(parent) or parent == source
+    ):
+        return None
+    if related is not None:
+        if (
+            not isinstance(related, list)
+            or len(related) > 10
+            or not all(isinstance(k, str) and _SOURCE_KEY.fullmatch(k) for k in related)
+            or source in related
+            or (parent is not None and parent in related)
+            or len(set(related)) != len(related)
+        ):
+            return None
     # The catalog must never carry an access decision (D24-B).
     if "access" in raw or "groups" in raw or "roles" in raw:
         return None
@@ -322,6 +371,8 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
         summary=summary,
         date=date,
         order=order,
+        parent=parent,
+        related=tuple(related or ()),
     )
 
 

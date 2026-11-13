@@ -301,6 +301,51 @@ def test_catalog_item_metadata_carries_date_and_manifest_order():
     assert item.as_listing()["order"] == 0
 
 
+def test_catalog_item_carries_project_relations():
+    """ADR-0030: parent and related pass through to the member's listing."""
+    catalog = parse_catalog_document(
+        {
+            "version": 2,
+            "items": {
+                ITEM_A: {**_item(SLUG_A).as_listing(), "parent": "parent-a", "related": ["other-a"]},
+            },
+            "objects": {OBJECT_A: [ITEM_A]},
+        }
+    )
+    listing = catalog.items[ITEM_A].as_listing()
+    assert listing["parent"] == "parent-a"
+    assert listing["related"] == ["other-a"]
+    plain = parse_catalog_document(
+        {"version": 2, "items": {ITEM_A: _item(SLUG_A).as_listing()}, "objects": {OBJECT_A: [ITEM_A]}}
+    )
+    assert "parent" not in plain.items[ITEM_A].as_listing()
+    assert "related" not in plain.items[ITEM_A].as_listing()
+
+
+@pytest.mark.parametrize(
+    "relations",
+    [
+        {"parent": SOURCE},
+        {"parent": "Not A Key"},
+        {"parent": 7},
+        {"related": "other-a"},
+        {"related": [SOURCE]},
+        {"related": ["other-a", "other-a"]},
+        {"parent": "parent-a", "related": ["parent-a"]},
+        {"related": [f"k-{n}" for n in range(11)]},
+    ],
+)
+def test_catalog_refuses_malformed_project_relations(relations):
+    with pytest.raises(ValueError):
+        parse_catalog_document(
+            {
+                "version": 2,
+                "items": {ITEM_A: {**_item(SLUG_A).as_listing(), **relations}},
+                "objects": {OBJECT_A: [ITEM_A]},
+            }
+        )
+
+
 def test_an_unmapped_object_fails_closed(restricted_client, verifier, store, transport):
     store.objects[f"_payload/{SOURCE}/site/orphan.html"] = b"<h1>orphan</h1>"
     session = _session(verifier, "orphan", MEMBER_A)
@@ -344,6 +389,34 @@ def test_listing_returns_only_what_the_viewer_may_open(restricted_client, verifi
     assert slugs(member_a) == {SLUG_A}
     assert slugs(member_b) == {SLUG_B}
     assert slugs(owner) == {SLUG_A, SLUG_B}
+
+
+def test_listing_prunes_relationships_to_projects_the_viewer_can_open(deps, verifier, transport):
+    """ADR-0030: a parent/related key the viewer cannot open never leaves the gate."""
+    child = replace(_item(SLUG_A), source="child-a", parent="parent-p", related=("other-b",))
+    parent = replace(_item(SLUG_B), source="parent-p")
+    child_key, parent_key = child.key, parent.key
+    catalog = ItemCatalog(items={child_key: child, parent_key: parent}, objects={})
+    policy = AccessPolicy(
+        default=_rule(), sections={}, sources={}, items={child_key: GROUP_A_RULE, parent_key: GROUP_B_RULE}
+    )
+    client = TestClient(create_app(_restricted(deps, catalog=catalog, policy=policy)), raise_server_exceptions=False)
+
+    def listing(email, token):
+        session = _session(verifier, token, email)
+        response = client.get("/private/items", headers=request_headers(transport, {"__session": session}))
+        return {item["source"]: item for item in response.json()["items"]}
+
+    member = listing(MEMBER_A, "rel-a")
+    assert set(member) == {"child-a"}
+    assert "parent" not in member["child-a"]
+    assert "related" not in member["child-a"]
+    assert "parent-p" not in json.dumps(member)
+
+    owner = listing(OWNER, "rel-owner")
+    assert owner["child-a"]["parent"] == "parent-p"
+    # other-b has no items in this response, so it is pruned even for the owner.
+    assert "related" not in owner["child-a"]
 
 
 def test_annotation_create_requires_access_to_the_item(restricted_client, verifier, transport):
