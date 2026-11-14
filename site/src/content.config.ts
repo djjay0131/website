@@ -172,12 +172,19 @@ export const deadlineSchema = z.strictObject({
   status: z.enum(["active", "done", "cancelled"]).optional(),
 });
 
+/** ADR-0030: optional project relationships, an envelope version 3 field. */
+export const projectRelationsSchema = z.strictObject({
+  parent: z.string().regex(re(PATTERNS.source)).optional(),
+  related: z.array(z.string().regex(re(PATTERNS.source))).max(10).optional(),
+});
+
 export const manifestSchema = z.strictObject({
   source: z.string().regex(re(PATTERNS.source)),
   manifest_version: z.string().regex(re(PATTERNS.manifest_version)).optional(),
   published: z.string().regex(re(PATTERNS.published)),
   items: z.array(itemSchema),
   deadlines: z.array(deadlineSchema).max(200).optional(),
+  project: projectRelationsSchema.optional(),
 });
 
 export type ManifestItem = z.infer<typeof itemSchema>;
@@ -312,11 +319,36 @@ export function validateManifest(raw: unknown, expectedSource: string): Manifest
     );
   }
 
-  if (manifest.deadlines !== undefined && envelope !== "2") {
+  if (manifest.deadlines !== undefined && envelope !== "2" && envelope !== "3") {
     problems.push(
       `  deadlines: this field was added in manifest envelope version 2 (ADR-0027). ` +
-        `A manifest carrying deadlines must declare manifest_version: "2" (absent means "1").`,
+        `A manifest carrying deadlines must declare manifest_version: "2" or "3" (absent means "1").`,
     );
+  }
+
+  // ADR-0030: project relationships are an envelope version 3 field, and must
+  // point away from this source and name each key once (contract rule; the
+  // schema cannot compare a value with a sibling field).
+  if (manifest.project !== undefined) {
+    if (envelope !== "3") {
+      problems.push(
+        `  project: this field was added in manifest envelope version 3 (ADR-0030). ` +
+          `A manifest carrying project must declare manifest_version: "3".`,
+      );
+    }
+    const { parent, related } = manifest.project;
+    if (parent !== undefined && parent === manifest.source) {
+      problems.push(`  project.parent: ${JSON.stringify(parent)} is this manifest's own source — a project cannot be its own parent.`);
+    }
+    const seenRelated = new Set<string>();
+    (related ?? []).forEach((key, index) => {
+      if (key === manifest.source || key === parent) {
+        problems.push(`  project.related[${index}]: ${JSON.stringify(key)} names this manifest's own source or its parent.`);
+      } else if (seenRelated.has(key)) {
+        problems.push(`  project.related[${index}]: duplicate related key ${JSON.stringify(key)}.`);
+      }
+      seenRelated.add(key);
+    });
   }
 
   if (manifest.deadlines) {

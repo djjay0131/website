@@ -9,6 +9,15 @@ what a contributor needs to pick up work today.
 
 ## Current position
 
+- **ADR-0030 (2026-11-13), branch `feat/d33-project-relationships`.** Manifest
+  envelope v3 adds optional `project.parent`/`project.related`; relationships ride
+  on catalog items through the gate and render only when the viewer can open both
+  projects. `var.private_satellites` (no default) + gitignored
+  `infra/private-satellites.auto.tfvars` keep double-anonymous repository names out
+  of this repo; opaque `qx-*` keys. **Owner steps after merge:**
+  place the private roster, `terraform apply`, advance the publish-action `v1` tag,
+  set each satellite's GCP_* variables, then grant access in the Firestore policy.
+
 - **D32 is merged and deployed 2026-11-03** (ADR-0029; PRs #162, #163, #164).
   Signing in augments the one main menu (no members' menu); `/p/` and legacy item
   URLs redirect to the canonical project route; the owner has a server-enforced

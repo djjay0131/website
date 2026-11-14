@@ -183,21 +183,23 @@ describe("manifest_version is accepted, defaulted and vetted", () => {
   });
 
   it("accepts a known version explicitly declared", () => {
-    expect(KNOWN_MANIFEST_VERSIONS).toEqual(["1", "2"]);
+    expect(KNOWN_MANIFEST_VERSIONS).toEqual(["1", "2", "3"]);
     expect(isKnownManifestVersion("1")).toBe(true);
     expect(isKnownManifestVersion("2")).toBe(true);
+    expect(isKnownManifestVersion("3")).toBe(true);
     expect(() => check(manifest({ manifest_version: "1" }))).not.toThrow();
     expect(() => check(manifest({ manifest_version: "2" }))).not.toThrow();
+    expect(() => check(manifest({ manifest_version: "3" }))).not.toThrow();
   });
 
   it("FAILS THE BUILD on a version the hub does not know (decision 3)", () => {
     // The same shape as the existing schema_version check, because it is the
     // same kind of mistake: reading a document written to rules you have never
     // seen and assuming they are the rules you know.
-    expect(isKnownManifestVersion("3")).toBe(false);
-    expect(() => check(manifest({ manifest_version: "3" }))).toThrow(HubContentError);
-    expect(() => check(manifest({ manifest_version: "3" }))).toThrow(
-      /manifest_version: "3" is not an envelope version this hub understands/,
+    expect(isKnownManifestVersion("4")).toBe(false);
+    expect(() => check(manifest({ manifest_version: "4" }))).toThrow(HubContentError);
+    expect(() => check(manifest({ manifest_version: "4" }))).toThrow(
+      /manifest_version: "4" is not an envelope version this hub understands/,
     );
   });
 
@@ -266,6 +268,44 @@ describe("optional deadline events are mirrored and versioned", () => {
     expect(() =>
       check(manifest({ deadlines: [{ ...deadline, start: "2026-11-05", end: "2026-11-06" }] })),
     ).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Project relationships (ADR-0030)
+// ---------------------------------------------------------------------------
+describe("optional project relationships are mirrored and versioned", () => {
+  const manifest = (over: Record<string, unknown> = {}) => ({
+    source: "phd-milestones",
+    manifest_version: "3",
+    published: "2026-11-13T00:00:00Z",
+    items: [],
+    project: { parent: "portfolio-a", related: ["other-a"] },
+    ...over,
+  });
+
+  it("accepts a version 3 manifest carrying a parent and related keys", () => {
+    expect(() => check(manifest())).not.toThrow();
+  });
+
+  it("still accepts deadlines in version 3", () => {
+    const deadlines = [{ id: "paper", title: "Paper", kind: "submission", start: "2026-11-13" }];
+    expect(() => check(manifest({ deadlines }))).not.toThrow();
+  });
+
+  it("requires manifest_version 3 when project is present", () => {
+    expect(() => check(manifest({ manifest_version: "2" }))).toThrow(/manifest envelope version 3/);
+    expect(() => check(manifest({ manifest_version: undefined }))).toThrow(/manifest envelope version 3/);
+  });
+
+  it("refuses a self-parent, a related key equal to the parent, a duplicate, and unknown fields", () => {
+    expect(() => check(manifest({ project: { parent: "phd-milestones" } }))).toThrow(/its own parent/);
+    expect(() => check(manifest({ project: { parent: "portfolio-a", related: ["portfolio-a"] } }))).toThrow(
+      /own source or its parent/,
+    );
+    expect(() => check(manifest({ project: { related: ["a-one", "a-one"] } }))).toThrow(/duplicate related key/);
+    expect(() => check(manifest({ project: { parent: "portfolio-a", children: ["x"] } }))).toThrow();
+    expect(() => check(manifest({ project: { parent: "Not A Key" } }))).toThrow();
   });
 });
 

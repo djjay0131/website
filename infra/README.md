@@ -670,7 +670,7 @@ without `-target`. In increasing order of severity:
    is refused at the platform), or of the service itself —
    `deletion_protection = false` makes that possible deliberately, because the
    service is stateless and one apply plus one image deploy re-creates it.
-3. **Stop `phd-milestones` publishing:** remove its entry from `var.satellites`
+3. **Stop `phd-milestones` publishing:** remove its entry from `var.satellites` (or, for a private-roster satellite, from `infra/private-satellites.auto.tfvars`, ADR-0030)
    and apply. That destroys its provider, service account and bucket binding —
    nothing else, and nothing belonging to `cv`.
 4. **Stop the hub writing private output:** targeted destroy of
@@ -695,6 +695,14 @@ Two things this module cannot roll back, stated so nobody tries:
   docs). Disable providers; do not expect to remove the config.
 
 ## Guardrails
+
+- **The private satellite roster (ADR-0030).** `var.private_satellites` has no
+  default and is supplied only by the gitignored
+  `infra/private-satellites.auto.tfvars` on the owner's machine. A plan without
+  it fails at input; never work around that with an empty map on an untargeted
+  plan, which would destroy every private satellite's service account, WIF
+  provider and bucket binding. CI's targeted apply passes `{}` explicitly. A key
+  in both rosters fails validation.
 
 - **No keys.** Nothing here creates a service-account key, and nothing may
   (§12.2). GitHub Actions authenticates through WIF — the hub's deploy identity

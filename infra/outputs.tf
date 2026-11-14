@@ -117,7 +117,7 @@ output "satellite_workload_identity_providers" {
 output "satellite_github_actions_variables" {
   description = "Everything a satellite's own repository needs, keyed by source name. Set each as a GitHub Actions variable in THAT repository (for cv: djjay0131/cv). The satellite needs no secret and no GitHub credential for this repository (ADR-0007 decision 2)."
   value = {
-    for source, satellite in var.satellites : source => {
+    for source, satellite in local.all_satellites : source => {
       GCP_PROJECT_ID     = data.google_project.hub.project_id
       GCP_WIF_PROVIDER   = google_iam_workload_identity_pool_provider.satellite[source].name
       GCP_PUBLISH_SA     = google_service_account.satellite_publish[source].email
@@ -128,7 +128,7 @@ output "satellite_github_actions_variables" {
 
 output "satellite_prefixes" {
   description = "The one prefix each satellite may write, keyed by source name. These are the literal strings the IAM conditions match; the Checkpoint 3 boundary tests in the handoff use them."
-  value       = { for source in keys(var.satellites) : source => "gs://${google_storage_bucket.content.name}/sources/${source}/" }
+  value       = { for source in keys(local.all_satellites) : source => "gs://${google_storage_bucket.content.name}/sources/${source}/" }
 }
 
 output "custom_domain_state" {

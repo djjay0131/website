@@ -32,6 +32,7 @@ const base = import.meta.env.BASE_URL;
   <nav class="breadcrumbs" aria-label="Breadcrumb">
     <ol>
       <li><a href={`${base}projects/`}>Projects</a></li>
+      <li data-parent-crumb hidden></li>
       <li aria-current="page">{title}</li>
     </ol>
   </nav>
@@ -51,13 +52,20 @@ const base = import.meta.env.BASE_URL;
     <p class="project-pages-note">Loading project pages…</p>
   </div>
 
+  <div class="project-relations-root" data-project-relations hidden></div>
+
   <section class="project-hub-upcoming" data-project-upcoming aria-live="polite">
     <p class="project-pages-note">Loading deadlines…</p>
   </section>
 
   <script>
     import { loadPrivateItems } from "../../../lib/private-items.mjs";
-    import { mountProjectPages, showProjectError } from "../../../lib/project-ui.mjs";
+    import {
+      mountParentCrumb,
+      mountProjectPages,
+      mountProjectRelations,
+      showProjectError,
+    } from "../../../lib/project-ui.mjs";
     import { loadCalendar, mountProjectUpcoming } from "../../../lib/calendar-ui.mjs";
 
     const root = document.getElementById("project-pages");
@@ -70,6 +78,10 @@ const base = import.meta.env.BASE_URL;
         showProjectError(root, "Could not load this project's pages. Try again shortly.");
       } else {
         mountProjectPages(root, result.items, source, base, title);
+        const relations = document.querySelector<HTMLElement>("[data-project-relations]");
+        if (relations) mountProjectRelations(relations, result.items, source);
+        const crumb = document.querySelector<HTMLElement>("[data-parent-crumb]");
+        if (crumb) mountParentCrumb(crumb, result.items, source);
       }
       const upcoming = document.querySelector<HTMLElement>("[data-project-upcoming]");
       if (upcoming && calendar.ok) {
@@ -86,7 +98,26 @@ const base = import.meta.env.BASE_URL;
   .breadcrumbs ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
   .breadcrumbs li + li::before { content: "›"; margin-right: 0.3rem; color: var(--color-muted); }
   .breadcrumbs [aria-current="page"] { color: var(--color-muted); }
+  .breadcrumbs li[hidden] { display: none; }
   .project-pages-note { color: var(--color-muted); }
+  .project-relations-root { margin-top: 1.5rem; display: grid; gap: 1.25rem; }
+  .project-relations-root[hidden] { display: none; }
+  .project-relations-root :global(.project-relations h2) { font-size: 1.1rem; margin: 0 0 0.6rem; }
+  .project-relations-root :global(.project-relations-list) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 0.6rem;
+  }
+  .project-relations-root :global(.project-relations-list a) {
+    display: block;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
   .project-pages-root :global(.project-pages) {
     list-style: none;
     padding: 0;

@@ -59,6 +59,10 @@ unrecognised `schema_version` does. Silent tolerance of an unknown envelope vers
 contract stops meaning anything.
 
 
+**Version 3 adds the optional `project` object (ADR-0030)**: `parent` and `related` source
+keys. A manifest that carries `project` MUST declare `"3"`; `deadlines` is valid in `"2"` and
+`"3"`. A version 1 or 2 manifest is still valid unchanged.
+
 ## The manifest
 
 `manifest.json` lives at the **root of `dist/`**. The publish action takes one

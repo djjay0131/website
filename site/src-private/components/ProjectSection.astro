@@ -22,6 +22,7 @@ const projectsUrl = `${base}projects/`;
 <nav class="breadcrumbs" aria-label="Breadcrumb">
   <ol>
     <li><a href={projectsUrl}>Projects</a></li>
+    <li data-parent-crumb hidden></li>
     <li><a href={projectUrl}>{title}</a></li>
     <li aria-current="page">{label}</li>
   </ol>
@@ -46,7 +47,7 @@ const projectsUrl = `${base}projects/`;
 
 <script>
   import { loadPrivateItems } from "../lib/private-items.mjs";
-  import { mountProjectNavigation, showProjectError } from "../lib/project-ui.mjs";
+  import { mountParentCrumb, mountProjectNavigation, showProjectError } from "../lib/project-ui.mjs";
   import { loadCalendar, mountProjectUpcoming } from "../lib/calendar-ui.mjs";
 
   const prevRoot = document.querySelector<HTMLElement>("[data-project-prevnext]");
@@ -62,6 +63,8 @@ const projectsUrl = `${base}projects/`;
       if (prevRoot) showProjectError(prevRoot, "Could not load the project pages. Try again shortly.");
     } else {
       mountProjectNavigation({ prevRoot, items: result.items, source, slug, base, title });
+      const crumb = document.querySelector<HTMLElement>("[data-parent-crumb]");
+      if (crumb) mountParentCrumb(crumb, result.items, source);
     }
     const upcoming = document.querySelector<HTMLElement>("[data-project-upcoming]");
     if (upcoming && calendar.ok) {
@@ -88,6 +91,7 @@ const projectsUrl = `${base}projects/`;
   .breadcrumbs ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
   .breadcrumbs li + li::before { content: "›"; margin-right: 0.3rem; color: var(--color-muted); }
   .breadcrumbs [aria-current="page"] { color: var(--color-muted); }
+  .breadcrumbs li[hidden] { display: none; }
 
   .project-layout {
     display: grid;

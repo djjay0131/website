@@ -29,3 +29,12 @@ site/public/og-card.svg
 
 # D25 Playwright screenshots (CI artifact, never committed: private pages)
 /site/d25-screenshots/
+
+# ADR-0030: the private satellite roster names repositories under
+# double-anonymous review. It lives only on the owner's machine.
+infra/private-satellites.auto.tfvars
+infra/*.private.tfvars
+
+# Python bytecode (tests import infra/scripts).
+__pycache__/
+*.py[cod]

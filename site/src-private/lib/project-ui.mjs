@@ -9,6 +9,7 @@ import {
   pageLabel,
   projectPageHref,
   projectPages,
+  projectRelations,
   projectTitle,
 } from "./projects.mjs";
 
@@ -51,7 +52,22 @@ export function mountProjectLanding(root, items, base = "/p/") {
       el("div", {}, el("dt", { text: "Pages" }), el("dd", { text: String(project.itemCount) })),
       el("div", {}, el("dt", { text: "Updated" }), el("dd", { text: project.lastUpdated ?? "—" })),
     );
-    card.append(heading, description, meta);
+    if (project.children?.length) {
+      meta.append(
+        el("div", {}, el("dt", { text: "Projects" }), el("dd", { text: String(project.children.length) })),
+      );
+    }
+    card.append(heading, description);
+    // ADR-0030: a parent's card lists the child projects the viewer can open.
+    if (project.children?.length) {
+      card.classList.add("project-card-parent");
+      const children = el("ul", { class: "project-card-children", "aria-label": `Projects in ${project.title}` });
+      for (const child of project.children) {
+        children.append(el("li", {}, el("a", { href: child.href, text: child.title })));
+      }
+      card.append(children);
+    }
+    card.append(meta);
     list.append(card);
   }
   root.append(list);
@@ -121,6 +137,52 @@ export function mountProjectNavigation({ prevRoot, items, source, slug, base = "
   }
 
   return around;
+}
+
+/**
+ * ADR-0030: a project page's relationships -- the child projects of a parent,
+ * and related projects -- limited to projects the viewer can open. Renders
+ * nothing (and hides `root`) when there are none.
+ */
+export function mountProjectRelations(root, items, source) {
+  const { children, related } = projectRelations(items, source);
+  root.replaceChildren();
+  const groups = [
+    ["Projects in this space", "project-children", children],
+    ["Related projects", "project-related", related],
+  ];
+  let shown = 0;
+  for (const [label, cls, links] of groups) {
+    if (!links.length) continue;
+    shown += 1;
+    const section = el("section", { class: `project-relations ${cls}` });
+    section.append(el("h2", { text: label }));
+    const list = el("ul", { class: "project-relations-list" });
+    for (const project of links) {
+      list.append(el("li", {}, el("a", { href: project.href, text: project.title })));
+    }
+    section.append(list);
+    root.append(section);
+  }
+  root.hidden = shown === 0;
+  return { children, related };
+}
+
+/**
+ * ADR-0030: fill a breadcrumb slot with the parent project, when the viewer can
+ * open it. The slot stays hidden otherwise, so no parent name is ever in the
+ * static page.
+ */
+export function mountParentCrumb(slot, items, source) {
+  const { parent } = projectRelations(items, source);
+  slot.replaceChildren();
+  if (!parent) {
+    slot.hidden = true;
+    return null;
+  }
+  slot.append(el("a", { href: parent.href, text: parent.title }));
+  slot.hidden = false;
+  return parent;
 }
 
 /** A small failure message that does not pretend the project is empty. */

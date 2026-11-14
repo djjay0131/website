@@ -129,8 +129,103 @@ export function projectPages(items, source) {
     .sort(compareProjectItems);
 }
 
-/** Cards for the landing page, newest project first. */
+/** Cards for every project the viewer can open, before grouping (D25). */
 export function buildProjects(items) {
+  return groupProjects(buildFlatProjects(items));
+}
+
+// --- Project relationships (ADR-0030) --------------------------------------
+//
+// A satellite may name a parent project and related projects in its manifest.
+// They reach this module ONLY on items the gate already let the viewer open, so
+// a relationship is shown only when the viewer can open BOTH projects: a child
+// whose parent the viewer cannot see stays a top-level card, and a related key
+// the viewer cannot open is silently dropped. Nesting is one level deep: a
+// project that itself names a visible parent is never treated as a parent.
+
+/** The parent key a project's items declare, or null. */
+function declaredParent(pages) {
+  for (const item of pages) {
+    if (typeof item?.parent === "string" && item.parent) return item.parent;
+  }
+  return null;
+}
+
+/** The related keys a project's items declare, de-duplicated. */
+function declaredRelated(pages) {
+  const keys = [];
+  for (const item of pages) {
+    for (const key of Array.isArray(item?.related) ? item.related : []) {
+      if (typeof key === "string" && key && !keys.includes(key)) keys.push(key);
+    }
+  }
+  return keys;
+}
+
+function link(project) {
+  return { source: project.source, title: project.title, href: project.href };
+}
+
+/**
+ * Nest children under visible parents and resolve related links.
+ * Returns the top-level projects; each carries `children`, `related` and
+ * (for a child) `parent`, all limited to projects in the same list.
+ */
+export function groupProjects(flat) {
+  const bySource = new Map(flat.map((project) => [project.source, project]));
+  const declared = new Map(flat.map((project) => [project.source, declaredParent(project.pages)]));
+
+  const parentOf = (source) => {
+    const key = declared.get(source);
+    if (!key || key === source || !bySource.has(key)) return null;
+    // One level: a parent that itself sits under a visible parent is not one.
+    const grand = declared.get(key);
+    if (grand && grand !== key && bySource.has(grand)) return null;
+    return key;
+  };
+
+  const enriched = flat.map((project) => ({
+    ...project,
+    parent: null,
+    children: [],
+    related: [],
+  }));
+  const byKey = new Map(enriched.map((project) => [project.source, project]));
+
+  for (const project of enriched) {
+    const key = parentOf(project.source);
+    if (key) {
+      const parent = byKey.get(key);
+      project.parent = link(parent);
+      parent.children.push(project);
+    }
+  }
+  for (const project of enriched) {
+    project.children.sort((a, b) => a.title.localeCompare(b.title));
+    const own = new Set([project.source, project.parent?.source, ...project.children.map((c) => c.source)]);
+    project.related = declaredRelated(project.pages)
+      .filter((key) => !own.has(key) && byKey.has(key))
+      .map((key) => link(byKey.get(key)));
+  }
+  return enriched.filter((project) => !project.parent);
+}
+
+/** One project's resolved relationships, for its hub page and breadcrumbs. */
+export function projectRelations(items, source) {
+  const flat = buildFlatProjects(items);
+  const top = groupProjects(flat);
+  const all = top.flatMap((project) => [project, ...project.children]);
+  const found = all.find((project) => project.source === source);
+  if (!found) return { parent: null, children: [], related: [] };
+  return {
+    parent: found.parent,
+    children: found.children.map(link),
+    related: found.related,
+  };
+}
+
+/** Cards for the landing page, newest project first, ungrouped. */
+export function buildFlatProjects(items) {
   const bySource = new Map();
   for (const item of items ?? []) {
     if (!isProjectItem(item)) continue;
