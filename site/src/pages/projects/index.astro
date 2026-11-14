@@ -63,4 +63,55 @@ const items = [
   description="Selected projects and research by Jason Cusati."
   items={items}
   emptyMessage="No projects are available in this build."
-/>
+>
+  <section slot="intro" class="member-projects" data-member-projects hidden aria-live="polite"></section>
+</SectionIndex>
+
+<script>
+  // D34: a signed-in viewer also sees their own private projects here, fetched
+  // from the gate at view time. Signed out, this stays hidden and empty.
+  import { installMemberProjects } from "../../lib/member-projects.mjs";
+  await installMemberProjects();
+</script>
+
+<style>
+  .member-projects { margin: 0 0 2rem; }
+  .member-projects[hidden] { display: none; }
+  .member-projects :global(.member-projects-header) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .member-projects :global(h2) { font-size: 1.25rem; margin: 0; }
+  .member-projects :global(.member-projects-grid) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: 0.75rem;
+  }
+  .member-projects :global(.member-project) {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+  .member-projects :global(.member-project-title) { font-size: 1.05rem; margin: 0 0 0.35rem; }
+  .member-projects :global(.member-project-description) { color: var(--color-muted); margin: 0; font-size: 0.92rem; }
+  .member-projects :global(.member-project-children) {
+    list-style: none;
+    padding: 0;
+    margin: 0.6rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.5rem;
+  }
+  .member-projects :global(.member-project-children a) {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    font-size: 0.85rem;
+  }
+</style>
