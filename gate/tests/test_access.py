@@ -400,7 +400,9 @@ def test_listing_prunes_relationships_to_projects_the_viewer_can_open(deps, veri
     policy = AccessPolicy(
         default=_rule(), sections={}, sources={}, items={child_key: GROUP_A_RULE, parent_key: GROUP_B_RULE}
     )
-    client = TestClient(create_app(_restricted(deps, catalog=catalog, policy=policy)), raise_server_exceptions=False)
+    client = TestClient(
+        create_app(_restricted(deps, catalog=catalog, policy=policy)), raise_server_exceptions=False
+    )
 
     def listing(email, token):
         session = _session(verifier, token, email)

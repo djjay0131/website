@@ -346,16 +346,15 @@ def _parse_item(key: str, raw: object) -> AccessItem | None:
         not isinstance(parent, str) or not _SOURCE_KEY.fullmatch(parent) or parent == source
     ):
         return None
-    if related is not None:
-        if (
-            not isinstance(related, list)
-            or len(related) > 10
-            or not all(isinstance(k, str) and _SOURCE_KEY.fullmatch(k) for k in related)
-            or source in related
-            or (parent is not None and parent in related)
-            or len(set(related)) != len(related)
-        ):
-            return None
+    if related is not None and (
+        not isinstance(related, list)
+        or len(related) > 10
+        or not all(isinstance(k, str) and _SOURCE_KEY.fullmatch(k) for k in related)
+        or source in related
+        or (parent is not None and parent in related)
+        or len(set(related)) != len(related)
+    ):
+        return None
     # The catalog must never carry an access decision (D24-B).
     if "access" in raw or "groups" in raw or "roles" in raw:
         return None
