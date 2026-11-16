@@ -77,6 +77,14 @@
           "href": "/research/governed-agentic-research/",
           "repo": null,
           "public": true
+        },
+        {
+          "name": "Agent skills: evidence or assertion?",
+          "goal": "An empirical study of agent skill files (SKILL.md) on public GitHub, using the public GitSkills dataset. Question: when a skill directs a coding agent's work, does it also tell the agent how to check that work — a prose request, a runnable test/lint/validation command, a bundled checker script, or an observable pass criterion?",
+          "status": "In progress (2026). Built around a transparent, non-executing detector and a line-anchored codebook; human validation in progress.",
+          "href": null,
+          "repo": null,
+          "public": true
         }
       ]
     },
