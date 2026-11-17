@@ -280,6 +280,22 @@
     "to": "/research/governed-agentic-research/how-governance-works/"
   },
   {
+    "from": "/website/research/internal-coding-harness/",
+    "to": "/research/internal-coding-harness/"
+  },
+  {
+    "from": "/website/research/internal-coding-harness/plan/",
+    "to": "/research/internal-coding-harness/plan/"
+  },
+  {
+    "from": "/website/research/internal-coding-harness/summary/",
+    "to": "/research/internal-coding-harness/summary/"
+  },
+  {
+    "from": "/website/research/internal-coding-harness/synthesis/",
+    "to": "/research/internal-coding-harness/synthesis/"
+  },
+  {
     "from": "/website/research/soa-agentic-se/",
     "to": "/research/soa-agentic-se/"
   },

@@ -1,0 +1,156 @@
+<p>All times Eastern. Feature freeze: Thursday 20:00.</p>
+<h2>Tuesday 2026-11-17</h2>
+<table>
+<thead>
+<tr>
+<th>When</th>
+<th>What</th>
+<th>Who</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Midday</td>
+<td>Repository created; governance and research scaffolding established</td>
+<td>Claude Code</td>
+<td>PR 1: scaffolding</td>
+</tr>
+<tr>
+<td>Midday</td>
+<td>Research: industry and academic</td>
+<td>Claude</td>
+<td>Research report, summary, best practices</td>
+</tr>
+<tr>
+<td>Afternoon</td>
+<td>Design brief written; Design A started</td>
+<td>Claude Code</td>
+<td>Design A</td>
+</tr>
+<tr>
+<td>Afternoon</td>
+<td>Design B started</td>
+<td>OpenCode</td>
+<td>Design B</td>
+</tr>
+<tr>
+<td>Afternoon</td>
+<td>Research and timeline published to the research website</td>
+<td>Claude Code</td>
+<td>Website draft PR</td>
+</tr>
+<tr>
+<td>Evening</td>
+<td>Design C from the same brief</td>
+<td>Jason with ChatGPT</td>
+<td>Design C, shared back</td>
+</tr>
+<tr>
+<td>Evening</td>
+<td>Smoke test: OpenCode against each of the open-weight models on a self-hosted endpoint, one tool-calling task each</td>
+<td>OpenCode</td>
+<td>Which models tool-call reliably</td>
+</tr>
+</tbody></table>
+<h2>Wednesday 2026-11-18</h2>
+<table>
+<thead>
+<tr>
+<th>When</th>
+<th>What</th>
+<th>Who</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>09:00</td>
+<td>Side-by-side comparison of designs A, B, C against the brief&#39;s criteria</td>
+<td>Claude</td>
+<td>Comparison table</td>
+</tr>
+<tr>
+<td>10:00</td>
+<td><strong>Decision: pick a design (or a merge)</strong></td>
+<td>Jason</td>
+<td>ADR recording the choice</td>
+</tr>
+<tr>
+<td>10:30 to 13:00</td>
+<td>Build 1: gateway or harness config with fixed role-based routing; audit log</td>
+<td>OpenCode, verified by Claude</td>
+<td>Agent session works end to end</td>
+</tr>
+<tr>
+<td>13:00 to 17:00</td>
+<td>Build 2: evaluation suite (8 to 12 small tasks with tests), runner, cost meter</td>
+<td>OpenCode, verified by Claude</td>
+<td><code>make eval</code> produces a results file</td>
+</tr>
+<tr>
+<td>17:00 to 20:00</td>
+<td>Build 3: escalation on failure signals; baseline vs routed run</td>
+<td>OpenCode, verified by Claude</td>
+<td>First cost and pass-rate numbers</td>
+</tr>
+<tr>
+<td>20:00</td>
+<td>Checkpoint: is there a working demo path? If not, cut escalation and ship fixed routing</td>
+<td>Jason and Claude</td>
+<td>Go or cut</td>
+</tr>
+</tbody></table>
+<h2>Thursday 2026-11-19</h2>
+<table>
+<thead>
+<tr>
+<th>When</th>
+<th>What</th>
+<th>Who</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>09:00 to 12:00</td>
+<td>Fix what the Wednesday run exposed; rerun evaluation from a fresh clone</td>
+<td>OpenCode, verified by Claude</td>
+<td>Reproduced results</td>
+</tr>
+<tr>
+<td>12:00 to 14:00</td>
+<td>Cost model script: per-token cost of self-hosted tiers at stated utilization vs API list prices, scaled to a 20,000-developer fleet with every assumption labelled</td>
+<td>OpenCode, verified by Claude</td>
+<td>Cost table and chart</td>
+</tr>
+<tr>
+<td>14:00 to 16:00</td>
+<td>Results and prototype page on the research website; architecture one-pager</td>
+<td>Claude</td>
+<td>Website PR, one-pager</td>
+</tr>
+<tr>
+<td>16:00 to 18:00</td>
+<td>Demo script (5 minutes), recorded backup of the demo in case of live failure</td>
+<td>Jason and Claude</td>
+<td>Script and recording</td>
+</tr>
+<tr>
+<td>20:00</td>
+<td><strong>Freeze.</strong> No changes after this except typos</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Evening</td>
+<td>One full rehearsal of the demo and the talk track</td>
+<td>Jason</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>Cut order if time runs short</h2>
+<ol>
+<li>Learned router (rule-based only).</li>
+<li>Escalation logic (fixed role routing only).</li>
+<li>Cloud hosting (run locally).</li>
+<li>Third model tier (two tiers).</li>
+</ol>
+<p>The evaluation and the audit log are not cuttable. They are the evidence.</p>
