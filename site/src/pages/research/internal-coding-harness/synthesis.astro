@@ -1,0 +1,29 @@
+---
+// Projects docs/research/2026-11-17-research-synthesis.md from the private repository djjay0131/internal-coding-harness
+// (branch research/initial-synthesis, commit 198dfb5), rendered into
+// src/data/internal-coding-harness/synthesis.html. Edits for publication are listed in
+// the pull request that added this page.
+import Base from "../../../layouts/Base.astro";
+import SynthesisArticle from "../../../components/SynthesisArticle.astro";
+import html from "../../../data/internal-coding-harness/synthesis.html?raw";
+const base = import.meta.env.BASE_URL;
+const here = `${base}research/internal-coding-harness/`;
+---
+
+<Base
+  annotatable
+  title="Jason Cusati — Internal Agentic Coding Harness: Research"
+  description="Research report on bringing an agentic coding tool in house at a large regulated enterprise: options, industry practice, academic evidence on harnesses, open-weight models, routing, cost and security, and design guidance (November 2026)."
+>
+  <p class="crumbs"><a href={here}>← Internal agentic coding harness</a></p>
+  <h1>Internal Agentic Coding Harnesses: Self-Hosted Models, Routing, and Governance</h1>
+  <p class="meta">Research report, 2026-11-17. Author: Jason Cusati. Research assistance: Claude. Bracketed tokens are source ids; each links to its entry in section 9.</p>
+  <SynthesisArticle html={html} />
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .meta { color: var(--color-muted); font-family: var(--font-body); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  :global(.synthesis [id^="s"]:target) { background: var(--color-surface); }
+  :global(.synthesis li a[href^="http"]) { overflow-wrap: anywhere; }
+</style>

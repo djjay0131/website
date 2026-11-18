@@ -1,0 +1,179 @@
+<p>Scope: what a large regulated enterprise needs to know before it brings an agentic coding tool (Claude Code or OpenCode style) in house and runs it against models it controls. The report covers industry practice and the academic literature, then turns both into design guidance. Every numeric claim carries a source in section 9. Benchmark scores for open-weight models are mostly vendor-reported and should be treated as claims to test, not facts to plan on.</p>
+<h2>1. What &quot;taking it internal&quot; can mean</h2>
+<p>Three different projects hide under the same phrase. They have different costs and different payoffs, so the first design decision is which one is being bought.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>What moves in house</th>
+<th>What it buys</th>
+<th>What it does not buy</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A. Controlled access</td>
+<td>Claude Code stays. Traffic goes through the firm&#39;s gateway to Claude on Bedrock, Vertex, or the Anthropic API, inside firm-run containers.</td>
+<td>Data path control, audit, model approval, spend limits.</td>
+<td>Lower token cost. Claude weights cannot be self-hosted.</td>
+</tr>
+<tr>
+<td>B. Open harness</td>
+<td>The agent loop itself is replaced by an open-source harness (OpenCode, or a firm-built one) that can talk to any model.</td>
+<td>Model choice per task, the ability to read and change the tool, no per-seat lock-in.</td>
+<td>Savings by itself. The harness still needs a cheaper model behind it.</td>
+</tr>
+<tr>
+<td>C. Self-hosted models</td>
+<td>Open-weight coding models served on the firm&#39;s own GPUs.</td>
+<td>Unmetered tokens at fixed cost, full data residency, the ability to fine-tune.</td>
+<td>Frontier quality on the hardest tasks, at least today.</td>
+</tr>
+</tbody></table>
+<p>Two facts constrain the choice. First, Anthropic&#39;s gateway documentation says it does not support routing Claude Code to non-Claude models through any gateway <a class="cite" href="#s1">[S1]</a>. Third-party gateways do it anyway by translating the Messages API, but a large regulated enterprise would be running an unsupported configuration. Second, OpenCode is MIT-licensed, lets each agent and subagent name its own model, and accepts any OpenAI-compatible endpoint as a provider <a class="cite" href="#s2">[S2]</a><a class="cite" href="#s3">[S3]</a><a class="cite" href="#s4">[S4]</a>. So a multi-model strategy points toward option B as the base, with A and C as model tiers behind one gateway rather than as competing products.</p>
+<h2>2. Industry practice</h2>
+<h3>2.1 Banks</h3>
+<p>Bank of America says roughly 18,000 to 20,000 of its developers use AI coding agents and reports a productivity gain of 15 to 20 percent; a co-president called coding the most measurable AI return so far <a class="cite" href="#s5">[S5]</a><a class="cite" href="#s6">[S6]</a><a class="cite" href="#s7">[S7]</a>. The bank has not named the model or vendor behind its developer tool <a class="cite" href="#s8">[S8]</a>. The public record supports &quot;large deployed base, measured gain, cost now matters&quot; and nothing more specific.</p>
+<p>JPMorganChase runs Claude Code inside Devspace, its containerized development platform, on its own infrastructure. Agents get no direct access to employee credentials or internal systems, access widens in stages, each new Claude model must pass the firm&#39;s approval process, and an automated gate decides pass or halt so the agent cannot sign off on its own work <a class="cite" href="#s9">[S9]</a>.</p>
+<p>Goldman Sachs built the GS AI Platform as a single entry point to several vendors&#39; models behind its firewall <a class="cite" href="#s10">[S10]</a><a class="cite" href="#s11">[S11]</a>. Bloomberg reporting, relayed in secondary coverage, says October 2026 guidance limited Claude Code and GitHub&#39;s coding tools to engineers after a period of wider experimentation <a class="cite" href="#s12">[S12]</a>. Business Insider reporting, also via secondary coverage, describes Goldman packaging its internal engineering standards into reusable instruction bundles for coding agents <a class="cite" href="#s13">[S13]</a>.</p>
+<p>The common shape across the three: a firm-owned gateway, containerized execution, staged access, model-by-model approval, and firm-specific skills layered on top. None of them publicly claims to run coding agents mainly on self-hosted open weights. That is the open ground a DevX team would be moving into.</p>
+<h3>2.2 The regulatory gap</h3>
+<p>On April 17, 2026 the Federal Reserve, OCC, and FDIC replaced SR 11-7 with revised model risk guidance (SR 26-2, OCC Bulletin 2026-13). The new guidance explicitly leaves generative and agentic AI out of scope, and the agencies said they would issue a request for information on banks&#39; use of AI <a class="cite" href="#s14">[S14]</a><a class="cite" href="#s15">[S15]</a><a class="cite" href="#s16">[S16]</a>. Commentators stress that the exclusion does not mean nothing applies; other obligations (third-party risk, operational resilience, information security) still do <a class="cite" href="#s17">[S17]</a>. The practical reading for a platform team: there is no supervisory checklist to copy, so the audit trail, model inventory, and approval process have to be designed in from the start and defended on their merits.</p>
+<h3>2.3 Tooling</h3>
+<p>OpenCode is a terminal coding agent maintained by Anomaly (the team that grew out of SST). It has a client/server design with an SDK <a class="cite" href="#s52">[S52]</a>, built-in primary agents (build, plan) and subagents (general, explore), custom agents defined in config or markdown with their own model and permission map, and an enterprise offering with central config that does not charge for tokens when the customer brings its own gateway <a class="cite" href="#s2">[S2]</a><a class="cite" href="#s3">[S3]</a><a class="cite" href="#s18">[S18]</a><a class="cite" href="#s19">[S19]</a>. Community guides show it working against vLLM, Ollama, and llama.cpp with a few lines of provider config; tool calling on vLLM needs the right parser flags for the model <a class="cite" href="#s4">[S4]</a><a class="cite" href="#s20">[S20]</a>.</p>
+<p>Gateways are now a supply-chain concern of their own. On March 24, 2026 two malicious LiteLLM releases (1.82.7 and 1.82.8) reached PyPI through a compromised security scanner in the project&#39;s CI pipeline and stole credentials from installations that pulled them; the maintainers pulled the packages and rebuilt the release pipeline <a class="cite" href="#s21">[S21]</a><a class="cite" href="#s22">[S22]</a>. A gateway holds every provider key and sees every prompt. It deserves the same scrutiny as an identity provider.</p>
+<h2>3. Academic evidence</h2>
+<h3>3.1 The harness is a first-order variable, and a noisy one</h3>
+<p>A May 2026 position paper collects evidence that the harness often moves agent scores more than the model does. Holding the model fixed and changing only the harness raised Terminal-Bench 2 pass@1 from 69.7% to 77.0%, third-party monitoring found up to 15 points of scaffold-only variation on SWE-bench Verified, and Claude Opus 4.5 scored 45.9% under a standardized scaffold on SWE-bench Pro against 55.4% under Claude Code <a class="cite" href="#s23">[S23]</a>. A source-code study of eleven coding agents adds that a deliberately minimal scaffold already reaches the mid-70s on SWE-bench Verified with a frontier model <a class="cite" href="#s24">[S24]</a>.</p>
+<p>A more careful study pushes back on the strong version of that story. Using 80 private, contamination-controlled tasks, it compared vendor-native harnesses with a neutral one and could not resolve an average advantage either way: the differences were about one point with confidence intervals of roughly ten. The neutral harness did cost 1.2 to 1.6 times as much per solved task, and an older open-weight model (DeepSeek V3.2) on the neutral harness solved under 20% of tasks, with many attempts ending in agent errors rather than wrong answers <a class="cite" href="#s25">[S25]</a>. A related study cited there reports up to a 40-fold spread in tokens per solved task across three open harnesses <a class="cite" href="#s25">[S25]</a>.</p>
+<p>Read together: harness choice matters most for cost and for weaker models. Open-weight models fail more often on mechanics (tool-call format, context limits, timeouts) than on reasoning, which means harness and serving configuration can make or break option C. It also means any internal claim of &quot;harness X is better&quot; needs a locked evaluation on the firm&#39;s own tasks.</p>
+<h3>3.2 Open-weight coding models</h3>
+<p>Aggregator surveys from October and November 2026 put vendor-reported SWE-bench Verified scores for open-weight models between about 68% and 81%: Devstral Small 2 at 68.0%, Qwen3-Coder-Next above 70%, Qwen3.6-27B at 77.2%, and DeepSeek-V4-Pro at 80.6% in its maximum reasoning mode <a class="cite" href="#s26">[S26]</a><a class="cite" href="#s27">[S27]</a><a class="cite" href="#s28">[S28]</a>. On the harder SWE-bench Pro the reported open-weight range is roughly 44% to 68% <a class="cite" href="#s29">[S29]</a><a class="cite" href="#s30">[S30]</a>. Several of these models carry Apache 2.0 or MIT licenses <a class="cite" href="#s27">[S27]</a><a class="cite" href="#s30">[S30]</a>. Hardware needs vary by an order of magnitude: the small models fit a single workstation GPU, the largest are trillion-parameter mixture-of-experts models that need a multi-GPU node <a class="cite" href="#s26">[S26]</a><a class="cite" href="#s31">[S31]</a>.</p>
+<p>Two cautions. These numbers come from model cards and blog aggregators, with different scaffolds behind each one, which section 3.1 shows is enough to move a score by ten points. And provenance matters to a large regulated enterprise: most of the strongest open weights come from Chinese labs, so license, origin, and supply-chain review belong in the model approval process next to the benchmark score.</p>
+<h3>3.3 Training your own</h3>
+<p>SWE-Gym (ICML 2025) built 2,438 executable Python task environments and showed fine-tuning on agent trajectories gave up to 19 points of absolute gain in resolve rate, reaching 32.0% on SWE-bench Verified with a learned verifier <a class="cite" href="#s32">[S32]</a>. SWE-smith scaled the idea to tens of thousands of synthetic tasks and trained a 32B model to 40.2% <a class="cite" href="#s33">[S33]</a>. Those results were state of the art for open weights in 2025. Off-the-shelf open models in late 2026 report scores roughly double that (section 3.2).</p>
+<p>The lesson for a platform team is narrow. Training a general coding model in house is not competitive with downloading one. The methods are still valuable for a different job: generating firm-specific tasks from internal repositories and tuning a small model, or a router, on internal trajectories. That is a quarter-scale project, not a three-day one.</p>
+<h3>3.4 Routing</h3>
+<p>Classic routing work looks strong on chat benchmarks. RouteLLM (ICLR 2025) reports 3.66 times cost savings at 95% of GPT-4 quality on MT Bench, yet the same routers save only about 1.4 times on MMLU, where queries are uniformly harder <a class="cite" href="#s34">[S34]</a><a class="cite" href="#s35">[S35]</a>. FrugalGPT reported up to 98% savings with cascades <a class="cite" href="#s34">[S34]</a>. Cascade routing unifies the two ideas <a class="cite" href="#s36">[S36]</a>.</p>
+<p>Coding agents break the assumptions behind prompt-level routers, and the 2026 literature says so directly:</p>
+<ul>
+<li>SWE-Router argues that a router which sees only the task description inherits an error floor, because similar-looking issues hide very different amounts of work. Its answer is temporal: let a cheap model run a few exploratory turns, then read the partial trajectory and decide whether to continue or escalate <a class="cite" href="#s37">[S37]</a>.</li>
+<li>Scrouting audits published per-task results on three SWE benchmarks and finds solve sets are largely nested, so no learned router reliably beats always calling the strongest model on quality. Routing is worth doing for cost. Its scout-first router matched the best single model&#39;s solve rate on the Python slice of SWE-bench Pro at about a fifth of the cost per solve <a class="cite" href="#s38">[S38]</a>.</li>
+<li>AgentRouter treats routing as a per-step assignment and uses a 12M-parameter classifier with under 5 ms overhead to map each step to one of four model tiers <a class="cite" href="#s39">[S39]</a>. RSI-Router routes per subtask with a small model as the router <a class="cite" href="#s40">[S40]</a>.</li>
+<li>Cognition&#39;s Devin Fusion is the main industry data point. It runs a frontier main agent and a cheaper sidekick in parallel, each with its own cached context, switches mid-session, and reports frontier-level results at about 35% lower cost on its own benchmark <a class="cite" href="#s41">[S41]</a><a class="cite" href="#s42">[S42]</a>. An independent analysis estimates that only about a third of the coding work actually left the frontier model <a class="cite" href="#s35">[S35]</a>.</li>
+</ul>
+<p>A practitioner warning completes the picture: routing lowers the price per call, but a cheap mis-route causes rework, so savings should be judged by the share of tokens that end up in merged work, not by the invoice alone <a class="cite" href="#s43">[S43]</a>.</p>
+<h3>3.5 Cost of self-hosting</h3>
+<p>Self-hosted cost per token is a function of utilization. An API bill scales linearly with volume; a GPU costs the same idle or busy <a class="cite" href="#s44">[S44]</a><a class="cite" href="#s45">[S45]</a>. Measurement studies of production clusters cited in one cost model put typical GPU utilization below 60% <a class="cite" href="#s44">[S44]</a>. Published break-even estimates differ by two orders of magnitude depending on the comparison: against frontier API prices, a few million tokens a day can justify a reserved GPU; with engineering time counted honestly, one vendor-neutral estimate lands between 200 million and 1 billion tokens a month; against cheap hosted open-weight APIs the break-even moves into the billions <a class="cite" href="#s46">[S46]</a><a class="cite" href="#s47">[S47]</a><a class="cite" href="#s48">[S48]</a>.</p>
+<p>A fleet of 20,000 developers running agents is far beyond any of these thresholds in aggregate, so the enterprise-scale question is not whether self-hosting can pay but which share of traffic can move to it without hurting merged-work yield. That share is exactly what routing research is trying to estimate, and the Devin Fusion analysis suggests a realistic early number is closer to a third than to 85%.</p>
+<h3>3.6 Security</h3>
+<p>The dominant threat to coding agents is indirect prompt injection: instructions planted in a repository, a pull request, a dependency changelog, an agent instruction file, or an MCP tool response <a class="cite" href="#s49">[S49]</a><a class="cite" href="#s50">[S50]</a>. Filtering does not reliably stop it, so current guidance assumes the model can be subverted and limits the blast radius with controls outside the model. The recurring list: sandbox the agent process, block network egress except to known destinations, block writes outside the workspace, inject secrets through a proxy so they never enter the agent&#39;s context, require human approval for high-impact actions, and keep a complete audit log <a class="cite" href="#s49">[S49]</a><a class="cite" href="#s51">[S51]</a>. The &quot;lethal trifecta&quot; framing (private data, untrusted content, and an outbound channel in the same context) and the &quot;rule of two&quot; give a quick test for any proposed agent configuration <a class="cite" href="#s51">[S51]</a>.</p>
+<p>Self-hosting changes this picture less than people expect. It removes the third-party data path. It does not remove injection, and it adds a new privileged component, the gateway.</p>
+<h2>4. Synthesis: what the evidence says to build</h2>
+<ol>
+<li>Use an open harness as the base and put every model behind one firm-owned, OpenAI-compatible gateway. Claude via Bedrock or Vertex becomes the top tier; self-hosted open weights become the lower tiers.</li>
+<li>Route by role and by trajectory, not by prompt. Start with fixed roles (plan and review on the strong tier; explore, edit, test-run, summarize on cheaper tiers), then add escalation on observable failure signals such as repeated tool errors, failing tests after N attempts, or a growing diff.</li>
+<li>Keep each tier&#39;s context cached and avoid bouncing a single conversation between models; cache misses can erase the saving.</li>
+<li>Do not train a general model. If anything is trained early, train the router on logged trajectories.</li>
+<li>Measure cost per merged change on a locked internal task suite, with the harness held fixed, before and after any routing change.</li>
+<li>Treat the gateway, the sandbox, and the audit log as the product. For a large regulated enterprise they are what makes the rest deployable.</li>
+</ol>
+<h2>5. Best practices</h2>
+<p><strong>Architecture</strong></p>
+<ul>
+<li>One gateway for all model traffic, with per-team budgets, model allowlists, and full request logging. Pin and hash-verify its dependencies.</li>
+<li>Harness and models are separately replaceable. Nothing in the harness config should assume a vendor.</li>
+<li>Central, signed configuration for agents, permissions, and skills; developers can extend but not weaken it.</li>
+</ul>
+<p><strong>Models</strong></p>
+<ul>
+<li>Maintain an approved-model inventory with license, origin, version hash, evaluation results, and an owner. New models enter through evaluation, as JPMorgan does for Claude releases.</li>
+<li>Serve open weights with a production server (vLLM or equivalent) and the model&#39;s documented tool-call parser. Test tool-call reliability separately from task success.</li>
+<li>Size capacity for utilization, not peak. Idle GPUs are the main way self-hosting loses money.</li>
+</ul>
+<p><strong>Routing</strong></p>
+<ul>
+<li>Default to the conservative tier when unsure. An unnecessary strong-model call is cheaper than a bad cheap-model result that triggers rework.</li>
+<li>Log the routing decision, the signals behind it, and the outcome for every step. That log is the future training set for a learned router.</li>
+<li>Report savings as cost per merged change and token yield, alongside pass rate.</li>
+</ul>
+<p><strong>Security and governance</strong></p>
+<ul>
+<li>Run agents in containers with no standing credentials, workspace-only writes, and default-deny egress.</li>
+<li>Inject secrets through a proxy. Never place them in prompts or environment variables the model can read.</li>
+<li>Require human approval for merges and other high-impact actions; an agent must not approve its own work.</li>
+<li>Keep an append-only audit record: who, which model and version, which tools, which files, which approvals.</li>
+<li>Review MCP servers and skills like any other third-party code.</li>
+</ul>
+<p><strong>Evaluation</strong></p>
+<ul>
+<li>Build a private task suite from internal repositories. Public benchmark scores are contaminated and scaffold-dependent.</li>
+<li>Hold the harness fixed when comparing models and the model fixed when comparing harnesses. Report confidence intervals; ten-point swings from noise are normal at small sample sizes.</li>
+<li>Re-run the suite on every model, harness, or routing change, from code, with pinned versions.</li>
+</ul>
+<h2>6. Open questions worth asking the team</h2>
+<ul>
+<li>Which of options A, B, C is the mandate, and is cost or control the primary driver?</li>
+<li>What is the current tool and its monthly token volume by task type? That decides the achievable routed share.</li>
+<li>Is there GPU capacity already, or is this cloud-hosted open weights inside the firm&#39;s tenancy?</li>
+<li>Who owns model approval now that SR 26-2 leaves generative AI out of scope?</li>
+<li>What does the firm measure today: suggestions accepted, merged changes, or something closer to cycle time?</li>
+</ul>
+<h2>7. Limits of this report</h2>
+<p>It was assembled in one day from public sources. Bank practices come from press coverage and vendor case studies, which are selective. Open-weight scores are vendor-reported and move monthly. Several routing papers are 2026 preprints without independent replication. Nothing here was measured by us yet; the prototype&#39;s evaluation is meant to supply the first numbers of our own.</p>
+<h2>8. Glossary</h2>
+<p>Harness: the loop, tools, context management, and permission system around a model. Gateway: the service every model request passes through. Tier: a class of model by cost and capability. Escalation: moving a task to a stronger tier after evidence the cheaper one is failing. Token yield: the share of tokens spent that end up in merged work.</p>
+<h2>9. Sources</h2>
+<ul>
+<li><span id="s1">[S1]</span> Anthropic, Claude Code docs, LLM gateway. <a href="https://code.claude.com/docs/en/llm-gateway">https://code.claude.com/docs/en/llm-gateway</a></li>
+<li><span id="s2">[S2]</span> OpenCode providers documentation. <a href="https://opencode.ai/docs/providers.md">https://opencode.ai/docs/providers.md</a></li>
+<li><span id="s3">[S3]</span> innFactory, OpenCode harness profile (license, agents, enterprise). <a href="https://innfactory.ai/en/ai-harness/opencode/">https://innfactory.ai/en/ai-harness/opencode/</a></li>
+<li><span id="s4">[S4]</span> T. Van Nuland, Local LLM with OpenCode. <a href="https://tobrun.github.io/blog/add-openai-compatible-endpoint-to-opencode">https://tobrun.github.io/blog/add-openai-compatible-endpoint-to-opencode</a></li>
+<li><span id="s5">[S5]</span> QA Financial, BofA: testing and governance collide as AI picks up pace (2026-08-31). <a href="https://qa-financial.com/bofa-pushes-ai-into-core-banking-as-testing-and-governance-collide/">https://qa-financial.com/bofa-pushes-ai-into-core-banking-as-testing-and-governance-collide/</a></li>
+<li><span id="s6">[S6]</span> Coté, Enterprise AI ROI at Bank of America (2026-09-25). <a href="https://cote.io/2026/09/25/enterprise-ai-roi-at-bank-of-america-developers-optimizing-normie-workflows-double-spending.html">https://cote.io/2026/09/25/enterprise-ai-roi-at-bank-of-america-developers-optimizing-normie-workflows-double-spending.html</a></li>
+<li><span id="s7">[S7]</span> BankingNewsAI, BofA AI agents timeline. <a href="https://www.bankingnewsai.com/banks/bank-of-america/ai-agents">https://www.bankingnewsai.com/banks/bank-of-america/ai-agents</a></li>
+<li><span id="s8">[S8]</span> Blits.ai, How Bank of America uses AI. <a href="https://www.blits.ai/ai-use-cases/organizations/bank-of-america">https://www.blits.ai/ai-use-cases/organizations/bank-of-america</a></li>
+<li><span id="s9">[S9]</span> Anthropic, JPMorganChase expands Claude Code (2026-11-09). <a href="https://claude.com/blog/jpmorganchase-expands-claude-code">https://claude.com/blog/jpmorganchase-expands-claude-code</a></li>
+<li><span id="s10">[S10]</span> Eulerpool, Goldman Sachs accelerates with centralized AI platform (2024-06-30). <a href="https://eulerpool.com/en/news/ai/goldman-sachs-accelerates-with-centralized-ai">https://eulerpool.com/en/news/ai/goldman-sachs-accelerates-with-centralized-ai</a></li>
+<li><span id="s11">[S11]</span> Fortune, Goldman Sachs internal AI assistant (2025-06-24). <a href="https://fortune.com/2025/06/24/goldman-sachs-internal-ai-assistant/">https://fortune.com/2025/06/24/goldman-sachs-internal-ai-assistant/</a></li>
+<li><span id="s12">[S12]</span> BuildMVPFast, Goldman Sachs pulls Claude Code from bankers and traders (summarizing Bloomberg, 2026-11-02). <a href="https://www.buildmvpfast.com/blog/goldman-sachs-claude-code-bankers-traders-regulated-firms-2026">https://www.buildmvpfast.com/blog/goldman-sachs-claude-code-bankers-traders-regulated-firms-2026</a></li>
+<li><span id="s13">[S13]</span> AI Understanding, Goldman Sachs is teaching AI agents its internal engineering practices (summarizing Business Insider). <a href="https://aiunderstanding.org/news/goldman-sachs-is-teaching-ai-agents-its-internal-engineering-practices-business-in">https://aiunderstanding.org/news/goldman-sachs-is-teaching-ai-agents-its-internal-engineering-practices-business-in</a></li>
+<li><span id="s14">[S14]</span> JD Supra, Banking regulators replace model risk management guidance. <a href="https://www.jdsupra.com/legalnews/banking-regulators-replace-5649360/">https://www.jdsupra.com/legalnews/banking-regulators-replace-5649360/</a></li>
+<li><span id="s15">[S15]</span> JD Supra, Agencies overhaul model risk management guidance. <a href="https://www.jdsupra.com/legalnews/agencies-overhaul-model-risk-management-9027604/">https://www.jdsupra.com/legalnews/agencies-overhaul-model-risk-management-9027604/</a></li>
+<li><span id="s16">[S16]</span> American Banker, Regulators&#39; guidance on model risk leaves many questions unanswered. <a href="https://www.americanbanker.com/opinion/regulators-guidance-on-model-risk-leaves-many-questions-unanswered">https://www.americanbanker.com/opinion/regulators-guidance-on-model-risk-leaves-many-questions-unanswered</a></li>
+<li><span id="s17">[S17]</span> Elevate, SR 11-7 was rescinded, and the guidance that replaced it excludes AI. <a href="https://elevateconsult.com/insights/sr-11-7-rescinded-model-risk-guidance-ai-gap">https://elevateconsult.com/insights/sr-11-7-rescinded-model-risk-guidance-ai-gap</a></li>
+<li><span id="s18">[S18]</span> OpenCode enterprise documentation. <a href="https://mintlify.com/anomalyco/opencode/enterprise">https://mintlify.com/anomalyco/opencode/enterprise</a></li>
+<li><span id="s19">[S19]</span> R. Walker, OpenCode research note. <a href="https://rywalker.com/research/opencode">https://rywalker.com/research/opencode</a></li>
+<li><span id="s20">[S20]</span> Hivenet Router docs, OpenCode integration. <a href="https://routerdocs.hivenet.com/integrations/open-code.md">https://routerdocs.hivenet.com/integrations/open-code.md</a></li>
+<li><span id="s21">[S21]</span> Future AGI, Best LiteLLM alternatives in 2026 (incident summary). <a href="https://futureagi.com/blog/best-litellm-alternatives-2026/">https://futureagi.com/blog/best-litellm-alternatives-2026/</a></li>
+<li><span id="s22">[S22]</span> Vercel, LiteLLM alternatives (incident and response). <a href="https://vercel.com/i/litellm-alternatives">https://vercel.com/i/litellm-alternatives</a></li>
+<li><span id="s23">[S23]</span> Stop Comparing LLM Agents Without Disclosing the Harness, arXiv:2605.23950. <a href="https://arxiv.org/abs/2605.23950">https://arxiv.org/abs/2605.23950</a></li>
+<li><span id="s24">[S24]</span> Harness Engineering: Anatomy, Architecture, and Evolution of Coding Agents, arXiv:2609.00006. <a href="https://arxiv.org/abs/2609.00006">https://arxiv.org/abs/2609.00006</a></li>
+<li><span id="s25">[S25]</span> M. Arjmandi, Harness or Model? Isolating the Harness Effect in Agentic Coding, arXiv:2609.11987. <a href="https://arxiv.org/abs/2609.11987">https://arxiv.org/abs/2609.11987</a></li>
+<li><span id="s26">[S26]</span> vdf.ai, Best local LLM for coding in 2026. <a href="https://vdf.ai/blog/best-local-llm-for-coding/">https://vdf.ai/blog/best-local-llm-for-coding/</a></li>
+<li><span id="s27">[S27]</span> Modal, Best open source models for Python coding agents in 2026. <a href="https://modal.com/resources/best-open-source-models-python-coding-agents">https://modal.com/resources/best-open-source-models-python-coding-agents</a></li>
+<li><span id="s28">[S28]</span> Hashnode, The 10 best open-weight LLMs for coding in 2026. <a href="https://hashnode.com/blog/best-open-weight-llms">https://hashnode.com/blog/best-open-weight-llms</a></li>
+<li><span id="s29">[S29]</span> Pinggy, Best open source LLMs for coding to self-host in 2026. <a href="https://pinggy.io/blog/best_open_source_self_hosted_llms_for_coding/">https://pinggy.io/blog/best_open_source_self_hosted_llms_for_coding/</a></li>
+<li><span id="s30">[S30]</span> Faros AI, Best open-weight models for coding. <a href="https://www.faros.ai/blog/open-weight-models">https://www.faros.ai/blog/open-weight-models</a></li>
+<li><span id="s31">[S31]</span> Morph, The best open source LLMs (November 2026). <a href="https://www.morphllm.com/best-open-source-llm">https://www.morphllm.com/best-open-source-llm</a></li>
+<li><span id="s32">[S32]</span> Pan et al., Training Software Engineering Agents and Verifiers with SWE-Gym, ICML 2025, arXiv:2412.21139. <a href="https://arxiv.org/abs/2412.21139">https://arxiv.org/abs/2412.21139</a></li>
+<li><span id="s33">[S33]</span> Yang et al., SWE-smith: Scaling Data for Software Engineering Agents, arXiv:2504.21798. <a href="https://arxiv.org/abs/2504.21798">https://arxiv.org/abs/2504.21798</a></li>
+<li><span id="s34">[S34]</span> S. Qu, Routing LLM calls: predict the model, or verify the answer? (review, October 2026). <a href="https://web.stanford.edu/~shuhuiq/blog/review-routing-cascades.html">https://web.stanford.edu/~shuhuiq/blog/review-routing-cascades.html</a></li>
+<li><span id="s35">[S35]</span> Pixis, Model routing (savings table and Devin Fusion analysis). <a href="https://inference-website.pixis.ai/blog/model-routing">https://inference-website.pixis.ai/blog/model-routing</a></li>
+<li><span id="s36">[S36]</span> A Unified Approach to Routing and Cascading for LLMs, ICML 2025. <a href="https://icml.cc/virtual/2025/poster/46183">https://icml.cc/virtual/2025/poster/46183</a></li>
+<li><span id="s37">[S37]</span> SWE-Router: Routing in Multi-turn Agentic Software Engineering Tasks, arXiv:2607.00053. <a href="https://arxiv.org/abs/2607.00053">https://arxiv.org/abs/2607.00053</a></li>
+<li><span id="s38">[S38]</span> Scrouting: Cost-Aware Routing of Coding Agents by Scouting the Repository First, arXiv:2608.04804. <a href="https://arxiv.org/abs/2608.04804">https://arxiv.org/abs/2608.04804</a></li>
+<li><span id="s39">[S39]</span> AgentRouter: Heterogeneous Model Routing for Cost-Optimal Multi-Step Agentic Workflows, arXiv:2609.22951. <a href="https://arxiv.org/abs/2609.22951">https://arxiv.org/abs/2609.22951</a></li>
+<li><span id="s40">[S40]</span> RSI-Router: Evolving Subtask-Level LLM Routing and Skills for Cost-Efficient Agents, arXiv:2609.34712. <a href="https://arxiv.org/abs/2609.34712">https://arxiv.org/abs/2609.34712</a></li>
+<li><span id="s41">[S41]</span> Cognition, Devin Fusion: Frontier Performance at 35% Lower Cost (2026-06-29). <a href="https://cognition.com/blog/devin-fusion">https://cognition.com/blog/devin-fusion</a></li>
+<li><span id="s42">[S42]</span> ZenML LLMOps database, Multi-model routing for cost-efficient AI code generation. <a href="https://www.zenml.io/llmops-database/multi-model-routing-for-cost-efficient-ai-code-generation">https://www.zenml.io/llmops-database/multi-model-routing-for-cost-efficient-ai-code-generation</a></li>
+<li><span id="s43">[S43]</span> Unblocked, Model routing for coding agents (2026-06-09). <a href="https://getunblocked.com/blog/model-routing-coding-agents">https://getunblocked.com/blog/model-routing-coding-agents</a></li>
+<li><span id="s44">[S44]</span> IntuitionLabs, Hosted AI APIs vs self-hosted models: cost comparison (2026-09-05). <a href="https://intuitionlabs.ai/articles/hosted-ai-api-vs-self-hosted-llm-cost">https://intuitionlabs.ai/articles/hosted-ai-api-vs-self-hosted-llm-cost</a></li>
+<li><span id="s45">[S45]</span> Beancount.io, The GPU breakeven line (2026-10-10). <a href="https://beancount.io/blog/2026/10/10/gpu-breakeven-line-self-hosted-vllm-vs-llm-api-cogs-guide">https://beancount.io/blog/2026/10/10/gpu-breakeven-line-self-hosted-vllm-vs-llm-api-cogs-guide</a></li>
+<li><span id="s46">[S46]</span> HowAIWorks, Self-hosted vs API: when running your own LLM pays off. <a href="https://howaiworks.ai/blog/self-hosted-vs-api-llm-cost">https://howaiworks.ai/blog/self-hosted-vs-api-llm-cost</a></li>
+<li><span id="s47">[S47]</span> General Compute, vLLM vs managed inference APIs (2026-07-08). <a href="https://www.generalcompute.com/blog/vllm-vs-managed-inference-apis-when-to-self-host-vs-pay-as-you-go">https://www.generalcompute.com/blog/vllm-vs-managed-inference-apis-when-to-self-host-vs-pay-as-you-go</a></li>
+<li><span id="s48">[S48]</span> Marka, Self-hosted LLM vs API: cost and security trade-offs for enterprise in 2026. <a href="https://www.marka.net.ua/news/self-hosted-llm-vs-api-the-real-cost-and-security-trade-offs-for-enterprise-in-2026/">https://www.marka.net.ua/news/self-hosted-llm-vs-api-the-real-cost-and-security-trade-offs-for-enterprise-in-2026/</a></li>
+<li><span id="s49">[S49]</span> NVIDIA, Practical security guidance for sandboxing agentic workflows. <a href="https://developer.nvidia.com/blog/practical-security-guidance-for-sandboxing-agentic-workflows-and-managing-execution-risk">https://developer.nvidia.com/blog/practical-security-guidance-for-sandboxing-agentic-workflows-and-managing-execution-risk</a></li>
+<li><span id="s50">[S50]</span> Stride, What are the security risks of AI coding agents? (2026-07-15). <a href="https://www.stride.build/blog/security-risks-of-ai-coding-agents">https://www.stride.build/blog/security-risks-of-ai-coding-agents</a></li>
+<li><span id="s51">[S51]</span> Sophos, Operating inside the lethal trifecta: blast radius reduction in AI agent deployments. <a href="https://www.sophos.com/blog/inside-the-lethal-trifecta-blast-radius-reduction-in-ai-agent-deployments">https://www.sophos.com/blog/inside-the-lethal-trifecta-blast-radius-reduction-in-ai-agent-deployments</a></li>
+<li><span id="s52">[S52]</span> OpenCode architecture map (client/server, agents, MCP). <a href="https://ggprompts.github.io/htmlstyleguides/architecture/opencode/index.html">https://ggprompts.github.io/htmlstyleguides/architecture/opencode/index.html</a></li>
+</ul>

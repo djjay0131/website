@@ -1,0 +1,59 @@
+<h2>The short version</h2>
+<p>A large regulated enterprise that wants to cut the cost of AI coding agents and control the tooling should not try to self-host Claude (the weights are not available) or train its own coding model (downloaded open weights are already far ahead of what in-house training produced a year ago). The evidence points to a different shape:</p>
+<ol>
+<li><strong>Open harness.</strong> Adopt an MIT-licensed harness such as OpenCode, or build a thin one, so the firm can read, change, and govern the agent loop. Claude Code cannot officially be pointed at non-Claude models.</li>
+<li><strong>One gateway.</strong> Put every model behind a firm-owned, OpenAI-compatible gateway with budgets, allowlists, and logging.</li>
+<li><strong>Tiered models.</strong> Keep a frontier model for planning and review. Serve open-weight models on firm GPUs for exploration, edits, test runs, and summaries.</li>
+<li><strong>Trajectory-aware routing.</strong> Route by agent role first, then escalate when the cheap tier shows it is stuck. Prompt-only routers do poorly on coding work.</li>
+<li><strong>Measured savings.</strong> Judge the result by cost per merged change on a private task suite. The best public data point for coding agents is about 35% lower cost at similar quality, with roughly a third of the work leaving the frontier model.</li>
+<li><strong>Controls as product.</strong> Sandboxed execution, default-deny egress, proxied secrets, human merge approval, and an append-only audit log are what make any of this deployable in a regulated firm.</li>
+</ol>
+<h2>What banks do</h2>
+<ul>
+<li>JPMorganChase runs Claude Code in firm-hosted containers with no direct credential access and per-model approval.</li>
+<li>Goldman Sachs fronts several vendors&#39; models with one internal platform and has narrowed coding-agent access to engineers.</li>
+<li>Bank of America reports about 20,000 developers on coding agents and a 15 to 20 percent gain, without naming the tool.</li>
+<li>US model risk guidance was replaced in April 2026 and now leaves generative and agentic AI out of scope, so firms must define their own controls.</li>
+</ul>
+<h2>What the papers say</h2>
+<ul>
+<li>The harness can move a benchmark score by ten points or more, and tokens per solved task by far more. Careful private evaluations show much of that is noise at small sample sizes, so claims need a locked internal suite.</li>
+<li>Open-weight models report 68 to 81 percent on SWE-bench Verified. They fail more on mechanics (tool-call format, timeouts) than on reasoning, so serving and harness configuration matter.</li>
+<li>For coding agents, routing is a cost tool. No learned router reliably beats &quot;always use the best model&quot; on quality; good ones match it at a fraction of the cost.</li>
+<li>Self-hosting pays only at high GPU utilization. A 20,000-developer fleet has the volume; the question is which share of traffic can move.</li>
+</ul>
+<h2>Risks to plan for</h2>
+<p>Cheap mis-routes that cause rework. Idle GPUs. Open-weight provenance and license review. The gateway as a single high-value target (a widely used open-source gateway shipped credential-stealing releases in March 2026). Prompt injection through repositories, tool descriptions, and agent instruction files.</p>
+<h2>Best practices</h2>
+<p><strong>Architecture</strong></p>
+<ul>
+<li>One gateway for all model traffic, with per-team budgets, model allowlists, and full request logging. Pin and hash-verify its dependencies.</li>
+<li>Harness and models are separately replaceable. Nothing in the harness config should assume a vendor.</li>
+<li>Central, signed configuration for agents, permissions, and skills; developers can extend but not weaken it.</li>
+</ul>
+<p><strong>Models</strong></p>
+<ul>
+<li>Maintain an approved-model inventory with license, origin, version hash, evaluation results, and an owner. New models enter through evaluation, as JPMorgan does for Claude releases.</li>
+<li>Serve open weights with a production server (vLLM or equivalent) and the model&#39;s documented tool-call parser. Test tool-call reliability separately from task success.</li>
+<li>Size capacity for utilization, not peak. Idle GPUs are the main way self-hosting loses money.</li>
+</ul>
+<p><strong>Routing</strong></p>
+<ul>
+<li>Default to the conservative tier when unsure. An unnecessary strong-model call is cheaper than a bad cheap-model result that triggers rework.</li>
+<li>Log the routing decision, the signals behind it, and the outcome for every step. That log is the future training set for a learned router.</li>
+<li>Report savings as cost per merged change and token yield, alongside pass rate.</li>
+</ul>
+<p><strong>Security and governance</strong></p>
+<ul>
+<li>Run agents in containers with no standing credentials, workspace-only writes, and default-deny egress.</li>
+<li>Inject secrets through a proxy. Never place them in prompts or environment variables the model can read.</li>
+<li>Require human approval for merges and other high-impact actions; an agent must not approve its own work.</li>
+<li>Keep an append-only audit record: who, which model and version, which tools, which files, which approvals.</li>
+<li>Review MCP servers and skills like any other third-party code.</li>
+</ul>
+<p><strong>Evaluation</strong></p>
+<ul>
+<li>Build a private task suite from internal repositories. Public benchmark scores are contaminated and scaffold-dependent.</li>
+<li>Hold the harness fixed when comparing models and the model fixed when comparing harnesses. Report confidence intervals; ten-point swings from noise are normal at small sample sizes.</li>
+<li>Re-run the suite on every model, harness, or routing change, from code, with pinned versions.</li>
+</ul>

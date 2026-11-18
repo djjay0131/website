@@ -1,0 +1,29 @@
+---
+// Projects llm/plans/2026-11-17-timeline-to-demo.md from the private repository djjay0131/internal-coding-harness
+// (branch research/initial-synthesis, commit 198dfb5), rendered into
+// src/data/internal-coding-harness/plan.html. Edits for publication are listed in
+// the pull request that added this page.
+import Base from "../../../layouts/Base.astro";
+import SynthesisArticle from "../../../components/SynthesisArticle.astro";
+import html from "../../../data/internal-coding-harness/plan.html?raw";
+const base = import.meta.env.BASE_URL;
+const here = `${base}research/internal-coding-harness/`;
+---
+
+<Base
+  annotatable
+  title="Jason Cusati — Internal Agentic Coding Harness: Plan"
+  description="Three-day timeline from research to a working prototype of an internal agentic coding harness, with the cut order if time runs short."
+>
+  <p class="crumbs"><a href={here}>← Internal agentic coding harness</a></p>
+  <h1>Plan: Timeline to Thursday Night</h1>
+  <p class="meta">Plan, 17 November 2026.</p>
+  <SynthesisArticle html={html} />
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .meta { color: var(--color-muted); font-family: var(--font-body); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  :global(.synthesis [id^="s"]:target) { background: var(--color-surface); }
+  :global(.synthesis li a[href^="http"]) { overflow-wrap: anywhere; }
+</style>
