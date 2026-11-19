@@ -288,6 +288,10 @@
     "to": "/research/internal-coding-harness/plan/"
   },
   {
+    "from": "/website/research/internal-coding-harness/results/",
+    "to": "/research/internal-coding-harness/results/"
+  },
+  {
     "from": "/website/research/internal-coding-harness/summary/",
     "to": "/research/internal-coding-harness/summary/"
   },

@@ -1,0 +1,30 @@
+---
+// Projects docs/research/2026-11-19-prototype-results.md from the private repository
+// djjay0131/internal-coding-harness (branch main), rendered into
+// src/data/internal-coding-harness/results.html.
+import Base from "../../../layouts/Base.astro";
+import SynthesisArticle from "../../../components/SynthesisArticle.astro";
+import html from "../../../data/internal-coding-harness/results.html?raw";
+const base = import.meta.env.BASE_URL;
+const here = `${base}research/internal-coding-harness/`;
+---
+
+<Base
+  annotatable
+  title="Jason Cusati — Internal Agentic Coding Harness: Prototype Results"
+  description="Pass rates, estimated cost per verified task, controls and limits from a two-day prototype of an internal agentic coding harness."
+>
+  <p class="crumbs"><a href={here}>← Internal agentic coding harness</a></p>
+  <h1>Prototype Results: What Two Days of Building Showed</h1>
+  <p class="meta">19 November 2026. Small-sample results from scripted runs on synthetic tasks; hardware figures are assumptions. Background is in the <a href={`${here}synthesis/`}>research synthesis</a>.</p>
+  <SynthesisArticle html={html} />
+</Base>
+
+<style>
+  .crumbs { font-size: 0.9rem; margin-bottom: 1rem; }
+  .meta { color: var(--color-muted); font-family: var(--font-body); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  :global(.synthesis [id^="s"]:target) { background: var(--color-surface); }
+  :global(.synthesis li a[href^="http"]) { overflow-wrap: anywhere; }
+  :global(.synthesis table) { border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+  :global(.synthesis th), :global(.synthesis td) { border: 1px solid var(--color-border); padding: 0.4rem 0.6rem; text-align: left; }
+</style>

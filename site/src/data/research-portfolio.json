@@ -81,7 +81,7 @@
         {
           "name": "Internal agentic coding harness",
           "goal": "What a large regulated enterprise needs to know before it brings an agentic coding tool in house and runs it against models it controls.",
-          "status": "Research synthesis, summary and timeline published (52 sources, 17 November 2026). The repository is private.",
+          "status": "Research synthesis, summary, timeline and first prototype results published (52 sources; results 19 November 2026). The repository is private.",
           "href": "/research/internal-coding-harness/",
           "repo": "internal-coding-harness",
           "public": true

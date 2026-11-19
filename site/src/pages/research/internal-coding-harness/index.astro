@@ -5,6 +5,7 @@
 //   docs/research/2026-11-17-research-synthesis.md  -> synthesis/
 //   docs/research/2026-11-17-summary.md (+ synthesis §5) -> summary/
 //   llm/plans/2026-11-17-timeline-to-demo.md        -> plan/
+//   docs/research/2026-11-19-prototype-results.md (branch main) -> results/
 // The rendered fragments live in src/data/internal-coding-harness/.
 import Base from "../../../layouts/Base.astro";
 const base = import.meta.env.BASE_URL;
@@ -38,6 +39,11 @@ const project = `${base}research/internal-coding-harness/`;
       <span class="card-desc">The short version of the report, followed by the best-practice checklist.</span>
       <span class="card-meta">summary · 17 November 2026</span>
     </a>
+    <a class="card" href={`${project}results/`}>
+      <span class="card-title">Prototype results</span>
+      <span class="card-desc">Pass rates by model size, estimated cost per verified task, the controls that held, and the limits of a two-day build.</span>
+      <span class="card-meta">results · 19 November 2026</span>
+    </a>
     <a class="card" href={`${project}plan/`}>
       <span class="card-title">Plan: timeline to demo</span>
       <span class="card-desc">The three-day schedule from research to a working prototype, and the cut order if time runs short.</span>
@@ -48,8 +54,8 @@ const project = `${base}research/internal-coding-harness/`;
   <h2>Status</h2>
   <p>
     The research synthesis, summary and timeline were written on 17 November
-    2026. Nothing in the report has been measured yet; the
-    prototype's evaluation is meant to supply the first numbers. The source
+    2026. The prototype's evaluation supplied the first numbers on 19 November
+    2026; they are small-sample and rest on assumed hardware. The source
     repository is private.
   </p>
 </Base>
