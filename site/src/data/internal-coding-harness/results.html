@@ -1,0 +1,36 @@
+<h2>Setup</h2>
+<p>An open agent loop (OpenCode) runs inside a sandbox and reaches models only through a gateway we own. A separate verifier grades each patch on a fresh copy with tests the agent never sees. Tasks are synthetic: ten routine changes to a small Python service and three harder ones written to defeat the obvious solution. Models are open-weight, served from a shared university endpoint.</p>
+<h2>Pass rates</h2>
+<table>
+<thead><tr><th>Task set</th><th>Small model first</th><th>Mid-size model first</th><th>Largest open model only</th></tr></thead>
+<tbody>
+<tr><td>Routine (10 tasks)</td><td>10 of 10, no escalation</td><td>10 of 10, no escalation</td><td>7 of 10</td></tr>
+<tr><td>Hard (3 tasks, 3 seeds)</td><td>8 of 9, 4 escalations</td><td>9 of 9, no escalation</td><td>2 of 3 (1 seed)</td></tr>
+</tbody>
+</table>
+<p>The largest model's misses were mostly timeouts. On this endpoint its problem was latency, not wrong answers.</p>
+<h2>Cost</h2>
+<p>Estimated serving cost per verified task, at 50 percent utilisation, on assumed hardware:</p>
+<table>
+<thead><tr><th>Task set</th><th>Small first</th><th>Mid-size first</th></tr></thead>
+<tbody>
+<tr><td>Routine</td><td>$0.022</td><td>$0.040</td></tr>
+<tr><td>Hard</td><td>$0.097</td><td>$0.070</td></tr>
+</tbody>
+</table>
+<p>Three things follow.</p>
+<ol>
+<li>Model size is the cost lever. Cost per task scales with the GPUs a model needs, and the smallest model that passes verification wins.</li>
+<li>Hosting is not. Our estimate for serving an open model ourselves lands near or above that model's hosted API price. The reason to host is control over data and change, not unit cost.</li>
+<li>Routing needs a difficulty signal. Small-first was cheapest on routine work and most expensive on hard work, because failed first attempts are paid for. Escalation rescued every failure, so the safety net works. Knowing when to skip the small model is the open problem.</li>
+</ol>
+<h2>Controls that held</h2>
+<ul>
+<li>A hash-chained audit log that detects a one-line edit.</li>
+<li>Approval bound to the exact patch, base, checks and policy revision; a one-byte change is refused.</li>
+<li>Governance levels as policy: a higher-risk change is held to the strong tier and to owner approval, and a patch that passes its tests but files a design document in the wrong place fails verification.</li>
+<li>Optional network isolation: the agent reaches the gateway and nothing else.</li>
+<li>A plan loop for larger work: six dependent features built and verified in order, each on the verified result of the last.</li>
+</ul>
+<h2>Limits</h2>
+<p>One language, one small service, tasks we wrote. Hardware figures are assumptions. No frontier model was run on these tasks, so any comparison with hosted frontier prices is a price comparison, not a measured saving. Network isolation was shown on one host.</p>

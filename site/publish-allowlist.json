@@ -31,6 +31,7 @@
     { "source": "hub", "slug": "research/internal-coding-harness" },
     { "source": "hub", "slug": "research/internal-coding-harness/synthesis" },
     { "source": "hub", "slug": "research/internal-coding-harness/summary" },
-    { "source": "hub", "slug": "research/internal-coding-harness/plan" }
+    { "source": "hub", "slug": "research/internal-coding-harness/plan" },
+    { "source": "hub", "slug": "research/internal-coding-harness/results" }
   ]
 }
